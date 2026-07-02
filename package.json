@@ -1,0 +1,36 @@
+{
+  "name": "cssomnom",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "import": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "scripts": {
+    "build": "tsup",
+    "publish:local": "pnpm run build && if [ -n \"$GUIDANCE_DIR\" ]; then mkdir -p \"$GUIDANCE_DIR/lib/third_party/cssomnom/\" && cp dist/* README.md LICENSE \"$GUIDANCE_DIR/lib/third_party/cssomnom/\"; else echo \"Error: GUIDANCE_DIR environment variable is not set.\"; exit 1; fi",
+    "test": "pnpm run preflight",
+    "test:node": "node --test --test-reporter=dot 'tests/**/*.ts'",
+    "typecheck": "tsc --noEmit",
+    "preflight": "pnpm typecheck && pnpm lint && pnpm test:node",
+    "lint": "oxlint",
+    "fixtures:generate": "node scripts/wpt_generate_fixtures.ts",
+    "submodules:update": "git submodule update --init --recursive",
+    "codegen": "node scripts/generate_all.ts",
+    "maintain": "pnpm update --latest && pnpm run submodules:update && pnpm run codegen && pnpm run fixtures:generate && pnpm run preflight"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@webref/css": "^8.5.8",
+    "linkedom": "^0.18.12",
+    "mdn-data": "^2.28.1",
+    "oxlint": "^1.68.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3"
+  }
+}

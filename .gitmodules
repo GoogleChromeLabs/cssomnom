@@ -1,0 +1,30 @@
+[submodule "tests/web-platform-tests"]
+	path = submodules/web-platform-tests
+	url = https://github.com/web-platform-tests/wpt.git
+[submodule "submodules/csswg-drafts"]
+	path = submodules/csswg-drafts
+	url = https://github.com/w3c/csswg-drafts.git
+[submodule "submodules/CSSOM"]
+	path = submodules/CSSOM
+	url = https://github.com/NV/CSSOM
+[submodule "submodules/csstree"]
+	path = submodules/csstree
+	url = https://github.com/csstree/csstree
+[submodule "submodules/postcss"]
+	path = submodules/postcss
+	url = https://github.com/postcss/postcss
+[submodule "submodules/postcss-parser-tests"]
+	path = submodules/postcss-parser-tests
+	url = https://github.com/postcss/postcss-parser-tests
+[submodule "submodules/css-houdini-drafts"]
+	path = submodules/css-houdini-drafts
+	url = https://github.com/w3c/css-houdini-drafts
+[submodule "submodules/rrweb-cssom"]
+	path = submodules/rrweb-cssom
+	url = https://github.com/rrweb-io/CSSOM
+[submodule "submodules/lightningcss"]
+	path = submodules/lightningcss
+	url = https://github.com/parcel-bundler/lightningcss
+[submodule "submodules/css-typed-om-polyfill"]
+	path = submodules/css-typed-om-polyfill
+	url = https://github.com/bramus/css-typed-om-polyfill

@@ -1,0 +1,2131 @@
+{
+  "atPropertyRules": [
+    {
+      "name": "--valid",
+      "syntax": "<color> | none",
+      "inherits": false,
+      "initialValue": "red",
+      "input": "@property --valid {\n    syntax: \"<color> | none\";\n    inherits: false;\n    initial-value: red;\n  }",
+      "expected": {
+        "cssText": "@property --valid {syntax: \"<color> | none\"; inherits: false;initial-value: red;}",
+        "syntax": "<color> | none",
+        "inherits": false,
+        "initialValue": "red",
+        "valid": true
+      }
+    },
+    {
+      "name": "--valid-reverse",
+      "syntax": "<length>",
+      "inherits": true,
+      "initialValue": "0px",
+      "input": "@property --valid-reverse {\n    initial-value: 0px;\n    inherits: true;\n    syntax: \"<length>\";\n  }",
+      "expected": {
+        "cssText": "@property --valid-reverse {syntax: \"<length>\"; inherits: true;initial-value: 0px;}",
+        "syntax": "<length>",
+        "inherits": true,
+        "initialValue": "0px",
+        "valid": true
+      }
+    },
+    {
+      "name": "--valid-universal",
+      "syntax": "*",
+      "inherits": false,
+      "input": "@property --valid-universal {\n    syntax: \"*\";\n    inherits: false;\n  }",
+      "expected": {
+        "cssText": "@property --valid-universal {syntax: \"*\"; inherits: false;}",
+        "syntax": "*",
+        "inherits": false,
+        "valid": true
+      }
+    },
+    {
+      "name": "--valid-whitespace",
+      "syntax": " <color># ",
+      "inherits": false,
+      "initialValue": "red, blue",
+      "input": "@property --valid-whitespace {\n    syntax: \" <color># \";\n    inherits: false;\n    initial-value: red, blue;\n  }",
+      "expected": {
+        "cssText": "@property --valid-whitespace {syntax: \" <color># \"; inherits: false;initial-value: red, blue;}",
+        "syntax": " <color># ",
+        "inherits": false,
+        "initialValue": "red, blue",
+        "valid": true
+      }
+    },
+    {
+      "name": "--vALId",
+      "syntax": "<color> | none",
+      "inherits": false,
+      "initialValue": "red",
+      "input": "@property --vALId {\n    syntax: \"<color> | none\";\n    inherits: false;\n    initial-value: red;\n  }",
+      "expected": {
+        "cssText": "@property --vALId {syntax: \"<color> | none\"; inherits: false;initial-value: red;}",
+        "syntax": "<color> | none",
+        "inherits": false,
+        "initialValue": "red",
+        "valid": true
+      }
+    },
+    {
+      "name": "--no-descriptors",
+      "inherits": false,
+      "input": "@property --no-descriptors {\n\n  }",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "name": "--no-syntax",
+      "inherits": false,
+      "initialValue": "red",
+      "input": "@property --no-syntax {\n    inherits: false;\n    initial-value: red;\n  }",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "name": "--no-inherits",
+      "syntax": "<color> | none",
+      "inherits": false,
+      "initialValue": "red",
+      "input": "@property --no-inherits {\n    syntax: \"<color> | none\";\n    initial-value: red;\n  }",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "name": "--no-initial-color-value",
+      "syntax": "<color> | none",
+      "inherits": false,
+      "input": "@property --no-initial-color-value {\n    syntax: \"<color> | none\";\n    inherits: false;\n  }",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "name": "--no-initial-universal-value",
+      "syntax": "*",
+      "inherits": false,
+      "input": "@property --no-initial-universal-value {\n    syntax: \"*\";\n    inherits: false;\n  }",
+      "expected": {
+        "cssText": "@property --no-initial-universal-value {syntax: \"*\"; inherits: false;}",
+        "syntax": "*",
+        "inherits": false,
+        "valid": true
+      }
+    },
+    {
+      "name": "--syntax-only",
+      "syntax": "<color> | none",
+      "inherits": false,
+      "input": "@property --syntax-only {\n    syntax: \"<color> | none\";\n  }",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "name": "--inherits-only",
+      "inherits": true,
+      "input": "@property --inherits-only {\n    inherits: true;\n  }",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "name": "--initial-value-only",
+      "inherits": false,
+      "initialValue": "red",
+      "input": "@property --initial-value-only {\n    initial-value: red;\n  }",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "foo(){}",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "foo(){}"
+      }
+    },
+    {
+      "syntax": "<angle>",
+      "initialValue": "42deg",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "42deg"
+      }
+    },
+    {
+      "syntax": "<angle>",
+      "initialValue": "1turn",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "360deg"
+      }
+    },
+    {
+      "syntax": "<color>",
+      "initialValue": "green",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "rgb(0, 128, 0)"
+      }
+    },
+    {
+      "syntax": "<color>",
+      "initialValue": "rgb(1, 2, 3)",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "rgb(1, 2, 3)"
+      }
+    },
+    {
+      "syntax": "<image>",
+      "initialValue": "url(\"http://a/\")",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "url(\"http://a/\")"
+      }
+    },
+    {
+      "syntax": "<integer>",
+      "initialValue": "5",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "5"
+      }
+    },
+    {
+      "syntax": "<length-percentage>",
+      "initialValue": "10px",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "10px"
+      }
+    },
+    {
+      "syntax": "<length-percentage>",
+      "initialValue": "10%",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "10%"
+      }
+    },
+    {
+      "syntax": "<length-percentage>",
+      "initialValue": "calc(10% + 10px)",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "calc(10% + 10px)"
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "10px",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "10px"
+      }
+    },
+    {
+      "syntax": "<number>",
+      "initialValue": "2.5",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "2.5"
+      }
+    },
+    {
+      "syntax": "<percentage>",
+      "initialValue": "10%",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "10%"
+      }
+    },
+    {
+      "syntax": "<resolution>",
+      "initialValue": "50dppx",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "50dppx"
+      }
+    },
+    {
+      "syntax": "<resolution>",
+      "initialValue": "96dpi",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "1dppx"
+      }
+    },
+    {
+      "syntax": "<time>",
+      "initialValue": "10s",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "10s"
+      }
+    },
+    {
+      "syntax": "<time>",
+      "initialValue": "1000ms",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "1s"
+      }
+    },
+    {
+      "syntax": "<transform-function>",
+      "initialValue": "rotateX(0deg)",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "rotateX(0deg)"
+      }
+    },
+    {
+      "syntax": "<transform-list>",
+      "initialValue": "rotateX(0deg)",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "rotateX(0deg)"
+      }
+    },
+    {
+      "syntax": "<transform-list>",
+      "initialValue": "rotateX(0deg) translateX(10px)",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "rotateX(0deg) translateX(10px)"
+      }
+    },
+    {
+      "syntax": "<url>",
+      "initialValue": "url(\"http://a/\")",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "url(\"http://a/\")"
+      }
+    },
+    {
+      "syntax": "<color>",
+      "initialValue": "tomato",
+      "inherits": false,
+      "expected": {
+        "valid": true,
+        "computedValue": "rgb(255, 99, 71)"
+      }
+    },
+    {
+      "syntax": "<color>",
+      "initialValue": "tomato",
+      "inherits": true,
+      "expected": {
+        "valid": true,
+        "computedValue": "rgb(255, 99, 71)"
+      }
+    },
+    {
+      "syntax": "<gandalf>",
+      "initialValue": "grey",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "gandalf",
+      "initialValue": "grey",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<color>",
+      "initialValue": "notacolor",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "10em",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<transform-function>",
+      "initialValue": "translateX(1em)",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<transform-function>",
+      "initialValue": "translateY(1lh)",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<transform-list>",
+      "initialValue": "rotate(10deg) translateX(1em)",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<transform-list>",
+      "initialValue": "rotate(10deg) translateY(1lh)",
+      "inherits": false,
+      "expected": {
+        "valid": false
+      }
+    }
+  ],
+  "registerProperty": [
+    {
+      "syntax": "<color>",
+      "expected": {
+        "valid": true,
+        "syntax": "<color>"
+      }
+    },
+    {
+      "syntax": "<color> | none",
+      "expected": {
+        "valid": true,
+        "syntax": "<color> | none"
+      }
+    },
+    {
+      "syntax": "<color># | <image> | none",
+      "expected": {
+        "valid": true,
+        "syntax": "<color># | <image> | none"
+      }
+    },
+    {
+      "syntax": "foo | <length>#",
+      "expected": {
+        "valid": true,
+        "syntax": "foo | <length>#"
+      }
+    },
+    {
+      "syntax": "foo | bar | baz",
+      "expected": {
+        "valid": true,
+        "syntax": "foo | bar | baz"
+      }
+    },
+    {
+      "syntax": "notasyntax",
+      "expected": {
+        "valid": true,
+        "syntax": "notasyntax"
+      }
+    },
+    {
+      "syntax": "red",
+      "expected": {
+        "valid": true,
+        "syntax": "red"
+      }
+    },
+    {
+      "syntax": "rgb(255, 0, 0)",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "syntax": "<color>",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "syntax": "foo | bar",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "syntax": "foo bar",
+      "initial-value": "foo bar",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "syntax": "Foo <length>",
+      "initial-value": "Foo 42px",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "syntax": "foo, bar",
+      "initial-value": "foo, bar",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "syntax": "<length> <percentage>",
+      "initial-value": "42px 100%",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "syntax": "|<length>",
+      "initial-value": "42px",
+      "expected": {
+        "valid": false,
+        "syntax": null
+      }
+    },
+    {
+      "initialValue": "10px",
+      "expected": {
+        "valid": true,
+        "initialValue": "10px"
+      }
+    },
+    {
+      "initialValue": "rgb(1, 2, 3)",
+      "expected": {
+        "valid": true,
+        "initialValue": "rgb(1, 2, 3)"
+      }
+    },
+    {
+      "initialValue": "red",
+      "expected": {
+        "valid": true,
+        "initialValue": "red"
+      }
+    },
+    {
+      "initialValue": "foo",
+      "expected": {
+        "valid": true,
+        "initialValue": "foo"
+      }
+    },
+    {
+      "initialValue": "foo(){}",
+      "expected": {
+        "valid": true,
+        "initialValue": "foo(){}"
+      }
+    },
+    {
+      "initialValue": "3em",
+      "syntax": "\"<length>\"",
+      "expected": {
+        "valid": false,
+        "initialValue": null
+      }
+    },
+    {
+      "initialValue": "var(--x)",
+      "expected": {
+        "valid": false,
+        "initialValue": null
+      }
+    },
+    {
+      "inherits": "true",
+      "expected": {
+        "valid": true,
+        "inherits": "true"
+      }
+    },
+    {
+      "inherits": "false",
+      "expected": {
+        "valid": true,
+        "inherits": "false"
+      }
+    },
+    {
+      "inherits": "none",
+      "expected": {
+        "valid": false,
+        "inherits": null
+      }
+    },
+    {
+      "inherits": "0",
+      "expected": {
+        "valid": false,
+        "inherits": null
+      }
+    },
+    {
+      "inherits": "1",
+      "expected": {
+        "valid": false,
+        "inherits": null
+      }
+    },
+    {
+      "inherits": "true",
+      "expected": {
+        "valid": false,
+        "inherits": null
+      }
+    },
+    {
+      "inherits": "false",
+      "expected": {
+        "valid": false,
+        "inherits": null
+      }
+    },
+    {
+      "inherits": "calc(0)",
+      "expected": {
+        "valid": false,
+        "inherits": null
+      }
+    },
+    {
+      "name": "--name1",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--name2, no need for escapes",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "['--name', 3]",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "no-leading-dash",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "\\\\--name",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--syntax-test-1",
+      "syntax": "*",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--syntax-test-2",
+      "syntax": " * ",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--syntax-test-3",
+      "syntax": "length",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--re-register",
+      "syntax": "<length>",
+      "initialValue": "0px",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--re-register",
+      "syntax": "<percentage>",
+      "initialValue": "0%",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--inherit-test-1",
+      "syntax": "<length>",
+      "initialValue": "0px",
+      "inherits": true,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--inherit-test-2",
+      "syntax": "<length>",
+      "initialValue": "0px",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "--inherit-test-3",
+      "syntax": "<length>",
+      "initialValue": "0px",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "name",
+      "syntax": "<color>",
+      "initialValue": "red",
+      "inherits": false,
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "expected": {
+        "valid": false,
+        "error": "TypeError"
+      }
+    },
+    {
+      "name": "no-leading-dash",
+      "inherits": false,
+      "expected": {
+        "valid": false,
+        "error": "\"SyntaxError\""
+      }
+    },
+    {
+      "inherits": false,
+      "expected": {
+        "valid": false,
+        "error": "\"SyntaxError\""
+      }
+    },
+    {
+      "name": "\\\\--name",
+      "inherits": false,
+      "expected": {
+        "valid": false,
+        "error": "\"SyntaxError\""
+      }
+    },
+    {
+      "name": "--syntax-test-3",
+      "syntax": "length",
+      "inherits": false,
+      "expected": {
+        "valid": false,
+        "error": "\"SyntaxError\""
+      }
+    },
+    {
+      "name": "--re-register",
+      "syntax": "<percentage>",
+      "initialValue": "0%",
+      "inherits": false,
+      "expected": {
+        "valid": false,
+        "error": "'InvalidModificationError'"
+      }
+    },
+    {
+      "name": "--inherit-test-3",
+      "syntax": "<length>",
+      "initialValue": "0px",
+      "expected": {
+        "valid": false,
+        "error": "TypeError"
+      }
+    }
+  ],
+  "syntaxParsing": [
+    {
+      "syntax": "--foo",
+      "initialValue": "--foo",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "--foo | <color>",
+      "initialValue": "--foo",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "--foo | <color>",
+      "initialValue": "red",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "--foo+",
+      "initialValue": "--foo --foo",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "--a | --b | --c",
+      "initialValue": "--b",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "a",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": " * ",
+      "initialValue": "b",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "2px",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": " <number>",
+      "initialValue": "5",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<percentage> ",
+      "initialValue": "10%",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>+",
+      "initialValue": "red",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": " <length>+ | <percentage>",
+      "initialValue": "2px 8px",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": " <length>+ | <color>#",
+      "initialValue": "red, blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<length>|<percentage>|<length-percentage>",
+      "initialValue": "2px",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color> | <image> | <url> | <integer> | <angle>",
+      "initialValue": "red",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<time> | <resolution> | <transform-list> | <custom-ident>",
+      "initialValue": "red",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "\\t<color>\\n|   foo",
+      "initialValue": "foo",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": ":> hello",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "yep 'this is valid too'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "unmatched opening bracket is valid :(",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "\"",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "default",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "0",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "7.1e-4cm",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<percentage>",
+      "initialValue": "-9.3e3%",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<length-percentage>",
+      "initialValue": "-54%",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<length-percentage>",
+      "initialValue": "0",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "10vmin",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<number>",
+      "initialValue": "-109",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<number>",
+      "initialValue": "2.3e4",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>",
+      "initialValue": "-109",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>",
+      "initialValue": "19",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<angle>",
+      "initialValue": "10deg",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<angle>",
+      "initialValue": "20.5rad",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<time>",
+      "initialValue": "2s",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<resolution>",
+      "initialValue": "10dpi",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<resolution>",
+      "initialValue": "3dPpX",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<transform-function>|<integer>",
+      "initialValue": "5",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "'foo bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": " 'foo bar' ",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "'foo bar",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "'\"foo\" bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "\"bar baz\"",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "\"bar 'baz'\"",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "\"bar 'baz'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>+",
+      "initialValue": "'foo' 'bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>#",
+      "initialValue": "'foo', 'bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>+ | <string>#",
+      "initialValue": "'foo' 'bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>+ | <string>#",
+      "initialValue": " 'foo' 'bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>+ | <string>#",
+      "initialValue": "'foo' \"bar\"",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string>+ | <string>#",
+      "initialValue": "'foo' \"bar",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string># | <string>+",
+      "initialValue": "'foo', 'bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string># | <string>+",
+      "initialValue": "'foo', 'bar' ",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string># | <string>+",
+      "initialValue": "\"foo\", 'bar'",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<string># | <string>+",
+      "initialValue": "\"foo\", 'bar",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>",
+      "initialValue": "lightgoldenrodyellow",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>+",
+      "initialValue": "yellow blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>+",
+      "initialValue": "yellow blue ",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>+ | <color>",
+      "initialValue": "yellow blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color> | <color>+",
+      "initialValue": "yellow blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color># | <color>",
+      "initialValue": "yellow, blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color> | <color>#",
+      "initialValue": "yellow, blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color># | <color>+",
+      "initialValue": "yellow blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>+ | <color>#",
+      "initialValue": "yellow, blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>+ | yellow",
+      "initialValue": "yellow blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "yellow",
+      "initialValue": "yellow",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "yellow | <color>+",
+      "initialValue": "yellow blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color># | yellow",
+      "initialValue": "yellow, blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "yellow | <color>#",
+      "initialValue": "yellow, blue",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1 1",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1%",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1% 1%",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1px",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1px 1px",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "banana",
+      "initialValue": "banana",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "bAnAnA",
+      "initialValue": "bAnAnA",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "ba-na-nya",
+      "initialValue": "ba-na-nya",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "banana",
+      "initialValue": "banan\\\\61",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "banan\\\\61",
+      "initialValue": "banana",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<custom-ident>",
+      "initialValue": "banan\\\\61",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "big | bigger | BIGGER",
+      "initialValue": "bigger",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "foo+|bar",
+      "initialValue": "foo foo foo",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "banana\\t",
+      "initialValue": "banana",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "\\nbanana\\r\\n",
+      "initialValue": "banana",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "ba\\f\\n|\\tna\\r|nya",
+      "initialValue": "nya",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "initialValue": "null",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "initialValue": "undefined",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "[\"array\"]",
+      "initialValue": "array",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "\\\\1F914",
+      "initialValue": "🤔",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "hmm\\\\1F914",
+      "initialValue": "hmm🤔",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "\\\\1F914hmm",
+      "initialValue": "🤔hmm",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "\\\\1F914 hmm",
+      "initialValue": "🤔hmm",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "\\\\1F914\\\\1F914",
+      "initialValue": "🤔🤔",
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "syntax": "<color>#",
+      "initialValue": "yellow blue",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "\"banana",
+      "initialValue": "nya\", \"banana\"",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<\\\\6c ength>",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<banana>",
+      "initialValue": "banana",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<Number>",
+      "initialValue": "10",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<LENGTH>",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "< length>",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length >",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length> +",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>++",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>##",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>+#",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>#+",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length> | *",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*|banana",
+      "initialValue": "banana",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "|banana",
+      "initialValue": "banana",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*+",
+      "initialValue": "banana",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "|",
+      "initialValue": "banana",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": " |",
+      "initialValue": "banana",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "||",
+      "initialValue": "banana",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "foo bar",
+      "initialValue": "foo bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "foo foo foo",
+      "initialValue": "foo foo foo",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "foo § bar",
+      "initialValue": "foo § bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "foo \\\\1F914 bar",
+      "initialValue": "foo \\\\1F914 bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length> <number>",
+      "initialValue": "0px 0",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length> <length> <length>",
+      "initialValue": "0px 0px 0px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1 1%",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1% 1",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1px 1",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1 1px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1px 1%",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>+ | <percentage>+ | <length>+ ",
+      "initialValue": "1% 1px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "initial",
+      "initialValue": "initial",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "inherit",
+      "initialValue": "inherit",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "unset",
+      "initialValue": "unset",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "revert",
+      "initialValue": "revert",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "revert-layer",
+      "initialValue": "revert-layer",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "default",
+      "initialValue": "default",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>|initial",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>|INHERIT",
+      "initialValue": "10px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<percentage>|unsEt",
+      "initialValue": "2%",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<color>|REVert",
+      "initialValue": "red",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>|deFAUlt",
+      "initialValue": "1",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "initial",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "inherit",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "unset",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "revert",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "revert-layer",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>",
+      "initialValue": "initial",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>",
+      "initialValue": "inherit",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>",
+      "initialValue": "unset",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>",
+      "initialValue": "revert",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>",
+      "initialValue": "revert-layer",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>",
+      "initialValue": "default",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>+",
+      "initialValue": "foo initial bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>+",
+      "initialValue": "foo inherit bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>+",
+      "initialValue": "foo unset bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>+",
+      "initialValue": "foo revert bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>+",
+      "initialValue": "foo revert-layer bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<custom-ident>+",
+      "initialValue": "foo default bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "whee!",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "\"\\n",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "*",
+      "initialValue": "semi;colon",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "banana",
+      "initialValue": "bAnAnA",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "10",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "10%",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "10em",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>+",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>#",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<length>",
+      "initialValue": "10px;",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<percentage>",
+      "initialValue": "0",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>",
+      "initialValue": "1.0",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<integer>",
+      "initialValue": "1e0",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "Foo | bar",
+      "initialValue": "foo",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "Foo | bar",
+      "initialValue": "Bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<angle>",
+      "initialValue": "0",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<angle>",
+      "initialValue": "10%",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<time>",
+      "initialValue": "2px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<resolution>",
+      "initialValue": "10",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<resolution>",
+      "initialValue": "-5.3dpcm",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<color>",
+      "initialValue": "fancy-looking",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<image>",
+      "initialValue": "banana.png",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<url>",
+      "initialValue": "banana.png",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "foo bar'",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "foo bar\"",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "\"foo\" bar",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "'foo' 2px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "foo",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "1",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>",
+      "initialValue": "1px",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>+",
+      "initialValue": "foo 'bar'",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string>#",
+      "initialValue": "foo, 'bar'",
+      "expected": {
+        "valid": false
+      }
+    },
+    {
+      "syntax": "<string># | <string>+",
+      "initialValue": "foo', 'bar'",
+      "expected": {
+        "valid": false
+      }
+    }
+  ]
+}

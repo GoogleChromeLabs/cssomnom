@@ -1,0 +1,1081 @@
+[
+  {
+    "name": "empty",
+    "input": "",
+    "result": {
+      "type": "StyleSheet",
+      "children": []
+    }
+  },
+  {
+    "name": "whitespace only",
+    "input": "  ",
+    "result": {
+      "type": "StyleSheet",
+      "children": []
+    }
+  },
+  {
+    "name": "comment only",
+    "input": "/* no css */",
+    "result": {
+      "type": "StyleSheet",
+      "children": []
+    }
+  },
+  {
+    "name": "comment and whitespaces only",
+    "input": "  /* no css */  ",
+    "result": {
+      "type": "StyleSheet",
+      "children": []
+    }
+  },
+  {
+    "name": "BOM UTF-16BE",
+    "input": "﻿",
+    "result": {
+      "type": "StyleSheet",
+      "children": []
+    }
+  },
+  {
+    "name": "BOM UTF-16BE #2",
+    "input": "﻿@a;",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Atrule",
+          "name": "a",
+          "prelude": null,
+          "block": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "BOM UTF-16LE",
+    "input": "￾",
+    "result": {
+      "type": "StyleSheet",
+      "children": []
+    }
+  },
+  {
+    "name": "BOM UTF-16LE #2",
+    "input": "￾@a;",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Atrule",
+          "name": "a",
+          "prelude": null,
+          "block": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "issue111.test1",
+    "input": "body:not([x|x]) {}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "body"
+                  },
+                  {
+                    "type": "PseudoClassSelector",
+                    "name": "not",
+                    "children": [
+                      {
+                        "type": "SelectorList",
+                        "children": [
+                          {
+                            "type": "Selector",
+                            "children": [
+                              {
+                                "type": "AttributeSelector",
+                                "name": {
+                                  "type": "Identifier",
+                                  "name": "x|x"
+                                },
+                                "matcher": null,
+                                "value": null,
+                                "flags": null
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": []
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "issue90.test1",
+    "input": "@media test {\n    @page {\n        p: v;\n    }\n}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Atrule",
+          "name": "media",
+          "prelude": {
+            "type": "AtrulePrelude",
+            "children": [
+              {
+                "type": "MediaQueryList",
+                "children": [
+                  {
+                    "type": "MediaQuery",
+                    "modifier": null,
+                    "mediaType": "test",
+                    "condition": null
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Atrule",
+                "name": "page",
+                "prelude": null,
+                "block": {
+                  "type": "Block",
+                  "children": [
+                    {
+                      "type": "Declaration",
+                      "important": false,
+                      "property": "p",
+                      "value": {
+                        "type": "Value",
+                        "children": [
+                          {
+                            "type": "Identifier",
+                            "name": "v"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "issue90.test2",
+    "input": "x {\n    p:v;\n}\n\n@media test {\n    a {\n        p:v;\n    }\n\n    /* comment */\n\n    @page {\n        p: v;\n    }\n\n    b {\n        p:v;\n    }\n}\n\ny {\n    p:v;\n}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "x"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Atrule",
+          "name": "media",
+          "prelude": {
+            "type": "AtrulePrelude",
+            "children": [
+              {
+                "type": "MediaQueryList",
+                "children": [
+                  {
+                    "type": "MediaQuery",
+                    "modifier": null,
+                    "mediaType": "test",
+                    "condition": null
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Rule",
+                "prelude": {
+                  "type": "SelectorList",
+                  "children": [
+                    {
+                      "type": "Selector",
+                      "children": [
+                        {
+                          "type": "TypeSelector",
+                          "name": "a"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "block": {
+                  "type": "Block",
+                  "children": [
+                    {
+                      "type": "Declaration",
+                      "important": false,
+                      "property": "p",
+                      "value": {
+                        "type": "Value",
+                        "children": [
+                          {
+                            "type": "Identifier",
+                            "name": "v"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "Atrule",
+                "name": "page",
+                "prelude": null,
+                "block": {
+                  "type": "Block",
+                  "children": [
+                    {
+                      "type": "Declaration",
+                      "important": false,
+                      "property": "p",
+                      "value": {
+                        "type": "Value",
+                        "children": [
+                          {
+                            "type": "Identifier",
+                            "name": "v"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "Rule",
+                "prelude": {
+                  "type": "SelectorList",
+                  "children": [
+                    {
+                      "type": "Selector",
+                      "children": [
+                        {
+                          "type": "TypeSelector",
+                          "name": "b"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "block": {
+                  "type": "Block",
+                  "children": [
+                    {
+                      "type": "Declaration",
+                      "important": false,
+                      "property": "p",
+                      "value": {
+                        "type": "Value",
+                        "children": [
+                          {
+                            "type": "Identifier",
+                            "name": "v"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "y"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.0",
+    "input": "s{p:v}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.1",
+    "input": "s0{p0:v0}s1{p1:v1}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s0"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p0",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v0"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s1"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p1",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v1"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.2",
+    "input": "@test;",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Atrule",
+          "name": "test",
+          "prelude": null,
+          "block": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.3",
+    "input": "@test0;@test1;",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Atrule",
+          "name": "test0",
+          "prelude": null,
+          "block": null
+        },
+        {
+          "type": "Atrule",
+          "name": "test1",
+          "prelude": null,
+          "block": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.4",
+    "input": "s{p:v}@test;",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Atrule",
+          "name": "test",
+          "prelude": null,
+          "block": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.c.0",
+    "input": "/* test */\ns {\n    p: v\n}\n/* test */",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.s.0",
+    "input": "s {\n    p: v\n}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.s.1",
+    "input": "s0 {\n    p0: v0\n}\n\ns1 {\n    p1: v1\n}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s0"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p0",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v0"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s1"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p1",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v1"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.s.2",
+    "input": "@test0;\n@test1;",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Atrule",
+          "name": "test0",
+          "prelude": null,
+          "block": null
+        },
+        {
+          "type": "Atrule",
+          "name": "test1",
+          "prelude": null,
+          "block": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "stylesheet.s.3",
+    "input": "s {\n    p:v\n}\n\n@test;",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "s"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "p",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "v"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Atrule",
+          "name": "test",
+          "prelude": null,
+          "block": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "issue #250",
+    "input": "@x {\n  unicode-range: U+2074, U+20AC, U+2212, U+2215, U+E0FF;\n}\n@x {\n  a: a();\n}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Atrule",
+          "name": "x",
+          "prelude": null,
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "unicode-range",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "UnicodeRange",
+                      "value": "U+2074"
+                    },
+                    {
+                      "type": "Operator",
+                      "value": ","
+                    },
+                    {
+                      "type": "UnicodeRange",
+                      "value": "U+20AC"
+                    },
+                    {
+                      "type": "Operator",
+                      "value": ","
+                    },
+                    {
+                      "type": "UnicodeRange",
+                      "value": "U+2212"
+                    },
+                    {
+                      "type": "Operator",
+                      "value": ","
+                    },
+                    {
+                      "type": "UnicodeRange",
+                      "value": "U+2215"
+                    },
+                    {
+                      "type": "Operator",
+                      "value": ","
+                    },
+                    {
+                      "type": "UnicodeRange",
+                      "value": "U+E0FF"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Atrule",
+          "name": "x",
+          "prelude": null,
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "a",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Function",
+                      "name": "a",
+                      "children": []
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "name": "CDO",
+    "input": "<!--",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "CDO"
+        }
+      ]
+    }
+  },
+  {
+    "name": "CDC",
+    "input": "-->",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "CDC"
+        }
+      ]
+    }
+  },
+  {
+    "name": "CDO/CDC",
+    "input": "<!--a{}-->",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "CDO"
+        },
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "TypeSelector",
+                    "name": "a"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": []
+          }
+        },
+        {
+          "type": "CDC"
+        }
+      ]
+    }
+  },
+  {
+    "name": "error"
+  },
+  {
+    "name": "rule with a bad-string token (issue #93)",
+    "input": ".first{color:red\"\n}.thisAndAllFollowingRulesGetSwallowed {\n  color: red\n}",
+    "result": {
+      "type": "StyleSheet",
+      "children": [
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "ClassSelector",
+                    "name": "first"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "color",
+                "value": {
+                  "type": "Raw",
+                  "value": "red\"\n"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "type": "Rule",
+          "prelude": {
+            "type": "SelectorList",
+            "children": [
+              {
+                "type": "Selector",
+                "children": [
+                  {
+                    "type": "ClassSelector",
+                    "name": "thisAndAllFollowingRulesGetSwallowed"
+                  }
+                ]
+              }
+            ]
+          },
+          "block": {
+            "type": "Block",
+            "children": [
+              {
+                "type": "Declaration",
+                "important": false,
+                "property": "color",
+                "value": {
+                  "type": "Value",
+                  "children": [
+                    {
+                      "type": "Identifier",
+                      "name": "red"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,106 @@
+[
+  {
+    "input": "100 {}",
+    "error": "Percent sign is expected"
+  },
+  {
+    "input": ". {}",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": ".{}",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": ".",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": ".1px {}",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": "# {}",
+    "error": "Name is expected"
+  },
+  {
+    "input": "#{}",
+    "error": "Name is expected"
+  },
+  {
+    "input": "#",
+    "error": "Name is expected"
+  },
+  {
+    "input": "a { color }",
+    "error": "Colon is expected"
+  },
+  {
+    "input": "a { color: #}",
+    "error": "Hex or identifier is expected"
+  },
+  {
+    "input": "a { color: # }",
+    "error": "Hex or identifier is expected"
+  },
+  {
+    "input": ": {}",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": ":{}",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": ":",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": "::",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": ": ",
+    "error": "Identifier is expected"
+  },
+  {
+    "input": ":pseudo({}",
+    "error": "\")\" is expected"
+  },
+  {
+    "input": "[",
+    "error": "Unexpected end of input"
+  },
+  {
+    "input": "]",
+    "error": "Selector is expected"
+  },
+  {
+    "input": ")",
+    "error": "Selector is expected"
+  },
+  {
+    "input": "}",
+    "error": "Selector is expected"
+  },
+  {
+    "input": "a /foo/ b",
+    "error": "Identifier \"deep\" is expected"
+  },
+  {
+    "input": ".a",
+    "error": "\"{\" is expected"
+  },
+  {
+    "input": ".a \n    ",
+    "error": "\"{\" is expected"
+  },
+  {
+    "input": "  \n   \n.a \n    ",
+    "error": "\"{\" is expected"
+  },
+  {
+    "input": ".foo { var(--side): 20px }",
+    "error": "Identifier is expected but function found"
+  }
+]

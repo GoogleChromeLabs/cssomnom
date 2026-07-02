@@ -1,0 +1,9 @@
+[
+  { "input": "&", "expected": "&" },
+  { "input": "&.bar", "expected": "&.bar" },
+  { "input": "& .bar", "expected": "& .bar" },
+  { "input": "& > .bar", "expected": "& > .bar" },
+  { "input": "> .bar", "expected": "& > .bar" },
+  { "input": ".foo", "expected": "& .foo" },
+  { "input": "div&", "expected": "div&" }
+]

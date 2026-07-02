@@ -1,0 +1,894 @@
+{
+  "anb_serialization": [
+    {
+      "input": "1",
+      "expected": "1"
+    },
+    {
+      "input": "+1",
+      "expected": "1"
+    },
+    {
+      "input": "-1",
+      "expected": "-1"
+    },
+    {
+      "input": "0n + 0",
+      "expected": "0"
+    },
+    {
+      "input": "0n + 1",
+      "expected": "1"
+    },
+    {
+      "input": "0n - 1",
+      "expected": "-1"
+    },
+    {
+      "input": "1n",
+      "expected": "n"
+    },
+    {
+      "input": "1n - 0",
+      "expected": "n"
+    },
+    {
+      "input": "1n + 1",
+      "expected": "n+1"
+    },
+    {
+      "input": "1n - 1",
+      "expected": "n-1"
+    },
+    {
+      "input": "-1n",
+      "expected": "-n"
+    },
+    {
+      "input": "-1n - 0",
+      "expected": "-n"
+    },
+    {
+      "input": "-1n + 1",
+      "expected": "-n+1"
+    },
+    {
+      "input": "-1n - 1",
+      "expected": "-n-1"
+    },
+    {
+      "input": "+n+1",
+      "expected": "n+1"
+    },
+    {
+      "input": "-n-1",
+      "expected": "-n-1"
+    },
+    {
+      "input": "n + 0",
+      "expected": "n"
+    },
+    {
+      "input": "n - 0",
+      "expected": "n"
+    },
+    {
+      "input": "2n + 2",
+      "expected": "2n+2"
+    },
+    {
+      "input": "-2n - 2",
+      "expected": "-2n-2"
+    }
+  ],
+  "urange_parsing": [
+    {
+      "input": "u/**/+/**/a/**/?",
+      "expected": "U+A0-AF"
+    },
+    {
+      "input": "u+abc",
+      "expected": "U+ABC"
+    },
+    {
+      "input": "U+abc",
+      "expected": "U+ABC"
+    },
+    {
+      "input": "u+ABC",
+      "expected": "U+ABC"
+    },
+    {
+      "input": "U+ABC",
+      "expected": "U+ABC"
+    },
+    {
+      "input": "u+AbC",
+      "expected": "U+ABC"
+    },
+    {
+      "input": "u+a",
+      "expected": "U+A"
+    },
+    {
+      "input": "u+aa",
+      "expected": "U+AA"
+    },
+    {
+      "input": "u+aaa",
+      "expected": "U+AAA"
+    },
+    {
+      "input": "u+aaaa",
+      "expected": "U+AAAA"
+    },
+    {
+      "input": "u+aaaaa",
+      "expected": "U+AAAAA"
+    },
+    {
+      "input": "u+a?",
+      "expected": "U+A0-AF"
+    },
+    {
+      "input": "u+a??",
+      "expected": "U+A00-AFF"
+    },
+    {
+      "input": "u+a???",
+      "expected": "U+A000-AFFF"
+    },
+    {
+      "input": "u+a????",
+      "expected": "U+A0000-AFFFF"
+    },
+    {
+      "input": "u/**/+0a/**/?",
+      "expected": "U+A0-AF"
+    },
+    {
+      "input": "u+0a",
+      "expected": "U+A"
+    },
+    {
+      "input": "U+0a0",
+      "expected": "U+A0"
+    },
+    {
+      "input": "u+0aaaaa",
+      "expected": "U+AAAAA"
+    },
+    {
+      "input": "u+0a0000",
+      "expected": "U+A0000"
+    },
+    {
+      "input": "u+00000a",
+      "expected": "U+A"
+    },
+    {
+      "input": "u+0a????",
+      "expected": "U+A0000-AFFFF"
+    },
+    {
+      "input": "u+1e9a",
+      "expected": "U+1E9A"
+    },
+    {
+      "input": "u/**/+0/**/?",
+      "expected": "U+0-F"
+    },
+    {
+      "input": "u+0",
+      "expected": "U+0"
+    },
+    {
+      "input": "u+00",
+      "expected": "U+0"
+    },
+    {
+      "input": "u+000",
+      "expected": "U+0"
+    },
+    {
+      "input": "u+0000",
+      "expected": "U+0"
+    },
+    {
+      "input": "u+00000",
+      "expected": "U+0"
+    },
+    {
+      "input": "u+000000",
+      "expected": "U+0"
+    },
+    {
+      "input": "u+00000?",
+      "expected": "U+0-F"
+    },
+    {
+      "input": "u+0?????",
+      "expected": "U+0-FFFFF"
+    },
+    {
+      "input": "u+1e3",
+      "expected": "U+1E3"
+    },
+    {
+      "input": "u+1e-20",
+      "expected": "U+1E-20"
+    },
+    {
+      "input": "u/**/+0/**/-0a",
+      "expected": "U+0-A"
+    },
+    {
+      "input": "u+0-0a",
+      "expected": "U+0-A"
+    },
+    {
+      "input": "u+000000-0aaaaa",
+      "expected": "U+0-AAAAA"
+    },
+    {
+      "input": "u/**/+0/**/-1",
+      "expected": "U+0-1"
+    },
+    {
+      "input": "u+0-1",
+      "expected": "U+0-1"
+    },
+    {
+      "input": "u+000000-000001",
+      "expected": "U+0-1"
+    },
+    {
+      "input": "u+0-10ffff",
+      "expected": "U+0-10FFFF"
+    },
+    {
+      "input": "u/**/+/**/?",
+      "expected": "U+0-F"
+    },
+    {
+      "input": "u+?",
+      "expected": "U+0-F"
+    },
+    {
+      "input": "u+?????",
+      "expected": "u+0-FFFFF"
+    },
+    {
+      "input": "u+efg",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+ abc",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u +abc",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u + abc",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "U + a b c",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+aaaaaaa",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+aaaaaa?",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+aaaaa??",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+aaaa???",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+aaa????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+aa?????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+a??????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+a?a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+aaaaaa",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+a?????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0aaaaaa",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0a00000",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0aaaaa0",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+00000aa",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+000000a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0a?????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+00a????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+22222a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u/**/0",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0000000",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0?a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+000000?",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+00000??",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0??????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+222222",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+2?????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0000000-0a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0-0aaaaaa",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0-000000a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0+0a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0?-0a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0-0a?",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+222222-22222a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u-0-1",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u-0+1",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0+1",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0000000-1",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0-0000001",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0-110000",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+0-222222",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+???????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+?a",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "u+??????",
+      "expected": null,
+      "invalid": true
+    },
+    {
+      "input": "()U+123",
+      "expected": null,
+      "invalid": true
+    }
+  ],
+  "shorthand_serialization": [
+    {
+      "context": "elem4",
+      "property": "cssText",
+      "expected": "margin: 10px;"
+    },
+    {
+      "context": "elem4",
+      "property": "margin",
+      "expected": "10px"
+    },
+    {
+      "context": "elem5",
+      "property": "cssText",
+      "expected": "margin-right: 10px; margin-left: 10px; margin-top: 10px; margin-bottom: 10px !important;"
+    },
+    {
+      "context": "elem5",
+      "property": "margin",
+      "expected": ""
+    },
+    {
+      "context": "elem6",
+      "property": "cssText",
+      "expected": "margin: 10px !important;"
+    },
+    {
+      "context": "elem6",
+      "property": "margin",
+      "expected": "10px"
+    },
+    {
+      "context": "elem7",
+      "property": "background",
+      "expected": "var(--a)"
+    },
+    {
+      "context": "elem7",
+      "property": "backgroundPosition",
+      "expected": ""
+    },
+    {
+      "context": "testElem",
+      "property": "margin",
+      "expected": "20px"
+    },
+    {
+      "context": "testElem",
+      "property": "margin",
+      "expected": "initial"
+    },
+    {
+      "context": "testElem",
+      "property": "cssText",
+      "expected": "margin: initial;"
+    },
+    {
+      "context": "testElem",
+      "property": "margin",
+      "expected": ""
+    },
+    {
+      "context": "testElem",
+      "property": "margin",
+      "expected": ""
+    }
+  ],
+  "calc_serialization": [
+    {
+      "input": "calc(10px + 1vmin + 10%)",
+      "expected": "calc(10% + 10px + 1vmin)"
+    },
+    {
+      "input": "calc(10px + 1vmin)",
+      "expected": "calc(10px + 1vmin)"
+    },
+    {
+      "input": "calc(10px + 1em)",
+      "expected": "calc(1em + 10px)"
+    },
+    {
+      "input": "calc(1vmin - 10px)",
+      "expected": "calc(-10px + 1vmin)"
+    },
+    {
+      "input": "calc(-10px + 1em)",
+      "expected": "calc(1em - 10px)"
+    },
+    {
+      "input": "calc(-10px)",
+      "expected": "calc(-10px)"
+    }
+  ],
+  "token_pairs": [
+    {
+      "t1": "foo",
+      "t2": "bar"
+    },
+    {
+      "t1": "foo",
+      "t2": "bar()"
+    },
+    {
+      "t1": "foo",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "foo",
+      "t2": "-"
+    },
+    {
+      "t1": "foo",
+      "t2": "123"
+    },
+    {
+      "t1": "foo",
+      "t2": "123%"
+    },
+    {
+      "t1": "foo",
+      "t2": "123em"
+    },
+    {
+      "t1": "foo",
+      "t2": "-->"
+    },
+    {
+      "t1": "foo",
+      "t2": "()"
+    },
+    {
+      "t1": "@foo",
+      "t2": "bar"
+    },
+    {
+      "t1": "@foo",
+      "t2": "bar()"
+    },
+    {
+      "t1": "@foo",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "@foo",
+      "t2": "-"
+    },
+    {
+      "t1": "@foo",
+      "t2": "123"
+    },
+    {
+      "t1": "@foo",
+      "t2": "123%"
+    },
+    {
+      "t1": "@foo",
+      "t2": "123em"
+    },
+    {
+      "t1": "@foo",
+      "t2": "-->"
+    },
+    {
+      "t1": "#foo",
+      "t2": "bar"
+    },
+    {
+      "t1": "#foo",
+      "t2": "bar()"
+    },
+    {
+      "t1": "#foo",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "#foo",
+      "t2": "-"
+    },
+    {
+      "t1": "#foo",
+      "t2": "123"
+    },
+    {
+      "t1": "#foo",
+      "t2": "123%"
+    },
+    {
+      "t1": "#foo",
+      "t2": "123em"
+    },
+    {
+      "t1": "#foo",
+      "t2": "-->"
+    },
+    {
+      "t1": "123foo",
+      "t2": "bar"
+    },
+    {
+      "t1": "123foo",
+      "t2": "bar()"
+    },
+    {
+      "t1": "123foo",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "123foo",
+      "t2": "-"
+    },
+    {
+      "t1": "123foo",
+      "t2": "123"
+    },
+    {
+      "t1": "123foo",
+      "t2": "123%"
+    },
+    {
+      "t1": "123foo",
+      "t2": "123em"
+    },
+    {
+      "t1": "123foo",
+      "t2": "-->"
+    },
+    {
+      "t1": "#",
+      "t2": "bar"
+    },
+    {
+      "t1": "#",
+      "t2": "bar()"
+    },
+    {
+      "t1": "#",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "#",
+      "t2": "-"
+    },
+    {
+      "t1": "#",
+      "t2": "123"
+    },
+    {
+      "t1": "#",
+      "t2": "123%"
+    },
+    {
+      "t1": "#",
+      "t2": "123em"
+    },
+    {
+      "t1": "-",
+      "t2": "bar"
+    },
+    {
+      "t1": "-",
+      "t2": "bar()"
+    },
+    {
+      "t1": "-",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "-",
+      "t2": "-"
+    },
+    {
+      "t1": "-",
+      "t2": "123"
+    },
+    {
+      "t1": "-",
+      "t2": "123%"
+    },
+    {
+      "t1": "-",
+      "t2": "123em"
+    },
+    {
+      "t1": "123",
+      "t2": "bar"
+    },
+    {
+      "t1": "123",
+      "t2": "bar()"
+    },
+    {
+      "t1": "123",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "123",
+      "t2": "123"
+    },
+    {
+      "t1": "123",
+      "t2": "123%"
+    },
+    {
+      "t1": "123",
+      "t2": "123em"
+    },
+    {
+      "t1": "123",
+      "t2": "%"
+    },
+    {
+      "t1": "@",
+      "t2": "bar"
+    },
+    {
+      "t1": "@",
+      "t2": "bar()"
+    },
+    {
+      "t1": "@",
+      "t2": "url(bar)"
+    },
+    {
+      "t1": "@",
+      "t2": "-"
+    },
+    {
+      "t1": ".",
+      "t2": "123"
+    },
+    {
+      "t1": ".",
+      "t2": "123%"
+    },
+    {
+      "t1": ".",
+      "t2": "123em"
+    },
+    {
+      "t1": "+",
+      "t2": "123"
+    },
+    {
+      "t1": "+",
+      "t2": "123%"
+    },
+    {
+      "t1": "+",
+      "t2": "123em"
+    },
+    {
+      "t1": "/",
+      "t2": "*"
+    }
+  ],
+  "comments": [
+    {
+      "text": "a/* comment */b",
+      "t1": "",
+      "expected": "a/* comment */b"
+    },
+    {
+      "text": "a/* comment */var(--t1)",
+      "t1": "b",
+      "expected": "a/**/b"
+    },
+    {
+      "text": "var(--t1)b",
+      "t1": "a/* comment */",
+      "expected": "a/**/b"
+    },
+    {
+      "text": "var(--t1)b",
+      "t1": "'a/* unfinished '",
+      "expected": "'a/* unfinished 'b"
+    },
+    {
+      "text": "var(--t1)b",
+      "t1": "\\\"a/* unfinished \\\"",
+      "expected": "\\\"a/* unfinished \\\"b"
+    },
+    {
+      "text": "var(--t1)b",
+      "t1": "'a \\\" '/* comment */",
+      "expected": "'a \\\" 'b"
+    }
+  ]
+}

@@ -1,0 +1,1003 @@
+{
+  "anchor_position": [
+    {
+      "property": "align-self",
+      "value": "anchor-center",
+      "expected": "anchor-center"
+    },
+    {
+      "property": "align-items",
+      "value": "anchor-center",
+      "expected": "anchor-center"
+    },
+    {
+      "property": "justify-self",
+      "value": "anchor-center",
+      "expected": "anchor-center"
+    },
+    {
+      "property": "justify-items",
+      "value": "anchor-center",
+      "expected": "anchor-center"
+    },
+    {
+      "property": "anchor-name",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "anchor-name",
+      "value": "--foo",
+      "expected": "--foo"
+    },
+    {
+      "property": "anchor-name",
+      "value": "--foo, --bar",
+      "expected": "--foo, --bar"
+    },
+    {
+      "property": "top",
+      "value": "calc((anchor(--foo top) + anchor(--bar bottom)) / 2)",
+      "expected": "calc(0.5 * (anchor(--foo top) + anchor(--bar bottom)))"
+    },
+    {
+      "property": "top",
+      "value": "calc(0.5 * (anchor(--foo top) + anchor(--bar bottom)))",
+      "expected": "calc(0.5 * (anchor(--foo top) + anchor(--bar bottom)))"
+    },
+    {
+      "property": "top",
+      "value": "anchor(--foo top, calc(0.5 * anchor(--bar bottom)))",
+      "expected": "anchor(--foo top, calc(0.5 * anchor(--bar bottom)))"
+    },
+    {
+      "property": "top",
+      "value": "min(100px, 10%, anchor(--foo top), anchor(--bar bottom))",
+      "expected": "min(100px, 10%, anchor(--foo top), anchor(--bar bottom))"
+    },
+    {
+      "property": "top",
+      "value": "anchor(--foo left, 0)",
+      "expected": "anchor(--foo left, 0px)"
+    },
+    {
+      "property": "top",
+      "value": "calc(anchor(--foo left, 0))",
+      "expected": "anchor(--foo left, 0px)"
+    },
+    {
+      "property": "width",
+      "value": "anchor-size()",
+      "expected": "anchor-size()"
+    },
+    {
+      "property": "width",
+      "value": "anchor-size(--foo)",
+      "expected": "anchor-size(--foo)"
+    },
+    {
+      "property": "width",
+      "value": "anchor-size(--foo, 10px)",
+      "expected": "anchor-size(--foo, 10px)"
+    },
+    {
+      "property": "width",
+      "value": "anchor-size(10px)",
+      "expected": "anchor-size(10px)"
+    },
+    {
+      "property": "width",
+      "value": "anchor-size(--foo width, 0)",
+      "expected": "anchor-size(--foo width, 0px)"
+    },
+    {
+      "property": "width",
+      "value": "calc(anchor-size(--foo width, 0))",
+      "expected": "anchor-size(--foo width, 0px)"
+    },
+    {
+      "property": "position-anchor",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "position-anchor",
+      "value": "auto",
+      "expected": "auto"
+    },
+    {
+      "property": "position-anchor",
+      "value": "--foo",
+      "expected": "--foo"
+    },
+    {
+      "property": "position-area",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "position-area",
+      "value": "center",
+      "expected": "center"
+    },
+    {
+      "property": "position-area",
+      "value": "center center",
+      "expected": "center"
+    },
+    {
+      "property": "position-area",
+      "value": "span-all",
+      "expected": "span-all"
+    },
+    {
+      "property": "position-area",
+      "value": "span-all span-all",
+      "expected": "span-all"
+    },
+    {
+      "property": "position-area",
+      "value": "center span-all",
+      "expected": "center span-all"
+    },
+    {
+      "property": "position-area",
+      "value": "span-all center",
+      "expected": "span-all center"
+    },
+    {
+      "property": "container-type",
+      "value": "anchored",
+      "expected": "anchored"
+    },
+    {
+      "property": "container-type",
+      "value": "size anchored",
+      "expected": "size anchored"
+    },
+    {
+      "property": "container-type",
+      "value": "anchored inline-size",
+      "expected": "inline-size anchored"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "initial",
+      "expected": "initial"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "inherit",
+      "expected": "inherit"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "unset",
+      "expected": "unset"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "revert",
+      "expected": "revert"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "all",
+      "expected": "all"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "--a",
+      "expected": "--a"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "--a, --b",
+      "expected": "--a, --b"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "--a, --b, --c",
+      "expected": "--a, --b, --c"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "--foo, --bar",
+      "expected": "--foo, --bar"
+    },
+    {
+      "property": "anchor-scope",
+      "value": "--bar, --foo",
+      "expected": "--bar, --foo"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "initial",
+      "expected": "initial"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "inherit",
+      "expected": "inherit"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "unset",
+      "expected": "unset"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "revert",
+      "expected": "revert"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-block",
+      "expected": "flip-block"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-block ",
+      "expected": "flip-block"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start, flip-block",
+      "expected": "flip-start, flip-block"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start flip-inline, flip-block",
+      "expected": "flip-start flip-inline, flip-block"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start, flip-start",
+      "expected": "flip-start, flip-start"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start flip-inline flip-block",
+      "expected": "flip-start flip-inline flip-block"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-block, --foo",
+      "expected": "flip-block, --foo"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--bar, flip-block flip-start",
+      "expected": "--bar, flip-block flip-start"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--foo, --bar, --baz",
+      "expected": "--foo, --bar, --baz"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--bar flip-block",
+      "expected": "--bar flip-block"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--bar flip-inline flip-block",
+      "expected": "--bar flip-inline flip-block"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-inline --foo",
+      "expected": "--foo flip-inline"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-inline flip-start --foo",
+      "expected": "--foo flip-inline flip-start"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "left top",
+      "expected": "left top"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "top left",
+      "expected": "left top"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "start start",
+      "expected": "start"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "left, right",
+      "expected": "left, right"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--foo, left",
+      "expected": "--foo, left"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--foo, left, --bar",
+      "expected": "--foo, left, --bar"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--foo, flip-start, left",
+      "expected": "--foo, flip-start, left"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--foo flip-start, left",
+      "expected": "--foo flip-start, left"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "left, --bar flip-start",
+      "expected": "left, --bar flip-start"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-x",
+      "expected": "flip-x"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-x ",
+      "expected": "flip-x"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start, flip-x",
+      "expected": "flip-start, flip-x"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start flip-y, flip-x",
+      "expected": "flip-start flip-y, flip-x"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start flip-y flip-x",
+      "expected": "flip-start flip-y flip-x"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-x, --foo",
+      "expected": "flip-x, --foo"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--bar, flip-x flip-start",
+      "expected": "--bar, flip-x flip-start"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--bar flip-x",
+      "expected": "--bar flip-x"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "--bar flip-y flip-x",
+      "expected": "--bar flip-y flip-x"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-y --foo",
+      "expected": "--foo flip-y"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-y flip-start --foo",
+      "expected": "--foo flip-y flip-start"
+    },
+    {
+      "property": "position-try-fallbacks",
+      "value": "flip-start flip-inline flip-y flip-block flip-x",
+      "expected": "flip-start flip-inline flip-y flip-block flip-x"
+    },
+    {
+      "property": "position-try-order",
+      "value": "initial",
+      "expected": "initial"
+    },
+    {
+      "property": "position-try-order",
+      "value": "inherit",
+      "expected": "inherit"
+    },
+    {
+      "property": "position-try-order",
+      "value": "unset",
+      "expected": "unset"
+    },
+    {
+      "property": "position-try-order",
+      "value": "revert",
+      "expected": "revert"
+    },
+    {
+      "property": "position-try-order",
+      "value": "normal",
+      "expected": "normal"
+    },
+    {
+      "property": "position-try-order",
+      "value": "most-width",
+      "expected": "most-width"
+    },
+    {
+      "property": "position-try-order",
+      "value": "most-height",
+      "expected": "most-height"
+    },
+    {
+      "property": "position-try-order",
+      "value": "most-block-size",
+      "expected": "most-block-size"
+    },
+    {
+      "property": "position-try-order",
+      "value": "most-inline-size",
+      "expected": "most-inline-size"
+    },
+    {
+      "property": "position-try",
+      "value": "flip-inline",
+      "expected": "flip-inline"
+    },
+    {
+      "property": "position-try",
+      "value": "flip-y",
+      "expected": "flip-y"
+    },
+    {
+      "property": "position-try",
+      "value": "most-height none",
+      "expected": "most-height none"
+    },
+    {
+      "property": "position-try",
+      "value": "--bar, --baz",
+      "expected": "--bar, --baz"
+    },
+    {
+      "property": "position-try",
+      "value": "most-inline-size --baz, flip-inline",
+      "expected": "most-inline-size --baz, flip-inline"
+    },
+    {
+      "property": "position-try",
+      "value": "most-block-size flip-inline flip-block, --bar, --baz",
+      "expected": "most-block-size flip-inline flip-block, --bar, --baz"
+    },
+    {
+      "property": "position-try",
+      "value": "most-width flip-y flip-x, --foo, --bar",
+      "expected": "most-width flip-y flip-x, --foo, --bar"
+    },
+    {
+      "property": "position-try",
+      "value": "normal none",
+      "expected": "none"
+    },
+    {
+      "property": "position-try",
+      "value": "most-width none",
+      "expected": "most-width none"
+    },
+    {
+      "property": "position-try",
+      "value": "normal --foo",
+      "expected": "--foo"
+    },
+    {
+      "property": "position-visibility",
+      "value": "initial",
+      "expected": "initial"
+    },
+    {
+      "property": "position-visibility",
+      "value": "inherit",
+      "expected": "inherit"
+    },
+    {
+      "property": "position-visibility",
+      "value": "unset",
+      "expected": "unset"
+    },
+    {
+      "property": "position-visibility",
+      "value": "revert",
+      "expected": "revert"
+    },
+    {
+      "property": "position-visibility",
+      "value": "always",
+      "expected": "always"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-valid",
+      "expected": "anchors-valid"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-visible",
+      "expected": "anchors-visible"
+    },
+    {
+      "property": "position-visibility",
+      "value": "no-overflow",
+      "expected": "no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-valid anchors-visible",
+      "expected": "anchors-valid anchors-visible"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-valid no-overflow",
+      "expected": "anchors-valid no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-visible anchors-valid",
+      "expected": "anchors-valid anchors-visible"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-visible no-overflow",
+      "expected": "anchors-visible no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "no-overflow anchors-valid",
+      "expected": "anchors-valid no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "no-overflow anchors-visible",
+      "expected": "anchors-visible no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-valid anchors-visible no-overflow",
+      "expected": "anchors-valid anchors-visible no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-valid no-overflow anchors-visible",
+      "expected": "anchors-valid anchors-visible no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-visible anchors-valid no-overflow",
+      "expected": "anchors-valid anchors-visible no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "anchors-visible no-overflow anchors-valid",
+      "expected": "anchors-valid anchors-visible no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "no-overflow anchors-valid anchors-visible",
+      "expected": "anchors-valid anchors-visible no-overflow"
+    },
+    {
+      "property": "position-visibility",
+      "value": "no-overflow anchors-visible anchors-valid",
+      "expected": "anchors-valid anchors-visible no-overflow"
+    }
+  ],
+  "view_transitions": [
+    {
+      "property": "view-transition-class",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "view-transition-class",
+      "value": "foo",
+      "expected": "foo"
+    },
+    {
+      "property": "view-transition-class",
+      "value": "bar",
+      "expected": "bar"
+    },
+    {
+      "property": "view-transition-class",
+      "value": "baz",
+      "expected": "baz"
+    },
+    {
+      "property": "view-transition-class",
+      "value": "foo bar",
+      "expected": "foo bar"
+    },
+    {
+      "property": "view-transition-class",
+      "value": "foo bar baz",
+      "expected": "foo bar baz"
+    },
+    {
+      "property": "view-transition-group",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "view-transition-group",
+      "value": "nearest",
+      "expected": "nearest"
+    },
+    {
+      "property": "view-transition-group",
+      "value": "contain",
+      "expected": "contain"
+    },
+    {
+      "property": "view-transition-group",
+      "value": "normal",
+      "expected": "normal"
+    },
+    {
+      "property": "view-transition-group",
+      "value": "abc",
+      "expected": "abc"
+    },
+    {
+      "property": "view-transition-group",
+      "value": "custom-ident",
+      "expected": "custom-ident"
+    },
+    {
+      "property": "view-transition-group",
+      "value": "a-1",
+      "expected": "a-1"
+    },
+    {
+      "property": "view-transition-name",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "view-transition-name",
+      "value": "auto",
+      "expected": "auto"
+    },
+    {
+      "property": "view-transition-name",
+      "value": "match-element",
+      "expected": "match-element"
+    },
+    {
+      "property": "view-transition-name",
+      "value": "foo",
+      "expected": "foo"
+    },
+    {
+      "property": "view-transition-name",
+      "value": "bar",
+      "expected": "bar"
+    },
+    {
+      "property": "view-transition-name",
+      "value": "baz",
+      "expected": "baz"
+    }
+  ],
+  "transitions": [
+    {
+      "property": "transition-behavior",
+      "value": "normal",
+      "expected": "normal"
+    },
+    {
+      "property": "transition-behavior",
+      "value": "allow-discrete",
+      "expected": "allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "allow-discrete display",
+      "expected": "display allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "allow-discrete display 3s",
+      "expected": "display 3s allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "allow-discrete display 3s 1s",
+      "expected": "display 3s 1s allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "allow-discrete display 3s ease-in-out",
+      "expected": "display 3s ease-in-out allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "allow-discrete display 3s ease-in-out 1s",
+      "expected": "display 3s ease-in-out 1s allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "display allow-discrete 3s ease-in-out 1s",
+      "expected": "display 3s ease-in-out 1s allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "display 3s allow-discrete ease-in-out 1s",
+      "expected": "display 3s ease-in-out 1s allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "display 3s ease-in-out allow-discrete 1s",
+      "expected": "display 3s ease-in-out 1s allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "display 3s ease-in-out 1s allow-discrete",
+      "expected": "display 3s ease-in-out 1s allow-discrete"
+    },
+    {
+      "property": "transition",
+      "value": "allow-discrete display, normal opacity, color",
+      "expected": "display allow-discrete, opacity, color"
+    },
+    {
+      "property": "transition",
+      "value": "normal opacity, color, allow-discrete display",
+      "expected": "opacity, color, display allow-discrete"
+    },
+    {
+      "property": "transition-delay",
+      "value": "0s",
+      "expected": "0s"
+    },
+    {
+      "property": "transition-delay",
+      "value": "500ms",
+      "expected": "500ms"
+    },
+    {
+      "property": "transition-delay",
+      "value": "1s, 2s",
+      "expected": "1s, 2s"
+    },
+    {
+      "property": "transition-delay",
+      "value": "-1s, -2s",
+      "expected": "-1s, -2s"
+    },
+    {
+      "property": "transition-duration",
+      "value": "0s",
+      "expected": "0s"
+    },
+    {
+      "property": "transition-duration",
+      "value": "500ms",
+      "expected": "500ms"
+    },
+    {
+      "property": "transition-duration",
+      "value": "1s, 2s",
+      "expected": "1s, 2s"
+    },
+    {
+      "property": "transition-property",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "transition-property",
+      "value": "all",
+      "expected": "all"
+    },
+    {
+      "property": "transition-property",
+      "value": "one",
+      "expected": "one"
+    },
+    {
+      "property": "transition-property",
+      "value": "one-two-three",
+      "expected": "one-two-three"
+    },
+    {
+      "property": "transition-property",
+      "value": "one, two, three",
+      "expected": "one, two, three"
+    },
+    {
+      "property": "transition-property",
+      "value": "width, all",
+      "expected": "width, all"
+    },
+    {
+      "property": "transition-property",
+      "value": "ALL, INVALID, SYNTAX, SRC",
+      "expected": "all, INVALID, SYNTAX, SRC"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "linear",
+      "expected": "linear"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "linear(0 0%, 0.5 50%, 1 100%)",
+      "expected": "linear(0 0%, 0.5 50%, 1 100%)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "linear(0 0%, 10 10%, 10 50%, 25.4 75%, 100 100%)",
+      "expected": "linear(0 0%, 10 10%, 10 50%, 25.4 75%, 100 100%)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "linear(0 0%, 1 100%)",
+      "expected": "linear(0 0%, 1 100%)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "ease",
+      "expected": "ease"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "ease-in",
+      "expected": "ease-in"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "ease-out",
+      "expected": "ease-out"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "ease-in-out",
+      "expected": "ease-in-out"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "cubic-bezier(0.1, 0.2, 0.8, 0.9)",
+      "expected": "cubic-bezier(0.1, 0.2, 0.8, 0.9)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "cubic-bezier(0, -2, 1, 3)",
+      "expected": "cubic-bezier(0, -2, 1, 3)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "cubic-bezier(0, 0.7, 1, 1.3)",
+      "expected": "cubic-bezier(0, 0.7, 1, 1.3)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "step-start",
+      "expected": "steps(1, start)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "step-end",
+      "expected": "steps(1)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(4)",
+      "expected": "steps(4)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(4, start)",
+      "expected": "steps(4, start)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(2, end)",
+      "expected": "steps(2)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(2, jump-start)",
+      "expected": "steps(2, jump-start)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(2, jump-end)",
+      "expected": "steps(2)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(2, jump-both)",
+      "expected": "steps(2, jump-both)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(2, jump-none)",
+      "expected": "steps(2, jump-none)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "steps(sibling-index(), jump-none)",
+      "expected": "steps(sibling-index(), jump-none)"
+    },
+    {
+      "property": "transition-timing-function",
+      "value": "linear, ease, linear",
+      "expected": "linear, ease, linear"
+    },
+    {
+      "property": "transition",
+      "value": "1s",
+      "expected": "1s"
+    },
+    {
+      "property": "transition",
+      "value": "cubic-bezier(0, -2, 1, 3)",
+      "expected": "cubic-bezier(0, -2, 1, 3)"
+    },
+    {
+      "property": "transition",
+      "value": "1s -3s",
+      "expected": "1s -3s"
+    },
+    {
+      "property": "transition",
+      "value": "none",
+      "expected": "none"
+    },
+    {
+      "property": "transition",
+      "value": "top",
+      "expected": "top"
+    },
+    {
+      "property": "transition",
+      "value": "1s -3s cubic-bezier(0, -2, 1, 3) top",
+      "expected": "top 1s cubic-bezier(0, -2, 1, 3) -3s"
+    },
+    {
+      "property": "transition",
+      "value": "1s -3s, cubic-bezier(0, -2, 1, 3) top",
+      "expected": "1s -3s, top cubic-bezier(0, -2, 1, 3)"
+    },
+    {
+      "property": "transition",
+      "value": "all",
+      "expected": "all"
+    },
+    {
+      "property": "transition",
+      "value": "all 1s",
+      "expected": "1s"
+    },
+    {
+      "property": "transition",
+      "value": "initial",
+      "expected": "initial"
+    }
+  ]
+}

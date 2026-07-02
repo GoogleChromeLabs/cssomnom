@@ -1,0 +1,522 @@
+[
+  {
+    "source": ":nth-child(  3n - 0)",
+    "expected": ":nth-child(3n)"
+  },
+  {
+    "source": ":nth-child(  1n - 0)",
+    "expected": ":nth-child(n)"
+  },
+  {
+    "source": "*",
+    "expected": "*"
+  },
+  {
+    "source": " * ",
+    "expected": "*"
+  },
+  {
+    "source": "div",
+    "expected": "div"
+  },
+  {
+    "source": " div ",
+    "expected": "div"
+  },
+  {
+    "source": ".class",
+    "expected": ".class"
+  },
+  {
+    "source": " .class    ",
+    "expected": ".class"
+  },
+  {
+    "source": "#id",
+    "expected": "#id"
+  },
+  {
+    "source": "     #id ",
+    "expected": "#id"
+  },
+  {
+    "source": ":hover",
+    "expected": ":hover"
+  },
+  {
+    "source": "    :hover    ",
+    "expected": ":hover"
+  },
+  {
+    "source": ":lang(ja)",
+    "expected": ":lang(ja)"
+  },
+  {
+    "source": ":lang( ja )",
+    "expected": ":lang(ja)"
+  },
+  {
+    "source": ":lang( j\\\\ a )",
+    "expected": ":lang(j\\\\ a)"
+  },
+  {
+    "source": " :not( abc ) ",
+    "expected": ":not(abc)"
+  },
+  {
+    "source": " :not(  .head ) ",
+    "expected": ":not(.head)"
+  },
+  {
+    "source": " :not(  #head   ) ",
+    "expected": ":not(#head)"
+  },
+  {
+    "source": " :not(  :hover   ) ",
+    "expected": ":not(:hover)"
+  },
+  {
+    "source": "[ns\\\\:foo]",
+    "expected": "[ns\\\\:foo]"
+  },
+  {
+    "source": "[\\\\30zonk]",
+    "expected": "[\\\\30 zonk]"
+  },
+  {
+    "source": "[\\\\@]",
+    "expected": "[\\\\@]"
+  },
+  {
+    "source": "[*|ns\\\\:foo]",
+    "expected": "[*|ns\\\\:foo]"
+  },
+  {
+    "source": "\\\\\\\\",
+    "expected": "\\\\\\\\"
+  },
+  {
+    "source": "*|\\\\\\\\",
+    "expected": "\\\\\\\\"
+  },
+  {
+    "source": "@namespace 'blah'; *|\\\\\\\\",
+    "expected": "*|\\\\\\\\"
+  },
+  {
+    "source": "|\\\\\\\\",
+    "expected": "|\\\\\\\\"
+  },
+  {
+    "source": ":nth-child( even   )",
+    "expected": ":nth-child(2n)"
+  },
+  {
+    "source": ":nth-child(   odd )",
+    "expected": ":nth-child(2n+1)"
+  },
+  {
+    "source": ":nth-child( +10  )",
+    "expected": ":nth-child(10)"
+  },
+  {
+    "source": ":nth-child(   -10 )",
+    "expected": ":nth-child(-10)"
+  },
+  {
+    "source": ":nth-child( +4n  )",
+    "expected": ":nth-child(4n)"
+  },
+  {
+    "source": ":nth-child( -3n   )",
+    "expected": ":nth-child(-3n)"
+  },
+  {
+    "source": ":nth-child( 1n + 5  )",
+    "expected": ":nth-child(n+5)"
+  },
+  {
+    "source": ":nth-child( -1n +     5 )",
+    "expected": ":nth-child(-n+5)"
+  },
+  {
+    "source": ":nth-child( -1n     - 5 )",
+    "expected": ":nth-child(-n-5)"
+  },
+  {
+    "source": ":nth-last-child( even   )",
+    "expected": ":nth-last-child(2n)"
+  },
+  {
+    "source": ":nth-last-child(   odd )",
+    "expected": ":nth-last-child(2n+1)"
+  },
+  {
+    "source": ":nth-last-child( +10  )",
+    "expected": ":nth-last-child(10)"
+  },
+  {
+    "source": ":nth-last-child(   -10 )",
+    "expected": ":nth-last-child(-10)"
+  },
+  {
+    "source": ":nth-last-child( +4n  )",
+    "expected": ":nth-last-child(4n)"
+  },
+  {
+    "source": ":nth-last-child( -3n   )",
+    "expected": ":nth-last-child(-3n)"
+  },
+  {
+    "source": ":nth-last-child( 1n + 5  )",
+    "expected": ":nth-last-child(n+5)"
+  },
+  {
+    "source": ":nth-last-child( -1n +     5 )",
+    "expected": ":nth-last-child(-n+5)"
+  },
+  {
+    "source": ":nth-last-child( -1n     - 5 )",
+    "expected": ":nth-last-child(-n-5)"
+  },
+  {
+    "source": ":nth-of-type( even   )",
+    "expected": ":nth-of-type(2n)"
+  },
+  {
+    "source": ":nth-of-type(   odd )",
+    "expected": ":nth-of-type(2n+1)"
+  },
+  {
+    "source": ":nth-of-type( +10  )",
+    "expected": ":nth-of-type(10)"
+  },
+  {
+    "source": ":nth-of-type(   -10 )",
+    "expected": ":nth-of-type(-10)"
+  },
+  {
+    "source": ":nth-of-type( +4n  )",
+    "expected": ":nth-of-type(4n)"
+  },
+  {
+    "source": ":nth-of-type( -3n   )",
+    "expected": ":nth-of-type(-3n)"
+  },
+  {
+    "source": ":nth-of-type( 1n + 5  )",
+    "expected": ":nth-of-type(n+5)"
+  },
+  {
+    "source": ":nth-of-type( -1n +     5 )",
+    "expected": ":nth-of-type(-n+5)"
+  },
+  {
+    "source": ":nth-of-type( -1n     - 5 )",
+    "expected": ":nth-of-type(-n-5)"
+  },
+  {
+    "source": ":nth-last-of-type( even   )",
+    "expected": ":nth-last-of-type(2n)"
+  },
+  {
+    "source": ":nth-last-of-type(   odd )",
+    "expected": ":nth-last-of-type(2n+1)"
+  },
+  {
+    "source": ":nth-last-of-type( +10  )",
+    "expected": ":nth-last-of-type(10)"
+  },
+  {
+    "source": ":nth-last-of-type(   -10 )",
+    "expected": ":nth-last-of-type(-10)"
+  },
+  {
+    "source": ":nth-last-of-type( +4n  )",
+    "expected": ":nth-last-of-type(4n)"
+  },
+  {
+    "source": ":nth-last-of-type( -3n   )",
+    "expected": ":nth-last-of-type(-3n)"
+  },
+  {
+    "source": ":nth-last-of-type( 1n + 5  )",
+    "expected": ":nth-last-of-type(n+5)"
+  },
+  {
+    "source": ":nth-last-of-type( -1n +     5 )",
+    "expected": ":nth-last-of-type(-n+5)"
+  },
+  {
+    "source": ":nth-last-of-type( -1n     - 5 )",
+    "expected": ":nth-last-of-type(-n-5)"
+  },
+  {
+    "source": ":nth-child(odd)",
+    "expected": ":nth-child(2n+1)"
+  },
+  {
+    "source": ":nth-child(even)",
+    "expected": ":nth-child(2n)"
+  },
+  {
+    "source": ":nth-child(1)",
+    "expected": ":nth-child(1)"
+  },
+  {
+    "source": ":nth-child(+1)",
+    "expected": ":nth-child(1)"
+  },
+  {
+    "source": ":nth-child(-1)",
+    "expected": ":nth-child(-1)"
+  },
+  {
+    "source": ":nth-child(5n)",
+    "expected": ":nth-child(5n)"
+  },
+  {
+    "source": ":nth-child(5N)",
+    "expected": ":nth-child(5n)"
+  },
+  {
+    "source": ":nth-child(+n)",
+    "expected": ":nth-child(n)"
+  },
+  {
+    "source": ":nth-child(n)",
+    "expected": ":nth-child(n)"
+  },
+  {
+    "source": ":nth-child(N)",
+    "expected": ":nth-child(n)"
+  },
+  {
+    "source": ":nth-child(+ n)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n)",
+    "expected": ":nth-child(-n)"
+  },
+  {
+    "source": ":nth-child(-N)",
+    "expected": ":nth-child(-n)"
+  },
+  {
+    "source": ":nth-child(5n-5)",
+    "expected": ":nth-child(5n-5)"
+  },
+  {
+    "source": ":nth-child(+n-5)",
+    "expected": ":nth-child(n-5)"
+  },
+  {
+    "source": ":nth-child(n-5)",
+    "expected": ":nth-child(n-5)"
+  },
+  {
+    "source": ":nth-child(+ n-5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n-5)",
+    "expected": ":nth-child(-n-5)"
+  },
+  {
+    "source": ":nth-child(5n +5)",
+    "expected": ":nth-child(5n+5)"
+  },
+  {
+    "source": ":nth-child(5n -5)",
+    "expected": ":nth-child(5n-5)"
+  },
+  {
+    "source": ":nth-child(+n +5)",
+    "expected": ":nth-child(n+5)"
+  },
+  {
+    "source": ":nth-child(n +5)",
+    "expected": ":nth-child(n+5)"
+  },
+  {
+    "source": ":nth-child(+n -5)",
+    "expected": ":nth-child(n-5)"
+  },
+  {
+    "source": ":nth-child(+ n +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(n 5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n +5)",
+    "expected": ":nth-child(-n+5)"
+  },
+  {
+    "source": ":nth-child(-n -5)",
+    "expected": ":nth-child(-n-5)"
+  },
+  {
+    "source": ":nth-child(-n 5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(5n- 5)",
+    "expected": ":nth-child(5n-5)"
+  },
+  {
+    "source": ":nth-child(5n- -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(5n- +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-5n- 5)",
+    "expected": ":nth-child(-5n-5)"
+  },
+  {
+    "source": ":nth-child(+n- 5)",
+    "expected": ":nth-child(n-5)"
+  },
+  {
+    "source": ":nth-child(n- 5)",
+    "expected": ":nth-child(n-5)"
+  },
+  {
+    "source": ":nth-child(+ n- 5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(n- +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(n- -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n- 5)",
+    "expected": ":nth-child(-n-5)"
+  },
+  {
+    "source": ":nth-child(-n- +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n- -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(5n + 5)",
+    "expected": ":nth-child(5n+5)"
+  },
+  {
+    "source": ":nth-child(5n - 5)",
+    "expected": ":nth-child(5n-5)"
+  },
+  {
+    "source": ":nth-child(5n + +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(5n + -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(5n - +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(5n - -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(+n + 5)",
+    "expected": ":nth-child(n+5)"
+  },
+  {
+    "source": ":nth-child(n + 5)",
+    "expected": ":nth-child(n+5)"
+  },
+  {
+    "source": ":nth-child(+ n + 5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(+n - 5)",
+    "expected": ":nth-child(n-5)"
+  },
+  {
+    "source": ":nth-child(+n + +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(+n + -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(+n - +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(+n - -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n + 5)",
+    "expected": ":nth-child(-n+5)"
+  },
+  {
+    "source": ":nth-child(-n - 5)",
+    "expected": ":nth-child(-n-5)"
+  },
+  {
+    "source": ":nth-child(-n + +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n + -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n - +5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-n - -5)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(1 - n)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(0 - n)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(-1 + n)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(2 n + 2)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(- 2n)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(+ 2n)",
+    "expected": "parse error"
+  },
+  {
+    "source": ":nth-child(+2 n)",
+    "expected": "parse error"
+  }
+]

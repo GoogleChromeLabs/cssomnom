@@ -1,0 +1,592 @@
+{
+  "serialization": [
+    {
+      "description": "CSSMathMax with one argument",
+      "input": "new CSSMathMax(1)",
+      "expected": "max(1)"
+    },
+    {
+      "description": "CSSMathMax with more than one argument",
+      "input": "new CSSMathMax(1, 2, 3)",
+      "expected": "max(1, 2, 3)"
+    },
+    {
+      "description": "CSSMathMax with pixel arguments",
+      "input": "new CSSMathMin(CSS.px(100), CSS.px(110))",
+      "expected": "min(100px, 110px)"
+    },
+    {
+      "description": "CSSMathMax containing nested CSSMathValues",
+      "input": "new CSSMathMax(new CSSMathSum(1, 2), 3)",
+      "expected": "max(1 + 2, 3)"
+    },
+    {
+      "description": "CSSMathMin with one argument",
+      "input": "new CSSMathMin(1)",
+      "expected": "min(1)"
+    },
+    {
+      "description": "CSSMathMin with more than one argument",
+      "input": "new CSSMathMin(1, 2, 3)",
+      "expected": "min(1, 2, 3)"
+    },
+    {
+      "description": "CSSMathMin with pixel arguments",
+      "input": "new CSSMathMin(CSS.px(90), CSS.px(100))",
+      "expected": "min(90px, 100px)"
+    },
+    {
+      "description": "CSSMathMin containing nested CSSMathValues",
+      "input": "new CSSMathMin(new CSSMathSum(1, 2), 3)",
+      "expected": "min(1 + 2, 3)"
+    },
+    {
+      "description": "CSSMathClamp with lower, value and upper arguments",
+      "input": "new CSSMathClamp(1, 2, 3)",
+      "expected": "clamp(1, 2, 3)"
+    },
+    {
+      "description": "CSSMathClamp with pixel arguments",
+      "input": "new CSSMathClamp(CSS.px(90), CSS.px(100), CSS.px(110))",
+      "expected": "clamp(90px, 100px, 110px)"
+    },
+    {
+      "description": "CSSMathClamp containing nested CSSMathValues",
+      "input": "new CSSMathClamp(new CSSMathSum(1, 2), 3, 4)",
+      "expected": "clamp(1 + 2, 3, 4)"
+    },
+    {
+      "description": "CSSMathSum with one argument",
+      "input": "new CSSMathSum(1)",
+      "expected": "calc(1)"
+    },
+    {
+      "description": "CSSMathSum with more than one argument",
+      "input": "new CSSMathSum(1, 2, 3)",
+      "expected": "calc(1 + 2 + 3)"
+    },
+    {
+      "description": "CSSMathSum with a CSSMathNegate as first value",
+      "input": "new CSSMathSum(new CSSMathNegate(1), 2, 3)",
+      "expected": "calc((-1) + 2 + 3)"
+    },
+    {
+      "description": "CSSMathSum containing a CSSMathNegate after first value",
+      "input": "new CSSMathSum(1, new CSSMathNegate(2), 3)",
+      "expected": "calc(1 - 2 + 3)"
+    },
+    {
+      "description": "CSSMathSum nested inside a CSSMathValue",
+      "input": "new CSSMathSum(new CSSMathSum(1, 2), 3)",
+      "expected": "calc((1 + 2) + 3)"
+    },
+    {
+      "description": "CSSMathNegate",
+      "input": "new CSSMathNegate(1)",
+      "expected": "calc(-1)"
+    },
+    {
+      "description": "CSSMathNegate nested inside a CSSMathValue",
+      "input": "new CSSMathProduct(new CSSMathNegate(1))",
+      "expected": "calc((-1))"
+    },
+    {
+      "description": "CSSMathProduct with one argument",
+      "input": "new CSSMathProduct(1)",
+      "expected": "calc(1)"
+    },
+    {
+      "description": "CSSMathProduct with more than one argument",
+      "input": "new CSSMathProduct(1, 2, 3)",
+      "expected": "calc(1 * 2 * 3)"
+    },
+    {
+      "description": "CSSMathProduct with a CSSMathInvert as first value",
+      "input": "new CSSMathProduct(new CSSMathInvert(1), 2, 3)",
+      "expected": "calc((1 / 1) * 2 * 3)"
+    },
+    {
+      "description": "CSSMathProduct containing a CSSMathInvert after first value",
+      "input": "new CSSMathProduct(1, new CSSMathInvert(2), 3)",
+      "expected": "calc(1 / 2 * 3)"
+    },
+    {
+      "description": "CSSMathProduct nested inside a CSSMathValue",
+      "input": "new CSSMathProduct(new CSSMathProduct(1, 2), 3)",
+      "expected": "calc((1 * 2) * 3)"
+    },
+    {
+      "description": "CSSMathInvert",
+      "input": "new CSSMathInvert(1)",
+      "expected": "calc(1 / 1)"
+    },
+    {
+      "description": "CSSMathInvert nested inside a CSSMathValue",
+      "input": "new CSSMathSum(new CSSMathInvert(1))",
+      "expected": "calc((1 / 1))"
+    },
+    {
+      "description": "CSSTranslate with 2 arguments",
+      "input": "new CSSTranslate(CSS.percent(1), CSS.px(1))",
+      "expected": "translate(1%, 1px)"
+    },
+    {
+      "description": "CSSTranslate with 3 arguments",
+      "input": "new CSSTranslate(CSS.px(1), CSS.percent(2), CSS.px(3))",
+      "expected": "translate3d(1px, 2%, 3px)"
+    },
+    {
+      "description": "CSSScale with 2 arguments",
+      "input": "new CSSScale(CSS.number(2), CSS.number(3))",
+      "expected": "scale(2, 3)"
+    },
+    {
+      "description": "CSSScale with 3 arguments",
+      "input": "new CSSScale(CSS.number(1), CSS.number(2), CSS.number(3))",
+      "expected": "scale3d(1, 2, 3)"
+    },
+    {
+      "description": "CSSRotate with 1 argument",
+      "input": "new CSSRotate(CSS.deg(90))",
+      "expected": "rotate(90deg)"
+    },
+    {
+      "description": "CSSRotate with 4 arguments",
+      "input": "new CSSRotate(CSS.number(1), CSS.number(2), CSS.number(3), CSS.deg(90))",
+      "expected": "rotate3d(1, 2, 3, 90deg)"
+    },
+    {
+      "description": "CSSSkew",
+      "input": "new CSSSkew(CSS.deg(90), CSS.deg(45))",
+      "expected": "skew(90deg, 45deg)"
+    },
+    {
+      "description": "CSSSkew with Y which is 0 value",
+      "input": "new CSSSkew(CSS.deg(90), CSS.turn(0))",
+      "expected": "skew(90deg)"
+    },
+    {
+      "description": "CSSSkewX",
+      "input": "new CSSSkewX(CSS.deg(90))",
+      "expected": "skewX(90deg)"
+    },
+    {
+      "description": "CSSSkewY",
+      "input": "new CSSSkewY(CSS.deg(90))",
+      "expected": "skewY(90deg)"
+    },
+    {
+      "description": "CSSPerspective",
+      "input": "new CSSPerspective(CSS.px(1))",
+      "expected": "perspective(1px)"
+    },
+    {
+      "description": "CSSPerspective with negative length",
+      "input": "new CSSPerspective(CSS.px(-1))",
+      "expected": "perspective(calc(-1px))"
+    },
+    {
+      "description": "CSSPerspective with none as string",
+      "input": "new CSSPerspective(\"none\")",
+      "expected": "perspective(none)"
+    },
+    {
+      "description": "CSSPerspective with none as CSSKeyword",
+      "input": "new CSSPerspective(new CSSKeywordValue(\"none\"))",
+      "expected": "perspective(none)"
+    },
+    {
+      "description": "CSSTransformValue with a single transform",
+      "input": "new CSSTransformValue([new CSSPerspective(CSS.px(1))])",
+      "expected": "perspective(1px)"
+    },
+    {
+      "description": "CSSTransformValue with multiple transforms",
+      "input": "new CSSTransformValue([\n      new CSSTranslate(CSS.px(1), CSS.px(0)),\n      new CSSRotate(CSS.deg(90)),\n      new CSSPerspective(CSS.px(1)),\n      new CSSSkew(CSS.deg(90), CSS.deg(45)),\n      new CSSScale(CSS.number(1), CSS.number(2), CSS.number(3)),\n    ])",
+      "expected": "translate(1px, 0px) rotate(90deg) perspective(1px) skew(90deg, 45deg) scale3d(1, 2, 3)"
+    },
+    {
+      "description": "CSSTransformValue containing CSSMathValues",
+      "input": "new CSSTransformValue([\n      new CSSTranslate(new CSSMathSum(CSS.px(1), CSS.em(1)), CSS.px(0)),\n      new CSSRotate(new CSSMathSum(CSS.deg(90), CSS.turn(1))),\n      new CSSPerspective(new CSSMathSum(CSS.px(1), CSS.em(1))),\n      new CSSSkew(new CSSMathProduct(CSS.deg(90), 2), new CSSMathProduct(CSS.turn(1), 2)),\n      new CSSScale(\n        new CSSMathProduct(CSS.number(1), CSS.number(2)),\n        new CSSMathSum(CSS.number(1), CSS.number(1)),\n        new CSSMathProduct(CSS.number(3))\n      ),\n    ])",
+      "expected": "translate(calc(1em + 1px), 0px) rotate(calc(90deg + 360deg)) perspective(calc(1em + 1px)) skew(calc(2 * 90deg), calc(2 * 360deg)) scale3d(calc(1 * 2), calc(1 + 1), calc(3))"
+    },
+    {
+      "description": "CSSMathInvert with 0 parameter",
+      "input": "new CSSTransformValue([\n      new CSSRotate(\n        new CSSMathInvert(\n          new CSSUnitValue(0, 'number')),\n        0, 0, CSS.deg(0))\n      ])",
+      "expected": "rotate3d(calc(1 / 0), 0, 0, 0deg)"
+    },
+    {
+      "description": "CSSMathInvert with 0 parameter and nested",
+      "input": "new CSSTransformValue([\n      new CSSRotate(\n        0, 0, 0,\n          new CSSMathProduct(CSS.deg(1),\n            new CSSMathInvert(\n              new CSSUnitValue(0, 'number')))\n        )\n      ])",
+      "expected": "rotate3d(0, 0, 0, calc(1deg * (1 / 0)))"
+    },
+    {
+      "description": "CSSMatrixComponent with 6 elements",
+      "input": "new CSSMatrixComponent(new DOMMatrixReadOnly([1, 2, 3, 4, 5, 6]))",
+      "expected": "matrix(1, 2, 3, 4, 5, 6)"
+    },
+    {
+      "description": "CSSMatrixComponent with 16 elements",
+      "input": "new CSSMatrixComponent(new DOMMatrixReadOnly([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]))",
+      "expected": "matrix3d(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)"
+    },
+    {
+      "description": "CSSTransformValue with updated is2D serializes as 2D transforms",
+      "input": "result",
+      "expected": "translate(1px, 2px) rotate(90deg) scale(1, 2)"
+    },
+    {
+      "description": "CSSUnitValue with length unit constructed from IDL serializes correctly",
+      "input": "new CSSUnitValue(3.14, 'px')",
+      "expected": "3.14px"
+    },
+    {
+      "description": "CSSUnitValue with length unit constructed from IDL serializes correctly",
+      "input": "CSS.px(3.14)",
+      "expected": "3.14px"
+    },
+    {
+      "description": "CSSUnitValue with unit \"percent\" constructed from IDL serializes correctly",
+      "input": "new CSSUnitValue(3.14, 'percent')",
+      "expected": "3.14%"
+    },
+    {
+      "description": "CSSUnitValue with unit \"percent\" constructed from IDL serializes correctly",
+      "input": "CSS.percent(3.14)",
+      "expected": "3.14%"
+    },
+    {
+      "description": "CSSUnitValue with unit \"number\" constructed from IDL serializes correctly",
+      "input": "new CSSUnitValue(3.14, 'number')",
+      "expected": "3.14"
+    },
+    {
+      "description": "CSSUnitValue with unit \"number\" constructed from IDL serializes correctly",
+      "input": "CSS.number(3.14)",
+      "expected": "3.14"
+    },
+    {
+      "description": "CSSUnitValue with integer values constructed from IDL serializes correctly",
+      "input": "new CSSUnitValue(3, 'number')",
+      "expected": "3"
+    },
+    {
+      "description": "CSSKeywordValue from DOMString modified by \"value\" setter serializes correctly",
+      "input": "result",
+      "expected": "3.14px"
+    },
+    {
+      "description": "CSSKeywordValue from CSSOM modified by \"value\" setter serializes correctly",
+      "input": "result",
+      "expected": "3.14px"
+    },
+    {
+      "description": "CSSKeywordValue constructed from IDL serializes correctly",
+      "input": "new CSSKeywordValue('auto')",
+      "expected": "auto"
+    },
+    {
+      "description": "CSSKeywordValue constructed from IDL serializes correctly",
+      "input": "new CSSKeywordValue('inherit')",
+      "expected": "inherit"
+    },
+    {
+      "description": "CSSKeywordValue constructed from IDL serializes correctly",
+      "input": "new CSSKeywordValue('lemon')",
+      "expected": "lemon"
+    },
+    {
+      "description": "CSSKeywordValue from DOMString modified through \"value\" setter serializes correctly",
+      "input": "result",
+      "expected": "lemon"
+    },
+    {
+      "description": "CSSKeywordValue from CSSOM modified through \"value\" setter serializes correctly",
+      "input": "result",
+      "expected": "lemon"
+    },
+    {
+      "description": "CSSUnparsedValue containing strings serializes to its tokenized contents",
+      "input": "new CSSUnparsedValue(['lem', 'on', 'ade'])",
+      "expected": "lem/**/on/**/ade"
+    },
+    {
+      "description": "CSSUnparsedValue containing variable references",
+      "input": "new CSSUnparsedValue([new CSSVariableReferenceValue('--A', new CSSUnparsedValue([new CSSVariableReferenceValue('--B')])), new CSSVariableReferenceValue('--C')])",
+      "expected": "var(--A,var(--B))var(--C)"
+    },
+    {
+      "description": "CSSUnparsedValue with mix of strings and variable references",
+      "input": "new CSSUnparsedValue(['foo', 'bar ', new CSSVariableReferenceValue('--A', new CSSUnparsedValue(['baz ', new CSSVariableReferenceValue('--B'), 'lemon'])), new CSSVariableReferenceValue('--C', new CSSUnparsedValue(['ade']))])",
+      "expected": "foo/**/bar var(--A,baz var(--B)lemon)var(--C,ade)"
+    }
+  ],
+  "normalization": [
+    {
+      "description": "translate() with X",
+      "input": "translate(1px)",
+      "expected": "new CSSTranslate(CSS.px(1), CSS.px(0))"
+    },
+    {
+      "description": "translate() with X and Y",
+      "input": "translate(1%, 1px)",
+      "expected": "new CSSTranslate(CSS.percent(1), CSS.px(1))"
+    },
+    {
+      "description": "translateX()",
+      "input": "translateX(1%)",
+      "expected": "new CSSTranslate(CSS.percent(1), CSS.px(0))"
+    },
+    {
+      "description": "translateY()",
+      "input": "translateY(1px)",
+      "expected": "new CSSTranslate(CSS.px(0), CSS.px(1))"
+    },
+    {
+      "description": "translate3d()",
+      "input": "translate3d(1px, 2%, 3px)",
+      "expected": "new CSSTranslate(CSS.px(1), CSS.percent(2), CSS.px(3))"
+    },
+    {
+      "description": "translateZ()",
+      "input": "translateZ(1px)",
+      "expected": "new CSSTranslate(CSS.px(0), CSS.px(0), CSS.px(1))"
+    },
+    {
+      "description": "scale() with one argument",
+      "input": "scale(2)",
+      "expected": "new CSSScale(CSS.number(2), CSS.number(2))"
+    },
+    {
+      "description": "scale() with two arguments",
+      "input": "scale(2, 3)",
+      "expected": "new CSSScale(CSS.number(2), CSS.number(3))"
+    },
+    {
+      "description": "scaleX()",
+      "input": "scaleX(2)",
+      "expected": "new CSSScale(CSS.number(2), CSS.number(1))"
+    },
+    {
+      "description": "scaleY()",
+      "input": "scaleY(2)",
+      "expected": "new CSSScale(CSS.number(1), CSS.number(2))"
+    },
+    {
+      "description": "scale3d()",
+      "input": "scale3d(1, 2, 3)",
+      "expected": "new CSSScale(CSS.number(1), CSS.number(2), CSS.number(3))"
+    },
+    {
+      "description": "scaleZ()",
+      "input": "scaleZ(2)",
+      "expected": "new CSSScale(CSS.number(1), CSS.number(1), CSS.number(2))"
+    },
+    {
+      "description": "rotate()",
+      "input": "rotate(90deg)",
+      "expected": "new CSSRotate(CSS.deg(90))"
+    },
+    {
+      "description": "rotate3d()",
+      "input": "rotate3d(1, 2, 3, 90deg)",
+      "expected": "new CSSRotate(CSS.number(1), CSS.number(2), CSS.number(3), CSS.deg(90))"
+    },
+    {
+      "description": "rotateX()",
+      "input": "rotateX(90deg)",
+      "expected": "new CSSRotate(CSS.number(1), CSS.number(0), CSS.number(0), CSS.deg(90))"
+    },
+    {
+      "description": "rotateY()",
+      "input": "rotateY(90deg)",
+      "expected": "new CSSRotate(CSS.number(0), CSS.number(1), CSS.number(0), CSS.deg(90))"
+    },
+    {
+      "description": "rotateZ()",
+      "input": "rotateZ(90deg)",
+      "expected": "new CSSRotate(CSS.number(0), CSS.number(0), CSS.number(1), CSS.deg(90))"
+    },
+    {
+      "description": "skew() with only X",
+      "input": "skew(90deg)",
+      "expected": "new CSSSkew(CSS.deg(90), CSS.deg(0))"
+    },
+    {
+      "description": "skew() with X and Y which is 0 value",
+      "input": "skew(90deg, 0deg)",
+      "expected": "new CSSSkew(CSS.deg(90), CSS.deg(0))"
+    },
+    {
+      "description": "skew() with X and Y",
+      "input": "skew(90deg, 45deg)",
+      "expected": "new CSSSkew(CSS.deg(90), CSS.deg(45))"
+    },
+    {
+      "description": "skewX()",
+      "input": "skewX(90deg)",
+      "expected": "new CSSSkewX(CSS.deg(90))"
+    },
+    {
+      "description": "skewY()",
+      "input": "skewY(90deg)",
+      "expected": "new CSSSkewY(CSS.deg(90))"
+    },
+    {
+      "description": "perspective()",
+      "input": "perspective(1px)",
+      "expected": "new CSSPerspective(CSS.px(1))"
+    },
+    {
+      "description": "perspective(none)",
+      "input": "perspective(none)",
+      "expected": "new CSSPerspective(new CSSKeywordValue('none'))"
+    },
+    {
+      "description": "Normalizing a matrix() returns a CSSMatrixComponent",
+      "input": "matrix(1, 2, 3, 4, 5, 6)",
+      "expected": "new CSSTransformValue([\n        new CSSMatrixComponent(new DOMMatrixReadOnly([1, 2, 3, 4, 5, 6]))\n      ])"
+    },
+    {
+      "description": "Normalizing a matrix3d() returns a CSSMatrixComponent",
+      "input": "matrix3d(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16)",
+      "expected": "new CSSTransformValue([\n        new CSSMatrixComponent(new DOMMatrixReadOnly([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]))\n      ])"
+    },
+    {
+      "description": "Normalizing transforms with calc values contains CSSMathValues",
+      "input": "translate(calc(1px + 1em)) perspective(calc(1px + 1em))",
+      "expected": "new CSSTransformValue([\n        new CSSTranslate(new CSSMathSum(CSS.px(1), CSS.em(1)), CSS.px(0)),\n        new CSSPerspective(new CSSMathSum(CSS.px(1), CSS.em(1))),\n      ])"
+    }
+  ],
+  "parsing": [
+    {
+      "description": "Parsing calc(1% + 2em + 3px)",
+      "property": "width",
+      "input": "calc(1% + 2em + 3px)",
+      "expected": "new CSSMathSum(CSS.percent(1), CSS.em(2), CSS.px(3))"
+    },
+    {
+      "description": "Parsing calc(1px + 2% + 3em)",
+      "property": "width",
+      "input": "calc(1px + 2% + 3em)",
+      "expected": "new CSSMathSum(CSS.px(1), CSS.percent(2), CSS.em(3))"
+    }
+  ],
+  "syntax_examples": [
+    {
+      "syntax": "<length>",
+      "description": "zero px",
+      "input": "new CSSUnitValue(0, 'px')"
+    },
+    {
+      "syntax": "<length>",
+      "description": "a negative em",
+      "input": "new CSSUnitValue(-3.14, 'em')"
+    },
+    {
+      "syntax": "<length>",
+      "description": "a positive cm",
+      "input": "new CSSUnitValue(3.14, 'cm')"
+    },
+    {
+      "syntax": "<length>",
+      "description": "a calc length",
+      "input": "new CSSMathSum(new CSSUnitValue(0, 'px'), new CSSUnitValue(0, 'em'))"
+    },
+    {
+      "syntax": "<percentage>",
+      "description": "zero percent",
+      "input": "new CSSUnitValue(0, 'percent')"
+    },
+    {
+      "syntax": "<percentage>",
+      "description": "a negative percent",
+      "input": "new CSSUnitValue(-3.14, 'percent')"
+    },
+    {
+      "syntax": "<percentage>",
+      "description": "a positive percent",
+      "input": "new CSSUnitValue(3.14, 'percent')"
+    },
+    {
+      "syntax": "<percentage>",
+      "description": "a calc percent",
+      "input": "new CSSMathSum(new CSSUnitValue(0, 'percent'), new CSSUnitValue(0, 'percent'))"
+    },
+    {
+      "syntax": "<time>",
+      "description": "zero seconds",
+      "input": "new CSSUnitValue(0, 's')"
+    },
+    {
+      "syntax": "<time>",
+      "description": "negative milliseconds",
+      "input": "new CSSUnitValue(-3.14, 'ms')"
+    },
+    {
+      "syntax": "<time>",
+      "description": "positive seconds",
+      "input": "new CSSUnitValue(3.14, 's')"
+    },
+    {
+      "syntax": "<time>",
+      "description": "a calc time",
+      "input": "new CSSMathSum(new CSSUnitValue(0, 's'), new CSSUnitValue(0, 'ms'))"
+    },
+    {
+      "syntax": "<angle>",
+      "description": "zero degrees",
+      "input": "new CSSUnitValue(0, 'deg')"
+    },
+    {
+      "syntax": "<angle>",
+      "description": "positive radians",
+      "input": "new CSSUnitValue(3.14, 'rad')"
+    },
+    {
+      "syntax": "<angle>",
+      "description": "negative degrees",
+      "input": "new CSSUnitValue(-3.14, 'deg')"
+    },
+    {
+      "syntax": "<angle>",
+      "description": "a calc angle",
+      "input": "new CSSMathSum(new CSSUnitValue(0, 'rad'), new CSSUnitValue(0, 'deg'))"
+    },
+    {
+      "syntax": "<flex>",
+      "description": "zero fractions",
+      "input": "new CSSUnitValue(0, 'fr')"
+    },
+    {
+      "syntax": "<flex>",
+      "description": "one fraction",
+      "input": "new CSSUnitValue(1, 'fr')"
+    },
+    {
+      "syntax": "<negative-flex>",
+      "description": "negative fraction",
+      "input": "new CSSUnitValue(-3.14, 'fr')"
+    },
+    {
+      "syntax": "<number>",
+      "description": "the number zero",
+      "input": "new CSSUnitValue(0, 'number')"
+    },
+    {
+      "syntax": "<number>",
+      "description": "a negative number",
+      "input": "new CSSUnitValue(-3.14, 'number')"
+    },
+    {
+      "syntax": "<number>",
+      "description": "a positive number",
+      "input": "new CSSUnitValue(3.14, 'number')"
+    },
+    {
+      "syntax": "<number>",
+      "description": "a calc number",
+      "input": "new CSSMathSum(new CSSUnitValue(2, 'number'), new CSSUnitValue(3, 'number'))"
+    }
+  ]
+}
