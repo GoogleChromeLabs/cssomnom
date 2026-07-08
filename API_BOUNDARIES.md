@@ -72,7 +72,7 @@ These APIs are NOT part of any W3C specification. They exist to make the library
     - `StreamingTokenizer`: For memory-efficient streaming tokenization.
 
 ## API Surface Verification
-The public API surface area is locked down and verified by [api-surface.test.ts](file:///usr/local/google/home/paulirish/code/cssom/tests/api-surface.test.ts). Any additions or removals of public exports must be reflected in that test to ensure intentional API changes.
+The public API surface area is locked down and verified by [api-surface.test.ts](./tests/api-surface.test.ts). Any additions or removals of public exports must be reflected in that test to ensure intentional API changes.
 
 ---
 

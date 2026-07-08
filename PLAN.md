@@ -33,14 +33,14 @@ Objective: Create a modern, spec-compliant, pure JavaScript CSSOM parser, levera
 - [x] **Design Parser Architecture**:
     - [x] Write a skeleton parser that handles top-level structure (rules, blocks) using a non-backtracking predictive parser.
 
-## Phase 3: AI-Assisted Implementation (Vibe Engineering via go/ralph)
-*Strategy: We will use the autonomous agent Ralph for this phase. `PLAN.md` remains our strategic source of truth. When ready, we will generate a dedicated `.gemini/tasks.md` file containing atomic checkboxes for Ralph to execute unattended. Documentation: [index.md](file:///google/src/files/head/depot/google3/video/youtube/devtools/executors/ralph/g3doc/index.md)*
+## Phase 3: AI-Assisted Implementation
+*Strategy: We will use autonomous AI agents for this phase. `PLAN.md` remains our strategic source of truth. When ready, we will generate a dedicated `.gemini/tasks.md` file containing atomic checkboxes for the agent to execute unattended.*
 
 
 - [x] **Setup automated test loop**:
     - *Action*: Create a runner that reads the extracted JSON fixtures and asserts against the parser's output.
-- [x] **Generate `.gemini/tasks.md` for Ralph**:
-    - [x] Decompose the parsed-out components (Tokenizer, Core Parser, etc.) into atomic tasks for Ralph.
+- [x] **Generate `.gemini/tasks.md` for AI agent**:
+    - [x] Decompose the parsed-out components (Tokenizer, Core Parser, etc.) into atomic tasks for the AI agent.
 - [x] **Implement Tokenizer**:
     - [x] Build the tokenizer in `src/tokenizer.ts` and verify against spec examples.
 - [x] **Implement Parser - Core**:
@@ -66,8 +66,8 @@ Objective: Create a modern, spec-compliant, pure JavaScript CSSOM parser, levera
 Objective: Implement support for CSS Nesting Module Level 1, allowing style rules and at-rules to be nested within other style rules.
 
 **Spec References**:
-- CSS Nesting Module Level 1: [css-nesting-1/Overview.bs](file:///usr/local/google/home/paulirish/code/cssom/submodules/csswg-drafts/css-nesting-1/Overview.bs)
-- CSS Syntax Module Level 3: [css-syntax-3/Overview.bs](file:///usr/local/google/home/paulirish/code/cssom/submodules/csswg-drafts/css-syntax-3/Overview.bs) (Referenced for general parsing rules)
+- CSS Nesting Module Level 1: [css-nesting-1/Overview.bs](submodules/csswg-drafts/css-nesting-1/Overview.bs)
+- CSS Syntax Module Level 3: [css-syntax-3/Overview.bs](submodules/csswg-drafts/css-syntax-3/Overview.bs) (Referenced for general parsing rules)
 
 ### Tasks
 
@@ -350,7 +350,6 @@ Objective: Systematically address the backlog of skipped external tests from W3C
 #### Step 1: Categorize Skipped Tests
 - [x] Analyze the currently skipped tests in `tests/` (especially fixtures extracted from submodules).
 - [x] Group them by feature or failure type (e.g., "Selector Specificity", "Complex At-Rules", "Error Recovery Edge Cases").
-  - See [skipped_tests_analysis.md](file:///usr/local/google/home/paulirish/.gemini/jetski/brain/bb6738bb-1176-4a77-add1-5431afd3c10c/skipped_tests_analysis.md) for details.
 
 #### Step 2: CSSOM & Interface Hardening
 - [x] **CSSRule**: Add empty setter for `cssText` in subclasses to prevent `TypeError` in strict mode when attempting to set it (spec says it should do nothing).
@@ -418,7 +417,7 @@ Objective: Fulfill the "Executable Specification" requirement by adding missing 
 
 ### Tasks
 
-#### Step 1: Spec Citations (Ralph)
+#### Step 1: Spec Citations
 - [x] **Citations**: Add spec citations (format `// X.X.X Title`) to `src/tokenizer.ts`.
 - [x] **Citations**: Add spec citations to `src/CSSOM.ts` (especially `insertRule` and `cssText` getters).
 - [x] **Citations**: Add spec citations to `src/typed-om.ts`.
@@ -523,7 +522,7 @@ Objective: Align with `css-typed-om` and `css-typed-om-2` drafts.
 Objective: Use `css-parser-api` as a reference for future parser architecture improvements.
 
 ### Tasks
-- [x] **Audit Parser API**: Read the spec and compared it with the current implementation. (See [CSS_PARSER_API_AUDIT.md](file:///usr/local/google/home/paulirish/.gemini/jetski/brain/421b1f6c-7c8d-4cda-93f9-db037ef495b9/CSS_PARSER_API_AUDIT.md))
+- [x] **Audit Parser API**: Read the spec and compared it with the current implementation.
 - [x] **Implement `CSSParserValue` Interfaces**: Define `CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`, `CSSParserDeclaration`, `CSSParserBlock`, and `CSSParserFunction`.
 - [x] **Expose `CSS` Parsing Methods**: Implement `CSS.parseValue()`, `CSS.parseValueList()`, `CSS.parseDeclaration()`, etc. (Dual Sync/Async API).
 - [x] **Bridge Parser to Parser API**: Created a mapping layer in `src/parser-api.ts` between internal AST and Houdini Parser API objects.
@@ -814,7 +813,7 @@ Objective: Address non-compliance issues, missing features, and technical debt i
 
 ### Test Cleanup & Enhancement
 - [x] **Fuzzing Enhancements**: Move `tests/fuzz.ts` to a subfolder (e.g., `tests/fuzz/`) and augment it to fuzz more areas (Typed OM, Media Queries, etc.).
-- [x] **Investigate Fuzzer Errors**: Investigate the 'Newline reached before string was closed' errors found by `fuzz-codebase.test.ts` when scanning `~/code`.
+- [x] **Investigate Fuzzer Errors**: Investigate the 'Newline reached before string was closed' errors found by `fuzz-codebase.test.ts` when scanning the target directory.
 - [x] **Clean Up `phase35` Test Files**: Relocate tests from `tests/phase35*.test.ts` to existing files or better-named files.
 - [x] **Clean Up `wpt_*` Files**:
     - [x] Move `tests/wpt_bulk_verify.ts` to `scripts/` (since it is a bulk check, not a unit test).
@@ -1026,7 +1025,7 @@ Objective: Address spec compliance issues, missing features, and technical debt 
 - [x] **Logical Properties: Static Mapping in Cascade**: Dynamically resolve mapping based on computed writing mode.
 
 - [x] **Logical Properties: Flawed Override Resolution**: Return empty string `""` when there is a mix of physical and logical longhands.
-- [x] **Logical Properties: `inset-block` Serialization Hack Removal**: Remove the hack added by Ralph in Phase 49.
+- [x] **Logical Properties: `inset-block` Serialization Hack Removal**: Remove the hack previously added in Phase 49.
 - [x] **Logical Properties: `border` Shorthand Omission**: Add `border` shorthand to `SHORTHANDS` dictionary.
 - [x] **Logical Properties: `border-radius` Recombination Missing**: Add `border-radius` to `tryCombineBoxShorthand`.
 - [x] **Selectors: Missing Validation for Empty Lists**: Throw `SyntaxError` if unforgiving and empty.

@@ -9,23 +9,22 @@ import { Parser } from '../src/parser.ts';
 import type { ParseError } from '../src/types.ts';
 
 test('Fuzz codebase with local CSS files', () => {
-  const homeDir = process.env.HOME;
-  if (!homeDir) {
-    console.log('HOME environment variable not found, skipping test.');
+  const fuzzDir = process.env.FUZZ_DIR;
+  if (!fuzzDir) {
+    console.log('FUZZ_DIR environment variable not set, skipping fuzzing test. Set FUZZ_DIR to run this test.');
     return;
   }
 
-  const codeDir = path.join(homeDir, 'code');
-  if (!fs.existsSync(codeDir)) {
-    console.log(`Directory ${codeDir} does not exist, skipping test.`);
+  if (!fs.existsSync(fuzzDir)) {
+    console.log(`Directory ${fuzzDir} does not exist, skipping test.`);
     return;
   }
 
-  console.log(`Finding CSS files in ${codeDir}...`);
+  console.log(`Finding CSS files in ${fuzzDir}...`);
   let cssFiles: string[] = [];
   try {
-    const output = child_process.execSync('fd --glob "*.css"', { cwd: codeDir, encoding: 'utf8' });
-    cssFiles = output.split('\n').filter(Boolean).map(f => path.resolve(codeDir, f));
+    const output = child_process.execSync('fd --glob "*.css"', { cwd: fuzzDir, encoding: 'utf8' });
+    cssFiles = output.split('\n').filter(Boolean).map(f => path.resolve(fuzzDir, f));
   } catch (e) {
     console.log('Failed to run fd command, skipping test.', e);
     return;

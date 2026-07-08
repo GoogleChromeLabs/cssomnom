@@ -13,7 +13,6 @@
   },
   "scripts": {
     "build": "tsup",
-    "publish:local": "pnpm run build && if [ -n \"$GUIDANCE_DIR\" ]; then mkdir -p \"$GUIDANCE_DIR/lib/third_party/cssomnom/\" && cp dist/* README.md LICENSE \"$GUIDANCE_DIR/lib/third_party/cssomnom/\"; else echo \"Error: GUIDANCE_DIR environment variable is not set.\"; exit 1; fi",
     "test": "pnpm run preflight",
     "test:node": "node --test --test-reporter=dot 'tests/**/*.ts'",
     "typecheck": "tsc --noEmit",
