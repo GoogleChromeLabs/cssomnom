@@ -3,7 +3,7 @@
 This report details the findings of an audit conducted on the `cssomnom` source files to identify hardcoded lists of CSS properties, values, units, and media features.
 
 ## Executive Summary
-The audit revealed that the codebase relies heavily on hardcoded lists across multiple core files. While some of these lists are relatively static (like math functions), others representing rapidly evolving specifications (like property names, shorthands, and units) are at high risk of becoming stale. In fact, the audit identified an **active bug** in `src/units.ts` where the `unitToBase` map is incomplete, missing many modern units defined in the `CSSUnit` type.
+The audit revealed that the codebase relies heavily on hardcoded lists across multiple core files. While some of these lists are relatively static (like math functions), others representing rapidly evolving specifications (like property names, shorthands, and units) are at high risk of becoming stale. In fact, the audit identified an **active bug** in `src/data/gen/units.ts` where the `unitToBase` map is incomplete, missing many modern units defined in the `CSSUnit` type.
 
 The recommended long-term strategy is to introduce a **build-time code generation pipeline** utilizing external data sources like `mdn-data` and `@webref/css` to keep these lists and TypeScript interfaces automatically synchronized with the latest standards.
 
@@ -30,7 +30,7 @@ This package provides curated data powering MDN Web Docs.
 
 ## Detailed Findings & Solutions
 
-### 1. `src/LogicalMapping.ts`
+### 1. `src/data/gen/LogicalMapping.ts`
 - **What**: `LOGICAL_MAPPING` object mapping logical properties to physical properties.
 - **Risk**: Medium. Misses newer logical properties like `scroll-margin-block` and `scroll-padding-block`.
 - **Solution**: Generate this mapping directly from `@webref/css` by parsing the `syntax` and `logicalPropertyGroup` metadata on properties.
@@ -45,8 +45,8 @@ This package provides curated data powering MDN Web Docs.
 - **Risk**: High. Tedious to maintain manually; covers only a small subset of shorthands.
 - **Solution**: Generate shorthand component lists from `mdn-data`'s `css.properties`. Any property where `"initial"` is an array of strings defines a shorthand and its longhands.
 
-### 4. `src/units.ts` & `src/typed-om.ts`
-- **What**: Mappings like `unitToBase` in `src/units.ts` and `CSSUnit` string union type.
+### 4. `src/data/gen/units.ts` & `src/typed-om.ts`
+- **What**: Mappings like `unitToBase` in `src/data/gen/units.ts` and `CSSUnit` string union type.
 - **Risk**: **High (Active Bug)**. `unitToBase` lacks entries for many modern units.
 - **Solution**: Neither `mdn-data` nor `@webref/css` currently export an easily consumable, up-to-date list of all CSS units. We should centralize unit definitions in a single local JSON/YAML configuration file and use it to generate both the TypeScript types and the mapping dictionaries, until upstream packages expose them.
 

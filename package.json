@@ -19,10 +19,14 @@
     "preflight": "pnpm typecheck && pnpm lint && pnpm test:node",
     "lint": "oxlint",
     "fixtures:generate": "node scripts/extract_external_suites.ts",
+    "external:extract": "node scripts/extract_external_suites.ts",
+    "baselines:prune": "node scripts/prune_resolved_failures.ts",
+    "wpt:sandbox": "node scripts/run_wpt_sandbox.ts",
+    "wpt:baseline": "node scripts/update_wpt_baseline.ts",
     "submodules:update": "git submodule update --init --recursive",
     "submodules:upgrade": "git submodule update --init --remote && pnpm run submodules:update",
     "codegen": "node scripts/generate_all.ts",
-    "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run fixtures:generate && pnpm run preflight"
+    "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run external:extract && pnpm run preflight"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
