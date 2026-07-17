@@ -181,7 +181,8 @@ export function patchWindowForTypedOM(window: WindowType) {
       get() {
         if (!this._contentDocument) {
           let iframeSandbox: IframeSandboxContext | null = null;
-          const iframeWindow = new Proxy({} as unknown as WindowType, {
+          const iframeWindowTarget: Partial<WindowType> = {};
+          const iframeWindow = new Proxy(iframeWindowTarget, {
             get(target, prop) {
               if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
                 return iframeWindow;
@@ -202,22 +203,22 @@ export function patchWindowForTypedOM(window: WindowType) {
               }
               return iframeSandbox ? (prop in iframeSandbox) : false;
             }
-          });
+          }) as WindowType;
           this._contentDocument = {
             write(src: string) {
               const scripts = extractScripts(src, '');
               const iframeTests: WptSandboxTest[] = [];
               const titleMatch = /<title>(.*?)<\/title>/i.exec(src);
               const iframeTitle = titleMatch ? titleMatch[1] : 'Document title';
-              const iframeDocument = {
+              const iframeDocument: Partial<DocumentType> = {
                 title: iframeTitle,
                 body: {
-                  appendChild: (el: unknown) => el
-                },
+                  appendChild: <T extends Node>(el: T): T => el
+                } as unknown as HTMLElement,
                 createElement: (name: string) => window.document.createElement(name),
-                querySelectorAll: () => []
+                querySelectorAll: () => [] as unknown as NodeListOf<Element>
               };
-              iframeSandbox = createWptContext(window, iframeDocument as unknown as DocumentType, iframeTests) as IframeSandboxContext;
+              iframeSandbox = createWptContext(window, iframeDocument, iframeTests) as IframeSandboxContext;
               
               iframeSandbox.parent = window;
               iframeSandbox.top = window;
@@ -300,8 +301,11 @@ export function patchWindowForTypedOM(window: WindowType) {
                 iframeWindow.dispatchEvent(domContentLoadedEv);
                 const loadEv = new iframeWindow.Event('load', { bubbles: true });
                 iframeWindow.dispatchEvent(loadEv);
-              } catch (e) {
-                // ignore
+              } catch (e: unknown) {
+                if (e && typeof e === 'object' && (('name' in e && e.name === 'AssertionError') || ('code' in e && e.code === 'ERR_ASSERTION'))) {
+                  throw e;
+                }
+                // ignore other environmental/DOM setup glitches
               }
               
               Promise.resolve().then(async () => {
@@ -718,7 +722,7 @@ function get_test_name(func: Function, name: string | undefined, defaultName: st
 
 export function createWptContext(
   window: WindowType,
-  document: DocumentType,
+  document: Partial<DocumentType>,
   tests: WptSandboxTest[]
 ): Record<string, unknown> {
   const ctx = {
@@ -789,13 +793,13 @@ export function createWptContext(
     },
 
     // Expose elements with IDs as globals
-    ...(Array.from(document.querySelectorAll('[id]')).reduce<Record<string, unknown>>((acc, el) => {
+    ...(document.querySelectorAll ? Array.from(document.querySelectorAll('[id]')).reduce<Record<string, unknown>>((acc, el) => {
       const id = el.getAttribute('id');
       if (id) {
         acc[id] = el;
       }
       return acc;
-    }, {})),
+    }, {}) : {}),
     
     test: (fn: Function, name?: string) => {
       const testName = get_test_name(fn, name, 'anonymous-test', tests);
