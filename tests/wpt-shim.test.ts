@@ -23,3 +23,32 @@ test('window.getComputedStyle in sandbox shim', () => {
   // @ts-expect-error get method on StylePropertyMapReadOnly
   assert.strictEqual(styleMap.get('color')?.toString(), 'rgb(255, 0, 0)'); // computed map maps red to rgb(255, 0, 0) in our mock ComputedStylePropertyMap
 });
+
+test('document.styleSheets in sandbox shim', () => {
+  const dom = parseHTML(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <style>
+          div { color: blue; }
+        </style>
+        <style>
+          span { color: green; }
+        </style>
+      </head>
+      <body></body>
+    </html>
+  `);
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+
+  const doc = win.document;
+  assert.ok('styleSheets' in doc, 'styleSheets should be in document');
+  const sheets = doc.styleSheets;
+  assert.strictEqual(sheets.length, 2);
+  assert.ok(sheets[0]);
+  assert.ok(sheets[1]);
+  assert.ok(sheets[0].cssRules);
+  assert.strictEqual(sheets[0].cssRules.length, 1);
+  assert.strictEqual(sheets[0].cssRules[0].cssText.replace(/\s+/g, ''), 'div{color:blue;}');
+});

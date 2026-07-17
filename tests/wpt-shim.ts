@@ -214,7 +214,29 @@ export function patchWindowForTypedOM(window: WindowType) {
                 title: iframeTitle,
                 body: window.document.createElement('body'),
                 createElement: (name: string) => window.document.createElement(name),
-                querySelectorAll: () => window.document.createDocumentFragment().querySelectorAll('*')
+                querySelectorAll: () => window.document.createDocumentFragment().querySelectorAll('*'),
+                get styleSheets() {
+                  const styles = Array.from(this.querySelectorAll!('style'));
+                  const links = Array.from(this.querySelectorAll!('link[rel="stylesheet"]'));
+                  const sheets: unknown[] = [];
+                  for (const styleEl of styles) {
+                    const sheet = (styleEl as unknown as { sheet?: unknown }).sheet;
+                    if (sheet) sheets.push(sheet);
+                  }
+                  for (const linkEl of links) {
+                    const sheet = (linkEl as unknown as { sheet?: unknown }).sheet;
+                    if (sheet) sheets.push(sheet);
+                  }
+                  const list = sheets as unknown as StyleSheetList;
+                  Object.defineProperty(list, 'item', {
+                    value(idx: number) {
+                      return list[idx] || null;
+                    },
+                    configurable: true,
+                    enumerable: false
+                  });
+                  return list;
+                }
               };
               iframeSandbox = createWptContext(window, iframeDocument, iframeTests) as IframeSandboxContext;
               
@@ -530,6 +552,70 @@ export function patchWindowForTypedOM(window: WindowType) {
       }
     });
   }
+
+  const htmlLinkEl = win.HTMLLinkElement as { prototype: Record<string, unknown> } | undefined;
+  if (htmlLinkEl) {
+    Object.defineProperty(htmlLinkEl.prototype, 'sheet', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (!this._sheet) {
+          const rules: unknown[] = [];
+          this._sheet = {
+            cssRules: rules,
+            rules,
+            insertRule(text: string, idx = 0) {
+              const rule = parseStyleSheet(text)[0];
+              if (!rule) {
+                throw new Error('SyntaxError: Failed to parse rule');
+              }
+              rules.splice(idx, 0, rule);
+              return idx;
+            },
+            deleteRule(idx: number) {
+              rules.splice(idx, 1);
+            }
+          };
+        }
+        return this._sheet;
+      }
+    });
+  }
+
+  const documentConstructor = win.Document as { prototype: Record<string, unknown> } | undefined;
+  if (documentConstructor) {
+    Object.defineProperty(documentConstructor.prototype, 'styleSheets', {
+      get(this: Document) {
+        const styles = Array.from(this.querySelectorAll('style'));
+        const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
+        
+        const sheets: unknown[] = [];
+        for (const styleEl of styles) {
+          const sheet = (styleEl as unknown as { sheet?: unknown }).sheet;
+          if (sheet) {
+            sheets.push(sheet);
+          }
+        }
+        for (const linkEl of links) {
+          const sheet = (linkEl as unknown as { sheet?: unknown }).sheet;
+          if (sheet) {
+            sheets.push(sheet);
+          }
+        }
+        const list = sheets as unknown as StyleSheetList;
+        Object.defineProperty(list, 'item', {
+          value(idx: number) {
+            return list[idx] || null;
+          },
+          configurable: true,
+          enumerable: false
+        });
+        return list;
+      },
+      configurable: true
+    });
+  }
+
   Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
     get() {
       if (!this._attributeStyleMap) {
