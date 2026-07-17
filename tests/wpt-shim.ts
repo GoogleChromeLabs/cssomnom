@@ -786,6 +786,19 @@ export function patchWindowForTypedOM(window: WindowType) {
       }
     });
   };
+
+  win.matchMedia = function(media: string) {
+    return {
+      matches: false,
+      media,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent() { return false; }
+    };
+  };
 }
 
 function code_unit_str(char: string) {
@@ -837,6 +850,7 @@ export function createWptContext(
     removeEventListener: window.removeEventListener.bind(window),
     dispatchEvent: window.dispatchEvent.bind(window),
     getComputedStyle: (window as { getComputedStyle?: unknown }).getComputedStyle,
+    matchMedia: (window as { matchMedia?: unknown }).matchMedia,
     HTMLElement: window.HTMLElement,
     Element: window.Element,
     Node: window.Node,

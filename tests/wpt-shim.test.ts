@@ -52,3 +52,17 @@ test('document.styleSheets in sandbox shim', () => {
   assert.strictEqual(sheets[0].cssRules.length, 1);
   assert.strictEqual(sheets[0].cssRules[0].cssText.replace(/\s+/g, ''), 'div{color:blue;}');
 });
+
+test('window.matchMedia in sandbox shim', () => {
+  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+
+  assert.ok('matchMedia' in win, 'matchMedia should be in win');
+  const mql = win.matchMedia('(max-width: 600px)');
+  assert.ok(mql);
+  assert.strictEqual(typeof mql.matches, 'boolean');
+  assert.strictEqual(mql.media, '(max-width: 600px)');
+  assert.strictEqual(typeof mql.addListener, 'function');
+  assert.strictEqual(typeof mql.removeListener, 'function');
+});
