@@ -29,6 +29,12 @@ import { formatNumber } from './utils/format.ts';
 import { DOMMatrixReadOnly, DOMMatrix, setParseTransformListHook } from './DOMMatrix.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 
+function validateProperty(property: string): void {
+  if (!property.startsWith('--') && !SUPPORTED_PROPERTIES.has(property.toLowerCase())) {
+    throw new TypeError(`Invalid property name "${property}"`);
+  }
+}
+
 function compareStrings(a: string, b: string): number {
   return a === b ? 0 : (a < b ? -1 : 1);
 }
@@ -282,6 +288,14 @@ export class CSSStyleValue {
 
     if (isCSSWideKeyword) {
       return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
+    }
+
+    const shorthand = SHORTHANDS[property];
+    if (shorthand && !hasVarFunction(trimmed)) {
+      const expanded = shorthand.expand(trimmed);
+      if (expanded === null) {
+        throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
+      }
     }
 
     if (hasVarFunction(trimmed)) {
@@ -3443,6 +3457,7 @@ export class StylePropertyMapReadOnly {
   }
 
   get(property: string): CSSStyleValue | undefined {
+    validateProperty(property);
     const res = this._getRaw(property);
     if (res) {
       res._associatedProperty = property;
@@ -3491,6 +3506,7 @@ export class StylePropertyMapReadOnly {
   }
 
   has(property: string): boolean {
+    validateProperty(property);
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
       return shorthand.longhands.every(lh => this.declarations.some(d => d.name === lh));
@@ -3499,6 +3515,7 @@ export class StylePropertyMapReadOnly {
   }
 
   getAll(property: string): CSSStyleValue[] {
+    validateProperty(property);
     const res = this._getAllRaw(property);
     for (const val of res) {
       val._associatedProperty = property;
@@ -3666,6 +3683,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   }
 
   override get(property: string): CSSStyleValue | undefined {
+    validateProperty(property);
     const res = this._getRaw(property);
     if (res) {
       res._associatedProperty = property;
@@ -3723,6 +3741,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   }
 
   override getAll(property: string): CSSStyleValue[] {
+    validateProperty(property);
     const res = this._getAllRaw(property);
     for (const val of res) {
       val._associatedProperty = property;
@@ -3768,10 +3787,12 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   }
 
   override has(property: string): boolean {
+    validateProperty(property);
     return getPropertyValueSafe(this._style, property) !== '';
   }
 
   set(property: string, ...values: (CSSStyleValue | string)[]): void {
+    validateProperty(property);
     this._checkPendingSubstitution(property);
     for (const val of values) {
       if (val instanceof CSSStyleValue && val._associatedProperty !== null && val._associatedProperty !== property) {
@@ -3794,6 +3815,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   }
 
   append(property: string, ...values: (CSSStyleValue | string)[]): void {
+    validateProperty(property);
     this._checkPendingSubstitution(property);
     for (const val of values) {
       if (val instanceof CSSStyleValue && val._associatedProperty !== null && val._associatedProperty !== property) {
@@ -3819,6 +3841,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   }
 
   delete(property: string): void {
+    validateProperty(property);
     this._checkPendingSubstitution(property);
     setPropertySafe(this._style, this._element, property, null);
     getStyleCache(this._style).delete(property.toLowerCase());

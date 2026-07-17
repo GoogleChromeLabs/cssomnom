@@ -10,11 +10,8 @@ test('window.getComputedStyle in sandbox shim', () => {
   const win = dom.window;
   patchWindowForTypedOM(win);
 
-  // @ts-expect-error getComputedStyle is mocked on patched window
   assert.ok('getComputedStyle' in win, 'getComputedStyle should be in win');
-  // @ts-expect-error getComputedStyle is mocked on patched window
   const el = win.document.getElementById('test')!;
-  // @ts-expect-error getComputedStyle is mocked on patched window
   const style = win.getComputedStyle(el);
   assert.ok(style, 'getComputedStyle(el) should return style');
   assert.strictEqual(style.color, 'red');
