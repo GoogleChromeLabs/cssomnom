@@ -490,7 +490,7 @@ interface RectifyOptions {
   numberToUnit: (v: number) => CSSUnitValue;
   validateNumeric: (type: CSSNumericType) => boolean;
   allowUndefined?: boolean;
-  useTypeError?: boolean;
+  undefinedAsSyntaxError?: boolean;
 }
 
 const SIMPLE_NUMERIC = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))([a-zA-Z%]*)$/;
@@ -499,18 +499,16 @@ function rectifyColorChannel(
   v: number | string | CSSNumericValue | CSSKeywordValue | undefined,
   options: RectifyOptions
 ): CSSNumericValue | CSSKeywordValue {
-  const { name, numberToUnit, validateNumeric, allowUndefined = false, useTypeError = false } = options;
+  const { name, numberToUnit, validateNumeric, allowUndefined = false, undefinedAsSyntaxError = false } = options;
 
-  if (v === undefined) {
-    if (allowUndefined) {
+  if (v === undefined || v === null) {
+    if (allowUndefined && v === undefined) {
       return new CSSKeywordValue('undefined');
     }
-    const errMessage = `Value cannot be undefined`;
-    if (useTypeError) {
-      throw new TypeError(errMessage);
-    } else {
-      throw new DOMException(errMessage, 'SyntaxError');
+    if (undefinedAsSyntaxError) {
+      throw new DOMException(`Value cannot be null or undefined`, 'SyntaxError');
     }
+    throw new TypeError(`Value cannot be null or undefined`);
   }
 
   if (typeof v === 'number') {
@@ -561,19 +559,15 @@ function rectifyColorChannel(
     }
   }
 
-  const errMessage = `Invalid ${name} value`;
-  if (useTypeError) {
-    throw new TypeError(errMessage);
-  } else {
-    throw new DOMException(errMessage, 'SyntaxError');
-  }
+  throw new DOMException(`Invalid ${name} value`, 'SyntaxError');
 }
 
 function rectifyColorRGBComp(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorRGBComp',
     numberToUnit: (num) => new CSSUnitValue(num * 100, 'percent'),
-    validateNumeric: (t) => matchesNumber(t) || matchesPercentage(t)
+    validateNumeric: (t) => matchesNumber(t) || matchesPercentage(t),
+    undefinedAsSyntaxError: true
   });
 }
 
@@ -581,7 +575,8 @@ function rectifyColorPercent(v: number | string | CSSNumericValue | CSSKeywordVa
   return rectifyColorChannel(v, {
     name: 'CSSColorPercent',
     numberToUnit: (num) => new CSSUnitValue(num * 100, 'percent'),
-    validateNumeric: matchesPercentage
+    validateNumeric: matchesPercentage,
+    undefinedAsSyntaxError: true
   });
 }
 
@@ -606,8 +601,7 @@ function rectifyColorAngle(v: number | string | CSSNumericValue | CSSKeywordValu
     name: 'CSSColorAngle',
     numberToUnit: (num) => new CSSUnitValue(num, 'deg'),
     validateNumeric: matchesAngle,
-    allowUndefined,
-    useTypeError: true
+    allowUndefined
   });
 }
 
@@ -721,7 +715,7 @@ export class CSSHSL extends CSSColorValue {
   }
 
   get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val); }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val, true); }
 
   get s(): CSSNumericValue | CSSKeywordValue { return this._s; }
   set s(val: number | string | CSSNumericValue | CSSKeywordValue) { this._s = rectifyColorPercent(val); }
@@ -850,7 +844,7 @@ export class CSSLCH extends CSSColorValue {
   set c(val: number | string | CSSNumericValue | CSSKeywordValue) { this._c = rectifyColorPercent(val); }
 
   get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val); }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val, true); }
 
   get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
   set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
@@ -928,7 +922,7 @@ export class CSSOKLCH extends CSSColorValue {
   set c(val: number | string | CSSNumericValue | CSSKeywordValue) { this._c = rectifyColorPercent(val); }
 
   get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val); }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val, true); }
 
   get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
   set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }

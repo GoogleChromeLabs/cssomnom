@@ -155,14 +155,14 @@ test('CSS Color compliance tasks (Phase 68 Task 10)', () => {
   assert.strictEqual(canvasParsed.value, 'canvas');
 });
 
-test('rectifyColorAngle throws TypeError instead of SyntaxError DOMException on invalid angles', () => {
+test('rectifyColorAngle throws SyntaxError DOMException on invalid angles', () => {
   const hsl = new CSSHSL(120, 50, 50);
   assert.throws(() => {
     hsl.h = 'invalid-angle';
-  }, TypeError);
+  }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
   assert.throws(() => {
     hsl.h = new CSSUnitValue(10, 'px');
-  }, TypeError);
+  }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
 });
 
 test('color() function reification to CSSColor', () => {
