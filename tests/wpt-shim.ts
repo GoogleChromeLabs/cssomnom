@@ -218,18 +218,18 @@ export function patchWindowForTypedOM(window: WindowType) {
                 get styleSheets() {
                   const styles = Array.from(this.querySelectorAll!('style'));
                   const links = Array.from(this.querySelectorAll!('link[rel="stylesheet"]'));
-                  const sheets: StyleSheet[] = [];
+                  const sheets: CSSStyleSheet[] = [];
                   for (const styleEl of styles) {
                     if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-                      sheets.push(styleEl.sheet as StyleSheet);
+                      sheets.push(styleEl.sheet as CSSStyleSheet);
                     }
                   }
                   for (const linkEl of links) {
                     if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-                      sheets.push(linkEl.sheet as StyleSheet);
+                      sheets.push(linkEl.sheet as CSSStyleSheet);
                     }
                   }
-                  const list = sheets as unknown as StyleSheetList;
+                  const list = sheets as CSSStyleSheet[] & { item(idx: number): CSSStyleSheet | null };
                   Object.defineProperty(list, 'item', {
                     value(idx: number) {
                       return list[idx] || null;
@@ -237,7 +237,7 @@ export function patchWindowForTypedOM(window: WindowType) {
                     configurable: true,
                     enumerable: false
                   });
-                  return list;
+                  return list as StyleSheetList;
                 }
               };
               iframeSandbox = createWptContext(window, iframeDocument, iframeTests) as IframeSandboxContext;
@@ -591,18 +591,18 @@ export function patchWindowForTypedOM(window: WindowType) {
         const styles = Array.from(this.querySelectorAll('style'));
         const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
         
-        const sheets: StyleSheet[] = [];
+        const sheets: CSSStyleSheet[] = [];
         for (const styleEl of styles) {
           if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-            sheets.push(styleEl.sheet as StyleSheet);
+            sheets.push(styleEl.sheet as CSSStyleSheet);
           }
         }
         for (const linkEl of links) {
           if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-            sheets.push(linkEl.sheet as StyleSheet);
+            sheets.push(linkEl.sheet as CSSStyleSheet);
           }
         }
-        const list = sheets as unknown as StyleSheetList;
+        const list = sheets as CSSStyleSheet[] & { item(idx: number): CSSStyleSheet | null };
         Object.defineProperty(list, 'item', {
           value(idx: number) {
             return list[idx] || null;
@@ -610,7 +610,7 @@ export function patchWindowForTypedOM(window: WindowType) {
           configurable: true,
           enumerable: false
         });
-        return list;
+        return list as StyleSheetList;
       },
       configurable: true
     });
