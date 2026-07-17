@@ -1749,6 +1749,28 @@ Objective: Implement full spec-compliant expansion and contraction for the `back
   - [x] Run Codex Reviewer over the implementation diff range.
   - [x] Run Grizz gatekeeper green check.
 
+## Phase 74: WPT Self-Tests & Conformance Crawler Expansion [ ]
+
+Objective: Verify our WPT shim conformance against WPT's own unit tests, then scale up our sandbox runner to crawl and report conformance across all major CSS specification test folders.
+
+### Tasks
+- [ ] **WPT `testharness.js` Unit Tests**:
+  - [ ] Execute the 33 unit tests in `submodules/web-platform-tests/resources/test/tests/unit/` using the WPT sandbox.
+  - [ ] Identify and fix any shim errors, DOM node overrides, or compatibility gaps in `tests/wpt-shim.ts` exposed by these tests.
+- [ ] **Broad Spec Conformance Crawler Expansion**:
+  - [ ] Expand the WPT sandbox crawler to read and execute tests under other core specification directories: `cssom/`, `css-syntax/`, `css-nesting/`, `css-variables/`, `selectors/`, `mediaqueries/`.
+  - [ ] Configure includes/excludes lists for these spec folders in `tests/wpt-sandbox-config.json`.
+- [ ] **Unified Multi-Spec Progress Logging**:
+  - [ ] Create `wpt-progress.md` logging progress across multiple specs.
+  - [ ] Update progress logging script (`scripts/update_wpt_progress.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
+    ```markdown
+    | Date & Time (UTC) | Commit | Typed OM (12150) | CSSOM (600) | Nesting (120) | Syntax (350) | Selectors (500) | MQ (200) | Overall | Pass Rate |
+    | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+    ```
+- [ ] **Code Review & Verification**:
+  - [ ] Run Codex Reviewer over changes.
+  - [ ] Verify Grizz gatekeeper green check.
+
 ---
 
 ## Potential roadmap items
@@ -1760,13 +1782,6 @@ Objective: Explore long-term ideas for WPT conformance, prototype patching optio
 #### 1. Spec-Compliance & API Surface Refinements
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
-- [ ] **Run WPT `testharness.js` self-tests in sandbox**: Execute the 33 unittests in `submodules/web-platform-tests/resources/test/tests/unit/` using `run_wpt_sandbox.ts` to verify our `wpt-shim.ts` conformance.
-- [ ] **Broad WPT Conformance Suite Expansion**: Extend the WPT sandbox crawler to include other core CSS specification subfolders (`cssom/`, `css-nesting/`, `css-syntax/`, `css-variables/`, `selectors/`, `mediaqueries/`), expanding our test coverage to ~1,680 files and over 50k+ assertions. Log overall progress in a new file `wpt-progress.md` using the Option 1 multi-column percentage layout with spec totals in headers:
-  ```markdown
-  | Date & Time (UTC) | Commit | Typed OM (12150) | CSSOM (600) | Nesting (120) | Syntax (350) | Selectors (500) | MQ (200) | Overall | Pass Rate |
-  | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-  | 2026-07-17 18:00:00 | `c522959` | 48.48% | 75.00% | 100.00% | 88.57% | 80.00% | 90.00% | 7350/13920 | 52.80% |
-  ```
 
 
 
