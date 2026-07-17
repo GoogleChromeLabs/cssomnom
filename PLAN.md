@@ -1774,25 +1774,25 @@ Objective: Verify our WPT shim conformance against WPT's own unit tests, then sc
  
 ---
  
-## Phase 75: High-Leverage WPT Conformance Quick Wins
+## Phase 75: High-Leverage WPT Conformance Quick Wins [x]
  
 Objective: Resolve over 5,700 Web Platform Test failures (~33% of overall crawler failures) by implementing 5 high-leverage mocks and validation steps in the sandbox environment and Typed OM core.
  
 ### Tasks
-- [ ] **Mock `window.getComputedStyle` in Sandbox Shim**:
+- [x] **Mock `window.getComputedStyle` in Sandbox Shim**:
   - Implement a stub `window.getComputedStyle` inside `patchWindowForTypedOM` in `tests/wpt-shim.ts` returning the element's style.
   - Dynamically attach a read-only `StylePropertyMapReadOnly` onto `style.styleMap` inside the getter.
   - Expose `getComputedStyle` as a global in the sandbox VM contexts (resolves ~1,960 failures).
-- [ ] **Strict Property & Shorthand Validation in Typed OM**:
+- [x] **Strict Property & Shorthand Validation in Typed OM**:
   - Implement property name validation in `StylePropertyMapReadOnly` and `StylePropertyMap` methods to throw `TypeError` for unsupported property names (resolves ~3,200 failures).
   - Modify `CSSStyleValue.parse` to throw `TypeError` if input is invalid shorthand values.
-- [ ] **Mock `document.styleSheets` in Sandbox Shim**:
+- [x] **Mock `document.styleSheets` in Sandbox Shim**:
   - Define a getter on `window.Document.prototype` in `tests/wpt-shim.ts` to return parsed stylesheets from `<style>` and `<link>` tags (resolves ~247 failures).
-- [ ] **DOMException SyntaxError for Color Subclasses**:
+- [x] **DOMException SyntaxError for Color Subclasses**:
   - Update HSL/HWB/LCH/OKLCH rectifiers in `src/typed-om.ts` to throw standard `DOMException` with `'SyntaxError'` name instead of `TypeError` on invalid parameters (resolves ~254 failures).
-- [ ] **Mock `window.matchMedia` in Sandbox Shim**:
+- [x] **Mock `window.matchMedia` in Sandbox Shim**:
   - Stub `window.matchMedia` inside `tests/wpt-shim.ts` to return mock media list objects for compatibility (resolves ~196 failures).
-- [ ] **Verification**:
+- [x] **Verification**:
   - Run the updated crawler and verify the overall conformance percentage jumps significantly.
  
 ---
