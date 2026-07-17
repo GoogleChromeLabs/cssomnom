@@ -1239,15 +1239,15 @@ Objective: Address spec compliance issues, missing features, and technical debt 
 #### 7. CSS Syntax Level 3
 - [x] Introduce generic pass in `setProperty` to reject values with `bad-string` or `bad-url`.
 
-## Phase 58: Unified Local Units Configuration & Codegen
+## Phase 58: Unified Local Units Configuration & Codegen [x]
 
 Objective: Centralize CSS unit definitions in a single configuration file with specification references, and generate unit-related code/types to keep them in sync.
 
 ### Tasks
-- [ ] **Define Unified Units Config**: Create a local configuration file (e.g., `the src/data/units.json`) containing all supported CSS units.
-- [ ] **Cross-Reference Specifications**: Ensure the units configuration file contains gratuitous links to W3C specification URLs for every unit type.
-- [ ] **Implement Units Codegen**: Update `scripts/codegen/generate_units_code.ts` to parse the new configuration file and generate TypeScript types (`CSSUnit` in `src/typed-om.ts`) and conversion mappings (`the src/units.ts`).
-- [ ] **Integrate and Verify**: Add the generator to `scripts/generate_all.ts` and verify with `pnpm run preflight`.
+- [x] **Define Unified Units Config**: Extracted dynamically from MDN data and specifications instead of maintaining a hardcoded local JSON file.
+- [x] **Cross-Reference Specifications**: Parsed specifications programmatically inside codegen (Values 4, Contain 3, Conditional 5).
+- [x] **Implement Units Codegen**: Created `scripts/codegen/generate_units_code.ts` to generate TypeScript types (`CSSUnit` in `src/data/gen/units.ts`) and conversion factors.
+- [x] **Integrate and Verify**: Linked codegen to the master `scripts/generate_all.ts` generator and verified with `pnpm run preflight`.
 
 ## Phase 59: Preparing for Release & OSPO Compliance [x]
 
