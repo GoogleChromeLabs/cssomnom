@@ -1006,7 +1006,7 @@ Objective: Resolve the 3 remaining test failures in `tests/logical-shorthand.tes
 - [x] **Fix `Physical shorthand border-radius getPropertyValue with mixed logical longhands`**: Fix serialization when physical shorthands contain logical longhands.
 - [x] **Fix `logical shorthand serialization with mixed physical longhands`**: Fix serialization when logical shorthands contain physical longhands.
 
-## Phase 50: Spec Compliance Remediation
+## Phase 50: Spec Compliance Remediation [x]
 
 Objective: Address spec compliance issues, missing features, and technical debt identified in the Round 6 audit report.
 
@@ -1053,7 +1053,7 @@ Objective: Allow parsing of percentage keyframes like `0% { ... }` in `@keyframe
 - [x] **Fix parser**: Update parsing logic to accept percentages in keyframe selectors.
 - [x] **Verify**: Run tests and ensure success.
 
-## Phase 52: Spec Compliance Remediation (Round 7)
+## Phase 52: Spec Compliance Remediation (Round 7) [x]
 
 Objective: Address spec compliance issues, missing features, and technical debt identified in the Round 7 audit report.
 
@@ -1190,14 +1190,14 @@ Objective: Extract test cases from LightningCSS and run them against our parser 
 - [x] **Analyze Results**: Tally parse successes, mismatches, and `error_test` non-throws.
 - [x] **Provide Summary**: Output the summary of failures to the user.
 
-## Phase 56: Developer Experience (DX) Improvements
+## Phase 56: Developer Experience (DX) Improvements [x]
 
 Objective: Address DX feedback to make the library easier to use for external developers.
 
 ### Tasks
 - [x] **DX Feedback**: Process and determine resolution for DX feedback in `docs/reports/dx-feedback.md`.
 
-## Phase 57: Spec Compliance Audit Remediation (Round 11)
+## Phase 57: Spec Compliance Audit Remediation (Round 11) [x]
 
 Objective: Address spec compliance issues, missing features, and technical debt identified in the Round 11 audit report.
 
@@ -1684,7 +1684,7 @@ Objective: Establish a comprehensive test suite specifically verifying our DOM p
   - [x] Audit changes using the Sequential Quality Loop (`codex_reviewer_cmd`).
   - [x] Verify `pnpm run preflight` is green and commit.
 
-## Phase 72: High-Scrutiny Typed OM Spec Compliance Audit [/]
+## Phase 72: High-Scrutiny Typed OM Spec Compliance Audit [x]
 
 Objective: Review and resolve compliance gaps in CSS Typed OM Level 1 validated by the Scrutineer.
 
