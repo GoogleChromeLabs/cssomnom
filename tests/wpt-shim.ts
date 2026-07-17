@@ -212,11 +212,9 @@ export function patchWindowForTypedOM(window: WindowType) {
               const iframeTitle = titleMatch ? titleMatch[1] : 'Document title';
               const iframeDocument: Partial<DocumentType> = {
                 title: iframeTitle,
-                body: {
-                  appendChild: <T extends Node>(el: T): T => el
-                } as unknown as HTMLElement,
+                body: window.document.createElement('body'),
                 createElement: (name: string) => window.document.createElement(name),
-                querySelectorAll: () => [] as unknown as NodeListOf<Element>
+                querySelectorAll: () => window.document.createDocumentFragment().querySelectorAll('*')
               };
               iframeSandbox = createWptContext(window, iframeDocument, iframeTests) as IframeSandboxContext;
               
@@ -734,14 +732,14 @@ export function createWptContext(
     HTMLElement: window.HTMLElement,
     Element: window.Element,
     Node: window.Node,
-    HTMLStyleElement: (window as unknown as Record<string, unknown>).HTMLStyleElement,
-    DOMException: (window as unknown as Record<string, unknown>).DOMException,
-    Event: (window as unknown as Record<string, unknown>).Event,
-    CustomEvent: (window as unknown as Record<string, unknown>).CustomEvent,
-    navigator: (window as unknown as Record<string, unknown>).navigator,
+    HTMLStyleElement: (window as { HTMLStyleElement?: unknown }).HTMLStyleElement,
+    DOMException: (window as { DOMException?: unknown }).DOMException,
+    Event: (window as { Event?: unknown }).Event,
+    CustomEvent: (window as { CustomEvent?: unknown }).CustomEvent,
+    navigator: (window as { navigator?: unknown }).navigator,
     ...TypedOM,
-    DOMMatrix: (globalThis as unknown as Record<string, unknown>).DOMMatrix,
-    DOMMatrixReadOnly: (globalThis as unknown as Record<string, unknown>).DOMMatrixReadOnly,
+    DOMMatrix: (globalThis as { DOMMatrix?: unknown }).DOMMatrix,
+    DOMMatrixReadOnly: (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly,
     CSS: TypedOM.CSS,
     AssertionError: AssertionErrorProxy,
     OptionalFeatureUnsupportedError,
