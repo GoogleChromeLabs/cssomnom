@@ -1,9 +1,7 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { parseHTML } from 'linkedom';
-import { patchWindowForTypedOM, createWptContext } from '../tests/wpt-shim.ts';
+import { patchWindowForTypedOM, createWptContext, type WptSandboxTest } from '../tests/wpt-shim.ts';
 import * as vm from 'node:vm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -48,7 +46,7 @@ export function runWptFile(filePath: string): WptTest[] {
   const win = dom.window;
   patchWindowForTypedOM(win);
 
-  const tests: Array<{ name: string; fn: Function }> = [];
+  const tests: WptSandboxTest[] = [];
   const sandbox = createWptContext(win, dom.document, tests);
 
   // Copy linkedom window properties to sandbox
@@ -62,8 +60,8 @@ export function runWptFile(filePath: string): WptTest[] {
     }
   }
 
-  const windowProxy: any = new Proxy(winObj, {
-    get(target, prop, receiver) {
+  const windowProxy = new Proxy(winObj, {
+    get(target, prop) {
       if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
         return windowProxy;
       }
@@ -149,10 +147,10 @@ export function runWptFile(filePath: string): WptTest[] {
   }
 
   const testQueue: WptTest[] = [];
-  for (const t of tests as any[]) {
+  for (const t of tests) {
     if (t.executed) {
       const wrappedFn = async () => {
-        if (t.status !== 0) {
+        if ((t.status ?? 0) !== 0) {
           throw new Error(t.message || `Test failed with status ${t.status}`);
         }
       };
@@ -168,7 +166,9 @@ export function runWptFile(filePath: string): WptTest[] {
     };
     const wrappedFn = async () => {
       try {
-        await t.fn(testHarnessParam);
+        if (t.fn) {
+          await t.fn(testHarnessParam);
+        }
       } finally {
         for (const cleanup of cleanups) {
           try {

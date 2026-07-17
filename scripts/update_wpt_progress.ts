@@ -1,5 +1,4 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -122,8 +121,8 @@ async function main() {
           passing = parseInt(match[1], 10);
           total = parseInt(match[2], 10);
         }
-      } catch (err: any) {
-        const stdout = err.stdout || '';
+      } catch (err: unknown) {
+        const stdout = (err && typeof err === 'object' && 'stdout' in err) ? String((err as Record<string, unknown>).stdout) : '';
         const match = stdout.match(/Summary: (\d+)\/(\d+) passed/);
         if (match) {
           passing = parseInt(match[1], 10);

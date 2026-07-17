@@ -1,5 +1,17 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { parseStyleSheet } from '../src/parser.ts';
+
+export interface WptSandboxTest {
+  type: 'setup' | 'test' | 'promise_test' | 'async_test';
+  name: string;
+  status?: number;
+  message?: string | null;
+  cleanups?: Function[];
+  executed?: boolean;
+  fn?: Function;
+  promise?: Promise<void>;
+  resolve?: (() => void) | null;
+  reject?: ((err: unknown) => void) | null;
+}
 /**
  * @license
  * Copyright 2026 Google LLC
@@ -45,6 +57,28 @@ export class OptionalFeatureUnsupportedError extends assert.AssertionError {
     super({ message });
     this.name = 'OptionalFeatureUnsupportedError';
   }
+}
+
+export function messageOf(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    return String((err as Record<string, unknown>).message);
+  }
+  return String(err);
+}
+
+export interface IframeSandboxContext {
+  parent?: unknown;
+  top?: unknown;
+  window?: unknown;
+  self?: unknown;
+  location?: { href: string };
+  isSingleTest?: boolean;
+  allowUncaughtException?: boolean;
+  harnessCompleted?: boolean;
+  harnessAborted?: boolean;
+  harnessErrorStatus?: number;
+  harnessErrorMessage?: string | null;
+  [key: string]: unknown;
 }
 type WindowType = ReturnType<typeof parseHTML>['window'];
 type DocumentType = ReturnType<typeof parseHTML>['document'];
@@ -146,8 +180,8 @@ export function patchWindowForTypedOM(window: WindowType) {
       enumerable: true,
       get() {
         if (!this._contentDocument) {
-          let iframeSandbox: any = null;
-          const iframeWindow = new Proxy({} as any, {
+          let iframeSandbox: IframeSandboxContext | null = null;
+          const iframeWindow = new Proxy({} as unknown as WindowType, {
             get(target, prop) {
               if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
                 return iframeWindow;
@@ -172,18 +206,18 @@ export function patchWindowForTypedOM(window: WindowType) {
           this._contentDocument = {
             write(src: string) {
               const scripts = extractScripts(src, '');
-              const iframeTests: any[] = [];
+              const iframeTests: WptSandboxTest[] = [];
               const titleMatch = /<title>(.*?)<\/title>/i.exec(src);
               const iframeTitle = titleMatch ? titleMatch[1] : 'Document title';
               const iframeDocument = {
                 title: iframeTitle,
                 body: {
-                  appendChild: (el: any) => el
+                  appendChild: (el: unknown) => el
                 },
                 createElement: (name: string) => window.document.createElement(name),
                 querySelectorAll: () => []
               };
-              iframeSandbox = createWptContext(window, iframeDocument as any, iframeTests);
+              iframeSandbox = createWptContext(window, iframeDocument as unknown as DocumentType, iframeTests) as IframeSandboxContext;
               
               iframeSandbox.parent = window;
               iframeSandbox.top = window;
@@ -195,57 +229,72 @@ export function patchWindowForTypedOM(window: WindowType) {
               
               let overallStatus = 0; // OK
               let overallMessage: string | null = null;
-
+ 
               let singleTestFailed = false;
               let singleTestMessage: string | null = null;
-
-              const rejectionHandler = (reason: any) => {
-                const isHarnessErr = reason && (reason instanceof HarnessError || reason.name === 'HarnessError');
-                if (isHarnessErr || !iframeSandbox.allowUncaughtException) {
-                  if (iframeSandbox.isSingleTest) {
+ 
+              const rejectionHandler = (reason: unknown) => {
+                const isHarnessErr = reason instanceof HarnessError || (
+                  reason !== null &&
+                  typeof reason === 'object' &&
+                  'name' in reason &&
+                  (reason as Record<string, unknown>).name === 'HarnessError'
+                );
+                if (isHarnessErr || !iframeSandbox?.allowUncaughtException) {
+                  if (iframeSandbox?.isSingleTest) {
                     singleTestFailed = true;
-                    singleTestMessage = reason?.message || String(reason);
+                    singleTestMessage = messageOf(reason);
                   } else {
                     overallStatus = 1;
-                    overallMessage = reason?.message || String(reason);
+                    overallMessage = messageOf(reason);
                   }
                 }
               };
-              const exceptionHandler = (err: any) => {
-                const isHarnessErr = err && (err instanceof HarnessError || err.name === 'HarnessError');
-                if (isHarnessErr || !iframeSandbox.allowUncaughtException) {
-                  if (iframeSandbox.isSingleTest) {
+              const exceptionHandler = (err: unknown) => {
+                const isHarnessErr = err instanceof HarnessError || (
+                  err !== null &&
+                  typeof err === 'object' &&
+                  'name' in err &&
+                  (err as Record<string, unknown>).name === 'HarnessError'
+                );
+                if (isHarnessErr || !iframeSandbox?.allowUncaughtException) {
+                  if (iframeSandbox?.isSingleTest) {
                     singleTestFailed = true;
-                    singleTestMessage = err?.message || String(err);
+                    singleTestMessage = messageOf(err);
                   } else {
                     overallStatus = 1;
-                    overallMessage = err?.message || String(err);
+                    overallMessage = messageOf(err);
                   }
                 }
               };
               process.on('unhandledRejection', rejectionHandler);
               process.on('uncaughtException', exceptionHandler);
-
+ 
               for (const s of scripts) {
                 if (s.code.trim()) {
                   try {
                     const script = new vm.Script(s.code, { filename: s.filename });
                     script.runInContext(iframeContext);
-                  } catch (err: any) {
-                    const isHarnessErr = err && (err instanceof HarnessError || err.name === 'HarnessError');
-                    if (isHarnessErr || !iframeSandbox.allowUncaughtException) {
-                      if (iframeSandbox.isSingleTest) {
+                  } catch (err: unknown) {
+                    const isHarnessErr = err instanceof HarnessError || (
+                      err !== null &&
+                      typeof err === 'object' &&
+                      'name' in err &&
+                      (err as Record<string, unknown>).name === 'HarnessError'
+                    );
+                    if (isHarnessErr || !iframeSandbox?.allowUncaughtException) {
+                      if (iframeSandbox?.isSingleTest) {
                         singleTestFailed = true;
-                        singleTestMessage = err.message || String(err);
+                        singleTestMessage = messageOf(err);
                       } else {
                         overallStatus = 1;
-                        overallMessage = err.message || String(err);
+                        overallMessage = messageOf(err);
                       }
                     }
                   }
                 }
               }
-
+ 
               try {
                 const domContentLoadedEv = new iframeWindow.Event('DOMContentLoaded', { bubbles: true });
                 iframeWindow.dispatchEvent(domContentLoadedEv);
@@ -257,13 +306,13 @@ export function patchWindowForTypedOM(window: WindowType) {
               
               Promise.resolve().then(async () => {
                 await new Promise(resolve => setTimeout(resolve, 0));
-
+ 
                 const timeoutPromise = <T>(promise: Promise<T>, ms: number, errorType: 'TIMEOUT' | 'ERROR' = 'TIMEOUT'): Promise<T> => {
                   let timer: NodeJS.Timeout;
                   const timeout = new Promise<never>((_, reject) => {
                     timer = setTimeout(() => {
                       const err = new Error(errorType);
-                      (err as any).isTimeout = true;
+                      (err as Error & { isTimeout?: boolean }).isTimeout = true;
                       reject(err);
                     }, ms);
                   });
@@ -274,10 +323,10 @@ export function patchWindowForTypedOM(window: WindowType) {
                 const testStatusMap = { PASS: 0, FAIL: 1, TIMEOUT: 2, NOTRUN: 3, PRECONDITION_FAILED: 4 };
 
                 let setupFailed = false;
-                let setupError: any = null;
+                let setupError: unknown = null;
                 let promiseSetupCalled = false;
 
-                if (iframeSandbox.isSingleTest) {
+                if (iframeSandbox?.isSingleTest) {
                   const hasSubtests = iframeTests.some(t => t.type !== 'setup');
                   if (hasSubtests) {
                     singleTestFailed = true;
@@ -294,17 +343,19 @@ export function patchWindowForTypedOM(window: WindowType) {
                     if (t.type === 'setup') {
                       promiseSetupCalled = true;
                       try {
-                        const setupPromise = t.fn();
-                        await timeoutPromise(setupPromise, 1000);
-                      } catch (e: any) {
+                        if (t.fn) {
+                          const setupPromise = t.fn();
+                          await timeoutPromise(setupPromise, 1000);
+                        }
+                      } catch (e: unknown) {
                         setupFailed = true;
                         setupError = e;
-                        if (e.isTimeout) {
+                        if (e && typeof e === 'object' && (e as Record<string, unknown>).isTimeout === true) {
                           overallStatus = 2; // TIMEOUT
                           overallMessage = 'promise_setup timed out';
                         } else {
                           overallStatus = 1; // ERROR
-                          overallMessage = e.message || String(e);
+                          overallMessage = messageOf(e);
                         }
                       }
                       continue;
@@ -314,7 +365,7 @@ export function patchWindowForTypedOM(window: WindowType) {
                       results.push({
                         name: t.name,
                         status: 3, // NOTRUN
-                        message: `Setup failed: ${setupError?.message || String(setupError)}`,
+                        message: `Setup failed: ${messageOf(setupError)}`,
                         ...testStatusMap
                       });
                       continue;
@@ -335,51 +386,64 @@ export function patchWindowForTypedOM(window: WindowType) {
                     let statusCode = 0; // PASS
                     let message: string | null = null;
                     if (t.type === 'test') {
-                      statusCode = t.status;
-                      message = t.message;
+                      statusCode = t.status ?? 0;
+                      message = t.message ?? null;
                     } else if (t.type === 'async_test') {
                       try {
-                        await timeoutPromise(t.promise, 1000);
-                        statusCode = t.status;
-                        message = t.message;
-                      } catch (err: any) {
-                        statusCode = err.isTimeout ? 2 : 1; // TIMEOUT or FAIL
-                        message = err.message || String(err);
+                        if (t.promise) {
+                          await timeoutPromise(t.promise, 1000);
+                        }
+                        statusCode = t.status ?? 0;
+                        message = t.message ?? null;
+                      } catch (err: unknown) {
+                        const isTimeout = err && typeof err === 'object' && (err as Record<string, unknown>).isTimeout === true;
+                        statusCode = isTimeout ? 2 : 1; // TIMEOUT or FAIL
+                        message = messageOf(err);
                       } finally {
-                        for (const cleanFn of t.cleanups) {
+                        for (const cleanFn of t.cleanups || []) {
                           try {
                             cleanFn();
-                          } catch (cleanErr: any) {
+                          } catch (cleanErr: unknown) {
                             overallStatus = 1;
-                            overallMessage = cleanErr.message || String(cleanErr);
-                            iframeSandbox.harnessAborted = true;
+                            overallMessage = messageOf(cleanErr);
+                            if (iframeSandbox) {
+                              iframeSandbox.harnessAborted = true;
+                            }
                           }
                         }
                       }
                     } else if (t.type === 'promise_test') {
                       const tObj = {
                         add_cleanup: (cleanFn: Function) => {
+                          if (!t.cleanups) {
+                            t.cleanups = [];
+                          }
                           t.cleanups.push(cleanFn);
                         }
                       };
                       try {
-                        const valOrPromise = t.fn(tObj);
-                        if (valOrPromise && typeof valOrPromise.then === 'function') {
-                          await timeoutPromise(valOrPromise, 1000);
-                        } else {
-                          await valOrPromise;
+                        if (t.fn) {
+                          const valOrPromise = t.fn(tObj);
+                          if (valOrPromise && typeof valOrPromise === 'object' && 'then' in valOrPromise && typeof (valOrPromise as Record<string, unknown>).then === 'function') {
+                            await timeoutPromise(valOrPromise as Promise<unknown>, 1000);
+                          } else {
+                            await valOrPromise;
+                          }
                         }
-                      } catch (err: any) {
-                        statusCode = err.isTimeout ? 2 : 1; // TIMEOUT or FAIL
-                        message = err.message || String(err);
+                      } catch (err: unknown) {
+                        const isTimeout = err && typeof err === 'object' && (err as Record<string, unknown>).isTimeout === true;
+                        statusCode = isTimeout ? 2 : 1; // TIMEOUT or FAIL
+                        message = messageOf(err);
                       } finally {
-                        for (const cleanFn of t.cleanups) {
+                        for (const cleanFn of t.cleanups || []) {
                           try {
                             cleanFn();
-                          } catch (cleanErr: any) {
+                          } catch (cleanErr: unknown) {
                             overallStatus = 1;
-                            overallMessage = cleanErr.message || String(cleanErr);
-                            iframeSandbox.harnessAborted = true;
+                            overallMessage = messageOf(cleanErr);
+                            if (iframeSandbox) {
+                              iframeSandbox.harnessAborted = true;
+                            }
                           }
                         }
                       }
@@ -393,9 +457,9 @@ export function patchWindowForTypedOM(window: WindowType) {
                     });
                   }
                 }
-                if (iframeSandbox.harnessCompleted && iframeSandbox.harnessErrorStatus !== undefined) {
+                if (iframeSandbox?.harnessCompleted && iframeSandbox.harnessErrorStatus !== undefined) {
                   overallStatus = iframeSandbox.harnessErrorStatus;
-                  overallMessage = iframeSandbox.harnessErrorMessage;
+                  overallMessage = iframeSandbox.harnessErrorMessage ?? null;
                 }
 
                 const completeData = {
@@ -640,7 +704,7 @@ function get_test_name(func: Function, name: string | undefined, defaultName: st
   if (func) {
     const func_code = func.toString().trim();
     const arrow = func_code.match(/^\(\)\s*=>\s*(?:{(.*)}\s*|(.*))$/s);
-    if (arrow && !/[\u000A\u000D\u2028\u2029]/.test(func_code)) {
+    if (arrow && !/[\n\r\u2028\u2029]/.test(func_code)) {
       const body = (arrow[1] !== undefined ? arrow[1] : arrow[2]).trim();
       const trimmed = body.replace(/^([^;]*)(;\s*)+$/, "$1");
       if (trimmed) {
@@ -655,9 +719,9 @@ function get_test_name(func: Function, name: string | undefined, defaultName: st
 export function createWptContext(
   window: WindowType,
   document: DocumentType,
-  tests: any[]
+  tests: WptSandboxTest[]
 ): Record<string, unknown> {
-  const ctx: Record<string, any> = {
+  const ctx = {
     window,
     document,
     addEventListener: window.addEventListener.bind(window),
@@ -666,22 +730,22 @@ export function createWptContext(
     HTMLElement: window.HTMLElement,
     Element: window.Element,
     Node: window.Node,
-    HTMLStyleElement: (window as any).HTMLStyleElement,
-    DOMException: (window as any).DOMException,
-    Event: (window as any).Event,
-    CustomEvent: (window as any).CustomEvent,
-    navigator: (window as any).navigator,
+    HTMLStyleElement: (window as unknown as Record<string, unknown>).HTMLStyleElement,
+    DOMException: (window as unknown as Record<string, unknown>).DOMException,
+    Event: (window as unknown as Record<string, unknown>).Event,
+    CustomEvent: (window as unknown as Record<string, unknown>).CustomEvent,
+    navigator: (window as unknown as Record<string, unknown>).navigator,
     ...TypedOM,
-    DOMMatrix: (globalThis as any).DOMMatrix,
-    DOMMatrixReadOnly: (globalThis as any).DOMMatrixReadOnly,
+    DOMMatrix: (globalThis as unknown as Record<string, unknown>).DOMMatrix,
+    DOMMatrixReadOnly: (globalThis as unknown as Record<string, unknown>).DOMMatrixReadOnly,
     CSS: TypedOM.CSS,
     AssertionError: AssertionErrorProxy,
     OptionalFeatureUnsupportedError,
-    setTimeout: (globalThis as any).setTimeout,
-    clearTimeout: (globalThis as any).clearTimeout,
-    setInterval: (globalThis as any).setInterval,
-    clearInterval: (globalThis as any).clearInterval,
-    setup: (properties?: any) => {
+    setTimeout: globalThis.setTimeout,
+    clearTimeout: globalThis.clearTimeout,
+    setInterval: globalThis.setInterval,
+    clearInterval: globalThis.clearInterval,
+    setup: (properties?: { single_test?: boolean; allow_uncaught_exception?: boolean }) => {
       if (properties) {
         if (properties.single_test) {
           ctx.isSingleTest = true;
@@ -703,9 +767,9 @@ export function createWptContext(
     promiseSetupCalled: false,
     harnessCompleted: false,
     harnessAborted: false,
-    harnessErrorStatus: undefined,
-    harnessErrorMessage: undefined,
-    promise_setup: (func: Function, properties: any = {}) => {
+    harnessErrorStatus: undefined as number | undefined,
+    harnessErrorMessage: undefined as string | null | undefined,
+    promise_setup: (func: Function, properties: { single_test?: boolean; allow_uncaught_exception?: boolean } = {}) => {
       if (typeof func !== 'function') {
         throw new HarnessError('`promise_setup` invoked without a function');
       }
@@ -725,13 +789,13 @@ export function createWptContext(
     },
 
     // Expose elements with IDs as globals
-    ...((Array.from(document.querySelectorAll('[id]')) as Array<{ getAttribute(name: string): string | null }>).reduce((acc: Record<string, unknown>, el) => {
+    ...(Array.from(document.querySelectorAll('[id]')).reduce<Record<string, unknown>>((acc, el) => {
       const id = el.getAttribute('id');
       if (id) {
         acc[id] = el;
       }
       return acc;
-    }, {}) as Record<string, unknown>),
+    }, {})),
     
     test: (fn: Function, name?: string) => {
       const testName = get_test_name(fn, name, 'anonymous-test', tests);
@@ -742,7 +806,7 @@ export function createWptContext(
           status: 3, // NOTRUN
           message: 'Harness was aborted or completed before execution',
           executed: true
-        } as any);
+        });
         return;
       }
       if (ctx.promiseSetupCalled) {
@@ -750,10 +814,10 @@ export function createWptContext(
       }
       let status = 0; // PASS
       let message: string | null = null;
-      let returnValue: any;
+      let returnValue: unknown;
       const cleanups: Function[] = [];
-      const testObj: any = {
-        type: 'test',
+      const testObj = {
+        type: 'test' as const,
         name: sanitize_unpaired_surrogates(testName),
         cleanups,
         add_cleanup: (cleanFn: Function) => {
@@ -763,16 +827,16 @@ export function createWptContext(
 
       try {
         returnValue = fn(testObj);
-      } catch (err: any) {
+      } catch (err: unknown) {
         status = 1; // FAIL
-        message = err.message || String(err);
+        message = messageOf(err);
       } finally {
         for (const cleanFn of cleanups) {
           try {
             cleanFn();
-          } catch (cleanErr: any) {
+          } catch (cleanErr: unknown) {
             ctx.harnessErrorStatus = 1;
-            ctx.harnessErrorMessage = cleanErr.message || String(cleanErr);
+            ctx.harnessErrorMessage = messageOf(cleanErr);
             ctx.harnessCompleted = true;
           }
         }
@@ -784,12 +848,12 @@ export function createWptContext(
         status,
         message,
         executed: true
-      } as any);
+      });
 
       if (returnValue !== undefined) {
         let msg = `Test named "${testName}" passed a function to \`test\` that returned a value.`;
         try {
-          if (returnValue && typeof returnValue.then === 'function') {
+          if (returnValue && typeof returnValue === 'object' && 'then' in returnValue && typeof (returnValue as Record<string, unknown>).then === 'function') {
             msg += ' Consider using `promise_test` instead when using Promises or async/await.';
           }
         } catch {}
@@ -809,7 +873,7 @@ export function createWptContext(
           fn: () => Promise.resolve(),
           cleanups: [],
           executed: true
-        } as any);
+        });
         return;
       }
       tests.push({
@@ -817,7 +881,7 @@ export function createWptContext(
         name: sanitize_unpaired_surrogates(testName),
         fn,
         cleanups: []
-      } as any);
+      });
     },
     async_test: (fn: Function, name?: string) => {
       const testName = get_test_name(fn, name, 'anonymous-test', tests);
@@ -830,20 +894,20 @@ export function createWptContext(
           promise: Promise.resolve(),
           cleanups: [],
           executed: true
-        } as any);
+        });
         return;
       }
       if (ctx.promiseSetupCalled) {
         throw new HarnessError('subsequent invocation of async_test');
       }
 
-      const testObj: any = {
+      const testObj: WptSandboxTest = {
         type: 'async_test',
         name: sanitize_unpaired_surrogates(testName),
         status: 0,
         message: null,
         resolve: null,
-        promise: null,
+        promise: undefined,
         cleanups: [],
         executed: true
       };
@@ -857,30 +921,39 @@ export function createWptContext(
         step: (stepFn: Function) => {
           try {
             stepFn();
-          } catch (e: any) {
+          } catch (e: unknown) {
             testObj.status = 1; // FAIL
-            testObj.message = e.message || String(e);
-            testObj.resolve();
+            testObj.message = messageOf(e);
+            if (testObj.resolve) {
+              testObj.resolve();
+            }
           }
         },
         done: () => {
-          testObj.resolve();
+          if (testObj.resolve) {
+            testObj.resolve();
+          }
         },
         add_cleanup: (cleanFn: Function) => {
+          if (!testObj.cleanups) {
+            testObj.cleanups = [];
+          }
           testObj.cleanups.push(cleanFn);
         }
       };
 
-      let returnValue: any;
+      let returnValue: unknown;
       try {
         returnValue = fn(tObj);
-      } catch (err: any) {
-        if (err instanceof HarnessError || err.name === 'HarnessError') {
+      } catch (err: unknown) {
+        if (err instanceof HarnessError || (err && typeof err === 'object' && 'name' in err && (err as Record<string, unknown>).name === 'HarnessError')) {
           throw err;
         }
         testObj.status = 1; // FAIL
-        testObj.message = err.message || String(err);
-        testObj.resolve();
+        testObj.message = messageOf(err);
+        if (testObj.resolve) {
+          testObj.resolve();
+        }
       }
 
       tests.push(testObj);
@@ -888,7 +961,7 @@ export function createWptContext(
       if (returnValue !== undefined) {
         let msg = `Test named "${testName}" passed a function to \`async_test\` that returned a value.`;
         try {
-          if (returnValue && typeof returnValue.then === 'function') {
+          if (returnValue && typeof returnValue === 'object' && 'then' in returnValue && typeof (returnValue as Record<string, unknown>).then === 'function') {
             msg += ' Consider using `promise_test` instead when using Promises or async/await.';
           }
         } catch {}
@@ -920,24 +993,26 @@ export function createWptContext(
       assert.strictEqual(typeof expected, 'object', `${message || ''}: expected is ${expected}, expected object`);
       assert.ok(expected !== null, `${message || ''}: expected is null, expected object`);
 
-      const check_equal = (act: any, exp: any, stack: any[]) => {
+      const check_equal = (act: Record<string, unknown>, exp: Record<string, unknown>, stack: unknown[]) => {
         stack.push(act);
         for (const p in act) {
-          assert.ok(exp.hasOwnProperty(p), `${message || ''}: unexpected property ${p}`);
-          if (typeof act[p] === 'object' && act[p] !== null) {
-            if (stack.indexOf(act[p]) === -1) {
-              check_equal(act[p], exp[p], stack);
+          assert.ok(Object.prototype.hasOwnProperty.call(exp, p), `${message || ''}: unexpected property ${p}`);
+          const actVal = act[p];
+          const expVal = exp[p];
+          if (typeof actVal === 'object' && actVal !== null) {
+            if (stack.indexOf(actVal) === -1) {
+              check_equal(actVal as Record<string, unknown>, expVal as Record<string, unknown>, stack);
             }
           } else {
-            assert.ok(Object.is(act[p], exp[p]), `${message || ''}: property ${p} expected ${exp[p]} got ${act[p]}`);
+            assert.ok(Object.is(actVal, expVal), `${message || ''}: property ${p} expected ${expVal} got ${actVal}`);
           }
         }
         for (const p in exp) {
-          assert.ok(act.hasOwnProperty(p), `${message || ''}: expected property ${p} missing`);
+          assert.ok(Object.prototype.hasOwnProperty.call(act, p), `${message || ''}: expected property ${p} missing`);
         }
         stack.pop();
       };
-      check_equal(actual, expected, []);
+      check_equal(actual as Record<string, unknown>, expected as Record<string, unknown>, []);
     },
     assert_class_string: (object: unknown, class_name: string, message?: string) => {
       const actual = Object.prototype.toString.call(object);
@@ -958,7 +1033,7 @@ export function createWptContext(
       }
     },
     _test_disabled_placeholder: (fn: Function, name: string) => {
-      tests.push({ name, fn });
+      tests.push({ type: 'test', name, fn });
     },
     assert_equals: (actual: unknown, expected: unknown, description?: string) => {
       assert.strictEqual(actual, expected, description ?? '');
@@ -997,8 +1072,9 @@ export function createWptContext(
           throw e;
         }
         assert.ok(e && typeof e === 'object', `${description || ''}: Thrown value is not an object`);
-        assert.strictEqual((e as any).constructor, constructor, `${description || ''}: expected constructor ${constructor.name}, got ${(e as any).constructor?.name}`);
-        assert.strictEqual((e as any).name, constructor.name, `${description || ''}: expected error name ${constructor.name}, got ${(e as any).name}`);
+        const errObj = e as Record<string, unknown>;
+        assert.strictEqual(errObj.constructor, constructor, `${description || ''}: expected constructor ${constructor.name}, got ${(errObj.constructor as Function | undefined)?.name}`);
+        assert.strictEqual(errObj.name, constructor.name, `${description || ''}: expected error name ${constructor.name}, got ${errObj.name}`);
       }
     },
     assert_throws_dom: (errorName: string | number, func: () => void, description?: string) => {
@@ -1097,9 +1173,10 @@ export function createWptContext(
             expectedCode = name_code_map[expectedName];
           }
 
-          assert.strictEqual((e as any).name, expectedName, `${description || ''}: expected name ${expectedName}`);
+          const errObj = e as Record<string, unknown>;
+          assert.strictEqual(errObj.name, expectedName, `${description || ''}: expected name ${expectedName}`);
           if (expectedCode !== undefined && expectedCode > 0) {
-            assert.strictEqual((e as any).code, expectedCode, `${description || ''}: expected code ${expectedCode}`);
+            assert.strictEqual(errObj.code, expectedCode, `${description || ''}: expected code ${expectedCode}`);
           }
           return;
         }
