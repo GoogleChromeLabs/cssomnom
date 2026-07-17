@@ -679,6 +679,27 @@ export function patchWindowForTypedOM(window: WindowType) {
     },
     configurable: true,
   });
+
+  win.getComputedStyle = function(el: Record<string, unknown>) {
+    const style = el.style as Record<string, unknown>;
+    if (!style) return style;
+    return new Proxy(style, {
+      get(target, prop) {
+        if (prop === 'styleMap') {
+          return typeof el.computedStyleMap === 'function' ? el.computedStyleMap() : undefined;
+        }
+        const val = target[prop as string];
+        if (typeof val === 'function') {
+          return val.bind(target);
+        }
+        return val;
+      },
+      has(target, prop) {
+        if (prop === 'styleMap') return true;
+        return prop in target;
+      }
+    });
+  };
 }
 
 function code_unit_str(char: string) {
@@ -729,6 +750,7 @@ export function createWptContext(
     addEventListener: window.addEventListener.bind(window),
     removeEventListener: window.removeEventListener.bind(window),
     dispatchEvent: window.dispatchEvent.bind(window),
+    getComputedStyle: (window as { getComputedStyle?: unknown }).getComputedStyle,
     HTMLElement: window.HTMLElement,
     Element: window.Element,
     Node: window.Node,
