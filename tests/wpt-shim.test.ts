@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM } from './wpt-shim.ts';
+import { StylePropertyMapReadOnly } from '../src/typed-om.ts';
 
 test('window.getComputedStyle in sandbox shim', () => {
   const dom = parseHTML('<!DOCTYPE html><html><body><div id="test" style="color: red;"></div></body></html>');
@@ -18,9 +19,8 @@ test('window.getComputedStyle in sandbox shim', () => {
 
   // styleMap on computed style is a StylePropertyMapReadOnly
   assert.ok('styleMap' in style, 'styleMap should be in style');
-  const styleMap = (style as Record<string, unknown>).styleMap as Record<string, unknown>;
+  const styleMap = (style as Record<string, unknown>).styleMap as StylePropertyMapReadOnly;
   assert.ok(styleMap, 'styleMap should be defined');
-  // @ts-expect-error get method on StylePropertyMapReadOnly
   assert.strictEqual(styleMap.get('color')?.toString(), 'rgb(255, 0, 0)'); // computed map maps red to rgb(255, 0, 0) in our mock ComputedStylePropertyMap
 });
 

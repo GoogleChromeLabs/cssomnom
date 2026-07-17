@@ -218,14 +218,16 @@ export function patchWindowForTypedOM(window: WindowType) {
                 get styleSheets() {
                   const styles = Array.from(this.querySelectorAll!('style'));
                   const links = Array.from(this.querySelectorAll!('link[rel="stylesheet"]'));
-                  const sheets: unknown[] = [];
+                  const sheets: StyleSheet[] = [];
                   for (const styleEl of styles) {
-                    const sheet = (styleEl as unknown as { sheet?: unknown }).sheet;
-                    if (sheet) sheets.push(sheet);
+                    if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
+                      sheets.push(styleEl.sheet as StyleSheet);
+                    }
                   }
                   for (const linkEl of links) {
-                    const sheet = (linkEl as unknown as { sheet?: unknown }).sheet;
-                    if (sheet) sheets.push(sheet);
+                    if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
+                      sheets.push(linkEl.sheet as StyleSheet);
+                    }
                   }
                   const list = sheets as unknown as StyleSheetList;
                   Object.defineProperty(list, 'item', {
@@ -589,17 +591,15 @@ export function patchWindowForTypedOM(window: WindowType) {
         const styles = Array.from(this.querySelectorAll('style'));
         const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
         
-        const sheets: unknown[] = [];
+        const sheets: StyleSheet[] = [];
         for (const styleEl of styles) {
-          const sheet = (styleEl as unknown as { sheet?: unknown }).sheet;
-          if (sheet) {
-            sheets.push(sheet);
+          if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
+            sheets.push(styleEl.sheet as StyleSheet);
           }
         }
         for (const linkEl of links) {
-          const sheet = (linkEl as unknown as { sheet?: unknown }).sheet;
-          if (sheet) {
-            sheets.push(sheet);
+          if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
+            sheets.push(linkEl.sheet as StyleSheet);
           }
         }
         const list = sheets as unknown as StyleSheetList;
