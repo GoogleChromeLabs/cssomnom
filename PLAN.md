@@ -1758,7 +1758,7 @@ Objective: Verify our WPT shim conformance against WPT's own unit tests, then sc
   - [x] Execute the 33 unit tests in `submodules/web-platform-tests/resources/test/tests/unit/` using the WPT sandbox.
   - [x] Identify and fix shim errors, DOM overrides, or compatibility gaps in `tests/wpt-shim.ts` (e.g. sync execution, complete/abort states, event target VM binding, cleanups support).
   - [ ] Follow up on 3 remaining punted failures (1 in `exceptional-cases.html` on late-registered test status after cleanup errors, and 2 in `exceptional-cases-timeouts.html` on timeout exceptions).
-- [ ] **Broad Spec Conformance Crawler Expansion**:
+- [/] **Broad Spec Conformance Crawler Expansion**:
   - [ ] Expand the WPT sandbox crawler to read and execute tests under other core specification directories: `cssom/`, `css-syntax/`, `css-nesting/`, `css-variables/`, `selectors/`, `mediaqueries/`.
   - [ ] Configure includes/excludes lists for these spec folders in `tests/wpt-sandbox-config.json`.
 - [ ] **Unified Multi-Spec Progress Logging**:

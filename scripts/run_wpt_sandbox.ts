@@ -20,11 +20,16 @@ function getScriptContent(htmlDir: string, src: string): string {
     return '';
   }
   
+  let resolvedSrc = src;
+  if (src === '/resources/WebIDLParser.js') {
+    resolvedSrc = '/resources/webidl2/lib/webidl2.js';
+  }
+
   let fullPath: string;
-  if (src.startsWith('/')) {
-    fullPath = path.join(WPT_ROOT, src);
+  if (resolvedSrc.startsWith('/')) {
+    fullPath = path.join(WPT_ROOT, resolvedSrc);
   } else {
-    fullPath = path.resolve(htmlDir, src);
+    fullPath = path.resolve(htmlDir, resolvedSrc);
   }
   
   if (fs.existsSync(fullPath)) {
@@ -55,10 +60,39 @@ export function runWptFile(filePath: string): WptTest[] {
     }
   }
 
+  const windowProxy: any = new Proxy(winObj, {
+    get(target, prop, receiver) {
+      if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
+        return windowProxy;
+      }
+      const val = target[prop];
+      if (val !== undefined) {
+        if (typeof val === 'function') {
+          return val.bind(target);
+        }
+        return val;
+      }
+      return Reflect.get(sandbox, prop as string);
+    },
+    has(target, prop) {
+      if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
+        return true;
+      }
+      return (target[prop] !== undefined) || (prop in sandbox);
+    },
+    set(target, prop, value) {
+      if (target[prop] !== undefined) {
+        return Reflect.set(target, prop, value);
+      }
+      return Reflect.set(sandbox, prop as string, value);
+    }
+  });
+
   // Ensure standard aliases are present
-  sandbox.window = win;
+  sandbox.window = windowProxy;
   sandbox.document = dom.document;
-  sandbox.globalThis = sandbox;
+  sandbox.globalThis = windowProxy;
+  sandbox.self = windowProxy;
 
   // Copy common globals explicitly if they are on window
   const commonGlobals = [

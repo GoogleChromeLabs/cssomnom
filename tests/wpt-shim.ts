@@ -18,10 +18,33 @@ import { parseStyleSheet } from '../src/parser.ts';
 
 import assert from 'node:assert';
 import fs from 'node:fs';
+import * as vm from 'node:vm';
 import path from 'node:path';
 import { parseHTML } from 'linkedom';
 import * as TypedOM from '../src/typed-om.ts';
+export class HarnessError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'HarnessError';
+  }
+}
 
+export const AssertionErrorProxy = new Proxy(assert.AssertionError, {
+  construct(target, args) {
+    const arg = args[0];
+    if (typeof arg === 'string') {
+      return new target({ message: arg });
+    }
+    return new target(arg);
+  }
+});
+
+export class OptionalFeatureUnsupportedError extends assert.AssertionError {
+  constructor(message: string) {
+    super({ message });
+    this.name = 'OptionalFeatureUnsupportedError';
+  }
+}
 type WindowType = ReturnType<typeof parseHTML>['window'];
 type DocumentType = ReturnType<typeof parseHTML>['document'];
 
@@ -104,6 +127,313 @@ export function extractScripts(htmlContent: string, htmlDir: string): { code: st
 
 export function patchWindowForTypedOM(window: WindowType) {
   const win = window as unknown as Record<string, unknown>;
+
+  // Implement postMessage if missing
+  if (!('postMessage' in win)) {
+    win.postMessage = function(this: typeof window, data: unknown) {
+      const event = new window.CustomEvent('message');
+      Object.defineProperty(event, 'data', { value: data, enumerable: true });
+      Object.defineProperty(event, 'source', { value: this, enumerable: true });
+      window.dispatchEvent(event);
+    };
+  }
+
+  const htmlIframeEl = win.HTMLIFrameElement as { prototype: Record<string, unknown> } | undefined;
+  if (htmlIframeEl) {
+    Object.defineProperty(htmlIframeEl.prototype, 'contentDocument', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        if (!this._contentDocument) {
+          const iframe = this;
+          let iframeSandbox: any = null;
+          const iframeWindow = new Proxy({}, {
+            get(target, prop) {
+              if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
+                return iframeWindow;
+              }
+              if (prop === 'postMessage') {
+                return (data: unknown) => {
+                  const event = new window.CustomEvent('message');
+                  Object.defineProperty(event, 'data', { value: data, enumerable: true });
+                  Object.defineProperty(event, 'source', { value: iframeWindow, enumerable: true });
+                  window.dispatchEvent(event);
+                };
+              }
+              return iframeSandbox ? iframeSandbox[prop as string] : undefined;
+            },
+            has(target, prop) {
+              if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
+                return true;
+              }
+              return iframeSandbox ? (prop in iframeSandbox) : false;
+            }
+          });
+          this._contentDocument = {
+            write(src: string) {
+              const scripts = extractScripts(src, '');
+              const iframeTests: any[] = [];
+              const titleMatch = /<title>(.*?)<\/title>/i.exec(src);
+              const iframeTitle = titleMatch ? titleMatch[1] : 'Document title';
+              const iframeDocument = {
+                title: iframeTitle,
+                body: {
+                  appendChild: (el: any) => el
+                },
+                createElement: (name: string) => window.document.createElement(name),
+                querySelectorAll: () => []
+              };
+              iframeSandbox = createWptContext(window, iframeDocument as any, iframeTests);
+              
+              iframeSandbox.parent = window;
+              iframeSandbox.top = window;
+              iframeSandbox.window = iframeWindow;
+              iframeSandbox.self = iframeWindow;
+              iframeSandbox.location = { href: 'about:blank' };
+              
+              const iframeContext = vm.createContext(iframeSandbox);
+              
+              let overallStatus = 0; // OK
+              let overallMessage: string | null = null;
+
+              let singleTestFailed = false;
+              let singleTestMessage: string | null = null;
+
+              const rejectionHandler = (reason: any) => {
+                const isHarnessErr = reason && (reason instanceof HarnessError || reason.name === 'HarnessError');
+                if (isHarnessErr || !iframeSandbox.allowUncaughtException) {
+                  if (iframeSandbox.isSingleTest) {
+                    singleTestFailed = true;
+                    singleTestMessage = reason?.message || String(reason);
+                  } else {
+                    overallStatus = 1;
+                    overallMessage = reason?.message || String(reason);
+                  }
+                }
+              };
+              const exceptionHandler = (err: any) => {
+                const isHarnessErr = err && (err instanceof HarnessError || err.name === 'HarnessError');
+                if (isHarnessErr || !iframeSandbox.allowUncaughtException) {
+                  if (iframeSandbox.isSingleTest) {
+                    singleTestFailed = true;
+                    singleTestMessage = err?.message || String(err);
+                  } else {
+                    overallStatus = 1;
+                    overallMessage = err?.message || String(err);
+                  }
+                }
+              };
+              process.on('unhandledRejection', rejectionHandler);
+              process.on('uncaughtException', exceptionHandler);
+
+              for (const s of scripts) {
+                if (s.code.trim()) {
+                  try {
+                    const script = new vm.Script(s.code, { filename: s.filename });
+                    script.runInContext(iframeContext);
+                  } catch (err: any) {
+                    const isHarnessErr = err && (err instanceof HarnessError || err.name === 'HarnessError');
+                    if (isHarnessErr || !iframeSandbox.allowUncaughtException) {
+                      if (iframeSandbox.isSingleTest) {
+                        singleTestFailed = true;
+                        singleTestMessage = err.message || String(err);
+                      } else {
+                        overallStatus = 1;
+                        overallMessage = err.message || String(err);
+                      }
+                    }
+                  }
+                }
+              }
+
+              try {
+                const domContentLoadedEv = new iframeWindow.Event('DOMContentLoaded', { bubbles: true });
+                iframeWindow.dispatchEvent(domContentLoadedEv);
+                const loadEv = new iframeWindow.Event('load', { bubbles: true });
+                iframeWindow.dispatchEvent(loadEv);
+              } catch (e) {
+                // ignore
+              }
+              
+              Promise.resolve().then(async () => {
+                await new Promise(resolve => setTimeout(resolve, 0));
+
+                const timeoutPromise = <T>(promise: Promise<T>, ms: number, errorType: 'TIMEOUT' | 'ERROR' = 'TIMEOUT'): Promise<T> => {
+                  let timer: NodeJS.Timeout;
+                  const timeout = new Promise<never>((_, reject) => {
+                    timer = setTimeout(() => {
+                      const err = new Error(errorType);
+                      (err as any).isTimeout = true;
+                      reject(err);
+                    }, ms);
+                  });
+                  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+                };
+
+                const results = [];
+                const testStatusMap = { PASS: 0, FAIL: 1, TIMEOUT: 2, NOTRUN: 3, PRECONDITION_FAILED: 4 };
+
+                let setupFailed = false;
+                let setupError: any = null;
+                let promiseSetupCalled = false;
+
+                if (iframeSandbox.isSingleTest) {
+                  const hasSubtests = iframeTests.some(t => t.type !== 'setup');
+                  if (hasSubtests) {
+                    singleTestFailed = true;
+                    singleTestMessage = 'Erroneous usage: subtest declaration in single_test page';
+                  }
+                  results.push({
+                    name: iframeTitle,
+                    status: singleTestFailed ? 1 : 0,
+                    message: singleTestMessage,
+                    ...testStatusMap
+                  });
+                } else {
+                  for (const t of iframeTests) {
+                    if (t.type === 'setup') {
+                      promiseSetupCalled = true;
+                      try {
+                        const setupPromise = t.fn();
+                        await timeoutPromise(setupPromise, 1000);
+                      } catch (e: any) {
+                        setupFailed = true;
+                        setupError = e;
+                        if (e.isTimeout) {
+                          overallStatus = 2; // TIMEOUT
+                          overallMessage = 'promise_setup timed out';
+                        } else {
+                          overallStatus = 1; // ERROR
+                          overallMessage = e.message || String(e);
+                        }
+                      }
+                      continue;
+                    }
+
+                    if (setupFailed) {
+                      results.push({
+                        name: t.name,
+                        status: 3, // NOTRUN
+                        message: `Setup failed: ${setupError?.message || String(setupError)}`,
+                        ...testStatusMap
+                      });
+                      continue;
+                    }
+
+                    if (promiseSetupCalled && (t.type === 'test' || t.type === 'async_test')) {
+                      overallStatus = 1; // ERROR
+                      overallMessage = `Error: subsequent invocation of ${t.type}`;
+                      results.push({
+                        name: t.name,
+                        status: 1, // FAIL
+                        message: `subsequent invocation of ${t.type}`,
+                        ...testStatusMap
+                      });
+                      continue;
+                    }
+
+                    let statusCode = 0; // PASS
+                    let message: string | null = null;
+                    if (t.type === 'test') {
+                      statusCode = t.status;
+                      message = t.message;
+                    } else if (t.type === 'async_test') {
+                      try {
+                        await timeoutPromise(t.promise, 1000);
+                        statusCode = t.status;
+                        message = t.message;
+                      } catch (err: any) {
+                        statusCode = err.isTimeout ? 2 : 1; // TIMEOUT or FAIL
+                        message = err.message || String(err);
+                      } finally {
+                        for (const cleanFn of t.cleanups) {
+                          try {
+                            cleanFn();
+                          } catch (cleanErr: any) {
+                            overallStatus = 1;
+                            overallMessage = cleanErr.message || String(cleanErr);
+                            iframeSandbox.harnessAborted = true;
+                          }
+                        }
+                      }
+                    } else if (t.type === 'promise_test') {
+                      const tObj = {
+                        add_cleanup: (cleanFn: Function) => {
+                          t.cleanups.push(cleanFn);
+                        }
+                      };
+                      try {
+                        const valOrPromise = t.fn(tObj);
+                        if (valOrPromise && typeof valOrPromise.then === 'function') {
+                          await timeoutPromise(valOrPromise, 1000);
+                        } else {
+                          await valOrPromise;
+                        }
+                      } catch (err: any) {
+                        statusCode = err.isTimeout ? 2 : 1; // TIMEOUT or FAIL
+                        message = err.message || String(err);
+                      } finally {
+                        for (const cleanFn of t.cleanups) {
+                          try {
+                            cleanFn();
+                          } catch (cleanErr: any) {
+                            overallStatus = 1;
+                            overallMessage = cleanErr.message || String(cleanErr);
+                            iframeSandbox.harnessAborted = true;
+                          }
+                        }
+                      }
+                    }
+
+                    results.push({
+                      name: t.name,
+                      status: statusCode,
+                      message,
+                      ...testStatusMap
+                    });
+                  }
+                }
+                if (iframeSandbox.harnessCompleted && iframeSandbox.harnessErrorStatus !== undefined) {
+                  overallStatus = iframeSandbox.harnessErrorStatus;
+                  overallMessage = iframeSandbox.harnessErrorMessage;
+                }
+
+                const completeData = {
+                  type: 'complete',
+                  tests: results,
+                  status: {
+                    status: overallStatus,
+                    message: overallMessage,
+                    OK: 0,
+                    ERROR: 1,
+                    TIMEOUT: 2,
+                    NOTRUN: 3
+                  }
+                };
+                console.log('COMPLETE DATA SENT:', JSON.stringify(completeData));
+                iframeWindow.postMessage(completeData);
+                process.off('unhandledRejection', rejectionHandler);
+                process.off('uncaughtException', exceptionHandler);
+              });
+            },
+            close() {}
+          };
+          this._contentWindow = iframeWindow;
+        }
+        return this._contentDocument;
+      }
+    });
+
+    Object.defineProperty(htmlIframeEl.prototype, 'contentWindow', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        void this.contentDocument;
+        return this._contentWindow;
+      }
+    });
+  }
+
   const htmlStyleEl = win.HTMLStyleElement as { prototype: Record<string, unknown> } | undefined;
   if (htmlStyleEl) {
     Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
@@ -285,19 +615,114 @@ export function patchWindowForTypedOM(window: WindowType) {
   });
 }
 
+function code_unit_str(char: string) {
+  return 'U+' + char.charCodeAt(0).toString(16);
+}
+
+function sanitize_unpaired_surrogates(str: string): string {
+  return str.replace(
+    /([\ud800-\udbff]+)(?![\udc00-\udfff])|(^|[^\ud800-\udbff])([\udc00-\udfff]+)/g,
+    (_, low, prefix, high) => {
+      let output = prefix || "";
+      const string = low || high;
+      for (let i = 0; i < string.length; i++) {
+        output += code_unit_str(string[i]);
+      }
+      return output;
+    }
+  );
+}
+
+function get_test_name(func: Function, name: string | undefined, defaultName: string, tests: Array<{ name: string }>): string {
+  if (name) {
+    return name;
+  }
+  if (func) {
+    const func_code = func.toString().trim();
+    const arrow = func_code.match(/^\(\)\s*=>\s*(?:{(.*)}\s*|(.*))$/s);
+    if (arrow && !/[\u000A\u000D\u2028\u2029]/.test(func_code)) {
+      const body = (arrow[1] !== undefined ? arrow[1] : arrow[2]).trim();
+      const trimmed = body.replace(/^([^;]*)(;\s*)+$/, "$1");
+      if (trimmed) {
+        return trimmed;
+      }
+    }
+  }
+  const suffix = tests.filter(t => t.name.startsWith(defaultName)).length;
+  return defaultName + (suffix > 0 ? ` ${suffix}` : '');
+}
+
 export function createWptContext(
   window: WindowType,
   document: DocumentType,
   tests: Array<{ name: string; fn: Function }>
 ): Record<string, unknown> {
-  return {
+  const ctx: Record<string, any> = {
     window,
     document,
+    addEventListener: window.addEventListener.bind(window),
+    removeEventListener: window.removeEventListener.bind(window),
+    dispatchEvent: window.dispatchEvent.bind(window),
     HTMLElement: window.HTMLElement,
     Element: window.Element,
     Node: window.Node,
+    HTMLStyleElement: (window as any).HTMLStyleElement,
+    DOMException: (window as any).DOMException,
+    Event: (window as any).Event,
+    CustomEvent: (window as any).CustomEvent,
+    navigator: (window as any).navigator,
+    DOMMatrix: (globalThis as any).DOMMatrix,
+    DOMMatrixReadOnly: (globalThis as any).DOMMatrixReadOnly,
     ...TypedOM,
     CSS: TypedOM.CSS,
+    AssertionError: AssertionErrorProxy,
+    OptionalFeatureUnsupportedError,
+    setTimeout: (globalThis as any).setTimeout,
+    clearTimeout: (globalThis as any).clearTimeout,
+    setInterval: (globalThis as any).setInterval,
+    clearInterval: (globalThis as any).clearInterval,
+    setup: (properties?: any) => {
+      if (properties) {
+        if (properties.single_test) {
+          ctx.isSingleTest = true;
+        }
+        if (properties.allow_uncaught_exception) {
+          ctx.allowUncaughtException = true;
+        }
+      }
+    },
+    done: () => {
+      ctx.harnessCompleted = true;
+      if (tests.filter(t => t.type !== 'setup').length === 0) {
+        ctx.harnessErrorStatus = 1; // ERROR
+        ctx.harnessErrorMessage = 'done() called before any tests were defined';
+      }
+    },
+    isSingleTest: false,
+    allowUncaughtException: false,
+    promiseSetupCalled: false,
+    harnessCompleted: false,
+    harnessAborted: false,
+    harnessErrorStatus: undefined,
+    harnessErrorMessage: undefined,
+    promise_setup: (func: Function, properties: any = {}) => {
+      if (typeof func !== 'function') {
+        throw new HarnessError('`promise_setup` invoked without a function');
+      }
+      ctx.promiseSetupCalled = true;
+      tests.push({
+        type: 'setup',
+        name: 'promise_setup',
+        fn: () => {
+          ctx.setup(properties);
+          const result = func();
+          if (!result || typeof result.then !== 'function') {
+            throw new HarnessError('Non-thenable returned by function passed to `promise_setup`');
+          }
+          return result;
+        }
+      });
+    },
 
     // Expose elements with IDs as globals
     ...((Array.from(document.querySelectorAll('[id]')) as Array<{ getAttribute(name: string): string | null }>).reduce((acc: Record<string, unknown>, el) => {
@@ -310,21 +735,210 @@ export function createWptContext(
     
     // WPT harness shims
     test: (fn: Function, name?: string) => {
-      const testName = name || `anonymous-test-${tests.length}`;
-      tests.push({ name: testName, fn });
+      const testName = get_test_name(fn, name, document.title || 'Untitled', tests);
+      if (ctx.harnessCompleted || ctx.harnessAborted) {
+        tests.push({
+          type: 'test',
+          name: sanitize_unpaired_surrogates(testName),
+          status: 3, // NOTRUN
+          message: 'Harness was aborted or completed before execution',
+          executed: true
+        } as any);
+        return;
+      }
+      if (ctx.promiseSetupCalled) {
+        throw new HarnessError('subsequent invocation of test');
+      }
+      let status = 0; // PASS
+      let message: string | null = null;
+      let returnValue: any;
+      const cleanups: Function[] = [];
+      const testObj: any = {
+        type: 'test',
+        name: sanitize_unpaired_surrogates(testName),
+        cleanups,
+        add_cleanup: (cleanFn: Function) => {
+          cleanups.push(cleanFn);
+        }
+      };
+
+      try {
+        returnValue = fn(testObj);
+      } catch (err: any) {
+        status = 1; // FAIL
+        message = err.message || String(err);
+      } finally {
+        for (const cleanFn of cleanups) {
+          try {
+            cleanFn();
+          } catch (cleanErr: any) {
+            ctx.harnessErrorStatus = 1;
+            ctx.harnessErrorMessage = cleanErr.message || String(cleanErr);
+            ctx.harnessCompleted = true;
+          }
+        }
+      }
+
+      tests.push({
+        type: 'test',
+        name: sanitize_unpaired_surrogates(testName),
+        status,
+        message,
+        executed: true
+      } as any);
+
+      if (returnValue !== undefined) {
+        let msg = `Test named "${testName}" passed a function to \`test\` that returned a value.`;
+        try {
+          if (returnValue && typeof returnValue.then === 'function') {
+            msg += ' Consider using `promise_test` instead when using Promises or async/await.';
+          }
+        } catch {}
+        ctx.harnessErrorStatus = 1;
+        ctx.harnessErrorMessage = msg;
+        ctx.harnessCompleted = true;
+      }
     },
     promise_test: (fn: Function, name?: string) => {
-      const testName = name || `anonymous-test-${tests.length}`;
-      tests.push({ name: testName, fn });
+      const testName = get_test_name(fn, name, document.title || 'Untitled', tests);
+      if (ctx.harnessCompleted || ctx.harnessAborted) {
+        tests.push({
+          type: 'promise_test',
+          name: sanitize_unpaired_surrogates(testName),
+          status: 3, // NOTRUN
+          message: 'Harness was aborted or completed before execution',
+          fn: () => Promise.resolve(),
+          cleanups: [],
+          executed: true
+        } as any);
+        return;
+      }
+      tests.push({
+        type: 'promise_test',
+        name: sanitize_unpaired_surrogates(testName),
+        fn,
+        cleanups: []
+      } as any);
+    },
+    async_test: (fn: Function, name?: string) => {
+      const testName = get_test_name(fn, name, document.title || 'Untitled', tests);
+      if (ctx.harnessCompleted || ctx.harnessAborted) {
+        tests.push({
+          type: 'async_test',
+          name: sanitize_unpaired_surrogates(testName),
+          status: 3, // NOTRUN
+          message: 'Harness was aborted or completed before execution',
+          promise: Promise.resolve(),
+          cleanups: [],
+          executed: true
+        } as any);
+        return;
+      }
+      if (ctx.promiseSetupCalled) {
+        throw new HarnessError('subsequent invocation of async_test');
+      }
+
+      const testObj: any = {
+        type: 'async_test',
+        name: sanitize_unpaired_surrogates(testName),
+        status: 0,
+        message: null,
+        resolve: null,
+        promise: null,
+        cleanups: [],
+        executed: true
+      };
+
+      testObj.promise = new Promise<void>((resolve, reject) => {
+        testObj.resolve = resolve;
+        testObj.reject = reject;
+      });
+
+      const tObj = {
+        step: (stepFn: Function) => {
+          try {
+            stepFn();
+          } catch (e: any) {
+            testObj.status = 1; // FAIL
+            testObj.message = e.message || String(e);
+            testObj.resolve();
+          }
+        },
+        done: () => {
+          testObj.resolve();
+        },
+        add_cleanup: (cleanFn: Function) => {
+          testObj.cleanups.push(cleanFn);
+        }
+      };
+
+      let returnValue: any;
+      try {
+        returnValue = fn(tObj);
+      } catch (err: any) {
+        if (err instanceof HarnessError || err.name === 'HarnessError') {
+          throw err;
+        }
+        testObj.status = 1; // FAIL
+        testObj.message = err.message || String(err);
+        testObj.resolve();
+      }
+
+      tests.push(testObj);
+
+      if (returnValue !== undefined) {
+        let msg = `Test named "${testName}" passed a function to \`async_test\` that returned a value.`;
+        try {
+          if (returnValue && typeof returnValue.then === 'function') {
+            msg += ' Consider using `promise_test` instead when using Promises or async/await.';
+          }
+        } catch {}
+        ctx.harnessErrorStatus = 1;
+        ctx.harnessErrorMessage = msg;
+        ctx.harnessCompleted = true;
+      }
     },
     assert_not_equals: (actual: unknown, expected: unknown, message?: string) => {
       assert.notStrictEqual(actual, expected, message ?? '');
     },
-    assert_array_equals: (actual: unknown[], expected: unknown[], message?: string) => {
+    assert_throws_exactly: (expected: unknown, func: () => void, description?: string) => {
+      try {
+        func();
+        assert.fail(`${description || ''}: Expected to throw exception`);
+      } catch (e: unknown) {
+        assert.strictEqual(e, expected, description ?? '');
+      }
+    },
+     assert_array_equals: (actual: unknown[], expected: unknown[], message?: string) => {
       assert.strictEqual(actual.length, expected.length, `${message || 'Array length mismatch'}: expected ${expected.length} but got ${actual.length}`);
       for (let i = 0; i < actual.length; i++) {
         assert.strictEqual(actual[i], expected[i], `${message || 'Array element mismatch at index ' + i}: expected ${expected[i]} but got ${actual[i]}`);
       }
+    },
+    assert_object_equals: (actual: unknown, expected: unknown, message?: string) => {
+      assert.strictEqual(typeof actual, 'object', `${message || ''}: value is ${actual}, expected object`);
+      assert.ok(actual !== null, `${message || ''}: value is null, expected object`);
+      assert.strictEqual(typeof expected, 'object', `${message || ''}: expected is ${expected}, expected object`);
+      assert.ok(expected !== null, `${message || ''}: expected is null, expected object`);
+
+      const check_equal = (act: any, exp: any, stack: any[]) => {
+        stack.push(act);
+        for (const p in act) {
+          assert.ok(exp.hasOwnProperty(p), `${message || ''}: unexpected property ${p}`);
+          if (typeof act[p] === 'object' && act[p] !== null) {
+            if (stack.indexOf(act[p]) === -1) {
+              check_equal(act[p], exp[p], stack);
+            }
+          } else {
+            assert.ok(Object.is(act[p], exp[p]), `${message || ''}: property ${p} expected ${exp[p]} got ${act[p]}`);
+          }
+        }
+        for (const p in exp) {
+          assert.ok(act.hasOwnProperty(p), `${message || ''}: expected property ${p} missing`);
+        }
+        stack.pop();
+      };
+      check_equal(actual, expected, []);
     },
     assert_class_string: (object: unknown, class_name: string, message?: string) => {
       const actual = Object.prototype.toString.call(object);
@@ -333,6 +947,16 @@ export function createWptContext(
     },
     assert_unreached: (message?: string) => {
       assert.fail(message || 'Reached unreachable code');
+    },
+    assert_implements: (condition: unknown, description?: string) => {
+      if (!condition) {
+        throw new AssertionErrorProxy({ message: 'assert_implements: ' + (description || '') });
+      }
+    },
+    assert_implements_optional: (condition: unknown, description?: string) => {
+      if (!condition) {
+        throw new OptionalFeatureUnsupportedError(description || '');
+      }
     },
     _test_disabled_placeholder: (fn: Function, name: string) => {
       tests.push({ name, fn });
@@ -366,15 +990,123 @@ export function createWptContext(
       }
     },
     assert_throws_js: (constructor: Function, func: () => void, description?: string) => {
-      assert.throws(func, constructor as unknown as (Function | RegExp | object | Error), description ?? '');
+      try {
+        func();
+        assert.fail(`${description || ''}: Expected to throw JS exception`);
+      } catch (e: unknown) {
+        if (e instanceof assert.AssertionError) {
+          throw e;
+        }
+        assert.ok(e && typeof e === 'object', `${description || ''}: Thrown value is not an object`);
+        assert.strictEqual((e as any).constructor, constructor, `${description || ''}: expected constructor ${constructor.name}, got ${(e as any).constructor?.name}`);
+        assert.strictEqual((e as any).name, constructor.name, `${description || ''}: expected error name ${constructor.name}, got ${(e as any).name}`);
+      }
     },
-    assert_throws_dom: (errorName: string, func: () => void, description?: string) => {
+    assert_throws_dom: (errorName: string | number, func: () => void, description?: string) => {
       try {
         func();
         assert.fail(`Expected to throw DOMException ${errorName}`);
       } catch (e: unknown) {
-        assert.strictEqual((e as Error).name, errorName, description ?? '');
+        if (e && typeof e === 'object' && 'name' in e) {
+          const codename_name_map: Record<string, string> = {
+            INDEX_SIZE_ERR: 'IndexSizeError',
+            HIERARCHY_REQUEST_ERR: 'HierarchyRequestError',
+            WRONG_DOCUMENT_ERR: 'WrongDocumentError',
+            INVALID_CHARACTER_ERR: 'InvalidCharacterError',
+            NO_MODIFICATION_ALLOWED_ERR: 'NoModificationAllowedError',
+            NOT_FOUND_ERR: 'NotFoundError',
+            NOT_SUPPORTED_ERR: 'NotSupportedError',
+            INUSE_ATTRIBUTE_ERR: 'InUseAttributeError',
+            INVALID_STATE_ERR: 'InvalidStateError',
+            SYNTAX_ERR: 'SyntaxError',
+            INVALID_MODIFICATION_ERR: 'InvalidModificationError',
+            NAMESPACE_ERR: 'NamespaceError',
+            INVALID_ACCESS_ERR: 'InvalidAccessError',
+            TYPE_MISMATCH_ERR: 'TypeMismatchError',
+            SECURITY_ERR: 'SecurityError',
+            NETWORK_ERR: 'NetworkError',
+            ABORT_ERR: 'AbortError',
+            URL_MISMATCH_ERR: 'URLMismatchError',
+            TIMEOUT_ERR: 'TimeoutError',
+            INVALID_NODE_TYPE_ERR: 'InvalidNodeTypeError',
+            DATA_CLONE_ERR: 'DataCloneError'
+          };
+
+          const name_code_map: Record<string, number> = {
+            IndexSizeError: 1,
+            HierarchyRequestError: 3,
+            WrongDocumentError: 4,
+            InvalidCharacterError: 5,
+            NoModificationAllowedError: 7,
+            NotFoundError: 8,
+            NotSupportedError: 9,
+            InUseAttributeError: 10,
+            InvalidStateError: 11,
+            SyntaxError: 12,
+            InvalidModificationError: 13,
+            NamespaceError: 14,
+            InvalidAccessError: 15,
+            TypeMismatchError: 17,
+            SecurityError: 18,
+            NetworkError: 19,
+            AbortError: 20,
+            URLMismatchError: 21,
+            TimeoutError: 23,
+            InvalidNodeTypeError: 24,
+            DataCloneError: 25,
+            EncodingError: 0,
+            NotReadableError: 0,
+            UnknownError: 0,
+            ConstraintError: 0,
+            DataError: 0,
+            TransactionInactiveError: 0,
+            ReadOnlyError: 0,
+            VersionError: 0,
+            OperationError: 0,
+            NotAllowedError: 0,
+            OptOutError: 0
+          };
+
+          const code_name_map: Record<number, string> = {};
+          for (const [k, v] of Object.entries(name_code_map)) {
+            if (v > 0) code_name_map[v] = k;
+          }
+
+          let expectedName = '';
+          let expectedCode: number | undefined = undefined;
+
+          if (typeof errorName === 'number') {
+            if (errorName === 0) {
+              throw new assert.AssertionError({ message: 'Test bug: ambiguous DOMException code 0 passed to assert_throws_dom()' });
+            }
+            if (errorName === 22) {
+              throw new assert.AssertionError({ message: 'Test bug: QuotaExceededError needs to be tested for using assert_throws_quotaexceedederror()' });
+            }
+            if (!(errorName in code_name_map)) {
+              throw new assert.AssertionError({ message: `Test bug: unrecognized DOMException code "${errorName}" passed to assert_throws_dom()` });
+            }
+            expectedName = code_name_map[errorName];
+            expectedCode = errorName;
+          } else {
+            if (errorName === 'QuotaExceededError') {
+              throw new assert.AssertionError({ message: 'Test bug: QuotaExceededError needs to be tested for using assert_throws_quotaexceedederror()' });
+            }
+            expectedName = codename_name_map[errorName] || errorName;
+            if (!(expectedName in name_code_map)) {
+              throw new assert.AssertionError({ message: `Test bug: unrecognized DOMException code name or name "${errorName}" passed to assert_throws_dom()` });
+            }
+            expectedCode = name_code_map[expectedName];
+          }
+
+          assert.strictEqual((e as any).name, expectedName, `${description || ''}: expected name ${expectedName}`);
+          if (expectedCode !== undefined && expectedCode > 0) {
+            assert.strictEqual((e as any).code, expectedCode, `${description || ''}: expected code ${expectedCode}`);
+          }
+          return;
+        }
+        throw e;
       }
     },
   };
+  return ctx;
 }
