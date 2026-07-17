@@ -65,6 +65,10 @@ export class ArrayComponentValueStream implements ComponentValueStream {
   set position(pos: number) {
     this.index = pos;
   }
+
+  slice(start: number, end: number): ComponentValue[] {
+    return this.values.slice(start, end);
+  }
 }
 
 export class StreamingTokenizerStream implements TokenStream {
@@ -144,5 +148,9 @@ export class LazyComponentValueStream implements ComponentValueStream {
       throw new Error('Cannot seek past buffered content in LazyComponentValueStream');
     }
     this.index = pos;
+  }
+
+  slice(start: number, end: number): ComponentValue[] {
+    return this.buffer.slice(start, end);
   }
 }

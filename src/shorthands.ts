@@ -24,6 +24,531 @@ export interface ShorthandDefinition {
   contract: (longhands: Record<string, ComponentValue[]>) => string | null;
   logicalLonghands?: readonly string[];
   physicalLonghands?: readonly string[];
+  stub?: boolean;
+}
+
+function isRepeatKeyword(token: ComponentValue): boolean {
+  return token.type === 'ident' && ['repeat', 'no-repeat', 'space', 'round', 'repeat-x', 'repeat-y'].includes(token.value.toLowerCase());
+}
+
+function isAttachmentKeyword(token: ComponentValue): boolean {
+  return token.type === 'ident' && ['scroll', 'fixed', 'local'].includes(token.value.toLowerCase());
+}
+
+function isBoxKeyword(token: ComponentValue): boolean {
+  return token.type === 'ident' && ['border-box', 'padding-box', 'content-box', 'text', 'border-area'].includes(token.value.toLowerCase());
+}
+
+function isClipOnlyBoxKeyword(keyword: string): boolean {
+  return ['text', 'border-area'].includes(keyword.toLowerCase());
+}
+
+function isColorToken(token: ComponentValue): boolean {
+  if (token.type === 'hash') return true;
+  if (token.type === 'ident') {
+    const val = token.value.toLowerCase();
+    return [
+      'transparent', 'currentcolor',
+      'aliceblue', 'antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond',
+      'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 'cornflowerblue',
+      'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 'darkgreen', 'darkgrey',
+      'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 'darkred', 'darksalmon', 'darkseagreen',
+      'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 'darkviolet', 'deeppink', 'deepskyblue',
+      'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 'forestgreen', 'fuchsia', 'gainsboro',
+      'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow', 'grey', 'honeydew', 'hotpink', 'indianred',
+      'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush', 'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral',
+      'lightcyan', 'lightgoldenrodyellow', 'lightgray', 'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon',
+      'lightseagreen', 'lightskyblue', 'lightslategray', 'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime',
+      'limegreen', 'linen', 'magenta', 'maroon', 'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple',
+      'mediumseagreen', 'mediumslateblue', 'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue',
+      'mintcream', 'mistyrose', 'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange',
+      'orangered', 'orchid', 'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff',
+      'peru', 'pink', 'plum', 'powderblue', 'purple', 'rebeccapurple', 'red', 'rosybrown', 'royalblue', 'saddlebrown',
+      'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slate50', 'slateblue',
+      'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 'tomato', 'turquoise',
+      'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen',
+      'canvas', 'canvastext', 'linktext', 'visitedtext', 'activetext', 'buttonface', 'buttontext', 'buttonborder',
+      'field', 'fieldtext', 'highlight', 'highlighttext', 'mark', 'marktext', 'graytext'
+    ].includes(val);
+  }
+  if (token.type === 'function') {
+    const name = ('name' in token ? token.name : ('value' in token ? token.value : ''))?.toString().toLowerCase();
+    if (name) {
+      return ['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color'].includes(name);
+    }
+  }
+  return false;
+}
+
+function isImageToken(token: ComponentValue): boolean {
+  if (token.type === 'ident' && token.value.toLowerCase() === 'none') {
+    return true;
+  }
+  if (token.type === 'url') {
+    return true;
+  }
+  if (token.type === 'function') {
+    const name = ('name' in token ? token.name : ('value' in token ? token.value : ''))?.toString().toLowerCase();
+    if (name) {
+      return [
+        'url', 'src', 'image', 'image-set',
+        'linear-gradient', 'radial-gradient', 'conic-gradient',
+        'repeating-linear-gradient', 'repeating-radial-gradient', 'repeating-conic-gradient'
+      ].includes(name);
+    }
+  }
+  return false;
+}
+
+function isPositionOrSizeValue(token: ComponentValue): boolean {
+  if (token.type === 'ident') {
+    return ['left', 'right', 'top', 'bottom', 'center', 'auto', 'cover', 'contain'].includes(token.value.toLowerCase());
+  }
+  if (token.type === 'percentage' || token.type === 'dimension') {
+    return true;
+  }
+  if (token.type === 'number' && token.value === 0) {
+    return true;
+  }
+  if (token.type === 'function') {
+    const name = ('name' in token ? token.name : ('value' in token ? token.value : ''))?.toString().toLowerCase();
+    if (name) {
+      return ['calc', 'min', 'max', 'clamp'].includes(name);
+    }
+  }
+  return false;
+}
+
+function extractSizeTokens(tokens: ComponentValue[], slashIdx: number): { size: ComponentValue[]; consumed: number } | null {
+  if (slashIdx + 1 >= tokens.length) return null;
+  const first = tokens[slashIdx + 1];
+  if (first.type === 'ident' && ['cover', 'contain'].includes(first.value.toLowerCase())) {
+    return { size: [first], consumed: 1 };
+  }
+  
+  const isSizeVal = (t: ComponentValue) => {
+    if (t.type === 'ident' && t.value.toLowerCase() === 'auto') return true;
+    if (t.type === 'percentage' || t.type === 'dimension') return true;
+    if (t.type === 'number' && t.value === 0) return true;
+    if (t.type === 'function') {
+      const name = ('name' in t ? t.name : ('value' in t ? t.value : ''))?.toString().toLowerCase();
+      if (name && ['calc', 'min', 'max', 'clamp'].includes(name)) return true;
+    }
+    return false;
+  };
+
+  if (!isSizeVal(first)) return null;
+
+  if (slashIdx + 2 < tokens.length) {
+    const second = tokens[slashIdx + 2];
+    if (isSizeVal(second)) {
+      return { size: [first, second], consumed: 2 };
+    }
+  }
+  return { size: [first], consumed: 1 };
+}
+
+function mapBoxKeywords(keywords: string[]): { origin: string; clip: string } | null {
+  if (keywords.length === 0) {
+    return { origin: 'padding-box', clip: 'border-box' };
+  }
+  if (keywords.length === 1) {
+    const a = keywords[0].toLowerCase();
+    if (isClipOnlyBoxKeyword(a)) {
+      return { origin: 'border-box', clip: a };
+    } else {
+      return { origin: a, clip: a };
+    }
+  }
+  if (keywords.length === 2) {
+    const a = keywords[0].toLowerCase();
+    const b = keywords[1].toLowerCase();
+    const aClipOnly = isClipOnlyBoxKeyword(a);
+    const bClipOnly = isClipOnlyBoxKeyword(b);
+    if (aClipOnly && bClipOnly) {
+      return { origin: 'border-box', clip: `${a} ${b}` };
+    }
+    if (aClipOnly) {
+      return { origin: b, clip: a };
+    }
+    if (bClipOnly) {
+      return { origin: a, clip: b };
+    }
+    return { origin: a, clip: b };
+  }
+  if (keywords.length === 3) {
+    const clips = keywords.filter(isClipOnlyBoxKeyword);
+    const origins = keywords.filter(k => !isClipOnlyBoxKeyword(k));
+    if (clips.length === 2 && origins.length === 1) {
+      return { origin: origins[0], clip: clips.join(' ') };
+    }
+    return null;
+  }
+  return null;
+}
+
+function parseRepeatTokens(tokens: ComponentValue[]): ComponentValue[] | null {
+  if (tokens.length === 1) {
+    const val = tokens[0].value?.toString().toLowerCase();
+    if (val === 'repeat-x') {
+      return [
+        { type: 'ident', value: 'repeat' },
+        { type: 'ident', value: 'no-repeat' }
+      ] as ComponentValue[];
+    }
+    if (val === 'repeat-y') {
+      return [
+        { type: 'ident', value: 'no-repeat' },
+        { type: 'ident', value: 'repeat' }
+      ] as ComponentValue[];
+    }
+    return [tokens[0]];
+  }
+  if (tokens.length === 2) {
+    return tokens;
+  }
+  return null;
+}
+
+function normalizePositionTokens(tokens: ComponentValue[]): ComponentValue[] {
+  if (tokens.length === 1) {
+    const t0 = tokens[0];
+    if (t0.type === 'ident') {
+      const v = t0.value.toLowerCase();
+      if (v === 'left' || v === 'right') {
+        return [t0, { type: 'ident', value: 'center' }];
+      }
+      if (v === 'top' || v === 'bottom') {
+        return [{ type: 'ident', value: 'center' }, t0];
+      }
+      if (v === 'center') {
+        return [t0, t0];
+      }
+    } else {
+      return [t0, { type: 'percentage', value: 50, sign: null }];
+    }
+  }
+  if (tokens.length === 2) {
+    const t0 = tokens[0];
+    const t1 = tokens[1];
+    if (t0.type === 'ident' && t1.type === 'ident') {
+      const v0 = t0.value.toLowerCase();
+      const v1 = t1.value.toLowerCase();
+      const isHoriz = (v: string) => ['left', 'right'].includes(v);
+      const isVert = (v: string) => ['top', 'bottom'].includes(v);
+      
+      if (isVert(v0) && isHoriz(v1)) {
+        return [t1, t0];
+      }
+      if (v0 === 'center' && isVert(v1)) {
+        return [t0, t1];
+      }
+      if (isHoriz(v0) && v1 === 'center') {
+        return [t0, t1];
+      }
+      if (isVert(v0) && v1 === 'center') {
+        return [t1, t0];
+      }
+    }
+  }
+  return tokens;
+}
+
+function normalizeSizeTokens(tokens: ComponentValue[]): ComponentValue[] {
+  if (tokens.length === 1) {
+    const t0 = tokens[0];
+    if (t0.type === 'ident' && ['cover', 'contain'].includes(t0.value.toLowerCase())) {
+      return [t0];
+    }
+    return [t0, { type: 'ident', value: 'auto' }];
+  }
+  return tokens;
+}
+
+
+
+function joinWithWhitespace(tokens: ComponentValue[]): ComponentValue[] {
+  const res: ComponentValue[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (i > 0) {
+      res.push({ type: 'whitespace', value: ' ' });
+    }
+    res.push(tokens[i]);
+  }
+  return res;
+}
+
+function expandBackground(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const layers: ComponentValue[][] = [];
+  let currentLayer: ComponentValue[] = [];
+  for (const val of values) {
+    if (val.type === 'comma') {
+      layers.push(currentLayer);
+      currentLayer = [];
+    } else {
+      currentLayer.push(val);
+    }
+  }
+  layers.push(currentLayer);
+
+  const numLayers = layers.length;
+  if (numLayers === 0) return null;
+
+  const imageLayers: ComponentValue[][] = [];
+  const positionLayers: ComponentValue[][] = [];
+  const sizeLayers: ComponentValue[][] = [];
+  const repeatLayers: ComponentValue[][] = [];
+  const attachmentLayers: ComponentValue[][] = [];
+  const originLayers: ComponentValue[][] = [];
+  const clipLayers: ComponentValue[][] = [];
+  let parsedColor: ComponentValue[] | null = null;
+
+  for (let i = 0; i < numLayers; i++) {
+    const layer = layers[i];
+    const layerClean = layer.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
+    if (layerClean.length === 0) {
+      return null;
+    }
+
+    const slashIdx = layerClean.findIndex(t => t.type === 'delim' && t.value === '/');
+    let sizeTokens: ComponentValue[] | null = null;
+    if (slashIdx !== -1) {
+      const sizeResult = extractSizeTokens(layerClean, slashIdx);
+      if (!sizeResult) return null;
+      sizeTokens = sizeResult.size;
+      layerClean.splice(slashIdx, 1 + sizeResult.consumed);
+    }
+
+    const repeatTokens: ComponentValue[] = [];
+    const attachmentTokens: ComponentValue[] = [];
+    const boxKeywords: string[] = [];
+    let colorTokens: ComponentValue[] | null = null;
+    let imageTokens: ComponentValue[] | null = null;
+    const positionTokens: ComponentValue[] = [];
+
+    for (const token of layerClean) {
+      if (isRepeatKeyword(token)) {
+        repeatTokens.push(token);
+      } else if (isAttachmentKeyword(token)) {
+        attachmentTokens.push(token);
+      } else if (isBoxKeyword(token)) {
+        boxKeywords.push(token.value as string);
+      } else if (isColorToken(token)) {
+        if (i !== numLayers - 1) return null;
+        if (colorTokens !== null) return null;
+        colorTokens = [token];
+      } else if (isImageToken(token)) {
+        if (imageTokens !== null) return null;
+        imageTokens = [token];
+      } else if (isPositionOrSizeValue(token)) {
+        positionTokens.push(token);
+      } else {
+        return null;
+      }
+    }
+
+    if (sizeTokens !== null && positionTokens.length === 0) return null;
+    if (positionTokens.length > 4) return null;
+
+    const boxMapped = mapBoxKeywords(boxKeywords);
+    if (!boxMapped) return null;
+
+    const repeatMapped = parseRepeatTokens(repeatTokens);
+    const repeatFinal = repeatMapped ? joinWithWhitespace(repeatMapped) : [{ type: 'ident', value: 'repeat' } as ComponentValue];
+
+    const positionFinal = positionTokens.length > 0 
+      ? joinWithWhitespace(normalizePositionTokens(positionTokens))
+      : joinWithWhitespace([{ type: 'percentage', value: 0, sign: null } as ComponentValue, { type: 'percentage', value: 0, sign: null } as ComponentValue]);
+
+    const sizeFinal = sizeTokens !== null 
+      ? joinWithWhitespace(normalizeSizeTokens(sizeTokens))
+      : [{ type: 'ident', value: 'auto' } as ComponentValue];
+
+    const imageFinal = imageTokens || [{ type: 'ident', value: 'none' } as ComponentValue];
+
+    const attachmentFinal = attachmentTokens.length > 0 
+      ? joinWithWhitespace(attachmentTokens) 
+      : [{ type: 'ident', value: 'scroll' } as ComponentValue];
+
+    const originFinal = [{ type: 'ident', value: boxMapped.origin } as ComponentValue];
+    const clipFinal = joinWithWhitespace(boxMapped.clip.split(' ').map(c => ({ type: 'ident', value: c } as ComponentValue)));
+
+    imageLayers.push(imageFinal);
+    positionLayers.push(positionFinal);
+    sizeLayers.push(sizeFinal);
+    repeatLayers.push(repeatFinal);
+    attachmentLayers.push(attachmentFinal);
+    originLayers.push(originFinal);
+    clipLayers.push(clipFinal);
+
+    if (colorTokens !== null) {
+      parsedColor = colorTokens;
+    }
+  }
+
+  const joinLayers = (layers: ComponentValue[][]): ComponentValue[] => {
+    const res: ComponentValue[] = [];
+    for (let i = 0; i < layers.length; i++) {
+      if (i > 0) {
+        res.push({ type: 'comma', value: ',' });
+        res.push({ type: 'whitespace', value: ' ' });
+      }
+      res.push(...layers[i]);
+    }
+    return res;
+  };
+
+  return {
+    'background-image': joinLayers(imageLayers),
+    'background-position': joinLayers(positionLayers),
+    'background-size': joinLayers(sizeLayers),
+    'background-repeat': joinLayers(repeatLayers),
+    'background-attachment': joinLayers(attachmentLayers),
+    'background-origin': joinLayers(originLayers),
+    'background-clip': joinLayers(clipLayers),
+    'background-color': parsedColor || [{ type: 'ident', value: 'transparent' } as ComponentValue]
+  };
+}
+
+function contractBackground(longhands: Record<string, ComponentValue[]>): string | null {
+  const image = longhands['background-image'];
+  const position = longhands['background-position'];
+  const size = longhands['background-size'];
+  const repeat = longhands['background-repeat'];
+  const attachment = longhands['background-attachment'];
+  const origin = longhands['background-origin'];
+  const clip = longhands['background-clip'];
+  const color = longhands['background-color'];
+
+  if (!image || !position || !size || !repeat || !attachment || !origin || !clip || !color) {
+    return null;
+  }
+
+  const splitLayers = (tokens: ComponentValue[]): ComponentValue[][] => {
+    const res: ComponentValue[][] = [];
+    let current: ComponentValue[] = [];
+    for (const t of tokens) {
+      if (t.type === 'comma') {
+        res.push(current);
+        current = [];
+      } else {
+        current.push(t);
+      }
+    }
+    res.push(current);
+    return res;
+  };
+
+  const imageLayers = splitLayers(image);
+  const positionLayers = splitLayers(position);
+  const sizeLayers = splitLayers(size);
+  const repeatLayers = splitLayers(repeat);
+  const attachmentLayers = splitLayers(attachment);
+  const originLayers = splitLayers(origin);
+  const clipLayers = splitLayers(clip);
+
+  const numLayers = imageLayers.length;
+  if (
+    positionLayers.length !== numLayers ||
+    sizeLayers.length !== numLayers ||
+    repeatLayers.length !== numLayers ||
+    attachmentLayers.length !== numLayers ||
+    originLayers.length !== numLayers ||
+    clipLayers.length !== numLayers
+  ) {
+    return null;
+  }
+
+  const layerStrings: string[] = [];
+
+  for (let i = 0; i < numLayers; i++) {
+    const imgVal = serialize(imageLayers[i]).trim();
+    const posVal = serialize(positionLayers[i]).trim();
+    const sizeVal = serialize(sizeLayers[i]).trim();
+    const repVal = serialize(repeatLayers[i]).trim();
+    const attVal = serialize(attachmentLayers[i]).trim();
+    const origVal = serialize(originLayers[i]).trim();
+    const clipVal = serialize(clipLayers[i]).trim();
+
+    const parts: string[] = [];
+
+    const hasImage = imgVal !== 'none' && imgVal !== '';
+    if (hasImage) {
+      parts.push(imgVal);
+    }
+
+    const isInitialPosition = posVal !== '' && ['0% 0%', 'left top', '0% center', 'center left', 'left center'].includes(posVal.toLowerCase());
+    const isInitialSize = sizeVal !== '' && ['auto', 'auto auto'].includes(sizeVal.toLowerCase());
+
+    if (posVal !== '' && sizeVal !== '') {
+      if (!isInitialSize) {
+        parts.push(`${posVal} / ${sizeVal}`);
+      } else if (!isInitialPosition) {
+        parts.push(posVal);
+      }
+    }
+
+    const isInitialRepeat = repVal !== '' && ['repeat', 'repeat repeat'].includes(repVal.toLowerCase());
+    if (repVal !== '' && !isInitialRepeat) {
+      const tokens = repeatLayers[i].filter(t => t.type !== 'whitespace' && t.type !== 'EOF');
+      if (tokens.length === 2) {
+        const v0 = tokens[0].value?.toString().toLowerCase();
+        const v1 = tokens[1].value?.toString().toLowerCase();
+        if (v0 === 'repeat' && v1 === 'no-repeat') {
+          parts.push('repeat-x');
+        } else if (v0 === 'no-repeat' && v1 === 'repeat') {
+          parts.push('repeat-y');
+        } else if (v0 === v1) {
+          parts.push(v0);
+        } else {
+          parts.push(`${v0} ${v1}`);
+        }
+      } else {
+        parts.push(repVal);
+      }
+    }
+
+    if (attVal !== '' && attVal.toLowerCase() !== 'scroll') {
+      parts.push(attVal);
+    }
+
+    if (origVal !== '' && clipVal !== '') {
+      const isClipOnly = ['text', 'border-area'].includes(clipVal.toLowerCase()) || clipVal.toLowerCase().includes('text') || clipVal.toLowerCase().includes('border-area');
+      const defaultOrigin = isClipOnly ? 'border-box' : 'padding-box';
+
+      if (origVal.toLowerCase() !== 'padding-box' || clipVal.toLowerCase() !== 'border-box') {
+        if (isClipOnly) {
+          if (origVal.toLowerCase() === defaultOrigin) {
+            parts.push(clipVal);
+          } else {
+            parts.push(`${origVal} ${clipVal}`);
+          }
+        } else {
+          if (origVal.toLowerCase() === clipVal.toLowerCase()) {
+            parts.push(origVal);
+          } else {
+            parts.push(`${origVal} ${clipVal}`);
+          }
+        }
+      }
+    }
+
+    if (i === numLayers - 1) {
+      const colVal = serialize(color).trim();
+      if (colVal !== '' && colVal.toLowerCase() !== 'transparent') {
+        parts.push(colVal);
+      }
+    }
+
+    if (parts.length === 0) {
+      parts.push('none');
+    }
+
+    console.log('PARTS FOR LAYER:', i, JSON.stringify(parts));
+    layerStrings.push(parts.join(' '));
+  }
+
+  return layerStrings.join(', ');
 }
 
 const expandBox = (physical: readonly string[], logical: readonly string[]) => (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
@@ -235,9 +760,11 @@ const expandBorderRadius = (values: ComponentValue[]): Record<string, ComponentV
 
 const contractBorderRadius = (values: Record<string, ComponentValue[]>): string | null => {
   const physical = ['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'];
-  
+
+  const hasPhysical = physical.every(prop => values[prop] !== undefined);
+  if (!hasPhysical) return null;
+
   const longhands = physical.map(prop => values[prop]);
-  if (longhands.some(v => !v)) return null;
 
   const parsed = longhands.map(lh => {
     const filtered = lh.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
@@ -450,6 +977,11 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
     expand: expandBox(['scroll-padding-top','scroll-padding-right','scroll-padding-bottom','scroll-padding-left'], ['scroll-padding-block-start','scroll-padding-inline-start','scroll-padding-block-end','scroll-padding-inline-end']),
     contract: contractBox(['scroll-padding-top','scroll-padding-right','scroll-padding-bottom','scroll-padding-left'], ['scroll-padding-block-start','scroll-padding-inline-start','scroll-padding-block-end','scroll-padding-inline-end']),
     logicalLonghands: ['scroll-padding-block-start','scroll-padding-inline-start','scroll-padding-block-end','scroll-padding-inline-end'],
+  },
+  'background': {
+    longhands: SHORTHANDS_DATA['background'],
+    expand: expandBackground,
+    contract: contractBackground,
   },
 };
 

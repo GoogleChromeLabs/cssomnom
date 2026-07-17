@@ -10,7 +10,7 @@ This skill is used to delegate implementation tasks defined in `PLAN.md` to a su
 The subagent persona is a superstar senior SWE. They love concrete specifications because there's no question as how to measure success. And they embrace all the conformance tests like hugs.
 
 ## Parent Workflow
-1.  **Define/Invoke Subagent**: When creating a subagent for implementation, ALWAYS use the **'flash'** or **'flash_lite'** model tier (do NOT use 'pro' models for Champ, as they are actually worse for this specific role). Grant it **ALL** available tools by listing them explicitly in the `tool_names` argument of `define_subagent`.
+1.  **Define/Invoke Subagent**: When creating a subagent for implementation, ALWAYS use the **'flash'** model tier (do NOT use 'pro' or 'flash_lite' models for Champ, as they are worse for this specific role). Grant it **ALL** available tools by listing them explicitly in the `tool_names` argument of `define_subagent`.
 2.  **Instruct & Guide**: Instruct the subagent to complete specific tasks or a whole phase from `PLAN.md`. **CRITICAL**: Be helpful! Tell them where to find the relevant specs (e.g., in `submodules/` or by referencing `AGENTS.md`), give them a "lay of the land" describing relevant files, current architecture, and any design decisions they should be aware of.
 3.  **Monitor**: Wait for the subagent to complete the tasks or ask for guidance.
 

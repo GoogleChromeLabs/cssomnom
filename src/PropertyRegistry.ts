@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 import { unitToBase, unitToPixels } from './data/units.ts';
+import { NAMED_COLORS } from './data/colors.ts';
 import { tokenize } from './tokenizer.ts';
 import { Parser } from './parser.ts';
 import type { ComponentValue, Token, SimpleBlock, CSSFunction } from './types.ts';
@@ -183,18 +184,34 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
 
         if (itemTokens.length !== 1) return false;
         const t = itemTokens[0];
-        const isCalc = t.type === 'function' && (t as CSSFunction).name.toLowerCase() === 'calc';
+        const MATH_FUNCTIONS = new Set(['calc', 'min', 'max', 'clamp', 'round', 'mod', 'rem', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'pow', 'sqrt', 'hypot', 'log', 'exp', 'abs', 'sign']);
+        const isMathFunction = t.type === 'function' && MATH_FUNCTIONS.has((t as CSSFunction).name.toLowerCase());
         
-        if (name === 'length') return isCalc || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || (t.type === 'number' && t.value === 0);
-        if (name === 'number') return isCalc || t.type === 'number';
-        if (name === 'percentage') return isCalc || t.type === 'percentage';
-        if (name === 'length-percentage') return isCalc || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || t.type === 'percentage' || (t.type === 'number' && t.value === 0);
+        if (name === 'length') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || (t.type === 'number' && t.value === 0);
+        if (name === 'number') return isMathFunction || t.type === 'number';
+        if (name === 'percentage') return isMathFunction || t.type === 'percentage';
+        if (name === 'length-percentage') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || t.type === 'percentage' || (t.type === 'number' && t.value === 0);
         if (name === 'integer') return t.type === 'number' && t.numberType === 'integer';
-        if (name === 'angle') return isCalc || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'angle');
-        if (name === 'time') return isCalc || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'time');
-        if (name === 'resolution') return isCalc || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'resolution');
+        if (name === 'angle') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'angle');
+        if (name === 'time') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'time');
+        if (name === 'resolution') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'resolution');
 
-        if (name === 'color') return t.type === 'ident' || t.type === 'function' || (t.type === 'hash');
+        if (name === 'color') {
+          if (t.type === 'hash') {
+            return /^[0-9a-fA-F]{3,4}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(t.value);
+          }
+          if (t.type === 'function') {
+            const funcName = (t as CSSFunction).name.toLowerCase();
+            const COLOR_FUNCTIONS = new Set(['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
+            return COLOR_FUNCTIONS.has(funcName);
+          }
+          if (t.type === 'ident') {
+            const val = (t as Token).value.toString().toLowerCase();
+            const SYSTEM_COLORS = new Set(['canvas', 'canvastext', 'linktext', 'visitedtext', 'activeborder', 'activecaption', 'appworkspace', 'background', 'buttonface', 'buttonhighlight', 'buttonshadow', 'buttontext', 'captiontext', 'graytext', 'highlight', 'highlighttext', 'inactiveborder', 'inactivecaption', 'inactivecaptiontext', 'infobackground', 'infotext', 'menu', 'menutext', 'scrollbar', 'threeddarkshadow', 'threedface', 'threedhighlight', 'threedlightshadow', 'threedshadow', 'window', 'windowframe', 'windowtext', 'currentcolor']);
+            return val in NAMED_COLORS || SYSTEM_COLORS.has(val);
+          }
+          return false;
+        }
         if (name === 'url') return t.type === 'url' || (t.type === 'function' && (t as CSSFunction).name === 'url');
         if (name === 'image') return t.type === 'url' || t.type === 'function';
         if (name === 'custom-ident') {
@@ -262,10 +279,14 @@ const registry = new Map<string, PropertyDefinitionInternal>();
 
 export const PropertyRegistry = {
   validate(definition: PropertyDefinition) {
+    if (definition.name === undefined) {
+      throw new TypeError('The name parameter is required.');
+    }
     if (definition.inherits === undefined) {
       throw new TypeError('The inherits flag is required.');
     }
-    if (!Parser.isValidDashedIdent(definition.name)) {
+    const nameStr = definition.name.toString();
+    if (!Parser.isValidDashedIdent(nameStr)) {
       throw new DOMException('Property name must be a valid <dashed-ident>', 'SyntaxError');
     }
     

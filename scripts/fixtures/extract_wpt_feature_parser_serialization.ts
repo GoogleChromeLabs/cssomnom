@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
 
 interface TestFixture {

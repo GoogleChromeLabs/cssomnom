@@ -33,7 +33,7 @@ export class MediaParser {
    * Invalid queries are replaced with 'not all'.
    */
   public static parse(mediaText: string): MediaQuery[] {
-    if (!mediaText || mediaText.trim() === '') {
+    if (!mediaText) {
       return [];
     }
 
@@ -43,19 +43,19 @@ export class MediaParser {
 
     const queries: MediaQuery[] = [];
     let currentQuery: ComponentValue[] = [];
+    let seenComma = false;
 
     for (const val of values) {
       if (val.type === 'comma') {
         queries.push(this.normalizeAndValidate(currentQuery));
         currentQuery = [];
-      } else if (val.type === 'whitespace' && currentQuery.length === 0) {
-        // Skip leading whitespace
+        seenComma = true;
       } else {
         currentQuery.push(val);
       }
     }
 
-    if (currentQuery.length > 0) {
+    if (currentQuery.length > 0 || seenComma) {
       queries.push(this.normalizeAndValidate(currentQuery));
     }
 
@@ -63,6 +63,15 @@ export class MediaParser {
   }
 
   private static normalizeAndValidate(values: ComponentValue[]): MediaQuery {
+    const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+    if (filtered.length === 0) {
+      return {
+        type: 'media-query',
+        invalid: true,
+        tokens: values
+      };
+    }
+
     const canonical = this.canonicalSerialize(values);
     const tokens = tokenize(canonical);
     const parser = new Parser(tokens);
@@ -111,17 +120,22 @@ export class MediaParser {
       } else if (v.type === 'at-keyword') {
         serialized = '@' + v.value.toLowerCase();
       } else if (v.type === 'dimension') {
-        serialized = v.value.toString() + (v.unit ? serializeIdentifier(v.unit.toLowerCase()) : '');
+        let unit = v.unit;
+        if (unit.toLowerCase() === 'x') {
+          unit = 'dppx';
+        }
+        serialized = v.value.toString() + (unit ? serializeIdentifier(unit.toLowerCase()) : '');
 
       } else {
         serialized = serialize([v]).trim();
       }
 
       const isOperator = v.type === 'delim' && (v.value === '>' || v.value === '<' || v.value === '=' || v.value === '+' || v.value === '-');
+      const isSlash = v.type === 'delim' && v.value === '/';
       const lastWasOperator = lastType === 'delim' && (result.endsWith('>') || result.endsWith('<') || result.endsWith('=') || result.endsWith('+') || result.endsWith('-'));
 
       // Add space between idents or between ident and other things if needed
-      if ((lastType === 'ident' || lastType === 'dimension' || lastType === 'function') && (v.type === 'ident' || v.type === 'number' || v.type === 'dimension' || v.type === 'delim' || v.type === 'simple-block')) {
+      if ((lastType === 'ident' || lastType === 'dimension' || lastType === 'function' || lastType === 'number') && (v.type === 'ident' || v.type === 'number' || v.type === 'dimension' || v.type === 'delim' || v.type === 'simple-block')) {
         result += ' ';
       } else if (lastType === 'simple-block' && v.type === 'ident') {
         result += ' ';
@@ -135,6 +149,8 @@ export class MediaParser {
         result += ' ';
       } else if (isOperator && !lastWasOperator) {
         // Add space before operators if not already there and not part of a combined operator
+        if (!result.endsWith(' ') && result.length > 0 && !result.endsWith('(')) result += ' ';
+      } else if (isSlash) {
         if (!result.endsWith(' ') && result.length > 0 && !result.endsWith('(')) result += ' ';
       }
 
@@ -153,6 +169,8 @@ export class MediaParser {
             result += ' ';
           }
         }
+      } else if (isSlash) {
+        result += ' ';
       }
       
       lastType = v.type;
@@ -392,13 +410,24 @@ export class MediaQueryValidator {
 
     if (tokens.length >= 3 && tokens[0].type === 'ident' && tokens[1].type === 'colon') {
       const featureName = tokens[0].value.toLowerCase();
-      const valueTokens = tokens.slice(2);
+      let valueTokens = tokens.slice(2);
+      if (featureName.includes('aspect-ratio')) {
+        const filtered = valueTokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+        if (filtered.length === 1) {
+          valueTokens = [
+            filtered[0],
+            { type: 'delim', value: '/' } as Token,
+            { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
+          ];
+        }
+      }
       if (this.isValidMfValue(valueTokens)) {
+        const rebuiltTokens = [tokens[0], tokens[1], ...valueTokens];
         return {
           type: 'media-feature',
           name: featureName,
           value: valueTokens,
-          tokens
+          tokens: rebuiltTokens
         };
       }
     }
@@ -466,12 +495,25 @@ export class MediaQueryValidator {
       }
       
       if (featureName) {
+        if (featureName.includes('aspect-ratio')) {
+          const filtered = valueTokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+          if (filtered.length === 1) {
+            valueTokens = [
+              filtered[0],
+              { type: 'delim', value: '/' } as Token,
+              { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
+            ];
+          }
+        }
+        const rebuiltTokens = leftIsIdent
+          ? [left[0], ...tokens.slice(ops[0].start, ops[0].end), ...valueTokens]
+          : [...valueTokens, ...tokens.slice(ops[0].start, ops[0].end), right[0]];
         return {
           type: 'media-feature',
           name: featureName,
           value: valueTokens,
           operator: ops[0].op,
-          tokens
+          tokens: rebuiltTokens
         };
       }
       
@@ -496,16 +538,43 @@ export class MediaQueryValidator {
       if (!this.isValidMfValue(left) || !this.isValidMfValue(middle) || !this.isValidMfValue(right)) return null;
       if (middle.length === 1 && middle[0].type === 'ident') {
         const featureName = (middle[0] as Token).value.toString().toLowerCase();
+        let leftVal = left;
+        let rightVal = right;
+        if (featureName.includes('aspect-ratio')) {
+          const filtL = left.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+          if (filtL.length === 1) {
+            leftVal = [
+              filtL[0],
+              { type: 'delim', value: '/' } as Token,
+              { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
+            ];
+          }
+          const filtR = right.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+          if (filtR.length === 1) {
+            rightVal = [
+              filtR[0],
+              { type: 'delim', value: '/' } as Token,
+              { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
+            ];
+          }
+        }
+        const rebuiltTokens = [
+          ...leftVal,
+          ...tokens.slice(ops[0].start, ops[0].end),
+          middle[0],
+          ...tokens.slice(ops[1].start, ops[1].end),
+          ...rightVal
+        ];
         return {
           type: 'media-feature',
           name: featureName,
           range: {
-            leftValue: left,
+            leftValue: leftVal,
             leftOp: op1,
             rightOp: op2,
-            rightValue: right
+            rightValue: rightVal
           },
-          tokens
+          tokens: rebuiltTokens
         };
       }
       return null;

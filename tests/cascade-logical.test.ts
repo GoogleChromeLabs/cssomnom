@@ -49,3 +49,48 @@ test('getCascadedStyle resolves logical properties based on writing-mode', () =>
   assert.strictEqual(style['margin-inline-start'], '10px');
   assert.strictEqual(style['margin-left'], undefined);
 });
+
+test('text-orientation: upright forces direction to ltr in vertical writing modes', () => {
+  const css = '.test { writing-mode: vertical-rl; text-orientation: upright; direction: rtl; margin-inline-start: 10px; }';
+  const tokens = tokenize(css);
+  const parser = new Parser(tokens);
+  const stylesheet = parser.parseStyleSheet();
+  
+  const element = { matches: (sel: string) => sel === '.test' };
+  const style = getCascadedStyle(element, stylesheet.cssRules as unknown as Rule[]);
+  
+  // vertical-rl + ltr (forced by text-orientation: upright) -> inline-start is top.
+  assert.strictEqual(style['margin-top'], '10px');
+  assert.strictEqual(style['margin-bottom'], undefined);
+});
+
+test('getCascadedStyle inherits writing-mode and direction from parent element', () => {
+  const css = `
+    .parent { writing-mode: vertical-rl; direction: ltr; }
+    .child { margin-inline-start: 10px; }
+  `;
+  const tokens = tokenize(css);
+  const parser = new Parser(tokens);
+  const stylesheet = parser.parseStyleSheet();
+  
+  interface MockElement {
+    matches: (sel: string) => boolean;
+    parentElement: MockElement | null;
+  }
+  const parentEl: MockElement = {
+    matches: (sel: string) => sel === '.parent',
+    parentElement: null
+  };
+  const childEl: MockElement = {
+    matches: (sel: string) => sel === '.child',
+    parentElement: parentEl
+  };
+  
+  const rules = stylesheet.cssRules as unknown as Rule[];
+  const childStyle = getCascadedStyle(childEl, rules);
+  
+  // child should inherit writing-mode: vertical-rl from parentEl, mapping inline-start to margin-top
+  assert.strictEqual(childStyle['margin-top'], '10px');
+  assert.strictEqual(childStyle['margin-left'], undefined);
+});
+

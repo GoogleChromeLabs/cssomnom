@@ -14,22 +14,23 @@
   "scripts": {
     "build": "tsup",
     "test": "pnpm run preflight",
-    "test:node": "node --test --test-reporter=dot 'tests/**/*.ts'",
+    "test:node": "node --test --test-reporter=dot 'tests/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "preflight": "pnpm typecheck && pnpm lint && pnpm test:node",
     "lint": "oxlint",
-    "fixtures:generate": "node scripts/wpt_generate_fixtures.ts",
+    "fixtures:generate": "node scripts/generate_fixtures.ts",
     "submodules:update": "git submodule update --init --recursive",
+    "submodules:upgrade": "git submodule update --init --remote && pnpm run submodules:update",
     "codegen": "node scripts/generate_all.ts",
-    "maintain": "pnpm update --latest && pnpm run submodules:update && pnpm run codegen && pnpm run fixtures:generate && pnpm run preflight"
+    "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run fixtures:generate && pnpm run preflight"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
-    "@webref/css": "^8.5.8",
-    "linkedom": "^0.18.12",
+    "@types/node": "^26.1.1",
+    "@webref/css": "^8.7.0",
+    "linkedom": "^0.18.13",
     "mdn-data": "^2.28.1",
-    "oxlint": "^1.68.0",
+    "oxlint": "^1.74.0",
     "tsup": "^8.5.1",
-    "typescript": "^6.0.3"
+    "typescript": "^7.0.2"
   }
 }

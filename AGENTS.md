@@ -3,7 +3,6 @@ Building a spec-compliant CSSOM (CSS Object Model) parser in pure TypeScript.
 
 ### Coding Rules
 - **Execution**: Run node scripts directly: `node script.ts`. Do NOT use `npx tsx` or `ts-node`.
-- Avoid ` /** @type {any} */` it is lazy - you are not lazy - you work hard.
 
 ## Spec References
 We are building a spec-compliant implementation. Agents MUST adhere to the W3C specifications listed below, except where intentional deviations are documented in `API_BOUNDARIES.md` for pragmatism, performance, or Node.js compatibility. You are expected to actively consult these Bikeshed (`.bs`) source files to understand the normative algorithms and edge cases before implementing or auditing features.
@@ -29,6 +28,7 @@ Relevant Specifications:
 - **WPT Fixtures**: Continuously look for and extract new test fixtures and test cases from the W3C Web Platform Tests (WPT) submodule to ensure high conformance.
 - **Red/Green TDD**: Prefer test-driven development when fixing bugs or compliance gaps. Write a failing test first to demonstrate the issue (Red), then implement the fix to make it pass (Green). This protects against building tests that pass by accident.
 - **Bug Fixes & Regression Tests**: Whenever you fix a bug or a spec non-compliance, you MUST add a corresponding regression test to ensure the bug does not return. Do not simply fix the code without verifying it with a test.
+- Citations: Add spec references as comments to our implementation so future users can easily cross-reference the relevant spec text.
 
 ## Architectural Constraints
 
@@ -54,4 +54,7 @@ As CSS specifications evolve, this codebase must evolve with them. We prioritize
 - **Prioritize Conformance**: The ultimate goal is to pass the W3C CSSOM conformance tests.
 - Run 'pnpm run preflight' before committing and address failures.
 - **Attribution Clarification**: If you see a message like "The following changes were made by the USER ...", those changes are almost certainly made by a subagent, not the user.
+- **The Multi-Agent Quality Loop**: You MUST strictly adhere to the multi-agent developer-reviewer-gatekeeper workflow and anti-greenwashing policies defined in [LOOP.md](file:///usr/local/google/home/paulirish/code/cssom/LOOP.md). Review the checklist, bug bars, and subagent settings before launching any code edits or reviews.
+- **Subagent Submodule Optimization**: Spawning subagents in isolated workspaces (`share` mode) leaves submodule folders empty. Cloning or copying the 1.3 GB `web-platform-tests` submodule is extremely slow. Instead, the subagent (or the parent during setup) should **symlink** the parent's `submodules/` directory into the subagent's workspace (e.g., `ln -s <parent_dir>/submodules submodules`) to gain instant, zero-copy access to spec files and WPT tests without network latency.
+
 

@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 import { ParseHooks } from './parse-hooks.ts';
-import { serialize, serializeDeclarations, serializeString, serializeIdentifier } from './serializer.ts';
+import { serialize, serializeDeclarations, serializeString, serializeIdentifier, serializeSelectorList } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
-import { StylePropertyMapReadOnly } from './typed-om.ts';
+import { StylePropertyMap } from './typed-om.ts';
 import type { Declaration, Rule, ASTAtRule, ComponentValue, MediaQuery } from './types.ts';
 import { MediaParser, serializeMediaQuery } from './MediaParser.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
@@ -247,6 +247,9 @@ export class CSSStyleSheet extends StyleSheet {
     sheet._parseRule = parseRule;
     sheet._constructedFlag = false;
     for (const rule of rules) {
+      if (rule instanceof CSSRule) {
+        rule.parentStyleSheet = sheet;
+      }
       sheet._registerRuleProperties(rule);
     }
     return sheet;
@@ -292,6 +295,9 @@ export class CSSStyleSheet extends StyleSheet {
     this._unregisterProperties();
     this._rules = filteredRules;
     for (const rule of this._rules) {
+      if (rule instanceof CSSRule) {
+        rule.parentStyleSheet = this;
+      }
       this._registerRuleProperties(rule);
     }
   }
@@ -348,6 +354,9 @@ export class CSSStyleSheet extends StyleSheet {
       }
     }
 
+    if (parsedRule instanceof CSSRule) {
+      parsedRule.parentStyleSheet = this;
+    }
     this._rules.splice(index, 0, parsedRule);
     this._registerRuleProperties(parsedRule);
     return index;
@@ -426,7 +435,17 @@ function serializeGroupingRule(atKeyword: string, condition: string, rules: Rule
 
 export class CSSRule {
   parentRule: CSSRule | null = null;
-  parentStyleSheet: CSSStyleSheet | null = null;
+  private _parentStyleSheet: CSSStyleSheet | null = null;
+
+  get parentStyleSheet(): CSSStyleSheet | null {
+    if (this._parentStyleSheet) return this._parentStyleSheet;
+    if (this.parentRule) return this.parentRule.parentStyleSheet;
+    return null;
+  }
+
+  set parentStyleSheet(sheet: CSSStyleSheet | null) {
+    this._parentStyleSheet = sheet;
+  }
   
   static readonly STYLE_RULE = 1;
   static readonly CHARSET_RULE = 2;
@@ -507,6 +526,11 @@ export class CSSGroupingRule extends CSSRule {
     this._rules = rules;
     this.cssRules = new CSSRuleList(() => this._rules);
     this._parseRuleInBlock = parseRuleInBlock;
+    for (const rule of rules) {
+      if (rule instanceof CSSRule) {
+        rule.parentRule = this;
+      }
+    }
   }
 
   // 6.16 The CSSGroupingRule Interface
@@ -517,6 +541,9 @@ export class CSSGroupingRule extends CSSRule {
     }
     if (index < 0 || index > this._rules.length) {
       throw new DOMException('Index size error', 'IndexSizeError');
+    }
+    if (parsedRule instanceof CSSRule) {
+      parsedRule.parentRule = this;
     }
     this._rules.splice(index, 0, parsedRule);
     return index;
@@ -531,7 +558,7 @@ export class CSSStyleRule extends CSSGroupingRule {
   private _selectorText: string;
   private _selectorAST: import('./types.ts').SelectorList | null = null;
   private _style: CSSStyleDeclaration;
-  readonly styleMap: StylePropertyMapReadOnly;
+  readonly styleMap: StylePropertyMap;
 
   constructor(selectorText: string, styleDeclarations: Declaration[], rules: Rule[], parseRuleInBlock: (text: string) => Rule, selectorAST: import('./types.ts').SelectorList | null = null) {
     super(rules, parseRuleInBlock);
@@ -539,7 +566,7 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._selectorAST = selectorAST;
     this._style = new CSSStyleDeclaration(styleDeclarations);
     this._style.parentRule = this;
-    this.styleMap = new StylePropertyMapReadOnly(styleDeclarations);
+    this.styleMap = new StylePropertyMap(this._style);
   }
 
   get style(): CSSStyleDeclaration {
@@ -551,14 +578,38 @@ export class CSSStyleRule extends CSSGroupingRule {
   }
 
   get selectorText(): string {
+    if (this._selectorAST) {
+      return serializeSelectorList(this._selectorAST);
+    }
     return this._selectorText;
   }
 
   set selectorText(value: string) {
-    const selector = ParseHooks.parseSelector(value);
-    if (selector !== null) {
-      this._selectorText = selector;
-      this._selectorAST = ParseHooks.parseSelectorAST(value);
+    const declaredNamespaces = new Set<string>();
+    if (this.parentStyleSheet) {
+      for (const rule of this.parentStyleSheet.cssRules) {
+        if (rule.type === 10) {
+          declaredNamespaces.add((rule as CSSNamespaceRule).prefix);
+        }
+      }
+    }
+    const isNested = this.parentRule !== null;
+    const selectorAST = ParseHooks.parseSelectorAST(value, declaredNamespaces, isNested);
+    if (selectorAST !== null) {
+      if (isNested) {
+        for (const selector of selectorAST.selectors) {
+          if (selector.type === 'complex-selector') {
+            if (selector.items.length > 0 && selector.items[0].type === 'combinator') {
+              selector.items.unshift({
+                type: 'compound-selector',
+                selectors: [{ type: 'nesting-selector' }]
+              });
+            }
+          }
+        }
+      }
+      this._selectorAST = selectorAST;
+      this._selectorText = serializeSelectorList(selectorAST);
     }
   }
 
@@ -752,16 +803,56 @@ export class CSSViewTransitionRule extends CSSRule {
   set cssText(_value: string) {}
 }
 
+function normalizeKeyframeSelector(selector: string): string {
+  const parts = selector.split(',');
+  const normalized: string[] = [];
+  for (const part of parts) {
+    const trimmed = part.trim().toLowerCase();
+    if (trimmed === 'from') {
+      normalized.push('0%');
+    } else if (trimmed === 'to') {
+      normalized.push('100%');
+    } else {
+      if (!trimmed.endsWith('%')) {
+        throw new DOMException(`Invalid keyframe selector`, 'SyntaxError');
+      }
+      const valStr = trimmed.slice(0, -1).trim();
+      const val = Number(valStr);
+      if (Number.isNaN(val) || valStr === '' || val < 0 || val > 100) {
+        throw new DOMException(`Invalid keyframe selector`, 'SyntaxError');
+      }
+      normalized.push(`${val}%`);
+    }
+  }
+  if (normalized.length === 0) {
+    throw new DOMException(`Invalid keyframe selector`, 'SyntaxError');
+  }
+  return normalized.join(', ');
+}
+
 export class CSSKeyframesRule extends CSSRule {
+  [index: number]: CSSKeyframeRule;
   name: string;
   readonly cssRules: CSSRuleList;
-  private _rules: Rule[];
+  private _rules: CSSKeyframeRule[];
 
-  constructor(name: string, rules: Rule[]) {
+  constructor(name: string, rules: CSSKeyframeRule[]) {
     super();
     this.name = name;
     this._rules = rules;
     this.cssRules = new CSSRuleList(() => this._rules);
+
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        if (typeof prop === 'string') {
+          const index = Number(prop);
+          if (Number.isInteger(index) && index >= 0) {
+            return target._rules[index];
+          }
+        }
+        return Reflect.get(target, prop, receiver);
+      }
+    });
   }
 
   get type() { return 7; }
@@ -772,16 +863,68 @@ export class CSSKeyframesRule extends CSSRule {
 
   // The CSSKeyframesRule Interface
   get cssText() {
-    return serializeGroupingRule('keyframes', serializeIdentifier(this.name), this._rules);
+    const isDisallowed = ['none', 'initial', 'inherit', 'unset', 'revert', 'default'].includes(this.name.toLowerCase());
+    const serializedName = isDisallowed ? JSON.stringify(this.name) : serializeIdentifier(this.name);
+    return serializeGroupingRule('keyframes', serializedName, this._rules);
   }
 
   set cssText(_value: string) {
     // Do nothing as per spec
   }
+
+  findRule(select: string): CSSKeyframeRule | null {
+    let normalized: string;
+    try {
+      normalized = normalizeKeyframeSelector(select);
+    } catch {
+      return null;
+    }
+    for (let i = this._rules.length - 1; i >= 0; i--) {
+      if (this._rules[i].keyText === normalized) {
+        return this._rules[i];
+      }
+    }
+    return null;
+  }
+
+  appendRule(ruleText: string): void {
+    const openBrace = ruleText.indexOf('{');
+    const closeBrace = ruleText.lastIndexOf('}');
+    if (openBrace === -1 || closeBrace === -1 || closeBrace < openBrace) {
+      return;
+    }
+    const selectorText = ruleText.slice(0, openBrace).trim();
+    let keyText: string;
+    try {
+      keyText = normalizeKeyframeSelector(selectorText);
+    } catch {
+      return;
+    }
+    const body = ruleText.slice(openBrace + 1, closeBrace);
+    const styleDecl = ParseHooks.parseStyleAttribute(tokenize(body));
+    const keyframe = new CSSKeyframeRule(keyText, styleDecl.declarations);
+    keyframe.parentRule = this;
+    this._rules.push(keyframe);
+  }
+
+  deleteRule(select: string): void {
+    let normalized: string;
+    try {
+      normalized = normalizeKeyframeSelector(select);
+    } catch {
+      return;
+    }
+    for (let i = this._rules.length - 1; i >= 0; i--) {
+      if (this._rules[i].keyText === normalized) {
+        this._rules.splice(i, 1);
+        break;
+      }
+    }
+  }
 }
 
 export class CSSKeyframeRule extends CSSRule {
-  keyText: string;
+  private _keyText!: string;
   private _style: CSSStyleDeclaration;
 
   constructor(keyText: string, styleDeclarations: Declaration[]) {
@@ -789,6 +932,14 @@ export class CSSKeyframeRule extends CSSRule {
     this.keyText = keyText;
     this._style = new CSSStyleDeclaration(styleDeclarations);
     this._style.parentRule = this;
+  }
+
+  get keyText(): string {
+    return this._keyText;
+  }
+
+  set keyText(value: string) {
+    this._keyText = normalizeKeyframeSelector(value);
   }
 
   get style(): CSSStyleDeclaration {
@@ -1003,15 +1154,90 @@ export class CSSNamespaceRule extends CSSRule {
   set cssText(_value: string) {}
 }
 
-export class CSSPageRule extends CSSGroupingRule {
-  selectorText: string;
-  private _style: CSSPageDescriptors;
+function parsePageSelectorList(text: string): string[] | null {
+  const trimmed = text.trim();
+  if (trimmed === '') return [];
 
+  const tokens = tokenize(text);
+  const values = ParseHooks.parseComponentValues(tokens);
+  
+  const selectorTokensList: ComponentValue[][] = [];
+  let current: ComponentValue[] = [];
+  for (const v of values) {
+    if (v.type === 'comma') {
+      selectorTokensList.push(current);
+      current = [];
+    } else {
+      current.push(v);
+    }
+  }
+  selectorTokensList.push(current);
+
+  const results: string[] = [];
+
+  for (const selTokens of selectorTokensList) {
+    const filtered = selTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+    if (filtered.length === 0) {
+      return null;
+    }
+
+    let hasIdent = false;
+    let pos = 0;
+    
+    if (filtered[0].type === 'ident') {
+      hasIdent = true;
+      pos = 1;
+    }
+    
+    while (pos < filtered.length) {
+      const colon = filtered[pos];
+      const ident = filtered[pos + 1];
+      if (colon && colon.type === 'colon' && ident && ident.type === 'ident') {
+        const pseudoName = ident.value.toLowerCase();
+        if (['left', 'right', 'first', 'blank'].includes(pseudoName)) {
+          pos += 2;
+          continue;
+        }
+      }
+      return null;
+    }
+    
+    let serialized = '';
+    if (hasIdent) {
+      serialized += (filtered[0].value as string).toLowerCase();
+    }
+    let p = hasIdent ? 1 : 0;
+    while (p < filtered.length) {
+      serialized += ':' + (filtered[p + 1].value as string).toLowerCase();
+      p += 2;
+    }
+    results.push(serialized);
+  }
+
+  return results;
+}
+
+export class CSSPageRule extends CSSGroupingRule {
+  private _selectorText: string;
+  private _style: CSSPageDescriptors;
+ 
   constructor(selectorText: string, declarations: import('./types.ts').Declaration[], rules: import('./types.ts').Rule[], parseRuleInBlock: (text: string) => import('./types.ts').Rule) {
     super(rules, parseRuleInBlock);
-    this.selectorText = selectorText;
+    const parsed = parsePageSelectorList(selectorText);
+    this._selectorText = parsed ? parsed.join(', ') : selectorText;
     this._style = new CSSPageDescriptors(declarations);
     this._style.parentRule = this;
+  }
+
+  get selectorText(): string {
+    return this._selectorText;
+  }
+
+  set selectorText(value: string) {
+    const parsed = parsePageSelectorList(value);
+    if (parsed !== null) {
+      this._selectorText = parsed.join(', ');
+    }
   }
 
   get style(): CSSPageDescriptors {
@@ -1120,4 +1346,30 @@ export class CSSAtRule extends CSSRule {
     const indentedBody = blockContentText.split('\n').map(line => '  ' + line).join('\n');
     return `@${this.name}${cond} {\n${indentedBody}\n}`;
   }
+}
+
+export class CSSCounterStyleRule extends CSSRule {
+  readonly name: string;
+
+  constructor(name: string) {
+    super();
+    this.name = name;
+  }
+
+  get type() { return 11; }
+  get cssText() { return `@counter-style ${this.name} {}`; }
+  set cssText(_value: string) {}
+}
+
+export class CSSFontFeatureValuesRule extends CSSRule {
+  readonly fontFamily: string;
+
+  constructor(fontFamily: string) {
+    super();
+    this.fontFamily = fontFamily;
+  }
+
+  get type() { return 14; }
+  get cssText() { return `@font-feature-values ${this.fontFamily} {}`; }
+  set cssText(_value: string) {}
 }

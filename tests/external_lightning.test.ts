@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 import { test, describe } from 'node:test';
+import assert from 'node:assert';
 import fs from 'node:fs';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
@@ -22,14 +23,10 @@ import { tokenize } from '../src/tokenizer.ts';
 const fixturesPath = new URL('./fixtures/lightningcss.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
-type Failure = { type: string; source: string; expected?: string; actual?: string; err: string };
+const baselinePath = new URL('./fixtures/external/lightning_known_failures.json', import.meta.url);
+const knownFailuresSet = new Set<string>(JSON.parse(fs.readFileSync(baselinePath, 'utf8')));
 
 describe('LightningCSS Extracted Tests', () => {
-    let parseSuccess = 0;
-    let matchSuccess = 0;
-    let expectedErrors = 0;
-    const failures: Failure[] = [];
-
     const isErrorTest = (type: string) => 
         type === 'error_test' || type === 'css_modules_error_test' || type === 'error_recovery_test';
 
@@ -37,72 +34,30 @@ describe('LightningCSS Extracted Tests', () => {
 
     for (let i = 0; i < fixtures.length; i++) {
         const fixture = fixtures[i];
+        const isKnownFailure = knownFailuresSet.has(fixture.type + '|' + normalize(fixture.source));
 
-        test(`Test ${i}: ${fixture.type}`, () => {
+        test(`Test ${i}: ${fixture.type}`, { skip: isKnownFailure }, () => {
             if (isErrorTest(fixture.type)) {
-                expectedErrors++;
-                
-                try {
+                assert.throws(() => {
                     const tokens = tokenize(fixture.source);
                     new Parser(tokens).parseStyleSheet();
-                } catch {
-                    parseSuccess++;
-                    return;
-                }
-
-                failures.push({ 
-                    type: fixture.type, 
-                    source: fixture.source, 
-                    err: 'Expected to throw but did not' 
-                });
+                }, (err: unknown) => {
+                    return err instanceof DOMException || err instanceof SyntaxError;
+                }, 'Expected a parsing error (DOMException or SyntaxError) to be thrown');
                 return;
             }
 
-            let cssText = '';
-            try {
-                const tokens = tokenize(fixture.source);
-                const stylesheet = new Parser(tokens).parseStyleSheet();
-                cssText = Array.from(stylesheet.cssRules).map(r => r.cssText).join('\n');
-                parseSuccess++;
-            } catch (e: unknown) {
-                const errMessage = e instanceof Error ? e.message : String(e);
-                failures.push({ 
-                    type: fixture.type, 
-                    source: fixture.source, 
-                    err: `Threw during parse: ${errMessage}` 
-                });
-                return;
-            }
+            const tokens = tokenize(fixture.source);
+            const stylesheet = new Parser(tokens).parseStyleSheet();
+            const cssText = Array.from(stylesheet.cssRules).map(r => r.cssText).join('\n');
 
             if (!fixture.expected) return;
 
             const nActual = normalize(cssText);
             const nExpected = normalize(fixture.expected);
 
-            if (nActual === nExpected) {
-                matchSuccess++;
-                return;
-            }
-
-            failures.push({ 
-                type: fixture.type, 
-                source: fixture.source, 
-                expected: nExpected, 
-                actual: nActual, 
-                err: 'Mismatch' 
-            });
+            assert.strictEqual(nActual, nExpected);
         });
     }
-
-    test('Summary Output', () => {
-        const summary = {
-            total: fixtures.length,
-            parseSuccess,
-            matchSuccess,
-            expectedErrors,
-            failuresCount: failures.length,
-            failures: failures.slice(0, 50)
-        };
-        fs.writeFileSync('tests/fixtures/failures_summary.json', JSON.stringify(summary, null, 2));
-    });
 });
+

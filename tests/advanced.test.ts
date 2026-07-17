@@ -57,12 +57,12 @@ test('parse @keyframes rule', () => {
   
   const frame1 = rule.cssRules[0] as CSSKeyframeRule;
   assert.strictEqual(frame1.type, 8);
-  assert.strictEqual(frame1.keyText, 'from');
+  assert.strictEqual(frame1.keyText, '0%');
   assert.strictEqual(frame1.style.getPropertyValue('top'), '0px');
   
   const frame2 = rule.cssRules[1] as CSSKeyframeRule;
   assert.strictEqual(frame2.type, 8);
-  assert.strictEqual(frame2.keyText, 'to');
+  assert.strictEqual(frame2.keyText, '100%');
   assert.strictEqual(frame2.style.getPropertyValue('top'), '200px');
 });
 

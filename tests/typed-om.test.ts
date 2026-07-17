@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSNumericValue, CSSUnitValue, CSSStyleValue } from '../src/typed-om.ts';
+import { CSSNumericValue, CSSUnitValue, CSSStyleValue, StylePropertyMap } from '../src/typed-om.ts';
 
 describe('Values & Typed OM', () => {
     test('math constants e and pi', () => {
@@ -39,15 +39,20 @@ describe('Values & Typed OM', () => {
         
         const calcVal = CSSNumericValue.parse('calc(10px + 20px)');
         assert.ok(calcVal);
-        // Simplification is performed eagerly now
-        assert.strictEqual(calcVal.toString(), '30px');
+        assert.strictEqual(calcVal.toString(), 'calc(10px + 20px)');
     });
 
     test('multi-argument math functions (atan2)', () => {
         const val = CSSNumericValue.parse('calc(atan2(10px, 20px))');
         assert.ok(val);
-        // Serialization should preserve atan2(10px, 20px)
-        assert.strictEqual(val.toString(), 'atan2(10px, 20px)');
+        assert.strictEqual(val.toString(), 'calc(atan2(10px, 20px))');
+
+        const validVal = CSSNumericValue.parse('calc(atan2(10px, 1em))');
+        assert.ok(validVal);
+
+        assert.throws(() => {
+          CSSNumericValue.parse('calc(atan2(10px, 1s))');
+        }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
     });
 
     test('type() and to()', () => {
@@ -62,6 +67,21 @@ describe('Values & Typed OM', () => {
         assert.ok(sum);
         const conv = sum.to('px');
         assert.strictEqual(conv.value, 192);
+
+        // resolution unit x conversion to dppx
+        const xVal = new CSSUnitValue(2, 'x' as unknown as 'dppx');
+        const dppxVal = xVal.to('dppx');
+        assert.strictEqual(dppxVal.value, 2);
+        assert.strictEqual(dppxVal.unit, 'dppx');
+
+        // invalid units should throw SyntaxError DOMException
+        assert.throws(() => {
+            px.to('invalid-unit');
+        }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
+
+        assert.throws(() => {
+            sum.to('invalid-unit');
+        }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
     });
 
     test('CSSNumericValue.parse throws on invalid input', () => {
@@ -122,6 +142,26 @@ describe('Values & Typed OM', () => {
         test('should return empty array for empty string', () => {
             const results = CSSStyleValue.parseAll('width', '');
             assert.deepStrictEqual(results, []);
+        });
+    });
+
+    describe('StylePropertyMap set/append validations', () => {
+        test('should throw TypeError on set() with empty values', () => {
+            const el = { style: { setProperty: () => {}, removeProperty: () => {}, getPropertyValue: () => "" } };
+            // @ts-expect-error - constructing with mock style
+            const map = new StylePropertyMap(el.style);
+            assert.throws(() => {
+                map.set('width');
+            }, TypeError);
+        });
+
+        test('should throw TypeError on append() with empty values', () => {
+            const el = { style: { setProperty: () => {}, removeProperty: () => {}, getPropertyValue: () => "" } };
+            // @ts-expect-error - constructing with mock style
+            const map = new StylePropertyMap(el.style);
+            assert.throws(() => {
+                map.append('background-image');
+            }, TypeError);
         });
     });
 });

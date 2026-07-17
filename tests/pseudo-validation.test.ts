@@ -56,9 +56,12 @@ test('Forbid pseudo-elements inside logical pseudos', () => {
   assert.strictEqual(Parser.parseSelectorAST(':not(:before)'), null);
 });
 
-test('Allow :not() chaining after pseudo-elements if arguments are valid', () => {
+test('Allow logical pseudo-classes after pseudo-elements', () => {
   assert.ok(Parser.parseSelectorAST('::before:not(:hover)'));
-  assert.strictEqual(Parser.parseSelectorAST('::before:not(.foo)'), null);
+  assert.ok(Parser.parseSelectorAST('::before:not(.foo)'));
+  assert.ok(Parser.parseSelectorAST('div::before:is(.hover)'));
+  assert.ok(Parser.parseSelectorAST('div::before:where(.foo)'));
+  assert.ok(Parser.parseSelectorAST('div::before:has(.foo)'));
 });
 
 

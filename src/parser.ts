@@ -46,6 +46,7 @@ import { PropertyRegistry, matchesSyntax } from './PropertyRegistry.ts';
 export class Parser {
   private tokens: TokenStream;
   public errors: ParseError[] = [];
+  private declaredNamespaces = new Set<string>();
   static readonly #customPropertyAstCache = new Map<string, ComponentValue[]>();
   static readonly #MAX_CACHE_SIZE = 1000;
 
@@ -328,9 +329,6 @@ export class Parser {
     while (true) {
       const next = this.nextToken;
       if (next.type === 'semicolon' || next.type === 'EOF') {
-        if (next.type === 'EOF') {
-          this.reportError('Unexpected EOF in at-rule', next);
-        }
         this.discardToken();
         if (!this.isSupportedAtRule(atRuleName)) return null;
         const handler = this.getAtRuleHandler(atRuleName);
@@ -412,7 +410,10 @@ export class Parser {
     if (i < prelude.length && prelude[i].type === 'simple-block' && (prelude[i] as SimpleBlock).associatedToken.type === '(') {
       const block = prelude[i] as SimpleBlock;
       try {
-        new SelectorParser(block.value, nested, false).parse();
+        new SelectorParser(block.value, {
+          allowRelative: nested,
+          declaredNamespaces: this.declaredNamespaces
+        }).parse();
         startSelector = serialize(block.value).trim();
       } catch (e) {
         return null;
@@ -431,7 +432,9 @@ export class Parser {
       if (i < prelude.length && prelude[i].type === 'simple-block' && (prelude[i] as SimpleBlock).associatedToken.type === '(') {
         const block = prelude[i] as SimpleBlock;
         try {
-          new SelectorParser(block.value, false, false).parse();
+          new SelectorParser(block.value, {
+            declaredNamespaces: this.declaredNamespaces
+          }).parse();
           endSelector = serialize(block.value).trim();
         } catch (e) {
           return null;
@@ -451,7 +454,29 @@ export class Parser {
     return new CSSViewTransitionRule(declarations);
   }
 
-  private handleKeyframesRule(rule: ASTAtRule, block: SimpleBlock): Rule {
+  private handleKeyframesRule(rule: ASTAtRule, block: SimpleBlock): Rule | null {
+    const preludeClean = rule.prelude.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+    if (preludeClean.length !== 1) {
+      return null;
+    }
+    const first = preludeClean[0];
+    let keyframesName = '';
+    if (first.type === 'ident') {
+      const valLower = first.value.toLowerCase();
+      const disallowed = ['none', 'initial', 'inherit', 'unset', 'revert', 'default'];
+      if (disallowed.includes(valLower)) {
+        return null;
+      }
+      keyframesName = first.value;
+    } else if (first.type === 'string') {
+      if (first.value === '') {
+        return null;
+      }
+      keyframesName = first.value;
+    } else {
+      return null;
+    }
+
     const keyframeRules: CSSKeyframeRule[] = [];
     const stream = new ArrayComponentValueStream(block.value);
     
@@ -479,8 +504,6 @@ export class Parser {
       }
       
       if (blockVal) {
-        const selectorText = serialize(prelude).trim();
-        
         const lists: ComponentValue[][] = [[]];
         for (const v of prelude) {
           if (v.type === 'comma') {
@@ -491,6 +514,7 @@ export class Parser {
         }
         
         let valid = true;
+        const normalizedParts: string[] = [];
         for (const list of lists) {
           let start = 0;
           while (start < list.length && list[start].type === 'whitespace') start++;
@@ -505,18 +529,29 @@ export class Parser {
           const v = trimmed[0];
           if (v.type === 'ident') {
             const valStr = v.value.toLowerCase();
-            if (valStr !== 'from' && valStr !== 'to') {
-
+            if (valStr === 'from') {
+              normalizedParts.push('0%');
+            } else if (valStr === 'to') {
+              normalizedParts.push('100%');
+            } else {
               valid = false;
               break;
             }
-          } else if (v.type !== 'percentage') {
+          } else if (v.type === 'percentage') {
+            const val = (v as import('./types.ts').PercentageToken).value;
+            if (val < 0 || val > 100) {
+              valid = false;
+              break;
+            }
+            normalizedParts.push(`${val}%`);
+          } else {
             valid = false;
             break;
           }
         }
         
-        if (valid) {
+        if (valid && normalizedParts.length > 0) {
+          const selectorText = normalizedParts.join(', ');
           const declarations = this.consumeDeclarationsFromBlockContents(blockVal.value);
           keyframeRules.push(new CSSKeyframeRule(selectorText, declarations));
         }
@@ -525,7 +560,7 @@ export class Parser {
       }
     }
 
-    return new CSSKeyframesRule(serialize(rule.prelude).trim(), keyframeRules);
+    return new CSSKeyframesRule(keyframesName, keyframeRules);
   }
 
   private handleFontFaceRule(rule: ASTAtRule, block: SimpleBlock): Rule {
@@ -711,7 +746,9 @@ export class Parser {
          }
       }
     }
-    return new CSSNamespaceRule(prefix, namespaceURI);
+    const nsRule = new CSSNamespaceRule(prefix, namespaceURI);
+    this.declaredNamespaces.add(nsRule.prefix);
+    return nsRule;
   }
 
   /**
@@ -784,10 +821,15 @@ export class Parser {
       } else if (val.type === 'EOF' || val.type === '}') {
         break;
       } else if (val.type === 'at-keyword') {
-        flushDecls();
+        const pos = stream.position;
         const atRule = this.consumeAtRuleFromStream(stream, nested);
         if (atRule) {
+          flushDecls();
           rules.push(atRule);
+        } else {
+          if (stream.position > pos) {
+            flushDecls();
+          }
         }
       } else {
         const pos = stream.position;
@@ -797,9 +839,15 @@ export class Parser {
         } else {
           stream.position = pos;
           const rule = this.consumeNestedQualifiedRuleFromStream(stream, nested, 'semicolon');
-          flushDecls();
           if (rule) {
+            flushDecls();
             rules.push(rule);
+          } else {
+            const consumedTokens = stream.slice(pos, stream.position);
+            const hasRealTokens = consumedTokens.some(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'semicolon');
+            if (hasRealTokens) {
+              flushDecls();
+            }
           }
         }
       }
@@ -1125,12 +1173,12 @@ export class Parser {
     if (isNested) {
       selectorText = this.normalizeNestedSelector(prelude);
       if (selectorText === '') return null;
-      selectorAST = Parser.parseSelectorAST(selectorText);
+      selectorAST = Parser.parseSelectorAST(selectorText, this.declaredNamespaces);
       if (selectorAST === null) return null;
     } else {
       if (!this.isValidSelector(prelude)) return null;
       try {
-        selectorAST = new SelectorParser(prelude).parse();
+        selectorAST = new SelectorParser(prelude, { declaredNamespaces: this.declaredNamespaces }).parse();
       } catch (e) {
         return null;
       }
@@ -1156,7 +1204,7 @@ export class Parser {
     return prelude;
   }
 
-  public static parseSelectorAST(text: string): import('./types.ts').SelectorList | null {
+  public static parseSelectorAST(text: string, declaredNamespaces?: Set<string>, allowRelative = false): import('./types.ts').SelectorList | null {
     const tokens = tokenize(text);
     const parser = new Parser(tokens);
     const prelude = Parser.#consumeSelectorTokens(parser);
@@ -1164,7 +1212,7 @@ export class Parser {
     if (prelude === null) return null;
     
     try {
-      return new SelectorParser(prelude).parse();
+      return new SelectorParser(prelude, { allowRelative, declaredNamespaces }).parse();
     } catch (e) {
       return null;
     }
@@ -1500,7 +1548,10 @@ export class Parser {
       if (def) {
         const syntax = def.syntax || '*';
         const cleanResolved = resolved.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
-        if (!matchesSyntax(cleanResolved, syntax)) {
+        const isCSSWideKeyword = cleanResolved.length === 1 && cleanResolved[0].type === 'ident' &&
+          ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(cleanResolved[0].value.toLowerCase());
+        
+        if (!isCSSWideKeyword && !matchesSyntax(cleanResolved, syntax)) {
           if (def.initialValue !== undefined) {
             const tokens = tokenize(def.initialValue);
             const parser = new Parser(tokens);
@@ -1595,7 +1646,7 @@ ParseHooks.consumeRule = (tokens) => new Parser(tokens).consumeRule() as unknown
 ParseHooks.consumeListOfRules = (tokens, topLevel) => new Parser(tokens).consumeListOfRules(topLevel);
 ParseHooks.parseComponentValues = (tokens) => new Parser(tokens).parseComponentValues();
 ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
-ParseHooks.parseSelectorAST = (text) => Parser.parseSelectorAST(text);
+ParseHooks.parseSelectorAST = (text, declaredNamespaces, allowRelative) => Parser.parseSelectorAST(text, declaredNamespaces, allowRelative);
 ParseHooks.validateCustomPropertyValue = (values) => Parser.validateCustomPropertyValue(values);
 
 export function parse(css: string): CSSStyleSheet {

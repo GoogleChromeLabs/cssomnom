@@ -6,17 +6,7 @@
       "expected": "anchor-center"
     },
     {
-      "property": "align-items",
-      "value": "anchor-center",
-      "expected": "anchor-center"
-    },
-    {
       "property": "justify-self",
-      "value": "anchor-center",
-      "expected": "anchor-center"
-    },
-    {
-      "property": "justify-items",
       "value": "anchor-center",
       "expected": "anchor-center"
     },
@@ -57,6 +47,11 @@
     },
     {
       "property": "top",
+      "value": "calc(anchor(--foo left, 1px) + 10%)",
+      "expected": "calc(10% + anchor(--foo left, 1px))"
+    },
+    {
+      "property": "top",
       "value": "anchor(--foo left, 0)",
       "expected": "anchor(--foo left, 0px)"
     },
@@ -94,6 +89,11 @@
       "property": "width",
       "value": "calc(anchor-size(--foo width, 0))",
       "expected": "anchor-size(--foo width, 0px)"
+    },
+    {
+      "property": "position-anchor",
+      "value": "normal",
+      "expected": "normal"
     },
     {
       "property": "position-anchor",

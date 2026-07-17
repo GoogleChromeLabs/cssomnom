@@ -17,6 +17,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
+import { tokenize } from '../src/tokenizer.ts';
+import { CSSStyleSheet, CSSStyleRule } from '../src/CSSOM.ts';
+
 
 test('Selector namespace support (|)', () => {
   const cases = [
@@ -63,3 +66,53 @@ test('Attribute selector namespace support', () => {
     const simple3 = ((ast3.selectors[0] as import('../src/types.ts').ComplexSelector).items[0] as import('../src/types.ts').CompoundSelector).selectors[0] as import('../src/types.ts').AttributeSelector;
     assert.strictEqual(simple3.namespace, '');
 });
+
+test('Undeclared namespace prefix: parseStyleSheet drops rule, insertRule throws DOMException', () => {
+  // Stylesheet parsing should drop the rule (as per CSS error recovery)
+  const sheet1 = new Parser(tokenize('ns|div { color: red; }')).parseStyleSheet();
+  assert.strictEqual(sheet1.cssRules.length, 0);
+
+  const sheet2 = new Parser(tokenize('[ns|attr] { color: red; }')).parseStyleSheet();
+  assert.strictEqual(sheet2.cssRules.length, 0);
+
+  // insertRule should throw a SyntaxError DOMException
+  const sheet3 = new CSSStyleSheet();
+  assert.throws(() => {
+    sheet3.insertRule('ns|div { color: red; }', 0);
+  }, (err: unknown) => {
+    return err instanceof DOMException && err.name === 'SyntaxError';
+  });
+
+  assert.throws(() => {
+    sheet3.insertRule('[ns|attr] { color: red; }', 0);
+  }, (err: unknown) => {
+    return err instanceof DOMException && err.name === 'SyntaxError';
+  });
+
+  // Valid if declared:
+  const rules = new Parser(tokenize(`
+    @namespace ns "http://www.w3.org/1999/xhtml";
+    ns|div { color: red; }
+    [ns|attr] { color: red; }
+  `)).parseStyleSheet().cssRules;
+  assert.strictEqual(rules.length, 3);
+  assert.strictEqual(rules[1].type, 1); // STYLE_RULE
+  assert.strictEqual(rules[2].type, 1); // STYLE_RULE
+});
+
+test('CSSStyleRule.selectorText setter with undeclared namespace prefix', () => {
+  const sheet = new CSSStyleSheet();
+  sheet.insertRule('@namespace ns "http://example.com";', 0);
+  sheet.insertRule('div { color: red; }', 1);
+  const rule = sheet.cssRules[1] as CSSStyleRule;
+  
+  // Setting declared namespace prefix works:
+  rule.selectorText = 'ns|div';
+  assert.strictEqual(rule.selectorText, 'ns|div');
+  
+  // Setting undeclared namespace prefix does not mutate (ignores):
+  const originalSelector = rule.selectorText;
+  rule.selectorText = 'other|div';
+  assert.strictEqual(rule.selectorText, originalSelector);
+});
+

@@ -29,7 +29,7 @@ describe('Media Queries', () => {
         assert.deepStrictEqual(queries, ['not all', 'not all', 'not all']);
         
         const queriesValid = MediaParser.parse('(aspect-ratio: 16/9)').map(serializeMediaQuery);
-        assert.strictEqual(queriesValid[0], '(aspect-ratio: 16/9)');
+        assert.strictEqual(queriesValid[0], '(aspect-ratio: 16 / 9)');
     });
 
     test('allow negative lengths in range to parse successfully', () => {
@@ -61,7 +61,7 @@ describe('Media Queries', () => {
 
     test('ratio validation enforces structure and consumes entire sequence', () => {
         const queries = MediaParser.parse('(aspect-ratio: calc(16) / calc(9))').map(serializeMediaQuery);
-        assert.strictEqual(queries[0], '(aspect-ratio: calc(16) /calc(9))');
+        assert.strictEqual(queries[0], '(aspect-ratio: calc(16) / calc(9))');
         const queries2 = MediaParser.parse('(aspect-ratio: calc(16) / calc(9) foo)').map(serializeMediaQuery);
         assert.deepStrictEqual(queries2, ['not all']);
     });
@@ -104,5 +104,22 @@ describe('Media Queries', () => {
         
         const queries2 = MediaParser.parse('(hover < hover)').map(serializeMediaQuery);
         assert.deepStrictEqual(queries2, ['not all']);
+    });
+
+    test('comma list empty query recovery', () => {
+        const queries = MediaParser.parse(', all, , screen,').map(serializeMediaQuery);
+        assert.deepStrictEqual(queries, ['not all', 'all', 'not all', 'screen', 'not all']);
+    });
+
+    test('aspect-ratio single operand serialization and spacing', () => {
+        const queries = MediaParser.parse('(aspect-ratio: 2), (aspect-ratio: 16/9), (aspect-ratio: 1 / 3)').map(serializeMediaQuery);
+        assert.strictEqual(queries[0], '(aspect-ratio: 2 / 1)');
+        assert.strictEqual(queries[1], '(aspect-ratio: 16 / 9)');
+        assert.strictEqual(queries[2], '(aspect-ratio: 1 / 3)');
+    });
+
+    test('resolution unit x converts to dppx', () => {
+        const queries = MediaParser.parse('(resolution: 2x)').map(serializeMediaQuery);
+        assert.strictEqual(queries[0], '(resolution: 2dppx)');
     });
 });

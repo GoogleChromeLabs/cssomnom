@@ -75,12 +75,12 @@ test('Detailed @keyframes parsing', () => {
   
   const fromRule = keyframesRule.cssRules[0] as CSSKeyframeRule;
   assert.ok(fromRule instanceof CSSKeyframeRule, 'Should be CSSKeyframeRule');
-  assert.strictEqual(fromRule.keyText, 'from');
+  assert.strictEqual(fromRule.keyText, '0%');
   assert.strictEqual(fromRule.style.getPropertyValue('transform').trim(), 'rotate(0deg)');
   
   const toRule = keyframesRule.cssRules[1] as CSSKeyframeRule;
   assert.ok(toRule instanceof CSSKeyframeRule, 'Should be CSSKeyframeRule');
-  assert.strictEqual(toRule.keyText, 'to');
+  assert.strictEqual(toRule.keyText, '100%');
   assert.strictEqual(toRule.style.getPropertyValue('transform').trim(), 'rotate(360deg)');
 });
 

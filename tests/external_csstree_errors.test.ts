@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 import { test } from 'node:test';
+import assert from 'node:assert';
 import * as fs from 'fs';
 import * as path from 'path';
 import { CSSStyleSheet } from '../src/index.ts';
@@ -54,19 +55,11 @@ test('CSSTree Error Cases via insertRule', async (t) => {
     await t.test(`Should throw for "${testCase.input}"`, { skip: skipReason }, () => {
       const sheet = CSSStyleSheet.createInternal([], Parser.parseRuleText);
       
-      try {
+      assert.throws(() => {
         sheet.insertRule(testCase.input, 0);
-        throw new Error('Failed to throw SyntaxError');
-      } catch (e: unknown) {
-        if (e instanceof Error && e.name === 'SyntaxError') {
-          // Passed! It threw SyntaxError!
-        } else if (e instanceof Error && e.message === 'Failed to throw SyntaxError') {
-           throw e;
-        } else {
-          const name = e instanceof Error ? e.name : 'UnknownError';
-          throw new Error(`Threw wrong error: ${name}`);
-        }
-      }
+      }, (e: unknown) => {
+        return e instanceof Error && e.name === 'SyntaxError';
+      });
     });
   }
 });

@@ -54,7 +54,7 @@ test('Typed OM: CSSVariableReferenceValue parsing', () => {
   const ref2 = v2.item(0) as CSSVariableReferenceValue;
   assert.strictEqual(ref2.variable, '--foo');
   assert.ok(ref2.fallback instanceof CSSUnparsedValue);
-  assert.strictEqual(ref2.fallback.toString(), '10px');
+  assert.strictEqual(ref2.fallback.toString(), ' 10px');
 });
 
 test('Typed OM: CSSVariableReferenceValue parsing - validate fallback comma', () => {
@@ -346,6 +346,19 @@ test('CSSOM: Cycle tracking and boundary fallback logic', () => {
   rule.style.setProperty('--b', 'var(--c)');
   rule.style.setProperty('--c', 'var(--b)');
   assert.strictEqual(Parser.resolveVariables(rule.style, '--a').trim(), '10px');
+});
+
+test('CSSOM: Custom property resolved to CSS-wide keyword', () => {
+  PropertyRegistry.clear();
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync('@property --my-color { syntax: "<color>"; inherits: false; initial-value: blue; }');
+
+  sheet.insertRule('div { color: var(--my-color); --my-color: var(--my-keyword); --my-keyword: initial; }', 0);
+  const styleRule = sheet.cssRules[0] as unknown as CSSStyleRule;
+
+  // Resolving color should substitute var(--my-color) which resolves to 'initial'.
+  // Even though 'initial' is not a <color>, it is a CSS-wide keyword and should not trigger fallback/invalid.
+  assert.strictEqual(Parser.resolveVariables(styleRule.style, 'color').trim(), 'initial');
 });
 
 

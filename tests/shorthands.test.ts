@@ -146,4 +146,64 @@ describe('CSSStyleDeclaration Shorthands', () => {
     style.setProperty('margin-right', '10px');
     assert.strictEqual(style.getPropertyValue('margin'), '');
   });
+
+  describe('background shorthand expansion and contraction', () => {
+    test('Single color', () => {
+      const style = new CSSStyleDeclaration([]);
+      style.setProperty('background', 'yellow');
+      assert.strictEqual(style.getPropertyValue('background-color'), 'yellow');
+      assert.strictEqual(style.getPropertyValue('background-image'), 'none');
+      assert.strictEqual(style.getPropertyValue('background'), 'yellow');
+    });
+
+    test('Image and repeat', () => {
+      const style = new CSSStyleDeclaration([]);
+      style.setProperty('background', 'url(/favicon.ico) no-repeat');
+      assert.strictEqual(style.getPropertyValue('background-image'), 'url("/favicon.ico")');
+      assert.strictEqual(style.getPropertyValue('background-repeat'), 'no-repeat');
+      assert.strictEqual(style.getPropertyValue('background'), 'url("/favicon.ico") no-repeat');
+    });
+
+    test('Multiple backgrounds', () => {
+      const style = new CSSStyleDeclaration([]);
+      style.setProperty('background', 'url(/favicon.ico) no-repeat, url(/favicon.ico) no-repeat');
+      assert.strictEqual(style.getPropertyValue('background-image'), 'url("/favicon.ico"), url("/favicon.ico")');
+      assert.strictEqual(style.getPropertyValue('background'), 'url("/favicon.ico") no-repeat, url("/favicon.ico") no-repeat');
+    });
+
+    test('Position with size', () => {
+      const style = new CSSStyleDeclaration([]);
+      style.setProperty('background', 'url("/favicon.ico") 0% 0% / 10rem');
+      assert.strictEqual(style.getPropertyValue('background-position'), '0% 0%');
+      assert.strictEqual(style.getPropertyValue('background-size'), '10rem auto');
+      assert.strictEqual(style.getPropertyValue('background'), 'url("/favicon.ico") 0% 0% / 10rem auto');
+    });
+
+    test('Varying values', () => {
+      const style = new CSSStyleDeclaration([]);
+      style.setProperty('background', 'url(/favicon.ico) top left no-repeat, url(/favicon.ico) center / 100% 100% no-repeat, url(/favicon.ico) white');
+      assert.strictEqual(style.getPropertyValue('background'), 'url("/favicon.ico") no-repeat, url("/favicon.ico") center center / 100% 100% no-repeat, url("/favicon.ico") white');
+    });
+
+    test('All initial values', () => {
+      const style = new CSSStyleDeclaration([]);
+      style.setProperty('background', 'padding-box border-box');
+      assert.strictEqual(style.getPropertyValue('background'), 'none');
+    });
+
+    test('Level 4 Clip Box Keywords', () => {
+      const style1 = new CSSStyleDeclaration([]);
+      style1.setProperty('background', 'border-area border-box');
+      assert.strictEqual(style1.getPropertyValue('background'), 'border-area');
+
+      const style2 = new CSSStyleDeclaration([]);
+      style2.setProperty('background', 'border-area padding-box');
+      assert.strictEqual(style2.getPropertyValue('background'), 'padding-box border-area');
+
+      const style3 = new CSSStyleDeclaration([]);
+      style3.setProperty('background', 'border-area text');
+      assert.strictEqual(style3.getPropertyValue('background-clip'), 'border-area text');
+      assert.strictEqual(style3.getPropertyValue('background-origin'), 'border-box');
+    });
+  });
 });

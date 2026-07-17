@@ -14,8 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, ComponentValue, Declaration, CSSFunction } from './types.ts';
+import type { Token, ComponentValue, Declaration, CSSFunction, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
 import { SHORTHANDS } from './shorthands.ts';
+import { formatNumber } from './utils/format.ts';
 
 export function serialize(nodes: ComponentValue[], preserveCase: boolean = false, propertyName?: string): string {
   if (propertyName === 'font-family') {
@@ -119,16 +120,16 @@ function serializeToken(token: Token, preserveCase: boolean): string {
     case 'delim':
       return token.value;
     case 'number':
-      return token.value.toString();
+      return formatNumber(token.value);
     case 'percentage':
-      return token.value.toString() + '%';
+      return formatNumber(token.value) + '%';
     case 'dimension':
-      return token.value.toString() + (token.unit ? serializeIdentifier(token.unit) : '');
+      return formatNumber(token.value) + (token.unit ? serializeIdentifier(token.unit) : '');
 
     case 'whitespace':
       return token.value;
     case 'comment':
-      return token.value;
+      return '/**/';
     case 'CDO':
       return '<!--';
     case 'CDC':
@@ -390,24 +391,22 @@ function tryCombineBoxShorthand(
     const isLogical = logical.includes(d.name);
     if (!isPhysical && !isLogical) continue;
 
-    if (shorthand === 'border-radius' && isLogical) continue;
-
     const longhands = isPhysical ? physical : logical;
     const allDecls = longhands.map(name => declMap.get(name));
     
     if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
       if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
 
-      const vals = allDecls.map(other => serialize(other!.value).trim());
-      let value = '';
-      if (vals[0] === vals[1] && vals[0] === vals[2] && vals[0] === vals[3]) value = vals[0];
-      else if (vals[0] === vals[2] && vals[1] === vals[3]) value = `${vals[0]} ${vals[1]}`;
-      else if (vals[1] === vals[3]) value = `${vals[0]} ${vals[1]} ${vals[2]}`;
-      else value = `${vals[0]} ${vals[1]} ${vals[2]} ${vals[3]}`;
+      const valuesForContract: Record<string, ComponentValue[]> = {};
+      allDecls.forEach(other => {
+        valuesForContract[other!.name] = other!.value;
+      });
 
-      allDecls.forEach(other => processed.add(other!));
-      const useLogical = isLogical && shorthand !== 'border-radius';
-      return `${shorthand}: ${useLogical ? 'logical ' : ''}${value}${d.important ? ' !important' : ''}`;
+      const value = def.contract(valuesForContract);
+      if (value !== null) {
+        allDecls.forEach(other => processed.add(other!));
+        return `${shorthand}: ${value}${d.important ? ' !important' : ''}`;
+      }
     }
   }
   return null;
@@ -508,6 +507,37 @@ function tryCombineBorderFull(
       const combinedValue = [vals[0], vals[1], vals[2]].filter(v => v !== '').join(' ');
       allDecls.forEach(other => processed.add(other!));
       return `border: ${combinedValue}${d.important ? ' !important' : ''}`;
+    }
+  }
+  return null;
+}
+
+function tryCombineBackground(
+  d: Declaration,
+  declMap: Map<string, Declaration>,
+  processed: Set<Declaration>,
+  declarations: Declaration[],
+  declIndices: Map<Declaration, number>
+): string | null {
+  const longhands = [
+    'background-image', 'background-position', 'background-size', 'background-repeat',
+    'background-attachment', 'background-origin', 'background-clip', 'background-color'
+  ];
+  if (!longhands.includes(d.name)) return null;
+
+  const allDecls = longhands.map(name => declMap.get(name));
+  if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
+    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
+
+    const record: Record<string, ComponentValue[]> = {};
+    for (const name of longhands) {
+      record[name] = declMap.get(name)!.value;
+    }
+
+    const contracted = SHORTHANDS['background'].contract(record);
+    if (contracted !== null) {
+      allDecls.forEach(other => processed.add(other!));
+      return `background: ${contracted}${d.important ? ' !important' : ''}`;
     }
   }
   return null;
@@ -615,6 +645,9 @@ export function serializeDeclarations(declarations: Declaration[]): string {
     
     let combined = tryCombineBorderFull(d, declMap, processed, declarations, declIndices);
     if (!combined) {
+      combined = tryCombineBackground(d, declMap, processed, declarations, declIndices);
+    }
+    if (!combined) {
       combined = tryCombineBorderBlock(d, declMap, processed, declarations, declIndices);
     }
     if (!combined) {
@@ -676,3 +709,166 @@ export function serializeDeclarations(declarations: Declaration[]): string {
   
   return result.join('; ') + ';';
 }
+
+export function serializeSelectorList(list: SelectorList, hasDefaultNamespace = false): string {
+  return list.selectors.map(s => {
+    if (s.type === 'invalid-selector') {
+      return serialize(s.tokens);
+    }
+    return serializeComplexSelector(s, hasDefaultNamespace);
+  }).join(', ');
+}
+
+function serializeComplexSelector(complex: ComplexSelector, hasDefaultNamespace = false): string {
+  return complex.items.map((item, idx) => {
+    if (item.type === 'combinator') {
+      if (item.value === ' ') return ' ';
+      if (idx === 0) return `${item.value} `;
+      return ` ${item.value} `;
+    }
+    return item.selectors.map(s => serializeSimpleSelector(s, hasDefaultNamespace)).join('');
+  }).join('');
+}
+
+function formatAnPlusB(tokens: ComponentValue[]): string {
+  let text = serialize(tokens).replace(/\s+/g, '').toLowerCase();
+  
+  if (text === 'odd') {
+    text = '2n+1';
+  } else if (text === 'even') {
+    text = '2n';
+  }
+  
+  if (/^[+-]?\d+$/.test(text)) {
+    return parseInt(text, 10).toString();
+  }
+  
+  const nIdx = text.indexOf('n');
+  if (nIdx === -1) {
+    return text;
+  }
+  
+  const left = text.slice(0, nIdx);
+  const right = text.slice(nIdx + 1);
+  
+  let a = 1;
+  if (left === '-') {
+    a = -1;
+  } else if (left === '+') {
+    a = 1;
+  } else if (left !== '') {
+    a = parseInt(left, 10);
+  }
+  
+  let b = 0;
+  if (right !== '') {
+    b = parseInt(right, 10);
+  }
+  
+  if (a === 0) {
+    return b.toString();
+  }
+  
+  let partA = '';
+  if (a === 1) {
+    partA = 'n';
+  } else if (a === -1) {
+    partA = '-n';
+  } else {
+    partA = a + 'n';
+  }
+  
+  if (b === 0) {
+    return partA;
+  } else if (b > 0) {
+    return partA + '+' + b;
+  } else {
+    return partA + b;
+  }
+}
+
+function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = false): string {
+  switch (simple.type) {
+    case 'type-selector': {
+      let name = serializeIdentifier(simple.name);
+      if (simple.namespace !== undefined) {
+        if (simple.namespace === '*') {
+          if (hasDefaultNamespace) {
+            name = '*|' + name;
+          }
+        } else if (simple.namespace === '') {
+          name = '|' + name;
+        } else {
+          name = serializeIdentifier(simple.namespace) + '|' + name;
+        }
+      }
+      return name;
+    }
+    case 'universal-selector':
+      if (simple.namespace !== undefined) {
+        if (simple.namespace === '*') {
+          return hasDefaultNamespace ? '*|*' : '*';
+        } else if (simple.namespace === '') {
+          return '|*';
+        } else {
+          return serializeIdentifier(simple.namespace) + '|*';
+        }
+      }
+      return '*';
+    case 'id-selector': return '#' + serializeIdentifier(simple.name);
+    case 'class-selector': return '.' + serializeIdentifier(simple.name);
+    case 'attribute-selector': {
+      let attr = '[';
+      if (simple.namespace !== undefined) {
+        if (simple.namespace === '*') {
+          attr += '*|';
+        } else if (simple.namespace === '') {
+          attr += '|';
+        } else {
+          attr += serializeIdentifier(simple.namespace) + '|';
+        }
+      }
+      attr += serializeIdentifier(simple.name);
+      if (simple.operator) {
+        attr += simple.operator + serializeString(simple.value || '');
+      }
+      if (simple.flags) {
+        attr += ' ' + simple.flags;
+      }
+      return attr + ']';
+    }
+    case 'pseudo-class-selector':
+      let pc = `:${simple.name}`;
+      const lowerName = simple.name.toLowerCase();
+      const isNth = ['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type'].includes(lowerName);
+      if (simple.argument) {
+        if ('type' in simple.argument && simple.argument.type === 'selector-list') {
+          if (isNth && simple.nth) {
+            pc += `(${formatAnPlusB(simple.nth)} of ${serializeSelectorList(simple.argument, hasDefaultNamespace)})`;
+          } else {
+            pc += `(${serializeSelectorList(simple.argument, hasDefaultNamespace)})`;
+          }
+        } else {
+          if (isNth) {
+            pc += `(${formatAnPlusB(simple.argument as ComponentValue[])})`;
+          } else {
+            pc += `(${serialize(simple.argument as ComponentValue[]).trim()})`;
+          }
+        }
+      }
+      return pc;
+    case 'pseudo-element-selector':
+      let pe = `::${simple.name}`;
+      if (simple.argument) {
+        if ('type' in simple.argument && simple.argument.type === 'selector-list') {
+          pe += `(${serializeSelectorList(simple.argument, hasDefaultNamespace)})`;
+        } else {
+          pe += `(${serialize(simple.argument as ComponentValue[]).trim()})`;
+        }
+      }
+      return pe;
+    case 'nesting-selector': return '&';
+    default: return '';
+  }
+}
+

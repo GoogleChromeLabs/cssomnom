@@ -162,6 +162,7 @@ export interface ComponentValueStream {
   next(): ComponentValue;
   peek(): ComponentValue;
   position: number;
+  slice(start: number, end: number): ComponentValue[];
 }
 
 export type ComponentValue = Token | SimpleBlock | CSSFunction;

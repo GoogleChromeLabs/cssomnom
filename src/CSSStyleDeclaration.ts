@@ -252,7 +252,10 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           return res || '';
         }
 
-        return '';
+      }
+      const directDecl = this._getWinningDeclaration(property);
+      if (directDecl) {
+        return serialize(directDecl.value).trim();
       }
       return '';
     }
@@ -416,7 +419,10 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           }
         }
       }
-
+      const directDecl = this._getWinningDeclaration(property);
+      if (directDecl && directDecl.important) {
+        return 'important';
+      }
       return '';
     }
 
@@ -448,11 +454,14 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
-      const expanded = shorthand.expand(tokens);
+      const expanded = shorthand.expand(ParseHooks.parseComponentValues(tokens));
       if (expanded) {
         for (const [lh, val] of Object.entries(expanded)) {
           this.setProperty(lh, serialize(val), priority);
         }
+        return;
+      }
+      if (!shorthand.stub) {
         return;
       }
     }
@@ -504,6 +513,11 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       ]);
       for (const lh of allLh) {
         this.removeProperty(lh);
+      }
+      const index = this._declarations.findIndex(d => d.name === property);
+      if (index !== -1) {
+        this._declarations.splice(index, 1);
+        this._declMap.delete(property);
       }
       return value;
     }

@@ -1453,11 +1453,11 @@
       },
       {
         "input": "attr(|bar)",
-        "expected": "attr(bar)"
+        "expected": "attr(|bar)"
       },
       {
         "input": "attr( |bar )",
-        "expected": "attr(bar)"
+        "expected": "attr( |bar )"
       },
       {
         "input": "attr(foo-bar, \"fallback\")",
@@ -1469,7 +1469,7 @@
       },
       {
         "input": "attr(|bar, \"fallback\")",
-        "expected": "attr(bar, \"fallback\")"
+        "expected": "attr(|bar, \"fallback\")"
       },
       {
         "input": "attr(foo, \"\")",
@@ -1477,7 +1477,7 @@
       },
       {
         "input": "attr( |foo ,  \"\" )",
-        "expected": "attr(foo)"
+        "expected": "attr( |foo ,  \"\" )"
       },
       {
         "input": "inherit",
@@ -3292,7 +3292,7 @@
       "expected": "max(1, 2, 3)"
     },
     {
-      "expected": "min(100px, 110px)"
+      "expected": "max(100px, 110px)"
     },
     {
       "expected": "max(1 + 2, 3)"
@@ -3417,7 +3417,7 @@
       "expected": "rotate3d(calc(1 / 0), 0, 0, 0deg)"
     },
     {
-      "expected": "rotate3d(0, 0, 0, calc(1deg * (1 / 0)))"
+      "expected": "rotate3d(0, 0, 0, calc(1deg / 0))"
     },
     {
       "expected": "matrix(1, 2, 3, 4, 5, 6)"

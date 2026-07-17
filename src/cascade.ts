@@ -15,15 +15,15 @@
  * limitations under the License.
  */
 import { calculateSpecificity, compareSpecificity } from './specificity.ts';
-import { CSSRule, CSSNestedDeclarations, CSSGroupingRule } from './CSSOM.ts';
+import { CSSRule, CSSNestedDeclarations, CSSGroupingRule, CSSScopeRule } from './CSSOM.ts';
 import { tokenize } from './tokenizer.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from './data/LogicalMapping.ts';
 import { Parser } from './parser.ts';
 import { SelectorParser } from './SelectorParser.ts';
-import { serialize } from './serializer.ts';
+import { serialize, serializeSelectorList } from './serializer.ts';
 import type { 
   Rule, CSSStyleRule, CSSRuleList,
-  SelectorList, ComplexSelector, SimpleSelector, PseudoClassSelector, ComponentValue
+  SelectorList, PseudoClassSelector
 } from './types.ts';
 
 
@@ -55,7 +55,8 @@ export function getCascadedStyle(element: unknown, rules: Rule[]) {
             walkRules(styleRule.cssRules, resolvedSelector);
         }
       } else if (rule instanceof CSSGroupingRule) {
-        walkRules((rule as CSSGroupingRule).cssRules, parentSelector);
+        const nextParentSelector = rule instanceof CSSScopeRule ? '' : parentSelector;
+        walkRules((rule as CSSGroupingRule).cssRules, nextParentSelector);
       } else if (rule instanceof CSSNestedDeclarations) {
         const selectorToMatch = parentSelector || ':scope';
         const matchingSpecificity = getMatchingSpecificity(element, selectorToMatch);
@@ -78,13 +79,23 @@ export function getCascadedStyle(element: unknown, rules: Rule[]) {
 
   const declarations = new Map<string, { value: string, important: boolean }>();
   
+  // Inherit from parent if present
   let writingMode = 'horizontal-tb';
   let direction = 'ltr';
+  let textOrientation = 'mixed';
+
+  if (element && typeof element === 'object' && 'parentElement' in element && element.parentElement) {
+    const parentStyle = getCascadedStyle(element.parentElement, rules);
+    if (parentStyle['writing-mode']) writingMode = parentStyle['writing-mode'];
+    if (parentStyle['direction']) direction = parentStyle['direction'];
+    if (parentStyle['text-orientation']) textOrientation = parentStyle['text-orientation'];
+  }
   
   let wmImportant = false;
   let dirImportant = false;
+  let toImportant = false;
 
-  // First pass: find winning writing-mode and direction
+  // First pass: find winning writing-mode, direction and text-orientation
   for (const { rule } of matchedRules) {
     const style = rule.style;
     
@@ -105,7 +116,22 @@ export function getCascadedStyle(element: unknown, rules: Rule[]) {
         dirImportant = isImportant;
       }
     }
+
+    const to = style.getPropertyValue('text-orientation');
+    if (to) {
+      const isImportant = style.getPropertyPriority('text-orientation') === 'important';
+      if (isImportant || !toImportant) {
+        textOrientation = to;
+        toImportant = isImportant;
+      }
+    }
   }
+
+  // CSS Writing Modes: When text-orientation is upright, direction is forced to ltr.
+  if (textOrientation === 'upright' && (writingMode === 'vertical-rl' || writingMode === 'vertical-lr')) {
+    direction = 'ltr';
+  }
+
 
   // Second pass: process all properties with dynamic logical resolution
   for (const { rule } of matchedRules) {
@@ -212,57 +238,7 @@ export function resolveNestedSelector(selector: string, parentSelector: string):
 }
 
 
-function serializeSelectorList(list: SelectorList): string {
-  return list.selectors.map(s => {
-    if (s.type === 'invalid-selector') {
-      return serialize(s.tokens);
-    }
-    return serializeComplexSelector(s);
-  }).join(', ');
-}
 
-function serializeComplexSelector(complex: ComplexSelector): string {
-  return complex.items.map(item => {
-    if (item.type === 'combinator') return item.value === ' ' ? ' ' : ` ${item.value} `;
-    return item.selectors.map(s => serializeSimpleSelector(s)).join('');
-  }).join('');
-}
-
-function serializeSimpleSelector(simple: SimpleSelector): string {
-  switch (simple.type) {
-    case 'type-selector': return simple.name;
-    case 'universal-selector': return '*';
-    case 'id-selector': return `#${simple.name}`;
-    case 'class-selector': return `.${simple.name}`;
-    case 'attribute-selector':
-      let attr = `[${simple.name}`;
-      if (simple.operator) attr += `${simple.operator}${simple.value}`;
-      if (simple.flags) attr += ` ${simple.flags}`;
-      return attr + ']';
-    case 'pseudo-class-selector':
-      let pc = `:${simple.name}`;
-      if (simple.argument) {
-        if ('type' in simple.argument && simple.argument.type === 'selector-list') {
-          pc += `(${serializeSelectorList(simple.argument)})`;
-        } else {
-          pc += `(${serialize(simple.argument as ComponentValue[])})`;
-        }
-      }
-      return pc;
-    case 'pseudo-element-selector':
-      let pe = `::${simple.name}`;
-      if (simple.argument) {
-        if ('type' in simple.argument && simple.argument.type === 'selector-list') {
-          pe += `(${serializeSelectorList(simple.argument)})`;
-        } else {
-          pe += `(${serialize(simple.argument as ComponentValue[])})`;
-        }
-      }
-      return pe;
-    case 'nesting-selector': return '&';
-    default: return '';
-  }
-}
 
 function getMatchingSpecificity(element: unknown, selectorText: string): [number, number, number] | null {
   const tokens = tokenize(selectorText);

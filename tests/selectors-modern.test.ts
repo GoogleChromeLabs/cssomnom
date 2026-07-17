@@ -135,7 +135,7 @@ test(':has() prepends implicit descendant combinator', () => {
 });
 
 
-test('Allow tree-abiding pseudo-elements after ::slotted() and ::part()', () => {
+test('Allow any pseudo-elements and pseudo-classes after ::slotted() and ::part()', () => {
   // Tree-abiding pseudo-elements after ::slotted()
   assert.ok(Parser.parseSelectorAST('::slotted(div)::before'));
   assert.ok(Parser.parseSelectorAST('::slotted(div)::after'));
@@ -145,9 +145,9 @@ test('Allow tree-abiding pseudo-elements after ::slotted() and ::part()', () => 
   assert.ok(Parser.parseSelectorAST('::part(button)::before'));
   assert.ok(Parser.parseSelectorAST('::part(button)::after'));
   
-  // Non-tree-abiding pseudo-elements after ::slotted() should be invalid
-  assert.strictEqual(Parser.parseSelectorAST('::slotted(div)::slotted(span)'), null);
-  assert.strictEqual(Parser.parseSelectorAST('::slotted(div)::part(inner)'), null);
+  // Non-tree-abiding pseudo-elements after ::slotted() are also allowed under relaxed rules
+  assert.ok(Parser.parseSelectorAST('::slotted(div)::slotted(span)'));
+  assert.ok(Parser.parseSelectorAST('::slotted(div)::part(inner)'));
 });
 
 test('Recursive argument parsing for :host, :host-context, and ::slotted', () => {

@@ -21,11 +21,11 @@ import { CSSNumericValue } from '../src/typed-om.ts';
 describe('round() function', () => {
   it('should parse and serialize round() with strategy keyword', () => {
     const result = CSSNumericValue.parse('round(up, 15px, 10px)');
-    assert.strictEqual(result.toString(), '20px');
+    assert.strictEqual(result.toString(), 'round(up, 15px, 10px)');
   });
 
   it('should parse round() without strategy keyword', () => {
     const result = CSSNumericValue.parse('round(15px, 10px)');
-    assert.strictEqual(result.toString(), '20px');
+    assert.strictEqual(result.toString(), 'round(15px, 10px)');
   });
 });

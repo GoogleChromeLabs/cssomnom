@@ -23,10 +23,24 @@ import { tokenize } from './tokenizer.ts';
 import { Parser } from './parser.ts';
 import { SelectorParser } from './SelectorParser.ts';
 
-/**
- * Spec: https://drafts.csswg.org/selectors-4/#specificity-rules
- */
-export function calculateSpecificity(selector: string | SelectorList, parentSpecificity?: [number, number, number]): [number, number, number][] {
+export type Specificity = [number, number, number];
+const ZERO: Specificity = [0, 0, 0];
+
+function addSpecificity(a: Specificity, b: Specificity): Specificity {
+  return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+}
+
+function getArgumentSpecificity(
+  pseudo: PseudoClassSelector | PseudoElementSelector, 
+  parentSpecificity?: Specificity
+): Specificity {
+  if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
+    return calculateSelectorListSpecificity(pseudo.argument, parentSpecificity);
+  }
+  return ZERO;
+}
+
+export function calculateSpecificity(selector: string | SelectorList, parentSpecificity?: Specificity): Specificity[] {
   let list: SelectorList;
   if (typeof selector === 'string') {
     const tokens = tokenize(selector);
@@ -38,62 +52,37 @@ export function calculateSpecificity(selector: string | SelectorList, parentSpec
     list = selector;
   }
   
-  return list.selectors.map(complex => {
-    if (complex.type === 'invalid-selector') {
-      return [0, 0, 0] as [number, number, number];
-    }
-    return calculateComplexSelectorSpecificity(complex, parentSpecificity);
-  });
+  return list.selectors.map(complex => 
+    complex.type === 'invalid-selector' ? ZERO : calculateComplexSelectorSpecificity(complex, parentSpecificity)
+  );
 }
 
-/**
- * Returns the most specific specificity in the list.
- */
-export function calculateSelectorListSpecificity(list: SelectorList, parentSpecificity?: [number, number, number]): [number, number, number] {
-  let max: [number, number, number] = [0, 0, 0];
-  
-  for (const complex of list.selectors) {
+export function calculateSelectorListSpecificity(list: SelectorList, parentSpecificity?: Specificity): Specificity {
+  return list.selectors.reduce((max, complex) => {
     const current = complex.type === 'invalid-selector'
-      ? [0, 0, 0] as [number, number, number]
+      ? ZERO
       : calculateComplexSelectorSpecificity(complex, parentSpecificity);
-    if (compareSpecificity(current, max) > 0) {
-      max = current;
-    }
-  }
-  
-  return max;
+    return compareSpecificity(current, max) > 0 ? current : max;
+  }, ZERO);
 }
 
-export function calculateComplexSelectorSpecificity(complex: ComplexSelector, parentSpecificity?: [number, number, number]): [number, number, number] {
-  const result: [number, number, number] = [0, 0, 0];
-  
-  for (const item of complex.items) {
-    if (item.type === 'compound-selector') {
-      const compound = calculateCompoundSelectorSpecificity(item, parentSpecificity);
-      result[0] += compound[0];
-      result[1] += compound[1];
-      result[2] += compound[2];
-    }
-    // Combinators don't contribute to specificity
-  }
-  
-  return result;
+export function calculateComplexSelectorSpecificity(complex: ComplexSelector, parentSpecificity?: Specificity): Specificity {
+  return complex.items.reduce((acc, item) => 
+    item.type === 'compound-selector' 
+      ? addSpecificity(acc, calculateCompoundSelectorSpecificity(item, parentSpecificity)) 
+      : acc,
+    ZERO
+  );
 }
 
-function calculateCompoundSelectorSpecificity(compound: CompoundSelector, parentSpecificity?: [number, number, number]): [number, number, number] {
-  const result: [number, number, number] = [0, 0, 0];
-  
-  for (const simple of compound.selectors) {
-    const s = calculateSimpleSelectorSpecificity(simple, parentSpecificity);
-    result[0] += s[0];
-    result[1] += s[1];
-    result[2] += s[2];
-  }
-  
-  return result;
+function calculateCompoundSelectorSpecificity(compound: CompoundSelector, parentSpecificity?: Specificity): Specificity {
+  return compound.selectors.reduce((acc, simple) => 
+    addSpecificity(acc, calculateSimpleSelectorSpecificity(simple, parentSpecificity)),
+    ZERO
+  );
 }
 
-function calculateSimpleSelectorSpecificity(simple: SimpleSelector, parentSpecificity?: [number, number, number]): [number, number, number] {
+function calculateSimpleSelectorSpecificity(simple: SimpleSelector, parentSpecificity?: Specificity): Specificity {
   switch (simple.type) {
     case 'id-selector':
       return [1, 0, 0];
@@ -105,73 +94,46 @@ function calculateSimpleSelectorSpecificity(simple: SimpleSelector, parentSpecif
     case 'pseudo-element-selector':
       return calculatePseudoElementSpecificity(simple, parentSpecificity);
     case 'universal-selector':
-      return [0, 0, 0];
+      return ZERO;
     case 'nesting-selector':
-      if (!parentSpecificity) {
-        // The & selector behaves like :where(:scope) when no parent selector exists.
-        // Spec: css-nesting-1 #nest-selector
-        return [0, 0, 0];
-      }
-      return parentSpecificity;
+      // The & selector behaves like :where(:scope) when no parent selector exists.
+      return parentSpecificity ?? ZERO;
     case 'pseudo-class-selector':
       return calculatePseudoClassSpecificity(simple, parentSpecificity);
     default:
-      return [0, 0, 0];
+      return ZERO;
   }
 }
 
-function calculatePseudoClassSpecificity(pseudo: PseudoClassSelector, parentSpecificity?: [number, number, number]): [number, number, number] {
+function calculatePseudoClassSpecificity(pseudo: PseudoClassSelector, parentSpecificity?: Specificity): Specificity {
   const name = pseudo.name.toLowerCase();
   
-  // :where() has zero specificity
   if (name === 'where') {
-    return [0, 0, 0];
+    return ZERO;
   }
   
-  // :is(), :not(), :has() specificity is replaced by most specific argument
   if (['is', 'not', 'has', 'matches'].includes(name)) {
-    if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
-      return calculateSelectorListSpecificity(pseudo.argument, parentSpecificity);
-    }
-    return [0, 0, 0];
+    return getArgumentSpecificity(pseudo, parentSpecificity);
   }
   
-  // :nth-child(), :nth-last-child() specificity is 1 (pseudo-class) + max of argument
-  if (['nth-child', 'nth-last-child'].includes(name)) {
-    let argSpec: [number, number, number] = [0, 0, 0];
-    if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
-      argSpec = calculateSelectorListSpecificity(pseudo.argument, parentSpecificity);
-    }
-    return [argSpec[0], argSpec[1] + 1, argSpec[2]];
-  }
-
-  // :host and :host-context() specificity is 1 in B + specificity of argument
-  if (['host', 'host-context'].includes(name)) {
-    let argSpec: [number, number, number] = [0, 0, 0];
-    if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
-      argSpec = calculateSelectorListSpecificity(pseudo.argument, parentSpecificity);
-    }
+  if (['nth-child', 'nth-last-child', 'host', 'host-context'].includes(name)) {
+    const argSpec = getArgumentSpecificity(pseudo, parentSpecificity);
     return [argSpec[0], argSpec[1] + 1, argSpec[2]];
   }
   
-  // Other pseudo-classes count as 1 in B
   return [0, 1, 0];
 }
 
-function calculatePseudoElementSpecificity(pseudo: PseudoElementSelector, parentSpecificity?: [number, number, number]): [number, number, number] {
+function calculatePseudoElementSpecificity(pseudo: PseudoElementSelector, parentSpecificity?: Specificity): Specificity {
   const name = pseudo.name.toLowerCase();
-  // ::slotted() specificity is 1 in C + specificity of argument
   if (name === 'slotted') {
-    let argSpec: [number, number, number] = [0, 0, 0];
-    if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
-      argSpec = calculateSelectorListSpecificity(pseudo.argument, parentSpecificity);
-    }
+    const argSpec = getArgumentSpecificity(pseudo, parentSpecificity);
     return [argSpec[0], argSpec[1], argSpec[2] + 1];
   }
   return [0, 0, 1];
 }
 
-export function compareSpecificity(a: [number, number, number], b: [number, number, number]): number {
+export function compareSpecificity(a: Specificity, b: Specificity): number {
   if (a[0] !== b[0]) return a[0] - b[0];
   if (a[1] !== b[1]) return a[1] - b[1];
   return a[2] - b[2];

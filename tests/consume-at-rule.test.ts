@@ -19,13 +19,12 @@ import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 
-test('consumeAtRule reports error on EOF', () => {
+test('consumeAtRule does not report error on EOF', () => {
   const tokens = tokenize('@media screen');
   const parser = new Parser(tokens);
   parser.consumeRule();
   
-  assert.strictEqual(parser.errors.length, 1, 'Should have reported 1 error');
-  assert.strictEqual(parser.errors[0].message, 'Unexpected EOF in at-rule');
+  assert.strictEqual(parser.errors.length, 0, 'Should not have reported errors');
 });
 
 test('consumeAtRule does not crash on @font-face without block', () => {

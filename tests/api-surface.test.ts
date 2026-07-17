@@ -31,7 +31,9 @@ test('API Surface Area', () => {
 
     // CSSOM Rules
     'CSSContainerRule',
+    'CSSCounterStyleRule',
     'CSSFontFaceRule',
+    'CSSFontFeatureValuesRule',
     'CSSGroupingRule',
     'CSSImportRule',
     'CSSKeyframeRule',
@@ -91,12 +93,14 @@ test('API Surface Area', () => {
     'CSSHSL',
     'CSSHWB',
     'CSSLab',
-    'CSSLch',
+    'CSSLCH',
     'CSSOKLab',
     'CSSOKLCH',
     'StylePropertyMap',
     'StylePropertyMapReadOnly',
     'createCSSStyleValue',
+    'DOMMatrix',
+    'DOMMatrixReadOnly',
 
     // Typed OM Transforms
     'CSSMatrixComponent',
@@ -165,7 +169,12 @@ test('Parser static methods', () => {
 
 test('CSS methods', () => {
   const expectedMethods = [
-    ...UNITS,
+    ...UNITS.map(u => {
+      if (u === 'hz') return 'Hz';
+      if (u === 'khz') return 'kHz';
+      if (u === 'q') return 'Q';
+      return u;
+    }),
     // Parser
     'parseStylesheet', 'parseStylesheetSync', 'parseRuleList', 'parseRule', 'parseDeclarationList', 'parseDeclaration', 'parseValue', 'parseValueList', 'parseCommaValueList', 'parseComponentValue', 'registerProperty',
     // Tooling Extensions

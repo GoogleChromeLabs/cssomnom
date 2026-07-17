@@ -18,7 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
 
 const allFixtures: Record<string, unknown> = {};

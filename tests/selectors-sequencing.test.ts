@@ -19,14 +19,16 @@ import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import type { CompoundSelector } from '../src/types.ts';
 
+function assertSelectorRejected(sel: string) {
+  const ast = Parser.parseSelectorAST(sel);
+  assert.strictEqual(ast, null, `Should reject invalid selector: ${sel}`);
+}
+
 test('SelectorParser: Pseudo-element sequencing', () => {
   // Spec: A pseudo-element may only appear at the end of a compound selector.
   // Spec: Only one pseudo-element may appear in a compound selector.
   // Spec: In a complex selector, a pseudo-element may only appear at the end of the last compound selector.
 
-  // Invalid: multiple pseudo-elements (should throw or fail to parse as a single compound)
-  // Our parser currently might just parse them both into the same compound-selector.
-  
   const invalidSelectors = [
     'div::before::after',
     'div::before.class',
@@ -37,36 +39,7 @@ test('SelectorParser: Pseudo-element sequencing', () => {
   ];
 
   for (const sel of invalidSelectors) {
-    const ast = Parser.parseSelectorAST(sel);
-    if (ast) {
-        let foundPseudo = false;
-        for (let i = 0; i < (ast.selectors[0] as import('../src/types.ts').ComplexSelector).items.length; i++) {
-            const item = (ast.selectors[0] as import('../src/types.ts').ComplexSelector).items[i];
-            if (item.type === 'compound-selector') {
-                let compoundPseudo = 0;
-                for (let j = 0; j < item.selectors.length; j++) {
-                    const s = item.selectors[j];
-                    if (s.type === 'pseudo-element-selector') {
-                        compoundPseudo++;
-                        if (j !== item.selectors.length - 1) {
-                            assert.fail(`Pseudo-element not at end of compound in: ${sel}`);
-                        }
-                    }
-                }
-                if (compoundPseudo > 1) {
-                     assert.fail(`Multiple pseudo-elements in compound in: ${sel}`);
-                }
-                if (compoundPseudo > 0) {
-                    if (foundPseudo) assert.fail(`Pseudo-element in non-last compound in: ${sel}`);
-                    foundPseudo = true;
-                    const nextItem = (ast.selectors[0] as import('../src/types.ts').ComplexSelector).items[i+1];
-                    if (nextItem) {
-                         assert.fail(`Pseudo-element followed by other items in: ${sel}`);
-                    }
-                }
-            }
-        }
-    }
+    assertSelectorRejected(sel);
   }
 });
 
@@ -96,26 +69,7 @@ test('SelectorParser: Type selector position', () => {
   ];
 
   for (const sel of invalidSelectors) {
-    let ast = null;
-    try {
-      ast = Parser.parseSelectorAST(sel);
-    } catch (e) {
-      // Throwing is a valid way to reject invalid selectors
-      continue;
-    }
-    
-    if (ast) {
-      const compound = (ast.selectors[0] as import('../src/types.ts').ComplexSelector).items[0];
-      if (compound && compound.type === 'compound-selector') {
-        const selectors = compound.selectors;
-        for (let i = 1; i < selectors.length; i++) {
-          const s = selectors[i];
-          if (s.type === 'type-selector' || s.type === 'universal-selector') {
-            assert.fail(`Type or universal selector at index ${i} in: ${sel}`);
-          }
-        }
-      }
-    }
+    assertSelectorRejected(sel);
   }
 });
 
@@ -145,5 +99,23 @@ test('SelectorParser: ID selector hashType restriction', () => {
   for (const sel of invalidSelectors) {
     const ast = Parser.parseSelectorAST(sel);
     assert.strictEqual(ast, null, `Should reject ID selector with hashType 'unrestricted': ${sel}`);
+  }
+});
+
+test('SelectorParser: Relaxed pseudo-elements and pseudo-classes after ::part() and ::slotted()', () => {
+  const validSelectors = [
+    'div::part(button):hover',
+    'div::part(button):checked',
+    'div::part(button)::before',
+    'div::part(button)::selection',
+    'div::slotted(span):hover',
+    'div::slotted(span):checked',
+    'div::slotted(span)::after',
+    'div::slotted(span)::placeholder'
+  ];
+
+  for (const sel of validSelectors) {
+    const ast = Parser.parseSelectorAST(sel);
+    assert.ok(ast, `Should accept valid relaxed selector: ${sel}`);
   }
 });

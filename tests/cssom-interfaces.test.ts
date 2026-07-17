@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
-import { CSSPageRule, CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSFontFaceRule } from '../src/index.ts';
+import { CSSPageRule, CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSFontFaceRule, CSSCounterStyleRule, CSSFontFeatureValuesRule } from '../src/index.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import {
   CSSRuleList,
@@ -26,7 +26,8 @@ import {
   CSSStyleRule,
   CSSMediaRule,
   CSSStyleDeclaration,
-  CSSStyleSheet
+  CSSStyleSheet,
+  StylePropertyMap
 } from '../src/index.ts';
 import { CSSStyleProperties } from '../src/data/properties.ts';
 import type { StyleSheet } from '../src/types.ts';
@@ -139,6 +140,11 @@ test('CSSStyleRule interface', () => {
   // "PutForwards=cssText"
   (rule as unknown as { style: string }).style = 'color: blue;';
   assert.strictEqual(rule.style.getPropertyValue('color').trim(), 'blue');
+
+  // styleMap
+  assert.ok(rule.styleMap instanceof StylePropertyMap);
+  rule.styleMap.set('color', 'green');
+  assert.strictEqual(rule.style.getPropertyValue('color').trim(), 'green');
 });
 
 test('CSSStyleDeclaration interface', () => {
@@ -294,6 +300,27 @@ test('CSSPageRule.style PutForwards=cssText', () => {
   assert.strictEqual(rule.style.getPropertyValue('margin').trim(), '10px');
 });
 
+test('CSSPageRule.selectorText getter, setter and normalization', () => {
+  const ast = Parser.parseStyleSheetText('@page :first { margin:0; }');
+  const rule = ast[0] as unknown as CSSPageRule;
+
+  assert.strictEqual(rule.selectorText, ':first');
+
+  // Set valid
+  rule.selectorText = '  foo :first, :left ';
+  assert.strictEqual(rule.selectorText, 'foo:first, :left');
+  assert.ok(rule.cssText.includes('@page foo:first, :left {'));
+
+  // Set invalid
+  rule.selectorText = 'foo:bar'; // :bar is not a valid pseudo-page
+  assert.strictEqual(rule.selectorText, 'foo:first, :left'); // should remain unchanged
+
+  // Set empty
+  rule.selectorText = '   ';
+  assert.strictEqual(rule.selectorText, '');
+  assert.ok(rule.cssText.startsWith('@page {'));
+});
+
 test('CSSMarginRule.style PutForwards=cssText', () => {
   const ast = Parser.parseStyleSheetText('@page :first { @top-left { content: "foo"; } }');
   const pageRule = ast[0] as unknown as CSSPageRule;
@@ -367,5 +394,17 @@ test('CSSRuleList live after replaceSync', () => {
   sheet.replaceSync('.a { color: red; }');
   assert.strictEqual(rules.length, 1, 'CSSRuleList should be live after replaceSync');
   assert.strictEqual((rules[0] as CSSStyleRule).selectorText, '.a');
+});
+
+test('CSSCounterStyleRule and CSSFontFeatureValuesRule skeleton classes', () => {
+  const counterStyle = new CSSCounterStyleRule('foo');
+  assert.equal(counterStyle.type, 11);
+  assert.equal(counterStyle.name, 'foo');
+  assert.equal(counterStyle.cssText, '@counter-style foo {}');
+
+  const fontFeatureValues = new CSSFontFeatureValuesRule('sans-serif');
+  assert.equal(fontFeatureValues.type, 14);
+  assert.equal(fontFeatureValues.fontFamily, 'sans-serif');
+  assert.equal(fontFeatureValues.cssText, '@font-feature-values sans-serif {}');
 });
 

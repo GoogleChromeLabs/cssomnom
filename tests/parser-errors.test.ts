@@ -19,6 +19,7 @@ import * as assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import type { ParseError, ComponentValue } from '../src/types.ts';
+import { CSSStyleRule } from '../src/index.ts';
 import { ArrayComponentValueStream } from '../src/TokenStream.ts';
 
 test('Parser reports error on unexpected EOF in qualified rule', () => {
@@ -155,5 +156,41 @@ test('Parser reports error on unexpected } in qualified rule', () => {
   assert.strictEqual(parser.errors.length, 2);
   assert.strictEqual(parser.errors[0].message, 'Unexpected } in qualified rule');
   assert.strictEqual(parser.errors[1].message, 'Unexpected EOF in qualified rule');
+});
+
+test('Tokenizer reports error on EOF in escape sequence', () => {
+  const errors: ParseError[] = [];
+  tokenize('a\\', false, errors);
+  assert.strictEqual(errors.length, 1);
+  assert.strictEqual(errors[0].message, 'EOF reached in escape sequence');
+});
+
+test('Parser does not report parse error when at-rule prelude is terminated by EOF', () => {
+  const tokens = tokenize('@media screen');
+  const parser = new Parser(tokens);
+  parser.consumeListOfRules(true);
+  
+  assert.ok(parser.errors);
+  assert.strictEqual(parser.errors.length, 0);
+});
+
+test('Redundant semicolons do not split nested declarations', () => {
+  const css = `
+    .container {
+      color: red;
+      ;;;
+      background: blue;
+    }
+  `;
+  const tokens = tokenize(css);
+  const parser = new Parser(tokens);
+  const rules = parser.consumeListOfRules(true);
+
+  assert.strictEqual(rules.length, 1);
+  const styleRule = rules[0] as CSSStyleRule;
+  // Semicolons should be ignored and not split declarations
+  assert.strictEqual(styleRule.cssRules.length, 0);
+  assert.strictEqual(styleRule.style.getPropertyValue('color'), 'red');
+  assert.strictEqual(styleRule.style.getPropertyValue('background'), 'blue');
 });
 

@@ -20,7 +20,7 @@ import { getCascadedStyle } from '../src/cascade.ts';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import type { Rule, Declaration } from '../src/types.ts';
-import { CSSStyleRule, CSSNestedDeclarations, CSSMediaRule } from '../src/index.ts';
+import { CSSStyleRule, CSSNestedDeclarations, CSSMediaRule, CSSScopeRule } from '../src/index.ts';
 
 describe('CSS Nesting', () => {
     test('nested selector with &', () => {
@@ -313,6 +313,59 @@ describe('CSS Nesting', () => {
         // The invalid declaration should be skipped, background: blue is parsed.
         assert.strictEqual(parentRule.cssRules.length, 0);
         assert.strictEqual(parentRule.style.getPropertyValue('background').trim(), 'blue');
+    });
+
+    test('relative nested selector absolutizes in selectorText setter', () => {
+        const css = `
+            .parent {
+                .child { color: blue; }
+            }
+        `;
+        const tokens = tokenize(css);
+        const parser = new Parser(tokens);
+        const stylesheet = parser.parseStyleSheet();
+        const parentRule = stylesheet.cssRules[0] as CSSStyleRule;
+        const childRule = parentRule.cssRules[0] as CSSStyleRule;
+        
+        // Setting a relative selector on a nested rule should absolutize it:
+        childRule.selectorText = '> div';
+        assert.strictEqual(childRule.selectorText, '& > div');
+
+        childRule.selectorText = '+ p, ~ span';
+        assert.strictEqual(childRule.selectorText, '& + p, & ~ span');
+        
+        // Setting it on a non-nested rule (top-level) should NOT absolutize it,
+        // in fact it is invalid so it should be ignored (keep the original).
+        const topLevelRule = stylesheet.cssRules[0] as CSSStyleRule;
+        const originalSelector = topLevelRule.selectorText;
+        topLevelRule.selectorText = '> div';
+        assert.strictEqual(topLevelRule.selectorText, originalSelector);
+    });
+
+    test('@scope resets parent selector context (&) to :where(:scope)', () => {
+        const css = `
+            .parent {
+                @scope (.scope-root) {
+                    & .child { color: blue; }
+                }
+            }
+        `;
+        const tokens = tokenize(css);
+        const parser = new Parser(tokens);
+        const stylesheet = parser.parseStyleSheet();
+        
+        const parentRule = stylesheet.cssRules[0] as CSSStyleRule;
+        const scopeRule = parentRule.cssRules[0] as CSSScopeRule;
+        const childRules = Array.from(scopeRule.cssRules) as Rule[];
+        
+        const elementScopeChild = {
+            matches(sel: string) {
+                return sel === ':where(:scope) .child';
+            }
+        };
+        
+        const style = getCascadedStyle(elementScopeChild, childRules);
+        assert.strictEqual(style.color, 'blue');
     });
 });
 

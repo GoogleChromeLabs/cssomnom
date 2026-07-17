@@ -88,7 +88,7 @@ test('serialize keyframes rule', () => {
   const sheet = parser.parseStyleSheet();
   const rule = sheet.cssRules[0];
   
-  const expected = '@keyframes spin {\n  from { transform: rotate(0deg); }\n  to { transform: rotate(360deg); }\n}';
+  const expected = '@keyframes spin {\n  0% { transform: rotate(0deg); }\n  100% { transform: rotate(360deg); }\n}';
   assert.strictEqual(rule.cssText, expected);
 });
 

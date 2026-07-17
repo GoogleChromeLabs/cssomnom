@@ -24,6 +24,7 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 ### Deviations/Extensions
 - **Constructors**: Standard CSSOM usually instantiates these via the DOM. We allow direct instantiation with parameters (e.g., `new CSSStyleSheet(rules)`) to make them usable in Node.js without a full browser environment.
 - **Parsing**: Standard CSSOM does not expose static parsing methods on these classes. We use the `Parser` class (see below) to bridge this gap.
+- **`CSSImportRule.styleSheet`**: Hardcoded to `null` because the library is a static, offline parser and does not perform network fetches or local I/O to load external imported stylesheets.
 
 ---
 
@@ -55,6 +56,9 @@ These APIs are defined in newer Houdini drafts and are intended to expose lower-
 - **Immutability**: Properties like `prelude`, `body`, and `args` are mutable arrays instead of `FrozenArray`.
 - **Constructor Arguments**: The `body` parameter is mandatory in some constructors (e.g., `CSSParserQualifiedRule`) where the spec makes it optional.
 - **Math Functions**: We support new math functions from CSS Values 4 (like `sin()`, `cos()`, `abs()`, etc.) via a custom `CSSMathFunction` class. Since the CSS Typed OM 1 spec only defines operators for `sum`, `product`, `negate`, `invert`, `min`, `max`, and `clamp`, `CSSMathFunction.operator` returns `'sum'` as a fallback for these new functions to satisfy the type system, which is a known spec gap.
+- **WebIDL Dictionary Bindings**: In a browser, the WebIDL bindings layer automatically checks dictionary constraints (like checking that the `name` parameter in `CSS.registerProperty()` options is present and throwing a `TypeError`). In our headless Node runtime, we perform these validations manually in JavaScript.
+- **`CSSTransformComponent` Inheritance**: In the CSS Typed OM Level 1 specification, `CSSTransformComponent` does not inherit from `CSSStyleValue`. However, to support properties like `translate` and `rotate` which reify directly to transform components, and to allow them to be returned from `CSSStyleValue.parseAll()` and `StylePropertyMap.get()` (which return `CSSStyleValue`), we make `CSSTransformComponent` extend `CSSStyleValue`. This matches the implementation in modern browsers (like Blink/Chrome).
+- **Math Simplification & AST Structure Preservation**: In accordance with CSS Values 4 (Calculation Trees), we preserve the raw parsed AST structure of mathematical expressions in `CSSNumericValue.parse()` and `StylePropertyMap` parsing rather than performing eager simplification of compatible units (which is expected by older/Level 1 WPT tests). Eager simplification is deferred to computed-value time or manual `.simplify()` calls.
 
 ---
 

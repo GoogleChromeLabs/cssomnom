@@ -17,7 +17,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const CSSTREE_ROOT = path.join(REPO_ROOT, 'submodules/csstree');
 
 const stylesheetPath = path.join(CSSTREE_ROOT, 'fixtures/ast/stylesheet/StyleSheet.json');

@@ -17,7 +17,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const filePath = path.resolve(import.meta.dirname, '../submodules/CSSOM/spec/parse.spec.js');
+const filePath = path.resolve(import.meta.dirname, '../../submodules/CSSOM/spec/parse.spec.js');
 
 function run() {
     if (!fs.existsSync(filePath)) {
@@ -74,7 +74,7 @@ function run() {
 
         removeCircular(tests);
 
-        const outputPath = path.resolve(__dirname, '../tests/fixtures/external/nv_tests.json');
+        const outputPath = path.resolve(import.meta.dirname, '../../tests/fixtures/external/nv_tests.json');
         fs.writeFileSync(outputPath, JSON.stringify(tests, null, 2));
         console.log(`Saved to ${outputPath}`);
     } catch (e) {

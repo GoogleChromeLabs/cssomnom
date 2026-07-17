@@ -340,6 +340,46 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
   return null;
 }
 
+function toCanonical(val: CSSUnitValue): { value: number, unit: CSSUnit } {
+  const base = unitToBase[val.unit] || 'other';
+  if (base === 'length' && unitToPixels[val.unit]) {
+    return { value: val.value * unitToPixels[val.unit], unit: 'px' };
+  } else if (base === 'angle' && unitToRadians[val.unit]) {
+    return { value: val.value * (unitToRadians[val.unit] / unitToRadians['deg']), unit: 'deg' };
+  } else if (base === 'time' && unitToSeconds[val.unit]) {
+    return { value: val.value * unitToSeconds[val.unit], unit: 's' };
+  }
+  return { value: val.value, unit: val.unit };
+}
+
+function fromCanonical(value: number, targetUnit: CSSUnit): number {
+  const base = unitToBase[targetUnit] || 'other';
+  if (base === 'length' && unitToPixels[targetUnit]) {
+    return value / unitToPixels[targetUnit];
+  } else if (base === 'angle' && unitToRadians[targetUnit]) {
+    return value / (unitToRadians[targetUnit] / unitToRadians['deg']);
+  } else if (base === 'time' && unitToSeconds[targetUnit]) {
+    return value / unitToSeconds[targetUnit];
+  }
+  return value;
+}
+
+function isCanonicalizable(val: CSSUnitValue): boolean {
+  const base = unitToBase[val.unit] || 'other';
+  if (base === 'length') return !!unitToPixels[val.unit];
+  if (base === 'angle') return !!unitToRadians[val.unit];
+  if (base === 'time') return !!unitToSeconds[val.unit];
+  if (base === 'number') return true;
+  return false;
+}
+
+function areCompatibleForSimplification(values: CSSUnitValue[]): boolean {
+  if (values.length === 0) return true;
+  const firstUnit = values[0].unit;
+  if (values.every(v => v.unit === firstUnit)) return true;
+  return values.every(v => isCanonicalizable(v));
+}
+
 export function simplify(node: CSSNumericValue): CSSNumericValue {
   if (node instanceof CSSMathSum) {
     const values: CSSNumericValue[] = [];
@@ -410,67 +450,115 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
       }
     }
     
-    const allNumeric = values.every(c => c instanceof CSSUnitValue);
-    const hasInfinityOrNaN = values.some(c => c instanceof CSSUnitValue && (c.value === Infinity || c.value === -Infinity || Number.isNaN(c.value)));
+    // Split into numeric (CSSUnitValue or CSSMathInvert of CSSUnitValue) and other
+    const numericChildren: { value: number; unit: CSSUnit; inverted: boolean; original: CSSNumericValue }[] = [];
+    const otherChildren: CSSNumericValue[] = [];
     
-    if (allNumeric && !hasInfinityOrNaN) {
-      const numericChildren = values as CSSUnitValue[];
-      let product = 1;
-      let unit: CSSUnit = 'number';
-      let nonNumberUnitCount = 0;
-      
+    for (const child of values) {
+      if (child instanceof CSSUnitValue) {
+        numericChildren.push({ value: child.value, unit: child.unit, inverted: false, original: child });
+      } else if (child instanceof CSSMathInvert && child.value instanceof CSSUnitValue) {
+        numericChildren.push({ value: child.value.value, unit: child.value.unit, inverted: true, original: child });
+      } else {
+        otherChildren.push(child);
+      }
+    }
+
+    if (numericChildren.length > 0) {
+      // Calculate net exponents for base dimensions
+      const baseExponents = new Map<string, number>();
       for (const child of numericChildren) {
-        product *= child.value;
         if (child.unit !== 'number') {
-          unit = child.unit;
-          nonNumberUnitCount++;
+          const base = unitToBase[child.unit];
+          const delta = child.inverted ? -1 : 1;
+          baseExponents.set(base, (baseExponents.get(base) || 0) + delta);
         }
       }
       
-      if (nonNumberUnitCount <= 1) {
-        return new CSSUnitValue(product, unit);
+      // Clean up zero exponents
+      for (const [base, exp] of baseExponents) {
+        if (exp === 0) {
+          baseExponents.delete(base);
+        }
       }
-    }
-    
-    const combinedChildren: CSSNumericValue[] = [];
-    let numberProduct = 1;
-    let hasNumbers = false;
-    
-    for (const child of values) {
-      if (child instanceof CSSUnitValue && child.unit === 'number') {
-        numberProduct *= child.value;
-        hasNumbers = true;
+      
+      // We can simplify the numeric parts to a single CSSUnitValue if they represent a valid CSS dimension
+      // (i.e. at most one base dimension with exponent 1, all others 0)
+      if (baseExponents.size === 0 || (baseExponents.size === 1 && Array.from(baseExponents.values())[0] === 1)) {
+        let scalarProduct = 1;
+        for (const child of numericChildren) {
+          const base = unitToBase[child.unit] || 'other';
+          let canonicalVal = child.value;
+          if (base === 'length' && unitToPixels[child.unit]) {
+            canonicalVal *= unitToPixels[child.unit];
+          } else if (base === 'angle' && unitToRadians[child.unit]) {
+            canonicalVal *= unitToRadians[child.unit] / unitToRadians['deg'];
+          } else if (base === 'time' && unitToSeconds[child.unit]) {
+            canonicalVal *= unitToSeconds[child.unit];
+          }
+          
+          if (child.inverted) {
+            scalarProduct /= canonicalVal;
+          } else {
+            scalarProduct *= canonicalVal;
+          }
+        }
+        
+        let targetUnit: CSSUnit = 'number';
+        if (baseExponents.size === 1) {
+          const targetBase = Array.from(baseExponents.keys())[0];
+          const matchingChild = numericChildren.find(c => !c.inverted && unitToBase[c.unit] === targetBase);
+          targetUnit = matchingChild ? matchingChild.unit : (targetBase === 'length' ? 'px' : (targetBase === 'angle' ? 'deg' : (targetBase === 'time' ? 's' : 'number')));
+        }
+        
+        const finalValue = fromCanonical(scalarProduct, targetUnit);
+        const combinedUnitValue = new CSSUnitValue(finalValue, targetUnit);
+        
+        if (otherChildren.length === 0) {
+          return combinedUnitValue;
+        }
+        
+        // If combinedUnitValue is unit 'number' and value is 1, it's a multiplicative identity, we can omit it if there are other children.
+        if (combinedUnitValue.unit === 'number' && combinedUnitValue.value === 1) {
+          if (otherChildren.length === 1) {
+            return otherChildren[0];
+          }
+          return new CSSMathProduct(...otherChildren);
+        }
+        
+        // Put the combined numeric child at the front or back
+        if (combinedUnitValue.unit === 'number') {
+          otherChildren.unshift(combinedUnitValue);
+        } else {
+          otherChildren.push(combinedUnitValue);
+        }
       } else {
-        combinedChildren.push(child);
+        // If they cannot be simplified to a single CSSUnitValue, fall back to adding them as they are
+        for (const child of numericChildren) {
+          otherChildren.push(child.original);
+        }
       }
-    }
-    
-    if (hasNumbers) {
-      combinedChildren.unshift(new CSSUnitValue(numberProduct, 'number'));
     }
     
     // Distribution of numbers over sums
-    const numberNode = combinedChildren.find((c): c is CSSUnitValue => c instanceof CSSUnitValue && c.unit === 'number');
-    const sumNode = combinedChildren.find((c): c is CSSMathSum => c instanceof CSSMathSum);
+    const numberNode = otherChildren.find((c): c is CSSUnitValue => c instanceof CSSUnitValue && c.unit === 'number');
+    const sumNode = otherChildren.find((c): c is CSSMathSum => c instanceof CSSMathSum);
     
-    if (numberNode && sumNode && combinedChildren.length === 2 && sumNode.values.every(c => c instanceof CSSUnitValue)) {
+    if (numberNode && sumNode && otherChildren.length === 2 && sumNode.values.every(c => c instanceof CSSUnitValue)) {
       const distributedChildren = sumNode.values.map(child => {
         return simplify(new CSSMathProduct(numberNode, child));
       });
       return simplify(new CSSMathSum(...distributedChildren));
     }
     
-    if (combinedChildren.length === 1) {
-      return combinedChildren[0];
+    if (otherChildren.length === 1) {
+      return otherChildren[0];
     }
-    return new CSSMathProduct(...combinedChildren);
+    return new CSSMathProduct(...otherChildren);
   }
   
   if (node instanceof CSSMathNegate) {
     const simplifiedChild = simplify(node.value);
-    if (simplifiedChild instanceof CSSUnitValue) {
-      return new CSSUnitValue(-simplifiedChild.value, simplifiedChild.unit);
-    }
     if (simplifiedChild instanceof CSSMathNegate) {
       return simplifiedChild.value;
     }
@@ -479,6 +567,9 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
   
   if (node instanceof CSSMathInvert) {
     const simplifiedChild = simplify(node.value);
+    if (simplifiedChild instanceof CSSUnitValue && simplifiedChild.value === 0) {
+      throw new DOMException('Division by zero', 'SyntaxError');
+    }
     if (simplifiedChild instanceof CSSUnitValue && simplifiedChild.unit === 'number') {
       return new CSSUnitValue(1 / simplifiedChild.value, 'number');
     }
@@ -490,137 +581,18 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
   
   if (node instanceof CSSMathMin) {
     const values = node.values.map(c => simplify(c));
-    const allNumeric = values.every(c => c instanceof CSSUnitValue);
-    if (allNumeric && values.length > 0) {
-      const unitValues = values as CSSUnitValue[];
-      const firstUnit = unitValues[0].unit;
-      const firstBase = unitToBase[firstUnit] || 'other';
-      const supportedBases = ['length', 'angle', 'time', 'number', 'percent'];
-      
-      if (supportedBases.includes(firstBase)) {
-        const allSameBase = unitValues.every(c => (unitToBase[c.unit] || 'other') === firstBase);
-        if (allSameBase) {
-          const canonicalValues: number[] = [];
-          let canonicalUnit: CSSUnit = firstUnit;
-          let canCompare = true;
-          for (const child of unitValues) {
-            let val = child.value;
-            const u = child.unit;
-            if (firstBase === 'length') {
-              if (unitToPixels[u]) { val *= unitToPixels[u]; canonicalUnit = 'px'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'angle') {
-              if (unitToRadians[u]) { val *= unitToRadians[u] / unitToRadians['deg']; canonicalUnit = 'deg'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'time') {
-              if (unitToSeconds[u]) { val *= unitToSeconds[u]; canonicalUnit = 's'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'number') { canonicalUnit = 'number'; }
-            else if (firstBase === 'percent') { canonicalUnit = 'percent'; }
-            canonicalValues.push(val);
-          }
-          if (canCompare) {
-            return new CSSUnitValue(Math.min(...canonicalValues), canonicalUnit);
-          }
-        }
-      }
-      const allSameUnit = unitValues.every(c => c.unit === firstUnit);
-      if (allSameUnit) {
-        const numericValues = unitValues.map(c => c.value);
-        return new CSSUnitValue(Math.min(...numericValues), firstUnit);
-      }
-    }
-    return new CSSMathMin(...values);
+    return simplifyMinMax('min', values);
   }
   
   if (node instanceof CSSMathMax) {
     const values = node.values.map(c => simplify(c));
-    const allNumeric = values.every(c => c instanceof CSSUnitValue);
-    if (allNumeric && values.length > 0) {
-      const unitValues = values as CSSUnitValue[];
-      const firstUnit = unitValues[0].unit;
-      const firstBase = unitToBase[firstUnit] || 'other';
-      const supportedBases = ['length', 'angle', 'time', 'number', 'percent'];
-      
-      if (supportedBases.includes(firstBase)) {
-        const allSameBase = unitValues.every(c => (unitToBase[c.unit] || 'other') === firstBase);
-        if (allSameBase) {
-          const canonicalValues: number[] = [];
-          let canonicalUnit: CSSUnit = firstUnit;
-          let canCompare = true;
-          for (const child of unitValues) {
-            let val = child.value;
-            const u = child.unit;
-            if (firstBase === 'length') {
-              if (unitToPixels[u]) { val *= unitToPixels[u]; canonicalUnit = 'px'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'angle') {
-              if (unitToRadians[u]) { val *= unitToRadians[u] / unitToRadians['deg']; canonicalUnit = 'deg'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'time') {
-              if (unitToSeconds[u]) { val *= unitToSeconds[u]; canonicalUnit = 's'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'number') { canonicalUnit = 'number'; }
-            else if (firstBase === 'percent') { canonicalUnit = 'percent'; }
-            canonicalValues.push(val);
-          }
-          if (canCompare) {
-            return new CSSUnitValue(Math.max(...canonicalValues), canonicalUnit);
-          }
-        }
-      }
-      const allSameUnit = unitValues.every(c => c.unit === firstUnit);
-      if (allSameUnit) {
-        const numericValues = unitValues.map(c => c.value);
-        return new CSSUnitValue(Math.max(...numericValues), firstUnit);
-      }
-    }
-    return new CSSMathMax(...values);
+    return simplifyMinMax('max', values);
   }
   
   if (node instanceof CSSMathClamp) {
     const min = node.lower instanceof CSSKeywordValue ? node.lower : simplify(node.lower);
     const val = simplify(node.value);
     const max = node.upper instanceof CSSKeywordValue ? node.upper : simplify(node.upper);
-    
-    if (min instanceof CSSUnitValue && val instanceof CSSUnitValue && max instanceof CSSUnitValue) {
-      const unitValues = [min, val, max];
-      const firstUnit = val.unit;
-      const firstBase = unitToBase[firstUnit] || 'other';
-      const supportedBases = ['length', 'angle', 'time', 'number', 'percent'];
-      
-      if (supportedBases.includes(firstBase)) {
-        const allSameBase = unitValues.every(c => (unitToBase[c.unit] || 'other') === firstBase);
-        if (allSameBase) {
-          const canonicalValues: number[] = [];
-          let canonicalUnit: CSSUnit = firstUnit;
-          let canCompare = true;
-          for (const child of unitValues) {
-            let v = child.value;
-            const u = child.unit;
-            if (firstBase === 'length') {
-              if (unitToPixels[u]) { v *= unitToPixels[u]; canonicalUnit = 'px'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'angle') {
-              if (unitToRadians[u]) { v *= unitToRadians[u] / unitToRadians['deg']; canonicalUnit = 'deg'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'time') {
-              if (unitToSeconds[u]) { v *= unitToSeconds[u]; canonicalUnit = 's'; }
-              else { canCompare = false; break; }
-            } else if (firstBase === 'number') { canonicalUnit = 'number'; }
-            else if (firstBase === 'percent') { canonicalUnit = 'percent'; }
-            canonicalValues.push(v);
-          }
-          if (canCompare) {
-            const [minVal, valVal, maxVal] = canonicalValues;
-            return new CSSUnitValue(Math.min(Math.max(valVal, minVal), maxVal), canonicalUnit);
-          }
-        }
-      }
-      if (min.unit === val.unit && val.unit === max.unit) {
-        return new CSSUnitValue(Math.min(Math.max(val.value, min.value), max.value), val.unit);
-      }
-    }
     return new CSSMathClamp(min, val, max);
   }
 
@@ -662,15 +634,19 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
     if (node.name === 'hypot' && values.length > 0 && values.every(v => v instanceof CSSUnitValue)) {
       const unitValues = values as CSSUnitValue[];
       const firstUnit = unitValues[0].unit;
-      if (unitValues.every(v => v.unit === firstUnit)) {
-        const sumOfSquares = unitValues.reduce((sum, v) => sum + v.value * v.value, 0);
-        return new CSSUnitValue(Math.sqrt(sumOfSquares), firstUnit);
+      const base = unitToBase[firstUnit];
+      if (base && unitValues.every(v => unitToBase[v.unit] === base) && areCompatibleForSimplification(unitValues)) {
+        const canonicalValues = unitValues.map(v => toCanonical(v));
+        const sumOfSquares = canonicalValues.reduce((sum, v) => sum + v.value * v.value, 0);
+        const resultValue = Math.sqrt(sumOfSquares);
+        const canonicalUnit = canonicalValues[0].unit;
+        return new CSSUnitValue(resultValue, canonicalUnit);
       }
     }
 
     if (['sin', 'cos', 'tan'].includes(node.name) && values.length === 1 && values[0] instanceof CSSUnitValue) {
       const val = values[0];
-      if (val.unit === 'deg' || val.unit === 'rad' || val.unit === 'grad' || val.unit === 'turn') {
+      if (val.unit === 'deg' || val.unit === 'rad' || val.unit === 'grad' || val.unit === 'turn' || val.unit === 'number') {
         let rad = val.value;
         if (val.unit === 'deg') rad = val.value * Math.PI / 180;
         else if (val.unit === 'grad') rad = val.value * Math.PI / 200;
@@ -712,6 +688,59 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
       }
     }
 
+    if (node.name === 'atan2' && values.length === 2 && values.every(v => v instanceof CSSUnitValue)) {
+      const y = values[0] as CSSUnitValue;
+      const x = values[1] as CSSUnitValue;
+      const yBase = unitToBase[y.unit] || 'other';
+      const xBase = unitToBase[x.unit] || 'other';
+      if (yBase === xBase && areCompatibleForSimplification([y, x])) {
+        const yCanonical = toCanonical(y);
+        const xCanonical = toCanonical(x);
+        const resultRad = Math.atan2(yCanonical.value, xCanonical.value);
+        return new CSSUnitValue(resultRad * 180 / Math.PI, 'deg');
+      }
+    }
+
+    if ((node.name === 'mod' || node.name === 'rem') && values.length === 2 && values.every(v => v instanceof CSSUnitValue)) {
+      const a = values[0] as CSSUnitValue;
+      const b = values[1] as CSSUnitValue;
+      const aBase = unitToBase[a.unit] || 'other';
+      const bBase = unitToBase[b.unit] || 'other';
+      if (aBase === bBase && areCompatibleForSimplification([a, b])) {
+        const aCanonical = toCanonical(a);
+        const bCanonical = toCanonical(b);
+        let resultCanonicalVal: number;
+        if (node.name === 'mod') {
+          resultCanonicalVal = ((aCanonical.value % bCanonical.value) + bCanonical.value) % bCanonical.value;
+        } else {
+          resultCanonicalVal = aCanonical.value % bCanonical.value;
+        }
+        const resultVal = fromCanonical(resultCanonicalVal, a.unit);
+        return new CSSUnitValue(resultVal, a.unit);
+      }
+    }
+
+    if (node.name === 'exp' && values.length === 1 && values[0] instanceof CSSUnitValue) {
+      const val = values[0];
+      if (val.unit === 'number') {
+        return new CSSUnitValue(Math.exp(val.value), 'number');
+      }
+    }
+
+    if (node.name === 'log' && (values.length === 1 || values.length === 2) && values.every(v => v instanceof CSSUnitValue)) {
+      const a = values[0] as CSSUnitValue;
+      if (a.unit === 'number') {
+        if (values.length === 1) {
+          return new CSSUnitValue(Math.log(a.value), 'number');
+        } else {
+          const b = values[1] as CSSUnitValue;
+          if (b.unit === 'number') {
+            return new CSSUnitValue(Math.log(a.value) / Math.log(b.value), 'number');
+          }
+        }
+      }
+    }
+
     if (node.name === 'sign' && values.length === 1 && values[0] instanceof CSSUnitValue) {
       const val = values[0];
       return new CSSUnitValue(Math.sign(val.value), 'number');
@@ -721,4 +750,23 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
   }
 
   return node;
+}
+
+function simplifyMinMax(nodeName: 'min' | 'max', values: CSSNumericValue[]): CSSNumericValue {
+  const isMin = nodeName === 'min';
+  const flattened: CSSNumericValue[] = [];
+  
+  for (const child of values) {
+    if ((isMin && child instanceof CSSMathMin) || (!isMin && child instanceof CSSMathMax)) {
+      flattened.push(...child.values);
+    } else {
+      flattened.push(child);
+    }
+  }
+  
+  if (flattened.length === 1) {
+    return flattened[0];
+  }
+  
+  return isMin ? new CSSMathMin(...flattened) : new CSSMathMax(...flattened);
 }

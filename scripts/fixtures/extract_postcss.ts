@@ -27,7 +27,7 @@ const cases = [
   'rule-no-semicolon', 'selector', 'semicolons', 'spaces', 'tab'
 ];
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 const POSTCSS_TESTS_ROOT = path.join(REPO_ROOT, 'submodules/postcss-parser-tests');
 
 const casesDir = path.join(POSTCSS_TESTS_ROOT, 'cases');
@@ -70,7 +70,7 @@ async function run() {
     });
   }
 
-  const outputPath = path.resolve(import.meta.dirname, '../tests/fixtures/external/postcss_tests.json');
+  const outputPath = path.resolve(import.meta.dirname, '../../tests/fixtures/external/postcss_tests.json');
   fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
   console.log(`Saved ${results.length} tests to ${outputPath}`);
 }

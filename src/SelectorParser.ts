@@ -17,17 +17,105 @@
 import type { 
   SelectorList, ComplexSelector, CompoundSelector, SimpleSelector, 
   Combinator, ComponentValue, Token, SimpleBlock, CSSFunction,
-  InvalidSelector
+  InvalidSelector, IdentToken, DelimToken, HashToken, StringToken
 } from './types.ts';
 import { 
   PSEUDO_CLASSES, 
   PSEUDO_ELEMENTS 
 } from './data/selectors.ts';
 import { getOriginalText } from './serializer.ts';
+// Type guards for ComponentValue types
+export function isToken(val: ComponentValue | undefined): val is Token {
+  return val !== undefined && val.type !== 'simple-block' && val.type !== 'function';
+}
+
+export function isIdentToken(val: ComponentValue | undefined): val is IdentToken {
+  return val !== undefined && val.type === 'ident';
+}
+
+export function isDelimToken(val: ComponentValue | undefined, char?: string): val is DelimToken {
+  return val !== undefined && val.type === 'delim' && (char === undefined || (val as DelimToken).value === char);
+}
+
+export function isHashToken(val: ComponentValue | undefined): val is HashToken {
+  return val !== undefined && val.type === 'hash';
+}
+
+export function isStringToken(val: ComponentValue | undefined): val is StringToken {
+  return val !== undefined && (val.type === 'string' || val.type === 'bad-string');
+}
+
+export function isSimpleBlock(val: ComponentValue | undefined, associatedType?: string): val is SimpleBlock {
+  return val !== undefined && val.type === 'simple-block' && (associatedType === undefined || (val as SimpleBlock).associatedToken.type === associatedType);
+}
+
+export function isCSSFunction(val: ComponentValue | undefined, name?: string): val is CSSFunction {
+  return val !== undefined && val.type === 'function' && (name === undefined || (val as CSSFunction).name.toLowerCase() === name.toLowerCase());
+}
+
+export class ComponentValueCursor {
+  private values: ComponentValue[];
+  private _i: number = 0;
+
+  constructor(values: ComponentValue[]) {
+    this.values = values;
+  }
+
+  public get hasNext(): boolean {
+    return this._i < this.values.length;
+  }
+
+  public get i(): number {
+    return this._i;
+  }
+
+  public set i(pos: number) {
+    this._i = pos;
+  }
+
+  public get length(): number {
+    return this.values.length;
+  }
+
+  public get next(): ComponentValue | undefined {
+    return this.values[this._i];
+  }
+
+  public peek(offset: number = 1): ComponentValue | undefined {
+    return this.values[this._i + offset];
+  }
+
+  public consume(): ComponentValue {
+    return this.values[this._i++] || { type: 'EOF', value: '' } as unknown as ComponentValue;
+  }
+
+  public skipWhitespace(): void {
+    while (this._i < this.values.length && this.values[this._i].type === 'whitespace') {
+      this._i++;
+    }
+  }
+
+  public skipToNextComma(): void {
+    const commaOffset = this.values.slice(this._i).findIndex(v => v.type === 'comma');
+    this._i = commaOffset === -1 ? this.values.length : this._i + commaOffset;
+  }
+
+  public slice(start: number, end?: number): ComponentValue[] {
+    return this.values.slice(start, end ?? this._i);
+  }
+}
 
 const LEGACY_PSEUDO_CLASS_ALIASES: Record<string, string> = {
   '-webkit-autofill': 'autofill',
 };
+
+export interface SelectorParserOptions {
+  allowRelative?: boolean;
+  forgiving?: boolean;
+  insideHas?: boolean;
+  forbidPseudo?: boolean;
+  declaredNamespaces?: Set<string>;
+}
 
 /**
  * Selector Parser according to Selectors Level 4.
@@ -38,34 +126,28 @@ export class SelectorParser {
   public static readonly PSEUDO_ELEMENTS = PSEUDO_ELEMENTS;
 
 
-  private values: ComponentValue[];
-  private i: number = 0;
+  private cursor: ComponentValueCursor;
   private allowRelative: boolean;
   private forgiving: boolean;
   private insideHas: boolean;
   private forbidPseudo: boolean;
+  private declaredNamespaces?: Set<string>;
 
-  constructor(values: ComponentValue[], allowRelative: boolean = false, forgiving: boolean = false, insideHas: boolean = false, forbidPseudo: boolean = false) {
-    this.values = values;
-    this.allowRelative = allowRelative;
-    this.forgiving = forgiving;
-    this.insideHas = insideHas;
-    this.forbidPseudo = forbidPseudo;
+  constructor(values: ComponentValue[], options: SelectorParserOptions = {}) {
+    this.cursor = new ComponentValueCursor(values);
+    this.allowRelative = options.allowRelative ?? false;
+    this.forgiving = options.forgiving ?? false;
+    this.insideHas = options.insideHas ?? false;
+    this.forbidPseudo = options.forbidPseudo ?? false;
+    this.declaredNamespaces = options.declaredNamespaces;
   }
 
-  private get next(): ComponentValue | undefined {
-    return this.values[this.i];
-  }
-
-  private consume(): ComponentValue {
-    return this.values[this.i++] || { type: 'EOF', value: '' } as unknown as ComponentValue;
-  }
 
   private hasAmpersand(values: ComponentValue[]): boolean {
     return values.some(val => {
-      if (val.type === 'delim' && (val as Token).value === '&') return true;
-      if (val.type === 'simple-block') return this.hasAmpersand((val as SimpleBlock).value);
-      if (val.type === 'function') return this.hasAmpersand((val as CSSFunction).value);
+      if (isDelimToken(val, '&')) return true;
+      if (isSimpleBlock(val)) return this.hasAmpersand(val.value);
+      if (isCSSFunction(val)) return this.hasAmpersand(val.value);
       return false;
     });
   }
@@ -73,27 +155,26 @@ export class SelectorParser {
   public parse(): SelectorList {
     const selectors: (ComplexSelector | InvalidSelector)[] = [];
     
-    while (this.i < this.values.length) {
-      this.skipWhitespace();
-      if (this.i >= this.values.length || this.next?.type === 'EOF') break;
+    while (this.cursor.hasNext) {
+      this.cursor.skipWhitespace();
+      if (!this.cursor.hasNext || this.cursor.next?.type === 'EOF') break;
       
-      const start = this.i;
+      const start = this.cursor.i;
       try {
         const selector = this.consumeComplexSelector();
-        this.skipWhitespace();
+        this.cursor.skipWhitespace();
         
-        const next = this.next;
-        if (!next || next.type === 'comma' || (next as Token).type === 'EOF') {
+        const next = this.cursor.next;
+        if (!next || next.type === 'comma') {
           selectors.push(selector);
-
         } else {
           throw new SyntaxError('Unexpected token in selector');
         }
       } catch (e) {
         if (this.forgiving) {
-          this.skipToNextComma();
+          this.cursor.skipToNextComma();
           
-          const failedTokens = this.values.slice(start, this.i);
+          const failedTokens = this.cursor.slice(start, this.cursor.i);
           if (this.hasAmpersand(failedTokens)) {
             selectors.push({ type: 'invalid-selector', tokens: failedTokens });
           }
@@ -102,8 +183,8 @@ export class SelectorParser {
         }
       }
       
-      if (this.next?.type === 'comma') {
-        this.consume();
+      if (this.cursor.next?.type === 'comma') {
+        this.cursor.consume();
       }
     }
     
@@ -114,25 +195,21 @@ export class SelectorParser {
     return { type: 'selector-list', selectors };
   }
 
-  private skipWhitespace() {
-    while (this.next?.type === 'whitespace') {
-      this.i++;
+  private validateNamespace(namespace: string | undefined): void {
+    if (this.declaredNamespaces !== undefined && namespace !== undefined && namespace !== '*' && namespace !== '') {
+      if (!this.declaredNamespaces.has(namespace)) {
+        throw new DOMException(`Undeclared namespace prefix: "${namespace}"`, 'SyntaxError');
+      }
     }
   }
-
-  private skipToNextComma() {
-    const commaOffset = this.values.slice(this.i).findIndex(v => v.type === 'comma');
-    this.i = commaOffset === -1 ? this.values.length : this.i + commaOffset;
-  }
-
   private consumeComplexSelector(): ComplexSelector {
     const items: (CompoundSelector | Combinator)[] = [];
-    const start = this.i;
+    const start = this.cursor.i;
     let seenPseudoElement = false;
     
-    while (this.i < this.values.length) {
-      this.skipWhitespace();
-      if (this.i >= this.values.length || this.next?.type === 'comma') break;
+    while (this.cursor.hasNext) {
+      this.cursor.skipWhitespace();
+      if (!this.cursor.hasNext || this.cursor.next?.type === 'comma') break;
       
       // Check for combinators
       const combinator = this.tryConsumeCombinator();
@@ -185,26 +262,25 @@ export class SelectorParser {
       items.unshift({ type: 'combinator', value: ' ' });
     }
     
-    const end = this.i;
-    const tokens = this.values.slice(start, end);
+    const end = this.cursor.i;
+    const tokens = this.cursor.slice(start, end);
     return { type: 'complex-selector', items, tokens };
-
   }
 
 
   private tryConsumeCombinator(): Combinator | null {
-    const token = this.next;
+    const token = this.cursor.next;
     if (!token) return null;
     
-    if (token.type === 'delim') {
-      const val = (token as Token).value;
+    if (isDelimToken(token)) {
+      const val = token.value;
       if (val === '>' || val === '+' || val === '~') {
-        this.consume();
+        this.cursor.consume();
         return { type: 'combinator', value: val as ' ' | '>' | '+' | '~' | '||' };
       }
-      if (val === '|' && this.values[this.i + 1]?.type === 'delim' && (this.values[this.i + 1] as Token).value === '|') {
-        this.consume();
-        this.consume();
+      if (val === '|' && isDelimToken(this.cursor.peek(1), '|')) {
+        this.cursor.consume();
+        this.cursor.consume();
         return { type: 'combinator', value: '||' };
       }
     }
@@ -217,28 +293,11 @@ export class SelectorParser {
     return ['hover', 'active', 'focus', 'focus-visible', 'focus-within'].includes(lower);
   }
 
-  private validateSelectorListAfterPseudo(selectorList: SelectorList): void {
-    for (const selector of selectorList.selectors) {
-      if (selector.type === 'invalid-selector') {
-        throw new SyntaxError('Invalid selector in :not()');
-      }
-      if (selector.items.length !== 1 || selector.items[0].type !== 'compound-selector') {
-        throw new SyntaxError('Only compound selectors are allowed in :not() after a pseudo-element');
-      }
-      const compound = selector.items[0] as CompoundSelector;
-      for (const simple of compound.selectors) {
-        this.validateSimpleSelectorAfterPseudo(simple);
-      }
-    }
-  }
-
   private validateSimpleSelectorAfterPseudo(selector: SimpleSelector): void {
     if (selector.type === 'pseudo-class-selector') {
       const lowerName = selector.name.toLowerCase();
-      if (lowerName === 'not') {
-        if (selector.argument && !Array.isArray(selector.argument) && selector.argument.type === 'selector-list') {
-          this.validateSelectorListAfterPseudo(selector.argument);
-        }
+      if (['not', 'is', 'where', 'has'].includes(lowerName)) {
+        return;
       } else if (!this.isUserActionPseudoClass(selector.name)) {
         throw new SyntaxError('Only user-action pseudo-classes are allowed after a pseudo-element');
       }
@@ -252,17 +311,17 @@ export class SelectorParser {
     const selectors: SimpleSelector[] = [];
     let lastPseudoElement: string | null = null;
     
-    while (this.i < this.values.length) {
-      const token = this.next;
+    while (this.cursor.hasNext) {
+      const token = this.cursor.next;
       if (!token || token.type === 'whitespace' || token.type === 'comma') break;
       
-      if (token.type === 'delim') {
-        const val = (token as Token).value;
+      if (isDelimToken(token)) {
+        const val = token.value;
         if (val === '>' || val === '+' || val === '~') break;
         if (val === '|') {
           if (lastPseudoElement) break;
           // Could be namespace prefix or column combinator
-          if (this.values[this.i + 1]?.type === 'delim' && (this.values[this.i + 1] as Token).value === '|') {
+          if (isDelimToken(this.cursor.peek(1), '|')) {
              break; // Combinator ||
           }
           // Namespace prefix |
@@ -283,31 +342,30 @@ export class SelectorParser {
         }
         if (val === '&') {
            if (lastPseudoElement) break;
-           this.consume();
+           this.cursor.consume();
            selectors.push({ type: 'nesting-selector' });
            continue;
         }
       }
       
-      if (token.type === 'hash') {
+      if (isHashToken(token)) {
         if (token.hashType !== 'id') {
           throw new SyntaxError("ID selector must be an identifier");
         }
         if (lastPseudoElement) break;
         selectors.push({ type: 'id-selector', name: token.value });
-        this.consume();
+        this.cursor.consume();
         continue;
       }
 
-      
-      if (token.type === 'ident') {
+      if (isIdentToken(token)) {
         if (lastPseudoElement) break;
         if (selectors.length > 0) throw new SyntaxError('Type selector must be first in compound selector');
         selectors.push(this.consumeTypeOrUniversalSelector());
         continue;
       }
       
-      if (token.type === 'simple-block' && (token as SimpleBlock).associatedToken.type === '[') {
+      if (isSimpleBlock(token, '[')) {
         if (lastPseudoElement) break;
         selectors.push(this.consumeAttributeSelector());
         continue;
@@ -319,12 +377,13 @@ export class SelectorParser {
           const isSlottedOrPart = ['slotted', 'part'].includes(lastPseudoElement.toLowerCase());
           
           if (selector.type === 'pseudo-element-selector') {
-            const isTreeAbiding = ['before', 'after', 'marker', 'placeholder'].includes(selector.name.toLowerCase());
-            if (!isSlottedOrPart || !isTreeAbiding) {
-              throw new SyntaxError('Only tree-abiding pseudo-elements are allowed after ::slotted() or ::part()');
+            if (!isSlottedOrPart) {
+              throw new SyntaxError('Pseudo-elements cannot be nested');
             }
           } else if (selector.type === 'pseudo-class-selector') {
-            this.validateSimpleSelectorAfterPseudo(selector);
+            if (!isSlottedOrPart) {
+              this.validateSimpleSelectorAfterPseudo(selector);
+            }
           } else {
              throw new SyntaxError('Unexpected selector after pseudo-element');
           }
@@ -344,100 +403,104 @@ export class SelectorParser {
 
   private consumeTypeOrUniversalSelector(): SimpleSelector {
     let namespace: string | undefined = undefined;
-    const token = this.next as Token;
+    const token = this.cursor.next;
+    if (!token) {
+      throw new SyntaxError('Unexpected EOF in type selector');
+    }
 
     // Check for namespace prefix
-    const isNextPipe = this.values[this.i + 1]?.type === 'delim' && (this.values[this.i + 1] as Token).value === '|';
-    const isNextNextPipe = this.values[this.i + 2]?.type === 'delim' && (this.values[this.i + 2] as Token).value === '|';
+    const isNextPipe = isDelimToken(this.cursor.peek(1), '|');
+    const isNextNextPipe = isDelimToken(this.cursor.peek(2), '|');
     const isColumnCombinator = isNextPipe && isNextNextPipe;
 
-    if (token.type === 'ident' && isNextPipe && !isColumnCombinator) {
+    if (isIdentToken(token) && isNextPipe && !isColumnCombinator) {
        namespace = token.value;
-       this.i += 2;
-    } else if (token.type === 'delim' && token.value === '*' && isNextPipe && !isColumnCombinator) {
+       this.cursor.i += 2;
+    } else if (isDelimToken(token, '*') && isNextPipe && !isColumnCombinator) {
        namespace = '*';
-       this.i += 2;
-    } else if (token.type === 'delim' && token.value === '|' && !isNextPipe) {
+       this.cursor.i += 2;
+    } else if (isDelimToken(token, '|') && !isNextPipe) {
        namespace = '';
-       this.i += 1;
+       this.cursor.i += 1;
     }
 
-    const next = this.consume() as Token;
-    if (next.type === 'delim' && next.value === '*') {
+    const next = this.cursor.consume();
+    if (isDelimToken(next, '*')) {
+      this.validateNamespace(namespace);
       return { type: 'universal-selector', namespace };
     }
-    if (next.type !== 'ident') {
+    if (!isIdentToken(next)) {
       throw new SyntaxError('Expected identifier or * after namespace pipe');
     }
+    this.validateNamespace(namespace);
     return { type: 'type-selector', name: next.value, namespace };
+
   }
 
   private consumeClassSelector(): SimpleSelector {
-    this.consume(); // .
-    const ident = this.consume();
-    if (ident.type !== 'ident') return { type: 'class-selector', name: '' };
+    this.cursor.consume(); // .
+    const ident = this.cursor.consume();
+    if (!isIdentToken(ident)) return { type: 'class-selector', name: '' };
     return { type: 'class-selector', name: ident.value };
-
   }
 
   private consumeAttributeSelector(): SimpleSelector {
-    const block = this.consume() as SimpleBlock;
-    const vals = block.value;
+    const block = this.cursor.consume();
+    if (!isSimpleBlock(block, '[')) {
+      throw new SyntaxError('Expected attribute selector block');
+    }
+    
+    const subCursor = new ComponentValueCursor(block.value);
     let name = '';
     let namespace: string | undefined = undefined;
     let operator = '';
     let value = '';
     let flags = '';
     
-    let j = 0;
-    while (j < vals.length && vals[j].type === 'whitespace') j++;
-    if (j < vals.length) {
-      const v1 = vals[j];
-      const v2 = vals[j+1];
-      if (v1.type === 'ident' && v2?.type === 'delim' && v2.value === '|') {
+    subCursor.skipWhitespace();
+    if (subCursor.hasNext) {
+      const v1 = subCursor.next;
+      const v2 = subCursor.peek(1);
+      if (isIdentToken(v1) && isDelimToken(v2, '|')) {
         namespace = v1.value;
-        j += 2;
-      } else if (v1.type === 'delim' && v1.value === '*' && v2?.type === 'delim' && v2.value === '|') {
+        subCursor.i += 2;
+      } else if (isDelimToken(v1, '*') && isDelimToken(v2, '|')) {
         namespace = '*';
-        j += 2;
-      } else if (v1.type === 'delim' && v1.value === '|') {
+        subCursor.i += 2;
+      } else if (isDelimToken(v1, '|')) {
         namespace = '';
-        j++;
+        subCursor.i += 1;
       }
     }
 
-    
-    const valName = vals[j];
-    if (valName && valName.type === 'ident') {
+    const valName = subCursor.next;
+    if (isIdentToken(valName)) {
       name = valName.value;
-      j++;
+      subCursor.consume();
     }
-
     
-    while (j < vals.length && vals[j].type === 'whitespace') j++;
-    const valOp = vals[j];
-    if (valOp && valOp.type === 'delim') {
+    subCursor.skipWhitespace();
+    const valOp = subCursor.next;
+    if (isDelimToken(valOp)) {
       operator = valOp.value;
-      j++;
-      const valEq = vals[j];
-      if (valEq && valEq.type === 'delim' && valEq.value === '=') {
+      subCursor.consume();
+      const valEq = subCursor.next;
+      if (isDelimToken(valEq, '=')) {
         operator += valEq.value;
-        j++;
+        subCursor.consume();
       }
     }
 
-    
-    while (j < vals.length && vals[j].type === 'whitespace') j++;
-    const valVal = vals[j];
-    if (valVal && (valVal.type === 'string' || valVal.type === 'ident')) {
+    subCursor.skipWhitespace();
+    const valVal = subCursor.next;
+    if (isStringToken(valVal) || isIdentToken(valVal)) {
       value = valVal.value;
-      j++;
+      subCursor.consume();
     }
 
-    
-    while (j < vals.length && vals[j].type === 'whitespace') j++;
-    const valFlag = vals[j];
-    if (valFlag && valFlag.type === 'ident') {
+    subCursor.skipWhitespace();
+    const valFlag = subCursor.next;
+    if (isIdentToken(valFlag)) {
       const flagValue = valFlag.value;
       const lowerFlag = flagValue.toLowerCase();
 
@@ -445,28 +508,31 @@ export class SelectorParser {
         throw new SyntaxError(`Invalid attribute selector flag: ${flagValue}`);
       }
       flags = flagValue;
-      j++;
+      subCursor.consume();
     }
     
-    while (j < vals.length && vals[j].type === 'whitespace') j++;
-    if (j < vals.length) {
+    subCursor.skipWhitespace();
+    if (subCursor.hasNext) {
       throw new SyntaxError('Unexpected content in attribute selector');
     }
     
+    this.validateNamespace(namespace);
     return { type: 'attribute-selector', name, namespace, operator, value, flags };
+
   }
 
   private consumePseudoSelector(): SimpleSelector {
-    this.consume(); // :
+    this.cursor.consume(); // :
     let isPseudoElement = false;
-    if (this.next?.type === 'colon') {
-      this.consume();
+    if (this.cursor.next?.type === 'colon') {
+      this.cursor.consume();
       isPseudoElement = true;
     }
     
-    const token = this.consume();
+    const token = this.cursor.consume();
     if (!token) return { type: 'pseudo-class-selector', name: '' };
-    if (token.type === 'ident') {
+    
+    if (isIdentToken(token)) {
       const originalName = token.value;
       const lowerName = originalName.toLowerCase();
 
@@ -495,8 +561,8 @@ export class SelectorParser {
         throw new SyntaxError(`Unknown pseudo-class :${name}`);
       }
       return { type: 'pseudo-class-selector', name };
-    } else if (token.type === 'function') {
-      const func = token as CSSFunction;
+    } else if (isCSSFunction(token)) {
+      const func = token;
       const name = func.name;
       const lowerName = name.toLowerCase();
       
@@ -509,11 +575,15 @@ export class SelectorParser {
         }
         
         if (lowerName === 'slotted') {
-          const subParser = new SelectorParser(func.value, false, false, this.insideHas, true);
-          subParser.skipWhitespace();
+          const subParser = new SelectorParser(func.value, {
+            insideHas: this.insideHas,
+            forbidPseudo: true,
+            declaredNamespaces: this.declaredNamespaces
+          });
+          subParser.cursor.skipWhitespace();
           const compound = subParser.consumeCompoundSelector();
-          subParser.skipWhitespace();
-          if (subParser.i !== func.value.length || compound.selectors.length === 0) {
+          subParser.cursor.skipWhitespace();
+          if (subParser.cursor.i !== func.value.length || compound.selectors.length === 0) {
             throw new SyntaxError('Argument to ::slotted() must be a compound selector');
           }
           return { 
@@ -541,16 +611,26 @@ export class SelectorParser {
         }
         const isForgiving = ['is', 'where', 'matches'].includes(lowerName);
         const isLogicalPseudo = ['is', 'where', 'not', 'matches'].includes(lowerName);
-        const subParser = new SelectorParser(func.value, isHas, isForgiving, isHas || this.insideHas, isLogicalPseudo || isHas || this.forbidPseudo);
+        const subParser = new SelectorParser(func.value, {
+          allowRelative: isHas,
+          forgiving: isForgiving,
+          insideHas: isHas || this.insideHas,
+          forbidPseudo: isLogicalPseudo || isHas || this.forbidPseudo,
+          declaredNamespaces: this.declaredNamespaces
+        });
         return { type: 'pseudo-class-selector', name, argument: subParser.parse() };
       }
 
       if (['host', 'host-context'].includes(lowerName)) {
-        const subParser = new SelectorParser(func.value, false, false, this.insideHas, true);
-        subParser.skipWhitespace();
+        const subParser = new SelectorParser(func.value, {
+          insideHas: this.insideHas,
+          forbidPseudo: true,
+          declaredNamespaces: this.declaredNamespaces
+        });
+        subParser.cursor.skipWhitespace();
         const compound = subParser.consumeCompoundSelector();
-        subParser.skipWhitespace();
-        if (subParser.i !== func.value.length || compound.selectors.length === 0) {
+        subParser.cursor.skipWhitespace();
+        if (subParser.cursor.i !== func.value.length || compound.selectors.length === 0) {
           throw new SyntaxError(`Argument to :${name}() must be a compound selector`);
         }
         return { 
@@ -567,9 +647,8 @@ export class SelectorParser {
            let ofIdx = -1;
            for(let k=0; k<func.value.length; k++) {
              const v = func.value[k];
-             if (v.type === 'ident' && v.value.toLowerCase() === 'of') {
+             if (isIdentToken(v) && v.value.toLowerCase() === 'of') {
                ofIdx = k;
-
                break;
              }
            }
@@ -579,7 +658,11 @@ export class SelectorParser {
              }
              const nth = func.value.slice(0, ofIdx);
              this.validateAnPlusB(nth);
-             const subParserOf = new SelectorParser(func.value.slice(ofIdx + 1), false, false, this.insideHas, true);
+             const subParserOf = new SelectorParser(func.value.slice(ofIdx + 1), {
+               insideHas: this.insideHas,
+               forbidPseudo: true,
+               declaredNamespaces: this.declaredNamespaces
+             });
              return { type: 'pseudo-class-selector', name, argument: subParserOf.parse(), nth };
            } else {
              this.validateAnPlusB(func.value);
@@ -615,7 +698,7 @@ export class SelectorParser {
   private validateDir(values: ComponentValue[]): void {
     const nonWs = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
     const firstToken = nonWs[0];
-    if (nonWs.length !== 1 || !firstToken || firstToken.type !== 'ident') {
+    if (nonWs.length !== 1 || !isIdentToken(firstToken)) {
       throw new SyntaxError('Argument to :dir() must be a single identifier');
     }
     const val = firstToken.value.toLowerCase();
@@ -634,7 +717,7 @@ export class SelectorParser {
     let expectItem = true;
     for (const v of nonWs) {
       if (expectItem) {
-        if (v.type !== 'ident' && v.type !== 'string') {
+        if (!isIdentToken(v) && !isStringToken(v)) {
           throw new SyntaxError('Argument to :lang() must be identifiers or strings');
         }
         expectItem = false;

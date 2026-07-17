@@ -33,9 +33,10 @@ export const ParseHooks = {
   parseSelector: (_text: string): string | null => {
     throw new Error('parseSelector not injected');
   },
-  parseSelectorAST: (_text: string): SelectorList | null => {
+  parseSelectorAST: (_text: string, _declaredNamespaces?: Set<string>, _allowRelative?: boolean): SelectorList | null => {
     throw new Error('parseSelectorAST not injected');
   },
+
   validateCustomPropertyValue: (_values: ComponentValue[]): boolean => {
     throw new Error('validateCustomPropertyValue not injected');
   }

@@ -347,6 +347,7 @@ export abstract class AbstractTokenizer {
       return value;
     }
     if (cp === -1) {
+      this.parseError('EOF reached in escape sequence');
       return 0xFFFD;
     }
     return cp;

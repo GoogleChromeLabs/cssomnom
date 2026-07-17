@@ -1269,3 +1269,504 @@ Objective: Clean up repository structure, remove developer-specific files/paths,
 - [x] **Ignore Gemini Metadata**: Untrack `.gemini/` files and ensure they are gitignored.
 - [x] **De-personalize package.json**: Make the `publish:local` script generic to remove hardcoded user directory paths.
 - [x] **Upload to Gerrit**: Squash-merge history and push to Gerrit staging branch as a single clean CL.
+
+## Phase 61: CSS Typed OM Spec Compliance & Polyfill Compatibility [x]
+
+Objective: Align the Typed OM implementation with the specification and resolve gaps exposed by the compatibility run against the polyfill's unit tests.
+
+### Tasks
+
+#### 1. Constructors & API Alignment [x]
+- [x] **CSSScale constructor**: Wrap double/number arguments in `CSSUnitValue(val, 'number')` instead of storing raw numbers.
+- [x] **CSSTranslate unit validation**: Validate that constructor arguments are of compatible types (length or percentage) and throw `TypeError` if they are not (e.g. angle units).
+- [x] **CSSRotate.toMatrix()**: Implement the `toMatrix()` method.
+- [x] **CSSUnparsedValue index validation**: Implement proxy or index checks to throw `RangeError` on out-of-bounds index writes.
+
+
+#### 2. Parser Integration [x]
+- [x] **CSSTransformValue.parse integration**: Wire `CSSTransformValue.parse` into the main `CSSStyleValue.parse` flow so that transform functions (like `rotate()`) return structured `CSSTransformValue` objects instead of base `CSSStyleValue` strings.
+
+
+#### 3. Color Parsing Expansion [x]
+- [x] **Extended Color Parsing**: Expand `reifyColor` and `CSSColorValue.parse` to support hex colors, named colors, and all color functions (`hsl()`, `hwb()`, `lab()`, `lch()`, `oklab()`, `oklch()`, `color()`).
+
+
+#### 4. Semantic Value Validation [x]
+- [x] **Validate standard property values**: Prevent `StylePropertyMap.set` and `CSSStyleValue.parse` from accepting invalid values for standard properties. Integrate lightweight grammar checking or parser-based validation.
+
+
+## Phase 62: Spec Compliance Refinements & Math Wrappers [x]
+
+Objective: Fix remaining compatibility gaps identified during the polyfill test suite run, focusing on math simplification wrappers, mock fallback environments, and CSSRotate validation.
+
+### Tasks
+
+#### 1. DOMMatrixReadOnly Mock Fallback [x]
+- [x] **DOMMatrix Fallback**: Fall back to `globalThis.DOMMatrix` inside `newDOMMatrixReadOnly` if `DOMMatrixReadOnly` is not defined in the environment.
+
+#### 2. Rotate Axis Validation [x]
+- [x] **Axis Type Checks**: Restrict `CSSRotate` 3D coordinates `x`, `y`, and `z` to be unitless number types (throwing `TypeError` if they have other units).
+
+#### 3. Math Simplification Wrapper Compliance [x]
+- [x] **Retain Math wrapper**: Ensure that when `CSSNumericValue.parse` parses a math function (like `calc()`), it retains a single-child `CSSMathSum` wrap even if it simplifies to a single canonical unit (so that it behaves as a `CSSMathValue` and serializes as `calc(...)`).
+
+
+## Phase 63: Unskipping WPT Tests & Environment Setup [x]
+
+Objective: Address remaining mock setup differences and unskip all WPT tests currently in `knownSkips` inside `tests/typed-om-wpt.test.ts`.
+
+### Tasks
+
+#### 1. Global CSS Environment Setup [x]
+- [x] **Vitest Global Mock Setup**: Create a `vitest.setup.ts` to assign `globalThis.CSS = CSS` and integrate it into the Vitest config `vitest.cssomnom.config.ts`.
+
+#### 2. Call `simplify` on parser values [x]
+- [x] **Flatten nested sum values**: Invoke `simplify` on parsed math nodes in `createCSSStyleValue` and `parseNumeric` in `src/typed-om.ts` to support N-ary flat sums.
+
+#### 3. Unskip Skipped Tests [x]
+- [x] **Transform / Keyword setter reactivity**: Add manual setup blocks in `tests/typed-om-wpt.test.ts` for skipped `"result"` tests (transform `is2D` mutation, keyword/unit value setter mutations).
+- [x] **Unskip all**: Remove all 8 entries from `knownSkips` and verify they pass.
+
+
+## Phase 64: Test Suite Integrity Hardening [x]
+
+Objective: Fix test integrity concerns, stop silencing regressions, and activate dormant fixtures.
+
+### Tasks
+
+#### 1. Harden LightningCSS Runner [x]
+- [x] **Assert failures**: Update `tests/external_lightning.test.ts` to throw assertion errors (failing the test suite) when outputs mismatch, rather than silently catching them.
+- [x] **Track skips explicitly**: Move the 1,122 failing cases to an explicit skip/known-fail dictionary to establish a baseline, ensuring any new regressions fail the build.
+
+#### 2. Execute Dormant Fixtures [x]
+- [x] **Nesting parsing**: Write a test runner `tests/wpt-nesting.test.ts` to run Nesting tests in `tests/fixtures/wpt_nesting_parsing.json`.
+- [x] **Selector serialization**: Write a test runner `tests/wpt-selectors.test.ts` to run selector serialization tests in `tests/fixtures/selectors.json`.
+- [x] **Value serialization**: Load and run the remaining dormant fixtures (`tests/fixtures/wpt_extracted.json`, `tests/fixtures/values.json`).
+
+#### 3. Houdini Custom Properties Validation [x]
+- [x] **Unskip custom properties**: Implemented dedicated WPT conformance validator runner `tests/wpt-houdini.test.ts` executing all 2,000+ at-rule and JS validation cases.
+
+---
+
+## Phase 65: Test Runner Bug Fixes & Strict Assertions [x]
+
+Objective: Fix critical assertion-swallowing and skip-masking bugs in the newly created and modified test runners.
+
+### Tasks
+
+#### 1. Fix WPT Selector Test Swallowing [x]
+- [x] **Fix assertion catching**: Refactor `tests/wpt-selectors.test.ts` to separate the `assert.fail()` call from the main `try/catch` block, ensuring that failed assertions are correctly raised and reported.
+
+#### 2. Implement Native Skips in WPT Extracted [x]
+- [x] **Native test skips**: Replace the `return` and catch-silencing blocks in `tests/wpt-extracted.test.ts` with Node's native `{ skip: isKnownFailure }` option, ensuring the test reporter displays true test coverage and skips.
+
+#### 3. Refine Expected Error Assertions [x]
+- [x] **Assert error types**: Update `tests/wpt-houdini.test.ts`, `tests/external_lightning.test.ts`, and `tests/typed-om-wpt.test.ts` to verify that thrown errors are valid spec exceptions (like `TypeError` or `SyntaxError` / `DOMException`) instead of silently allowing runtime crashes.
+
+#### 4. Harden AST Selector Sequencing [x]
+- [x] **Enforce invalid selector failures**: Update `tests/selectors-sequencing.test.ts` to strictly assert that invalid compound selectors return `null` or throw errors.
+
+---
+
+## Phase 65.5: Clean Up Remaining Test Swallows & Skips [x]
+
+Objective: Fix residual test integrity issues discovered in the third audit pass, including sequencing assertion swallowing, WPT early returns, and register-property try-catches.
+
+### Tasks
+
+#### 1. Fix `selectors-sequencing.test.ts` Swallowing [x]
+- [x] **Remove helper try-catch**: Refactor `assertSelectorRejected` in `tests/selectors-sequencing.test.ts` to remove the try-catch block, letting assertion failures bubble up to fail the test.
+
+#### 2. Replace Early Returns in `typed-om-wpt.test.ts` with `t.skip()` [x]
+- [x] **Native skips for manual results**: Update `tests/typed-om-wpt.test.ts` to call context-level `t.skip()` (or equivalent) in the `result` handler, rather than returning early and generating a false green pass.
+
+#### 3. Refactor Brittle Try-Catches to `assert.throws` [x]
+- [x] **Register-property assertions**: Convert try-catch blocks in `tests/register-property.test.ts` and `tests/external_csstree_errors.test.ts` to standard `assert.throws` matching explicit `DOMException` / `SyntaxError` attributes.
+
+---
+
+## Phase 66: Dynamic WPT Sandbox Runner [x]
+
+Objective: Build a Node-based VM sandbox runner using `linkedom` to execute browser-based WPT tests without extraction.
+
+### Tasks
+
+
+#### 1. Implement WPT Sandbox Polyfills [x]
+- [x] **Linkedom stylesheet patches**: Patch `HTMLStyleElement.prototype.sheet` in `linkedom` to support standard parsing and `insertRule()`.
+- [x] **HTMLElement attributeStyleMap**: Define `HTMLElement.prototype.attributeStyleMap` and `Element.prototype.computedStyleMap()` getters using our `StylePropertyMap` wrapper.
+
+#### 2. Sandbox VM Execution Script [x]
+- [x] **Runner script**: Create `scripts/run_wpt_sandbox.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
+- [x] **Sandbox configuration**: Support a config file (`tests/wpt-sandbox-config.json`) defining whitelisted/skipped suites and baseline failures.
+
+#### 3. Integrate into Preflight [x]
+- [x] **Preflight hook**: Hook `scripts/run_wpt_sandbox.ts` into our node test run to enforce dynamic browser WPT checks.
+
+---
+
+## Phase 65.6: Identify & Prune Obsolete Skips [x]
+
+Objective: Build a diagnostic utility script to detect which of our 1,300+ skipped or baselined tests are now passing, and prune them from our skip records to promote them to active tests.
+
+### Tasks
+
+#### 1. Implement Skip Verification Script [x]
+- [x] **Verification script**: Create a script `/usr/local/google/home/paulirish/code/cssom/.worktrees/typed-om-compat/scripts/check_passing_skips.ts` that loads all test runners, bypasses their skip lists, executes the tests, and reports which ones are now passing.
+- [x] **Baseline pruner**: Support a write-back flag or step in the script to automatically remove passing cases from `lightning_known_failures.json` and `wpt_extracted_known_failures.json`.
+
+#### 2. Run and Prune Obsolete Skips [x]
+- [x] **Identify and Prune**: Run `node scripts/check_passing_skips.ts` and verify which tests are passing. Prune the passing tests from all lists.
+- [x] **Preflight check**: Confirm that our preflight still passes and the newly unskipped tests are verified correctly.
+
+
+
+---
+
+## Phase 68: Consolidated Spec Compliance Audits [x]
+
+Objective: Implement the findings from our consolidated spec compliance report across Typed OM, CSSOM, Syntax, Nesting, logical, colors, and animations.
+
+### Tasks
+
+#### 1. Numeric Values & Typed OM [x]
+- [x] **to() SyntaxError**: Throw a SyntaxError instead of a TypeError for invalid units.
+- [x] **Trig unitless radians**: Let `sin()`, `cos()`, `tan()` simplify unitless numbers directly as radians.
+- [x] **Standard math function calculation**: Implement simplification for `atan2`, `mod`, `rem`, `exp`, and `log` in `simplify()`.
+- [x] **hypot() compatible units**: Canonicalize compatible units before resolving hypotenuse.
+- [x] **min()/max() single child**: Update `CSSMathMin`/`CSSMathMax` to fully simplify same-unit children to a single child.
+- [x] **sortSumChildren order**: Correct sorting order to Numbers -> Percentages -> Dimensions.
+- [x] **Zero-valued power keys**: Delete power `0` keys in `CSSNumericType`.
+- [x] **Invert percentHint**: Preserve `percentHint` in `CSSMathInvert.type()`.
+- [x] **addTypes multiplication**: Refactor `addTypes` for multiplication to apply the percent hint propagation.
+- [x] **CSSMathClamp type**: Resolve combined type of all three clamp arguments.
+- [x] **CSSMathRound validation**: Add type compatibility checks in constructor and resolve combined types in `type()`.
+
+#### 2. CSS Logical Properties [x]
+- [x] **text-orientation upright**: Support `text-orientation: upright` direction override to `ltr` in vertical modes in cascade resolution.
+- [x] **Cascade inheritance**: Support looking up parent writing-mode/direction resolved values in `getCascadedStyle`.
+- [x] **Logical corner shorthands**: Expand and contract logical border corner radius shorthands.
+
+#### 3. Media Queries [x]
+- [x] **Comma list empty query recovery**: Empty queries in comma lists must resolve to `not all`.
+- [x] **aspect-ratio single operand**: Serialize `<ratio>` with both components even if denominator defaults to 1 (e.g. `2 / 1`).
+- [x] **aspect-ratio / spaces**: Ensure `/` in ratios has spaces around it during serialization (e.g. `1 / 3`).
+- [x] **Resolution unit x**: Convert `x` unit to `dppx` during Sum Value creation.
+
+#### 4. CSSOM [x]
+- [x] **CSSPageRule selectorText**: Convert to getter/setter with syntax validation and serialization normalization.
+- [x] **CSSImportRule styleSheet doc**: Document `CSSImportRule.styleSheet` returning `null` in `API_BOUNDARIES.md`.
+- [x] **CSSKeyframesRule methods**: Implement `appendRule`, `deleteRule`, and `findRule`.
+- [x] **Missing rules**: Add stub classes for `CSSCounterStyleRule` and `CSSFontFeatureValuesRule`.
+#### 5. Selectors & Specificity [x]
+- [x] **Undeclared namespace prefixes**: Throw SyntaxError on undeclared namespace prefixes.
+- [x] **pseudo-element combination**: Allow `:is()` and `:where()` to follow pseudo-elements.
+- [x] **CSSStyleRule selectorText**: Getter must serialize AST dynamically; Setter must not change values if parsing fails.
+
+#### 6. CSS Syntax [x]
+- [x] **EOF in escape sequence**: Report parse error when EOF is reached during escape sequence consumption.
+- [x] **At-rule EOF prelude**: Do not report parse error when at-rule prelude is terminated by EOF.
+- [x] **Declaration block flushing**: Distinguish "nothing returned" from "invalid rule error" to avoid splitting contiguous nested declarations.
+
+#### 7. CSS Animations [x]
+- [x] **@keyframes name validation**: Reject disallowed custom-idents (`none`, `initial` etc.) and empty strings.
+- [x] **Percentage range checks**: Ensure keyframe selector percentages are strictly in `[0, 100]` range.
+- [x] **Selector keyword normalization**: Normalize `from` and `to` to `0%` and `100%`.
+- [x] **keyText setter**: Throw SyntaxError on invalid selectors.
+- [x] **CSSKeyframesRule index accessors**: Support indexing (`rule[0]`) on `CSSKeyframesRule`.
+- [x] **Disallowed keyword name serialization**: Serialize disallowed names as strings.
+
+#### 8. CSS Nesting [x]
+- [x] **Relative nested selector**: absolutize relative selectors in nested style rule `selectorText` setters.
+- [x] **@scope resetting parent**: Reset parent selector context to `:where(:scope)` inside `@scope`.
+
+#### 9. Custom Properties [x]
+- [x] **CSS.registerProperty name**: Throw TypeError if name is omitted.
+- [x] **Specified value reification**: Custom properties (both registered and unregistered) must always reify to `CSSUnparsedValue` for specified values.
+
+#### 10. CSS Colors [x]
+- [x] **Subclass WebIDL casing**: Rename subclasses to `CSSLCH`, `CSSOKLab`, and `CSSOKLCH`.
+- [x] **CSSColorValue validation**: Make color components validated getters/setters.
+- [x] **Default alpha**: Default alpha parameters to primitive `1` to trigger percent rectification.
+- [x] **Lab/Oklab percentage conversion**: Convert percentage inputs to numbers during parsing.
+- [x] **System colors**: Resolve system color keywords to `CSSKeywordValue`.
+
+---
+
+## Phase 69: Spec Compliance Audit Remediation (Round 11) [x]
+
+Objective: Address and implement the 8 verified findings identified during the Round 11 Spec Compliance Audit.
+
+### Tasks
+
+#### 1. CSS Typed OM, Math Simplification, and Custom Properties
+- [x] **clamp() simplification**: return computed value instead of `CSSMathClamp` when all bounds and value are compatible resolved `CSSUnitValue`s.
+- [x] **CSSMathProduct dimensional division**: simplify product tree holding `CSSMathInvert` nodes if the result is a valid CSS dimension.
+- [x] **CSS-wide keywords in Custom Properties**: skip `matchesSyntax` check if resolved custom property value matches any CSS-wide keyword.
+
+#### 2. CSS Logical Properties, Selectors, Nesting, and Colors
+- [x] **rectifyColorAngle Error Type**: throw standard `TypeError` instead of `SyntaxError` DOMException on invalid angles.
+- [x] **color() function support**: implement `color()` function reification to `CSSColor`.
+- [x] **Pseudo-elements sequence validation**: relax compound selector sequencing to allow any pseudo-class or pseudo-element after `::part()` or `::slotted()`.
+
+#### 3. CSSOM and CSS Syntax
+- [x] **Transform Components Setters & Types**: use getter/setter pairs with `ensureNumeric` and corresponding unit validations in `CSSScale`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, and `CSSPerspective`.
+- [x] **Number/Percentage/Dimension Serialization Formatting**: implement `formatNumber` utility (up to 6 decimals, no scientific notation) and use it for token serialization and `CSSUnitValue.toString()`.
+
+
+---
+
+## Phase 61: SelectorParser Quality Improvements [x]
+
+Objective: Improve types cleanliness and readability of `src/SelectorParser.ts`.
+
+### Tasks
+- [x] **Clean up pseudo sets typings**: Modify codegen script to export `Set<string>` instead of literal types.
+- [x] **SelectorParser options**: Accept `SelectorParserOptions` object instead of telescoping positional flags.
+- [x] **Update instantiations**: Update all call sites of `new SelectorParser(...)` to use options.
+- [x] **Guards & Cursor**: Implement type-safe type guards and a `ComponentValueCursor` iterator.
+- [x] **Logic cleanup**: Clean up attribute, type/universal, compound selector parsing using the cursor and guards.
+
+---
+
+## Phase 62: Clean Polyfill Compatibility Setup [x]
+
+Objective: Isolate the polyfill compatibility test setup to keep submodules clean.
+
+### Tasks
+- [x] **Move vitest config**: Create `tests/polyfill-compat/vitest.config.ts` and `vitest.setup.ts` in our repo to avoid untracked files in the submodule.
+- [x] **Restore submodules**: Revert all local changes in the `css-typed-om-polyfill` submodule to keep it pristine.
+- [x] **Natively implement spec-compliant serialization**: Implement `CSSRGB.toString` legacy comma-separated serialization (CSS Color 4 #css-serialization-of-srgb) and division-by-zero math serialization in `src/typed-om.ts`, avoiding mock patches in the setup file.
+- [x] **Fix CSSColor alpha**: Fix `CSSColor.alpha` setter in `src/typed-om.ts` to allow numbers without forcing them to percentages (resolving `color()` test failure).
+- [x] **Resolve tests dynamically**: Use `fs.readdirSync` in config to resolve all tests, excluding `clamp.test.ts` due to expected spec-compliance simplification differences.
+- [x] **Parser compatibility wrapper**: Implement `tests/polyfill-compat/parser-compat.ts` to map polyfill parser tests to our `CSSStyleValue.parse` and tokenizer, avoiding running the polyfill's own parser.
+- [x] **DOM Prototype Patching**: Implement `attributeStyleMap` and `computedStyleMap` mock patching on DOM prototypes in the setup file.
+- [x] **Shorthand fallback and stubbing**: Fix `CSSStyleDeclaration.getPropertyValue` and `removeProperty` to fall back to direct declarations when shorthand contraction/expansion is not supported or fails, and support marking stubs in `SHORTHANDS`.
+
+## Phase 63: WPT Shim and Test Harness Refactor [x]
+
+Objective: Run WPT tests dynamically using a lightweight harness shim, eliminating static JSON fixtures.
+
+### Tasks
+- [x] **WPT Harness Shim**: Refactor `tests/typed-om-wpt.test.ts` to execute WPT HTML files directly using Node's `vm` module, injecting a lightweight `testharness.js` shim (supporting `test()`, `assert_equals()`, and `assert_style_value_equals()`).
+- [x] **Convert Custom Tests**: Port the custom tests from `tests/fixtures/typed-om-custom.json` into a native TS unit test file `tests/typed-om-custom-serialization.test.ts`.
+- [x] **Clean Up Static Fixtures**: Delete the static JSON fixtures (`tests/fixtures/typed-om.json` and any custom/extracted JSONs) and the temp script `scripts/fixtures/extract_typed_om.ts`.
+- [x] **Verify preflight**: Run `pnpm run preflight` to ensure everything passes with the new dynamic runner.
+
+---
+
+## Phase 64: Unify WPT Sandbox and Test Shims [x]
+
+Objective: Merge redundant WPT shims and DOM setups into a single, clean helper file (`tests/wpt-shim.ts`) and reuse it across both Node unit tests and the sandbox CLI script.
+
+### Tasks
+- [x] **Consolidate shims**: Move any unique shims from `scripts/run_wpt_sandbox.ts` (such as `promise_test()`, `assert_not_equals()`, `assert_array_equals()`, `assert_class_string()`, `assert_unreached()`) into `tests/wpt-shim.ts`.
+- [x] **Consolidate DOM setups**: Integrate the `HTMLStyleElement` `.sheet` mock patching from `tests/wpt-sandbox-setup.ts` and the `ComputedStylePropertyMapReadOnly` class from it into `tests/wpt-shim.ts`.
+- [x] **Cleanup setup files**: Delete `tests/wpt-global-setup.ts` and `tests/wpt-sandbox-setup.ts` and update any imports.
+- [x] **Refactor `scripts/run_wpt_sandbox.ts`**: Make `run_wpt_sandbox.ts` use the unified shims and prototype patches from `tests/wpt-shim.ts`.
+- [x] **Verify preflight**: Run `pnpm run preflight` to confirm both test suites and the CLI script compile and pass.
+
+---
+
+## Phase 65: Generate Standard Properties Syntax List [x]
+
+Objective: Replace the manually authored `src/data/standard-properties-syntax.ts` with a machine-generated file generated from `@webref/css` or `mdn-data` to follow codebase guidelines and support easier expansion of CSS property validation.
+
+*Note: We built the generator but reverted it. Standard CSS property grammars use complex structures (like spaces, groupings, `||`, `&&`) that are incompatible with Houdini `parseSyntax` constraints. We decided to manually maintain and document the file instead to avoid runtime SyntaxErrors and false-positive TypeErrors.*
+
+### Tasks
+- [x] **Create Generator**: Reverted (reasons documented in `src/data/standard-properties-syntax.ts`).
+- [x] **Hook into generate_all**: Reverted.
+- [x] **Verify preflight**: Hand-authored version with comprehensive documentation passes preflight.
+- [x] **Move STANDARD_PROPERTIES_SYNTAX**: Relocated from external `src/data/standard-properties-syntax.ts` to private constant in `src/typed-om.ts` to avoid circular dependencies and API leak.
+
+---
+
+## Phase 66: WPT Sandbox Config Compactness Optimization [x]
+
+Objective: Eliminate the verbose 9.5k line static JSON baseline configuration file and replace it with a dynamically-crawled test runner and compact serialized format.
+
+### Tasks
+- [x] **Dynamic WPT crawling**: Update `tests/wpt-sandbox.test.ts` to crawl the `css-typed-om` directory dynamically at runtime instead of loading a static `include` array.
+- [x] **Compact JSON Formatting**: Implement custom single-line-array serialization in `scripts/update_wpt_baseline.ts` to store each file's failures on a single line.
+- [x] **Dynamic exclusion**: Identify files that fail to initialize (syntax/load errors) and automatically populate them into the `exclude` list during baseline runs.
+- [x] **Verify preflight**: Run `pnpm run preflight` to confirm all 358 WPT test files run successfully in 9 seconds with the new compact JSON format (~335 lines).
+
+---
+
+## Phase 67: Syntax Validation Expansion for Keyword and Simple Properties [x]
+
+Objective: Manually expand syntax validation in `src/typed-om.ts` by adding simple keyword-only or basic single-unit properties to the `STANDARD_PROPERTIES_SYNTAX` registry. This will resolve thousands of WPT failures expecting `TypeError` on invalid value sets, without violating Houdini `parseSyntax` constraints.
+
+### Tasks
+- [x] **Identify Candidate Properties**: Analyze the WPT failures in `tests/wpt-sandbox-config.json` to find properties that fail because they allow invalid types (e.g. `writing-mode`, `direction`, `pointer-events`, `unicode-bidi`, `display`, `position`, etc.).
+- [x] **Define Houdini-Compliant Syntaxes**: Add these properties to `STANDARD_PROPERTIES_SYNTAX` inside `src/typed-om.ts`. Ensure their syntax strings use only basic types, `|` alternatives, or basic multipliers (no space separators, groupings, `||`, or `&&`).
+- [x] **Verify and Baseline**: Run `node scripts/update_wpt_baseline.ts` to execute the suite and confirm the resolved test cases are automatically removed from `tests/wpt-sandbox-config.json`.
+- [x] **Address Code Review Findings**:
+  - [x] Remove complex/space-separated properties that cause false-positives from `STANDARD_PROPERTIES_SYNTAX` (`display`, `font-style`, `font-variant-ligatures`, `font-variant-numeric`, `font-variant-east-asian`, `grid-auto-flow`, `text-overflow`, `text-emphasis-position`, `text-underline-position`, `list-style-type`, `overflow-clip-margin`).
+  - [x] Correct `transform-style` syntax by removing the invalid `auto` keyword.
+  - [x] Tweak documentation comments above `STANDARD_PROPERTIES_SYNTAX` to describe Houdini limitations and the baseline script.
+  - [x] Expand `tests/typed-om-validation.test.ts` to cover `<length-percentage>` (e.g. `bottom`) and `<length>`-only (e.g. `outline-offset`) error-throwing boundaries.
+- [x] **Run Preflight & Update Baseline**: Re-run the update baseline script and verify that `pnpm run preflight` is green.
+
+---
+
+## Phase 68: Pruning External Test Baselines to Collapsed Single-Line Keys [x]
+
+Objective: Migrate the massive, duplicate-heavy external test baselines (`lightning_known_failures.json` and `wpt_extracted_known_failures.json`) to a flat list of human-readable, collapsed single-line keys to reduce file sizes and clean up git diffs.
+
+### Tasks
+- [x] **Define Unified Normalizer**: Extract or share the whitespace normalizer logic.
+- [x] **Refactor Test Runners**: Update `tests/external_lightning.test.ts` and `tests/wpt-extracted.test.ts` to perform checks against Sets populated with the collapsed string keys.
+- [x] **Refactor Baseline Maintenance Scripts**: Update `scripts/check_passing_skips.ts` and `scripts/generate_lightning_baseline.ts` to read/write collapsed string array baselines.
+- [x] **Regenerate Baselines**: Execute the baseline updates and confirm the new compact baselines are generated and all tests remain green.
+
+---
+
+## Phase 69: CSSPositionValue, var() Normalization, and CSSTransformValue/DOMMatrix [x]
+
+Objective: Implement missing CSS Typed OM classes (`CSSPositionValue`, `CSSTransformValue`, transform components), support reification to/from `DOMMatrix`, and clean up `var()` reference normalization to align with WPT requirements.
+
+### Tasks
+- [x] **Fix Reification and Routing Logic in StylePropertyMap**:
+  - [x] Revert `CSSStyleValue.parseAll` wrapping for `translate`, `rotate`, and `scale` so they return raw `CSSTranslate`, `CSSRotate`, and `CSSScale` directly.
+  - [x] Refactor `StylePropertyMapReadOnly.get` and `getAll` to serialize declaration values and parse them using `CSSStyleValue.parseAll` (fixing incorrect `CSSUnparsedValue` fallback).
+  - [x] Refactor `StylePropertyMap.get` and `getAll` to parse values using `CSSStyleValue.parseAll` (fixing incorrect `CSSUnparsedValue` fallback).
+  - [x] Resolve WPT sandbox math/validation failures:
+    - [x] Throw `SyntaxError` on division by zero during math simplification.
+    - [x] Validate parsed numeric values in `CSSNumericValue.parse` to reject unresolved Level 4 functions (like `sign()`).
+    - [x] Enforce empty values validation in `StylePropertyMap.set`/`append` to throw `TypeError`.
+    - [x] Exclude `attribute-changed-callback.html` due to missing `customElements` in sandbox.
+- [x] **CSSPositionValue**:
+  - [x] Implement `CSSPositionValue` class in `src/typed-om.ts` with constructor `(x, y)` and properties `.x` / `.y` validating to `<length-percentage>`.
+  - [x] Hook `CSSPositionValue` parsing and reification for position-allowing properties (like `background-position`, `object-position`).
+  - [x] Add unit tests in `tests/typed-om-position.test.ts`.
+- [x] **var() Reference Normalization**:
+  - [x] Validate reification of custom property variables and fallback values to `CSSVariableReferenceValue`.
+  - [x] Normalize fallback values to ensure spec compliance when parsed.
+- [x] **CSSTransformValue & DOMMatrix**:
+  - [x] Expose or implement a basic compliant `DOMMatrix` helper.
+  - [x] Implement `CSSTransformValue` class containing a list of `CSSTransformComponent` subclasses (`CSSTranslate`, `CSSRotate`, `CSSScale`, `CSSSkew`, etc.).
+  - [x] Implement `.toMatrix()` on transform components.
+  - [x] Add unit tests in `tests/typed-om-transforms.test.ts`.
+  - [x] Address DOMMatrix & DOMMatrixReadOnly code review findings:
+    - [x] Write failing regression tests (Red phase)
+    - [x] Fix matrix multiplication (post-multiplication & multiplyArrays A * B)
+    - [x] Fix column-major array export/import (transpose for toFloat/fromFloat, length check, and parseMatrixInit)
+    - [x] Fix string parser updates (handle 'none' and "" as 2D identity matrix)
+    - [x] Verify tests pass and run preflight
+
+---
+
+## Phase 70: WPT Progress Tracking & Automation [x]
+
+Objective: Automate conformance logging of WPT sandbox tests to track progress over time.
+
+### Tasks
+- [x] **Progress Tracking Script**: Create `scripts/update_wpt_progress.ts` to execute WPT sandbox tests and append current statistics to `wpt-typed-om-progress.md` only when they change.
+- [x] **Git Pre-commit Hook**: Implement `.git/hooks/pre-commit` to automatically run progress tracking and stage the updated log file when `src/typed-om.ts` changes.
+- [x] **Initialize Log**: Run the script and commit the initial baseline log (`5890/12150` passed, 48.48% pass rate).
+- [x] **Historical Backfill**: Backfill the progress log table with past test execution numbers from transcripts.
+
+---
+
+## Phase 71: Dedicated Linkedom Integration Tests [x]
+
+Objective: Establish a comprehensive test suite specifically verifying our DOM prototype overrides under Linkedom, verifying scenarios that fail with legacy CSSOM but succeed with CSSOMNom.
+
+### Tasks
+- [x] **Create Test Suite (`tests/linkedom.test.ts`)**:
+  - [x] Test `Element.prototype.attributeStyleMap` and `computedStyleMap()` reification correctness.
+  - [x] Test custom properties case-preservation (workaround verify).
+  - [x] Test `HTMLStyleElement.prototype.sheet` dynamic re-parsing upon mutating `textContent`.
+  - [x] Test Level 4 value/math reification and serialization in sheets.
+- [x] **Code Review & Verification**:
+  - [x] Audit changes using the Sequential Quality Loop (`codex_reviewer_cmd`).
+  - [x] Verify `pnpm run preflight` is green and commit.
+
+## Phase 72: High-Scrutiny Typed OM Spec Compliance Audit [/]
+
+Objective: Review and resolve compliance gaps in CSS Typed OM Level 1 validated by the Scrutineer.
+
+### Tasks
+
+#### Phase 72.1: Property Map & Parsing Compliance [x]
+- [x] Implement `[[associatedProperty]]` internal slot on `CSSStyleValue` to restrict direct instances.
+- [x] Implement `iterable` and `size` support on `StylePropertyMapReadOnly`.
+- [x] Enforce `[[associatedProperty]]` validation in `StylePropertyMap` write methods.
+- [x] Validate property names in `CSSStyleValue.parse`/`parseAll` against `SUPPORTED_PROPERTIES`.
+- [x] Reject `CSSUnparsedValue` and `CSSVariableReferenceValue` arguments in `StylePropertyMap.append()`.
+- [x] Reify unrepresentable or invalid syntax values to direct `CSSStyleValue` instead of `CSSUnparsedValue`.
+- [x] Change `CSSStyleRule.styleMap` type to a read-write `StylePropertyMap`.
+- [x] Return `undefined` instead of `null` for missing properties in `StylePropertyMapReadOnly.get()`.
+- [x] Reify unitless `0` to `"px"` in length/dimension contexts.
+
+#### Phase 72.2: Math & Numeric Types Conformance [x]
+- [x] Fix `addTypesForSum` percent hint resolution to loop over all base types.
+- [x] Prevent `CSS.rad` and `CSS.turn` factories from converting inputs to degrees.
+- [x] Preserve mathematical AST structure in `CSSNumericValue.parse()` by removing eager simplification.
+- [x] Validate unit arguments in the `CSSUnitValue` constructor.
+- [x] Validate argument lengths in math value constructors (Sum, Product, Min, Max).
+- [x] Validate argument types in the `CSSMathProduct` constructor.
+- [x] Support `CSSMathRound` and `CSSMathFunction` in `CSSNumericValue.equals()`.
+- [x] Correct casing of unit factories on the `CSS` object (`Hz`, `kHz`, `Q` instead of `hz`, `khz`, `q`).
+
+#### Phase 72.3: Specialty Values & Color Validation [x]
+- [x] Assert `CSSTransformValue` constructor throws on empty lists.
+- [x] Assert `CSSKeywordValue` constructor throws on empty values.
+- [x] Clone input matrices in the `CSSMatrixComponent` constructor.
+- [x] Serialize 2D `CSSScale` with equal axes as `scale(x)`.
+- [x] Throw `SyntaxError` instead of `TypeError` on color syntax errors.
+- [x] Support `ObservableArray` behavior (or prevent direct re-assignment) for `CSSColor.channels`.
+- [x] Omit alpha from modern colors serialization when unity.
+
+#### Phase 72.4: DOMMatrix IDL Conformance [x]
+- [x] Implement missing standard `DOMMatrix` methods (`flipX`, `flipY`, `rotateFromVector`, `rotateFromVectorSelf`, `scale3d`, `scale3dSelf`, `toJSON`, `transformPoint`, and `setMatrixValue` on `DOMMatrix` / `DOMMatrixReadOnly`).
+
+---
+
+## Phase 73: Shorthand Completeness (background) [x]
+
+Objective: Implement full spec-compliant expansion and contraction for the `background` shorthand.
+
+### Tasks
+- [x] **Implement `expand` for `background`**:
+  - [x] Implement multi-layered parsing by splitting tokens by top-level commas.
+  - [x] Implement `/` size-position delimiter parsing.
+  - [x] Parse repeat, attachment, box (origin & clip), image, and position values per layer.
+  - [x] Enforce color restriction (only allowed in final layer).
+  - [x] Map box keywords according to origin & clip mapping rules (Level 3/4).
+  - [x] Build longhand expansion lists and return.
+- [x] **Implement `contract` for `background`**:
+  - [x] Match layers across all 7 list properties.
+  - [x] Serialize position and size with `/` delimiters when needed.
+  - [x] Canonicalize repeat, attachment, and box keyword serializations.
+  - [x] Add color to final layer and join layers with commas.
+- [x] **Tests and Verification**:
+  - [x] Write integration unit tests in `tests/style-property-map.test.ts` or `tests/shorthands.test.ts` verifying all test scenarios (single color, multiple gradients, position/size delimiters, box keyword pairings, and Level 4 clip keywords).
+  - [x] Verify `pnpm run preflight` is green.
+- [x] **Code Review & Verification**:
+  - [x] Run Codex Reviewer over the implementation diff range.
+  - [x] Run Grizz gatekeeper green check.
+
+---
+
+## Potential roadmap items
+
+Objective: Explore long-term ideas for WPT conformance, prototype patching options, and parser shorthand completeness.
+
+### Ideas
+
+#### 1. Spec-Compliance & API Surface Refinements
+- [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
+- [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
+- [ ] **Run WPT `testharness.js` self-tests in sandbox**: Execute the 33 unittests in `submodules/web-platform-tests/resources/test/tests/unit/` using `run_wpt_sandbox.ts` to verify our `wpt-shim.ts` conformance.
+- [ ] **Broad WPT Conformance Suite Expansion**: Extend the WPT sandbox crawler to include other core CSS specification subfolders (`cssom/`, `css-nesting/`, `css-syntax/`, `css-variables/`, `selectors/`, `mediaqueries/`), expanding our test coverage to ~1,680 files and over 50k+ assertions. Log overall progress in a new file `wpt-progress.md` using the Option 1 multi-column percentage layout with spec totals in headers:
+  ```markdown
+  | Date & Time (UTC) | Commit | Typed OM (12150) | CSSOM (600) | Nesting (120) | Syntax (350) | Selectors (500) | MQ (200) | Overall | Pass Rate |
+  | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+  | 2026-07-17 18:00:00 | `c522959` | 48.48% | 75.00% | 100.00% | 88.57% | 80.00% | 90.00% | 7350/13920 | 52.80% |
+  ```
+
+
+

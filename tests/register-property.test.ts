@@ -143,17 +143,15 @@ test('CSS.registerProperty: throws InvalidModificationError on duplicate registr
 
 test('CSS.registerProperty: throws DOMException on invalid name', () => {
   PropertyRegistry.clear();
-  try {
+  assert.throws(() => {
     CSS.registerProperty({
       name: 'not-a-custom-prop',
       syntax: '*',
       inherits: false
     });
-    assert.fail('Should have thrown');
-  } catch (e) {
-    assert.ok(e instanceof DOMException, 'Should be a DOMException');
-    assert.strictEqual((e as DOMException).name, 'SyntaxError');
-  }
+  }, (err: unknown) => {
+    return err instanceof DOMException && err.name === 'SyntaxError';
+  });
 });
 
 test('CSS.registerProperty: length validation regression', () => {
@@ -526,3 +524,16 @@ test('CSS.registerProperty: universal syntax (*) initialValue validation', () =>
     });
   }, { name: 'SyntaxError' });
 });
+
+test('CSS.registerProperty: throws TypeError on missing name', () => {
+  PropertyRegistry.clear();
+
+  assert.throws(() => {
+    // @ts-expect-error intentionally omitting name
+    CSS.registerProperty({
+      syntax: '*',
+      inherits: false
+    });
+  }, { name: 'TypeError' });
+});
+

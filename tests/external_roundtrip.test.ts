@@ -86,7 +86,8 @@ const knownCSSTreeSkips = new Map<string, string>([
   ['CDC', csstreeCDOReason],
   ['CDO/CDC', csstreeCDOReason],
   ['rule with a bad-string token (issue #93)', 'CSSTree specific test case for error recovery with bad strings.'],
-  ['issue #250', csstreeNormReason]
+  ['issue #250', csstreeNormReason],
+  ['issue111.test1', 'Undeclared namespace prefix x is invalid, which our spec-compliant parser drops.']
 ]);
 
 function runRoundTripTests(name: string, tests: RoundTripTestItem[], skipMap: Map<string, string>) {

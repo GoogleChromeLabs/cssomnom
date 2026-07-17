@@ -771,6 +771,7 @@
       }
     },
     {
+      "name": "",
       "inherits": false,
       "expected": {
         "valid": false,

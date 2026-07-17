@@ -26,7 +26,6 @@
  * 4. Constructor Arguments: The `body` parameter is mandatory in some constructors (e.g., `CSSParserQualifiedRule`) where the spec makes it optional.
  */
 
-import { CSSUnitValue } from './typed-om.ts';
 import { Parser } from './parser.ts';
 import { tokenize } from './tokenizer.ts';
 import type { ComponentValue, SimpleBlock, CSSFunction, ASTAtRule, Declaration } from './types.ts';
@@ -388,8 +387,6 @@ export function parseComponentValue(css: string, options: CSSParserOptions = {})
 export const CSS = {
     // Typed OM Factories
     ...CSSFactories,
-    rad: (v: number) => new CSSUnitValue(v * 180 / Math.PI, 'deg'),
-    turn: (v: number) => new CSSUnitValue(v * 360, 'deg'),
 
     // Tooling Extensions
     resolveNestedSelector,

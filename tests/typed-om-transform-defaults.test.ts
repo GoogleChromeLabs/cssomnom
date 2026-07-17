@@ -16,31 +16,9 @@
  */
 import test from 'node:test';
 import assert from 'node:assert';
-import { CSSTranslate, CSSScale, CSSRotate, CSSUnitValue, CSSMatrixComponent, CSSNumericValue } from '../src/typed-om.ts';
+import { CSSTranslate, CSSScale, CSSRotate, CSSSkew, CSSSkewX, CSSSkewY, CSSPerspective, CSSUnitValue, CSSKeywordValue, CSSMatrixComponent, CSSNumericValue, DOMMatrixReadOnly } from '../src/typed-om.ts';
 
-// Mock DOMMatrixReadOnly for tests
-class DOMMatrixReadOnly {
-  is2D: boolean;
-  a: number = 0; b: number = 0; c: number = 0; d: number = 0; e: number = 0; f: number = 0;
-  m11: number = 0; m12: number = 0; m13: number = 0; m14: number = 0;
-  m21: number = 0; m22: number = 0; m23: number = 0; m24: number = 0;
-  m31: number = 0; m32: number = 0; m33: number = 0; m34: number = 0;
-  m41: number = 0; m42: number = 0; m43: number = 0; m44: number = 0;
 
-  constructor(elements: number[]) {
-    if (elements.length === 6) {
-      this.is2D = true;
-      [this.a, this.b, this.c, this.d, this.e, this.f] = elements;
-    } else {
-      this.is2D = false;
-      [this.m11, this.m12, this.m13, this.m14, this.m21, this.m22, this.m23, this.m24, this.m31, this.m32, this.m33, this.m34, this.m41, this.m42, this.m43, this.m44] = elements;
-    }
-  }
-}
-
-if (!(globalThis as unknown as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly) {
-  (globalThis as unknown as { DOMMatrixReadOnly: unknown }).DOMMatrixReadOnly = DOMMatrixReadOnly;
-}
 
 test('CSSTranslate defaults z to 0px when omitted', () => {
   const translate = new CSSTranslate(new CSSUnitValue(10, 'px'), new CSSUnitValue(20, 'px'));
@@ -102,16 +80,44 @@ test('CSSTranslate.toMatrix() returns correct matrix', () => {
   assert.strictEqual(matrix.f, 20);
 });
 
-test('CSSMatrixComponent.toMatrix() returns wrapped matrix', () => {
+test('CSSMatrixComponent.toMatrix() returns copy of wrapped matrix', () => {
   const mockMatrix = new DOMMatrixReadOnly([1, 2, 3, 4, 5, 6]);
   const matrixComp = new CSSMatrixComponent(mockMatrix);
   const matrix = matrixComp.toMatrix();
-  assert.strictEqual(matrix, mockMatrix);
+  assert.notStrictEqual(matrix, mockMatrix);
+  assert.strictEqual(matrix.is2D, true);
+  assert.strictEqual(matrix.a, 1);
+  assert.strictEqual(matrix.b, 2);
+  assert.strictEqual(matrix.c, 3);
+  assert.strictEqual(matrix.d, 4);
+  assert.strictEqual(matrix.e, 5);
+  assert.strictEqual(matrix.f, 6);
 });
 
 test('CSSMatrixComponent constructor accepts options', () => {
   const mockMatrix = new DOMMatrixReadOnly([1, 2, 3, 4, 5, 6]);
   const matrixComp = new CSSMatrixComponent(mockMatrix, { is2D: false });
   assert.strictEqual(matrixComp.is2D, false);
+});
+
+test('Transform Components Setters & Types validations', () => {
+  const scale = new CSSScale(1, 2);
+  assert.throws(() => { scale.x = new CSSUnitValue(10, 'px'); }, TypeError);
+  assert.throws(() => { scale.y = new CSSUnitValue(10, 'px'); }, TypeError);
+  assert.throws(() => { scale.z = new CSSUnitValue(10, 'px'); }, TypeError);
+
+  const skew = new CSSSkew(new CSSUnitValue(10, 'deg'), new CSSUnitValue(20, 'deg'));
+  assert.throws(() => { skew.ax = new CSSUnitValue(10, 'px'); }, TypeError);
+  assert.throws(() => { skew.ay = new CSSUnitValue(10, 'px'); }, TypeError);
+
+  const skewX = new CSSSkewX(new CSSUnitValue(10, 'deg'));
+  assert.throws(() => { skewX.ax = new CSSUnitValue(10, 'px'); }, TypeError);
+
+  const skewY = new CSSSkewY(new CSSUnitValue(10, 'deg'));
+  assert.throws(() => { skewY.ay = new CSSUnitValue(10, 'px'); }, TypeError);
+
+  const perspective = new CSSPerspective(new CSSUnitValue(10, 'px'));
+  assert.throws(() => { perspective.length = new CSSUnitValue(10, 'deg'); }, TypeError);
+  assert.throws(() => { perspective.length = new CSSKeywordValue('invalid'); }, TypeError);
 });
 
