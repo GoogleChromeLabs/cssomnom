@@ -74,7 +74,7 @@ function run() {
 
         removeCircular(tests);
 
-        const outputPath = path.resolve(import.meta.dirname, '../../tests/fixtures/external/nv_tests.json');
+        const outputPath = path.resolve(import.meta.dirname, '../../tests/fixtures/external/nv-tests.json');
         fs.writeFileSync(outputPath, JSON.stringify(tests, null, 2));
         console.log(`Saved to ${outputPath}`);
     } catch (e) {

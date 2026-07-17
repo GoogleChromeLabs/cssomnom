@@ -13,7 +13,7 @@ Relevant Specifications:
 - CSS Values: `submodules/csswg-drafts/css-values-4/Overview.bs`
 - CSS Nesting: `submodules/csswg-drafts/css-nesting-1/Overview.bs`
 - Selectors: `submodules/csswg-drafts/selectors-4/Overview.bs`
-- CSS Typed OM: `submodules/csswg-drafts/css-typed-om-1/Overview.bs`
+- CSS Typed OM: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
 - CSS Variables: `submodules/csswg-drafts/css-variables-1/Overview.bs`
 - CSS Logical: `submodules/csswg-drafts/css-logical-1/Overview.bs`
 - Media Queries: `submodules/csswg-drafts/mediaqueries-4/Overview.bs`

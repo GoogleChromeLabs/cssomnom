@@ -20,8 +20,8 @@ import * as path from 'path';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
 
-const postcssPath = path.resolve(import.meta.dirname, 'fixtures/external/postcss_tests.json');
-const csstreePath = path.resolve(import.meta.dirname, 'fixtures/external/csstree_tests.json');
+const postcssPath = path.resolve(import.meta.dirname, 'fixtures/external/postcss-tests.json');
+const csstreePath = path.resolve(import.meta.dirname, 'fixtures/external/csstree-tests.json');
 
 const postcssTests = JSON.parse(fs.readFileSync(postcssPath, 'utf8'));
 const csstreeTests = JSON.parse(fs.readFileSync(csstreePath, 'utf8'));

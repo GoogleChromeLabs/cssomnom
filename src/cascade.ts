@@ -17,7 +17,7 @@
 import { calculateSpecificity, compareSpecificity } from './specificity.ts';
 import { CSSRule, CSSNestedDeclarations, CSSGroupingRule, CSSScopeRule } from './CSSOM.ts';
 import { tokenize } from './tokenizer.ts';
-import { resolveLogicalProperty, LOGICAL_MAPPING } from './data/LogicalMapping.ts';
+import { resolveLogicalProperty, LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
 import { Parser } from './parser.ts';
 import { SelectorParser } from './SelectorParser.ts';
 import { serialize, serializeSelectorList } from './serializer.ts';

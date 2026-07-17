@@ -17,8 +17,8 @@
 import fs from 'node:fs';
 
 const WEBREF_CSS_PATH = 'node_modules/@webref/css/css.json';
-const OUTPUT_PROPERTIES_PATH = 'src/data/properties.ts';
-const OUTPUT_LIST_PATH = 'src/data/property-list.ts';
+const OUTPUT_PROPERTIES_PATH = 'src/data/gen/properties.ts';
+const OUTPUT_LIST_PATH = 'src/data/gen/property-list.ts';
 
 function toCamelCase(str: string): string {
     return str.replace(/-([a-z])/g, (g) => g[1].toUpperCase());

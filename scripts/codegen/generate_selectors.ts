@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 
 const MDN_SELECTORS_PATH = 'node_modules/mdn-data/css/selectors.json';
-const OUTPUT_PATH = 'src/data/selectors.ts';
+const OUTPUT_PATH = 'src/data/gen/selectors.ts';
 
 function main() {
     const selectors = JSON.parse(fs.readFileSync(MDN_SELECTORS_PATH, 'utf8'));

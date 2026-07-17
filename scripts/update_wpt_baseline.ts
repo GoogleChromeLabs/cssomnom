@@ -21,7 +21,7 @@ import * as path from 'node:path';
 
 const REPO_ROOT = process.cwd();
 const TARGET_DIR = path.join(REPO_ROOT, 'submodules/web-platform-tests/css/css-typed-om');
-const CONFIG_PATH = path.join(REPO_ROOT, 'tests/wpt-sandbox-config.json');
+const CONFIG_PATH = path.join(REPO_ROOT, 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
 
 function crawlDirectory(dir: string, fileList: string[] = []): string[] {
   if (!fs.existsSync(dir)) {

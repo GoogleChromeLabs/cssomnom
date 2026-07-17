@@ -37,7 +37,7 @@ async function run() {
     });
   }
 
-  const stylesheetOutputPath = path.resolve(REPO_ROOT, 'tests/fixtures/external/csstree_tests.json');
+  const stylesheetOutputPath = path.resolve(REPO_ROOT, 'tests/fixtures/external/csstree-tests.json');
   fs.writeFileSync(stylesheetOutputPath, JSON.stringify(stylesheetResults, null, 2));
   console.log(`Saved ${stylesheetResults.length} tests to ${stylesheetOutputPath}`);
 
@@ -54,7 +54,7 @@ async function run() {
     }
   }
 
-  const errorsOutputPath = path.resolve(REPO_ROOT, 'tests/fixtures/external/csstree_errors.json');
+  const errorsOutputPath = path.resolve(REPO_ROOT, 'tests/fixtures/external/csstree-errors.json');
   fs.writeFileSync(errorsOutputPath, JSON.stringify(errorResults, null, 2));
   console.log(`Saved ${errorResults.length} error tests to ${errorsOutputPath}`);
 }

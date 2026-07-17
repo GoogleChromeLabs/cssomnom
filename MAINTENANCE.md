@@ -36,7 +36,7 @@ This runs `git submodule update --init --recursive --remote`.
 ```bash
 pnpm run fixtures:generate
 ```
-This runs `node scripts/wpt_generate_fixtures.ts`.
+This runs `node scripts/extract_external_suites.ts`.
 
 **3. Run Tests:**
 ```bash
@@ -86,6 +86,6 @@ Every auditor should:
 
 ## Fixture Generation Details
 
-The `scripts/wpt_generate_fixtures.ts` script reads from the submodules and generates JSON fixtures used by the tests. If you add new test files to WPT or need to support new properties, you may need to update this script or run it to include the new data.
+The `scripts/external_suites/extract_wpt.ts` script reads from the submodules and generates JSON fixtures used by the tests. If you add new test files to WPT or need to support new properties, you may need to update this script or run it to include the new data.
 
 *Note: We rely on Node's ability to run `.ts` files directly (supported in Node 24.11.0+), so no build step is needed for scripts.*

@@ -22,7 +22,7 @@ import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
 import { CSSStyleRule } from '../src/index.ts';
 
-const fixturesPath = path.resolve(import.meta.dirname, 'fixtures/external/nv_tests.json');
+const fixturesPath = path.resolve(import.meta.dirname, 'fixtures/external/nv-tests.json');
 const tests = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
 const normalizeQuotes = (s: string) => s.replace(/'/g, '"');

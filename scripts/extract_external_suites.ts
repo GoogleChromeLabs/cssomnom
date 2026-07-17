@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-const FIXTURES_DIR = path.resolve(import.meta.dirname, 'fixtures');
+const FIXTURES_DIR = path.resolve(import.meta.dirname, 'external_suites');
 
 function main() {
     console.log('Starting full fixture generation...');

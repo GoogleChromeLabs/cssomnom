@@ -29,7 +29,7 @@ import {
   CSSStyleSheet,
   StylePropertyMap
 } from '../src/index.ts';
-import { CSSStyleProperties } from '../src/data/properties.ts';
+import { CSSStyleProperties } from '../src/data/gen/properties.ts';
 import type { StyleSheet } from '../src/types.ts';
 
 test('CSSRule interface and inheritance', () => {

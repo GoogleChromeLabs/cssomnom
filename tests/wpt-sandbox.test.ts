@@ -105,7 +105,7 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
+const configPath = path.resolve(process.cwd(), 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
 if (fs.existsSync(configPath)) {
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as SandboxConfig;
   const targetDir = path.resolve(process.cwd(), 'submodules/web-platform-tests/css/css-typed-om');

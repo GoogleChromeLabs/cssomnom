@@ -22,7 +22,7 @@ import type {
 import { 
   PSEUDO_CLASSES, 
   PSEUDO_ELEMENTS 
-} from './data/selectors.ts';
+} from './data/gen/selectors.ts';
 import { getOriginalText } from './serializer.ts';
 // Type guards for ComponentValue types
 export function isToken(val: ComponentValue | undefined): val is Token {

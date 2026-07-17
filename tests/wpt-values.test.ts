@@ -24,7 +24,7 @@ import { tokenize } from '../src/tokenizer.ts';
 import { serialize } from '../src/serializer.ts';
 
 // Load fixtures
-const fixturesPath = path.join(process.cwd(), 'tests/fixtures/wpt_serialize_values.json');
+const fixturesPath = path.join(process.cwd(), 'tests/fixtures/wpt/wpt-values.json');
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
 // https://drafts.csswg.org/css-values-4/#calc-serialize

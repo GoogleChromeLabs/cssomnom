@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 import type { Token, Declaration, ComponentValue, CSSFunction, IdentToken, HashToken } from './types.ts';
-import { NAMED_COLORS } from './data/colors.ts';
+import { NAMED_COLORS } from './data/gen/colors.ts';
 import { matchesSyntax, PropertyRegistry } from './PropertyRegistry.ts';
 
 
@@ -24,10 +24,10 @@ import { parseMathFunction, simplify } from './math-parser.ts';
 import { tokenize } from './tokenizer.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { SHORTHANDS } from './shorthands.ts';
-import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/units.ts';
+import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/gen/units.ts';
 import { formatNumber } from './utils/format.ts';
 import { DOMMatrixReadOnly, DOMMatrix, setParseTransformListHook } from './DOMMatrix.ts';
-import { SUPPORTED_PROPERTIES } from './data/property-list.ts';
+import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 
 function compareStrings(a: string, b: string): number {
   return a === b ? 0 : (a < b ? -1 : 1);

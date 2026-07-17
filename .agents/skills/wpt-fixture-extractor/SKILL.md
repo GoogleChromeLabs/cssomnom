@@ -8,9 +8,9 @@ description: Extracts test cases from W3C Web Platform Tests (WPT) into JSON fix
 This skill is used to extract test cases from the W3C WPT submodule into local JSON fixtures for test-driven development.
 
 ## Workflow
-1.  **Target Directory**: Identify the target directory in \`submodules/wpt/\` (e.g., \`css/cssom/\`).
+1.  **Target Directory**: Identify the target directory in `submodules/web-platform-tests/` (e.g., `css/cssom/`).
 2.  **Parse Tests**: Read the HTML or JS files in the target directory to extract CSS input and expected serialization or object model state.
-3.  **Generate Fixtures**: Create or update a JSON file in \`tests/fixtures/\` with the extracted test cases.
+3.  **Generate Fixtures**: Create or update a JSON file in `tests/fixtures/` with the extracted test cases.
 4.  **Verify**: Ensure the generated JSON is valid and structured correctly for our test harness.
 
 ## Constraints

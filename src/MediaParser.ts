@@ -18,14 +18,14 @@ import { tokenize } from './tokenizer.ts';
 import { Parser } from './parser.ts';
 import { serialize, getMirrorToken, serializeIdentifier } from './serializer.ts';
 import type { ComponentValue, Token, CSSFunction, GeneralEnclosed, MediaFeature, MediaCondition, MediaQuery } from './types.ts';
-import { unitToBase } from './data/units.ts';
+import { unitToBase } from './data/gen/units.ts';
 import { parseMathFunction } from './math-parser.ts';
 import { 
   KNOWN_FEATURES, 
   RANGE_FEATURES,
   FEATURE_VALUE_TYPES, 
   FEATURE_ALLOWED_IDENTS
-} from './data/media-features.ts';
+} from './data/gen/media-features.ts';
 
 export class MediaParser {
   /**

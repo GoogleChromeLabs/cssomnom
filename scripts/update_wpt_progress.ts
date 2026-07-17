@@ -27,7 +27,7 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
 }
 
 async function main() {
-  const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
+  const configPath = path.resolve(process.cwd(), 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
   if (!fs.existsSync(configPath)) {
     console.error('Error: WPT sandbox config not found.');
     process.exit(1);

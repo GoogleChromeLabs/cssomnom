@@ -278,6 +278,6 @@ extractCssTextSerialize();
 extractTypedOMSerialization();
 crawlCssValuesSerialization();
 
-const outputPath = path.join(REPO_ROOT, 'tests/fixtures/wpt_extracted.json');
+const outputPath = path.join(REPO_ROOT, 'tests/fixtures/wpt/wpt-cssom.json');
 fs.writeFileSync(outputPath, JSON.stringify(allFixtures, null, 2));
 console.log(`\nSuccessfully saved all fixtures to ${outputPath}`);

@@ -16,7 +16,7 @@
  */
 import { serialize } from './serializer.ts';
 import type { ComponentValue } from './types.ts';
-import { SHORTHANDS_DATA } from './data/shorthands.ts';
+import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 
 export interface ShorthandDefinition {
   longhands: readonly string[];

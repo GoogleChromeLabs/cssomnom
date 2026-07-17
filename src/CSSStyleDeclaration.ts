@@ -19,10 +19,10 @@ import { serialize, serializeDeclarations } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import type { Declaration, CSSRule, ComponentValue } from './types.ts';
 import { SHORTHANDS } from './shorthands.ts';
-import { resolveLogicalProperty, resolvePhysicalProperty } from './data/LogicalMapping.ts';
-import { SUPPORTED_PROPERTIES } from './data/property-list.ts';
+import { resolveLogicalProperty, resolvePhysicalProperty } from './data/gen/LogicalMapping.ts';
+import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 import { camelToDashed } from './utils.ts';
-import { CSSStyleProperties } from './data/properties.ts';
+import { CSSStyleProperties } from './data/gen/properties.ts';
 
 export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
   return new Proxy(target, {

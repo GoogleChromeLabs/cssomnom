@@ -16,9 +16,9 @@
  */
 import type { ComponentValue, CSSFunction } from './types.ts';
 import { CSSNumericValue, CSSUnitValue, CSSMathSum, CSSMathProduct, CSSMathNegate, CSSMathInvert, CSSMathMin, CSSMathMax, CSSMathClamp, CSSMathFunction, CSSMathRound, CSSKeywordValue, type CSSNumericType } from './typed-om.ts';
-import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/units.ts';
+import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/gen/units.ts';
 
-import { MATH_FUNCTIONS } from './data/math-functions.ts';
+import { MATH_FUNCTIONS } from './data/gen/math-functions.ts';
 
 
 function isSameType(a: CSSNumericType, b: CSSNumericType): boolean {

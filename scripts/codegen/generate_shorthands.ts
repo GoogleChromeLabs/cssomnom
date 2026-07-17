@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 
 const WEBREF_CSS_PATH = 'node_modules/@webref/css/css.json';
-const SHORTHANDS_DATA_TS_PATH = 'src/data/shorthands.ts';
+const SHORTHANDS_DATA_TS_PATH = 'src/data/gen/shorthands.ts';
 
 function main() {
     const css = JSON.parse(fs.readFileSync(WEBREF_CSS_PATH, 'utf8'));

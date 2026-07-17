@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { MATH_FUNCTIONS } from '../src/data/math-functions.ts';
+import { MATH_FUNCTIONS } from '../src/data/gen/math-functions.ts';
 
 describe('MATH_FUNCTIONS list', () => {
   test('should strictly include only standard math functions', () => {

@@ -9,10 +9,10 @@ import { serialize } from '../src/serializer.ts';
 
 const REPO_ROOT = process.cwd();
 
-const fixturesPath = path.join(REPO_ROOT, 'tests/fixtures/wpt_extracted.json');
+const fixturesPath = path.join(REPO_ROOT, 'tests/fixtures/wpt/wpt-cssom.json');
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8')) as Record<string, unknown>;
 
-const baselinePath = path.join(REPO_ROOT, 'tests/fixtures/external/wpt_extracted_known_failures.json');
+const baselinePath = path.join(REPO_ROOT, 'tests/fixtures/baselines/wpt-cssom-known-failures.json');
 let baselineList: string[] = [];
 if (fs.existsSync(baselinePath)) {
   baselineList = JSON.parse(fs.readFileSync(baselinePath, 'utf8')) as string[];

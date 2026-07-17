@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const SPEC_PATH = 'submodules/csswg-drafts/css-color-4/Overview.bs';
-const OUTPUT_PATH = 'src/data/colors.ts';
+const OUTPUT_PATH = 'src/data/gen/colors.ts';
 
 function main() {
   const absoluteSpecPath = path.resolve(SPEC_PATH);

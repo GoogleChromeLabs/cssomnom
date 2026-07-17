@@ -18,7 +18,7 @@
     "typecheck": "tsc --noEmit",
     "preflight": "pnpm typecheck && pnpm lint && pnpm test:node",
     "lint": "oxlint",
-    "fixtures:generate": "node scripts/generate_fixtures.ts",
+    "fixtures:generate": "node scripts/extract_external_suites.ts",
     "submodules:update": "git submodule update --init --recursive",
     "submodules:upgrade": "git submodule update --init --remote && pnpm run submodules:update",
     "codegen": "node scripts/generate_all.ts",

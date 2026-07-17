@@ -17,7 +17,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import * as CSSOM from '../src/index.ts';
-import { UNITS } from '../src/data/units.ts';
+import { UNITS } from '../src/data/gen/units.ts';
 
 test('API Surface Area', () => {
   const expectedExports = [

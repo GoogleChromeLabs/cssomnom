@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 
 const WEBREF_CSS_PATH = 'node_modules/@webref/css/css.json';
-const LOGICAL_MAPPING_TS_PATH = 'src/data/LogicalMapping.ts';
+const LOGICAL_MAPPING_TS_PATH = 'src/data/gen/LogicalMapping.ts';
 
 function main() {
     const css = JSON.parse(fs.readFileSync(WEBREF_CSS_PATH, 'utf8'));

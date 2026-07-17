@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { resolveLogicalProperty } from '../src/data/LogicalMapping.ts';
+import { resolveLogicalProperty } from '../src/data/gen/LogicalMapping.ts';
 
 test('logical border-radius mapping in vertical-rl', () => {
   const writingMode = 'vertical-rl';

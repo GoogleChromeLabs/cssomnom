@@ -14,8 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { unitToBase, unitToPixels } from './data/units.ts';
-import { NAMED_COLORS } from './data/colors.ts';
+import { unitToBase, unitToPixels } from './data/gen/units.ts';
+import { NAMED_COLORS } from './data/gen/colors.ts';
 import { tokenize } from './tokenizer.ts';
 import { Parser } from './parser.ts';
 import type { ComponentValue, Token, SimpleBlock, CSSFunction } from './types.ts';
