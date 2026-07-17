@@ -1758,12 +1758,12 @@ Objective: Verify our WPT shim conformance against WPT's own unit tests, then sc
   - [x] Execute the 33 unit tests in `submodules/web-platform-tests/resources/test/tests/unit/` using the WPT sandbox.
   - [x] Identify and fix shim errors, DOM overrides, or compatibility gaps in `tests/wpt-shim.ts` (e.g. sync execution, complete/abort states, event target VM binding, cleanups support).
   - [ ] Follow up on 3 remaining punted failures (1 in `exceptional-cases.html` on late-registered test status after cleanup errors, and 2 in `exceptional-cases-timeouts.html` on timeout exceptions).
-- [/] **Broad Spec Conformance Crawler Expansion**:
-  - [ ] Expand the WPT sandbox crawler to read and execute tests under other core specification directories: `cssom/`, `css-syntax/`, `css-nesting/`, `css-variables/`, `selectors/`, `mediaqueries/`.
-  - [ ] Configure includes/excludes lists for these spec folders in `tests/wpt-sandbox-config.json`.
-- [ ] **Unified Multi-Spec Progress Logging**:
-  - [ ] Create `wpt-progress.md` logging progress across multiple specs.
-  - [ ] Update progress logging script (`scripts/update_wpt_progress.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
+- [x] **Broad Spec Conformance Crawler Expansion**:
+  - [x] Expand the WPT sandbox crawler to read and execute tests under other core specification directories: `cssom/`, `css-syntax/`, `css-nesting/`, `css-variables/`, `selectors/`, `mediaqueries/`.
+  - [x] Configure includes/excludes lists for these spec folders in `tests/wpt-sandbox-config.json`.
+- [x] **Unified Multi-Spec Progress Logging**:
+  - [x] Create `wpt-progress.md` logging progress across multiple specs.
+  - [x] Update progress logging script (`scripts/update_wpt_progress.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
     ```markdown
     | Date & Time (UTC) | Commit | Typed OM (12150) | CSSOM (600) | Nesting (120) | Syntax (350) | Selectors (500) | MQ (200) | Overall | Pass Rate |
     | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |

@@ -1,14 +1,39 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execSync } from 'node:child_process';
-import { runWptFile } from './run_wpt_sandbox.ts';
+import * as os from 'node:os';
+import { exec, execSync } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execPromise = promisify(exec);
+
+interface SpecConfig {
+  path: string;
+  exclude: string[];
+}
 
 interface SandboxConfig {
-  exclude: string[];
-  knownFailures: Record<string, string[]>;
+  specs: Record<string, SpecConfig>;
 }
+
+interface SpecResult {
+  passing: number;
+  total: number;
+}
+
+const SPEC_DISPLAY_NAMES: Record<string, string> = {
+  'css-typed-om': 'Typed OM',
+  'cssom': 'CSSOM',
+  'css-nesting': 'Nesting',
+  'css-syntax': 'Syntax',
+  'css-variables': 'Variables',
+  'selectors': 'Selectors',
+  'mediaqueries': 'MQ'
+};
+
+const specOrder = ['css-typed-om', 'cssom', 'css-nesting', 'css-syntax', 'css-variables', 'selectors', 'mediaqueries'];
 
 function crawlDirectory(dir: string, fileList: string[] = []): string[] {
   const files = fs.readdirSync(dir);
@@ -26,58 +51,101 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
+async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  const promises: Promise<void>[] = [];
+  let index = 0;
+
+  async function worker() {
+    while (index < items.length) {
+      const currentIndex = index++;
+      const item = items[currentIndex];
+      results[currentIndex] = await fn(item);
+    }
+  }
+
+  for (let i = 0; i < Math.min(limit, items.length); i++) {
+    promises.push(worker());
+  }
+  await Promise.all(promises);
+  return results;
+}
+
 async function main() {
-  const configPath = path.resolve(process.cwd(), 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
+  const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
   if (!fs.existsSync(configPath)) {
     console.error('Error: WPT sandbox config not found.');
     process.exit(1);
   }
 
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as SandboxConfig;
-  const targetDir = path.resolve(process.cwd(), 'submodules/web-platform-tests/css/css-typed-om');
-  const allFiles = crawlDirectory(targetDir).sort();
+  const specResults: Record<string, SpecResult> = {};
 
-  console.log('Running WPT sandbox tests to compute progress...');
-  let totalTests = 0;
-  let passingTests = 0;
-  let failingTests = 0;
-  let fileCount = 0;
+  let grandTotal = 0;
+  let grandPassing = 0;
 
-  for (const filePath of allFiles) {
-    const relativePath = path.relative(process.cwd(), filePath);
-    
-    // Check exclude list
-    let isExcluded = false;
-    for (const excl of config.exclude || []) {
-      if (relativePath === excl || relativePath.includes(excl)) {
-        isExcluded = true;
-        break;
-      }
-    }
-    if (isExcluded) {
+  console.log('Running WPT sandbox tests across expanded specifications...');
+  const concurrency = Math.max(1, os.availableParallelism() - 1);
+  console.log(`Using parallel concurrency limit: ${concurrency}`);
+
+  for (const [specName, specConfig] of Object.entries(config.specs)) {
+    console.log(`Starting spec: ${specName}`);
+    const targetDir = path.resolve(process.cwd(), specConfig.path);
+    if (!fs.existsSync(targetDir)) {
+      console.warn(`Warning: spec directory ${targetDir} not found, skipping.`);
+      specResults[specName] = { passing: 0, total: 0 };
       continue;
     }
 
-    fileCount++;
-    try {
-      const testQueue = runWptFile(filePath);
-      for (const testItem of testQueue) {
-        totalTests++;
-        try {
-          await testItem.fn();
-          passingTests++;
-        } catch {
-          failingTests++;
+    const allFiles = crawlDirectory(targetDir).sort();
+    const filteredFiles = allFiles.filter(filePath => {
+      const relativePath = path.relative(process.cwd(), filePath);
+      // Check exclude list
+      for (const excl of specConfig.exclude || []) {
+        if (relativePath === excl || relativePath.includes(excl)) {
+          return false;
         }
       }
-    } catch (err) {
-      // If file fails to initialize, treat it as failing all tests or just log it
-      console.warn(`Warning: failed to run ${relativePath}:`, err);
+      return true;
+    });
+
+    let specTotal = 0;
+    let specPassing = 0;
+
+    const results = await pool(concurrency, filteredFiles, async (filePath) => {
+      let passing = 0;
+      let total = 0;
+      try {
+        const { stdout } = await execPromise(`node scripts/run_wpt_sandbox.ts "${filePath}"`, { timeout: 5000 });
+        const match = stdout.match(/Summary: (\d+)\/(\d+) passed/);
+        if (match) {
+          passing = parseInt(match[1], 10);
+          total = parseInt(match[2], 10);
+        }
+      } catch (err: any) {
+        const stdout = err.stdout || '';
+        const match = stdout.match(/Summary: (\d+)\/(\d+) passed/);
+        if (match) {
+          passing = parseInt(match[1], 10);
+          total = parseInt(match[2], 10);
+        }
+      }
+      return { passing, total };
+    });
+
+    for (const res of results) {
+      specTotal += res.total;
+      specPassing += res.passing;
     }
+
+    specResults[specName] = { passing: specPassing, total: specTotal };
+    grandTotal += specTotal;
+    grandPassing += specPassing;
+    console.log(`- Spec ${specName}: ${specPassing}/${specTotal} passed.`);
   }
 
-  const passRate = totalTests > 0 ? ((passingTests / totalTests) * 100).toFixed(2) : '0.00';
-  console.log(`\nResults: ${passingTests}/${totalTests} passed (${passRate}%), ${failingTests} failed. (Scanned ${fileCount} files)`);
+  const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
+  console.log(`\nOverall Results: ${grandPassing}/${grandTotal} passed (${overallPassRate}%).`);
 
   // Get git details
   let commitHash = 'unknown';
@@ -93,7 +161,7 @@ async function main() {
   const now = new Date();
   const dateStr = now.toISOString().replace('T', ' ').substring(0, 19);
 
-  const progressFilePath = path.resolve(process.cwd(), 'wpt-typed-om-progress.md');
+  const progressFilePath = path.resolve(process.cwd(), 'wpt-progress.md');
   let fileExists = fs.existsSync(progressFilePath);
   let shouldAppend = true;
 
@@ -110,13 +178,11 @@ async function main() {
 
     if (lastRowLine) {
       const parts = lastRowLine.split('|').map(p => p.trim());
-      if (parts.length >= 7) {
-        const lastTotal = parseInt(parts[3], 10);
-        const lastPassed = parseInt(parts[4], 10);
-        const lastFailed = parseInt(parts[5], 10);
-
-        if (lastTotal === totalTests && lastPassed === passingTests && lastFailed === failingTests) {
-          console.log('No changes in test counts since last run. Skipping log update.');
+      if (parts.length >= 11) {
+        const lastOverall = parts[10];
+        const expectedOverall = `${grandPassing}/${grandTotal}`;
+        if (lastOverall === expectedOverall) {
+          console.log('No changes in overall test counts since last run. Skipping log update.');
           shouldAppend = false;
         }
       }
@@ -124,13 +190,33 @@ async function main() {
   }
 
   if (shouldAppend) {
-    const newRow = `| ${dateStr} | \`${commitStr}\` | ${totalTests} | ${passingTests} | ${failingTests} | ${passRate}% |`;
-    
+    const rowParts = [dateStr, `\`${commitStr}\``];
+    for (const key of specOrder) {
+      const res = specResults[key] || { passing: 0, total: 0 };
+      rowParts.push(`${res.passing}/${res.total}`);
+    }
+    rowParts.push(`${grandPassing}/${grandTotal}`);
+    rowParts.push(`${overallPassRate}%`);
+    const newRow = `| ${rowParts.join(' | ')} |`;
+
     if (!fileExists) {
-      const initialContent = `# WPT Typed OM Sandbox Progress Log\n\n` +
-        `This file tracks the conformance progress of the CSS Typed OM parser implementation against the W3C Web Platform Tests (WPT) sandbox runner.\n\n` +
-        `| Date & Time (UTC) | Commit | Total Tests | Passing | Failing | Pass Rate |\n` +
-        `| :--- | :--- | :---: | :---: | :---: | :---: |\n` +
+      const headers = ['Date & Time (UTC)', 'Commit'];
+      const alignments = [':---', ':---'];
+      for (const key of specOrder) {
+        const res = specResults[key] || { passing: 0, total: 0 };
+        const displayName = SPEC_DISPLAY_NAMES[key] || key;
+        headers.push(`${displayName} (${res.total})`);
+        alignments.push(':---:');
+      }
+      headers.push('Overall');
+      alignments.push(':---:');
+      headers.push('Pass Rate');
+      alignments.push(':---:');
+
+      const initialContent = `# WPT Multi-Spec Conformance Sandbox Progress Log\n\n` +
+        `This file tracks the conformance progress of the CSSOM / Typed OM implementations across major W3C Web Platform Tests spec suites.\n\n` +
+        `| ${headers.join(' | ')} |\n` +
+        `| ${alignments.join(' | ')} |\n` +
         `${newRow}\n`;
       fs.writeFileSync(progressFilePath, initialContent, 'utf-8');
       console.log(`Created ${progressFilePath} with first entry.`);

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { parseStyleSheet } from '../src/parser.ts';
 /**
  * @license
@@ -145,9 +146,8 @@ export function patchWindowForTypedOM(window: WindowType) {
       enumerable: true,
       get() {
         if (!this._contentDocument) {
-          const iframe = this;
           let iframeSandbox: any = null;
-          const iframeWindow = new Proxy({}, {
+          const iframeWindow = new Proxy({} as any, {
             get(target, prop) {
               if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
                 return iframeWindow;
@@ -648,14 +648,14 @@ function get_test_name(func: Function, name: string | undefined, defaultName: st
       }
     }
   }
-  const suffix = tests.filter(t => t.name.startsWith(defaultName)).length;
-  return defaultName + (suffix > 0 ? ` ${suffix}` : '');
+  const count = tests.filter(t => t.name.startsWith(defaultName)).length;
+  return `${defaultName}-${count}`;
 }
 
 export function createWptContext(
   window: WindowType,
   document: DocumentType,
-  tests: Array<{ name: string; fn: Function }>
+  tests: any[]
 ): Record<string, unknown> {
   const ctx: Record<string, any> = {
     window,
@@ -671,9 +671,9 @@ export function createWptContext(
     Event: (window as any).Event,
     CustomEvent: (window as any).CustomEvent,
     navigator: (window as any).navigator,
+    ...TypedOM,
     DOMMatrix: (globalThis as any).DOMMatrix,
     DOMMatrixReadOnly: (globalThis as any).DOMMatrixReadOnly,
-    ...TypedOM,
     CSS: TypedOM.CSS,
     AssertionError: AssertionErrorProxy,
     OptionalFeatureUnsupportedError,
@@ -733,9 +733,8 @@ export function createWptContext(
       return acc;
     }, {}) as Record<string, unknown>),
     
-    // WPT harness shims
     test: (fn: Function, name?: string) => {
-      const testName = get_test_name(fn, name, document.title || 'Untitled', tests);
+      const testName = get_test_name(fn, name, 'anonymous-test', tests);
       if (ctx.harnessCompleted || ctx.harnessAborted) {
         tests.push({
           type: 'test',
@@ -800,7 +799,7 @@ export function createWptContext(
       }
     },
     promise_test: (fn: Function, name?: string) => {
-      const testName = get_test_name(fn, name, document.title || 'Untitled', tests);
+      const testName = get_test_name(fn, name, 'anonymous-test', tests);
       if (ctx.harnessCompleted || ctx.harnessAborted) {
         tests.push({
           type: 'promise_test',
@@ -821,7 +820,7 @@ export function createWptContext(
       } as any);
     },
     async_test: (fn: Function, name?: string) => {
-      const testName = get_test_name(fn, name, document.title || 'Untitled', tests);
+      const testName = get_test_name(fn, name, 'anonymous-test', tests);
       if (ctx.harnessCompleted || ctx.harnessAborted) {
         tests.push({
           type: 'async_test',

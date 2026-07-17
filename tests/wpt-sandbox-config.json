@@ -1,0 +1,46 @@
+{
+  "specs": {
+    "css-typed-om": {
+      "path": "submodules/web-platform-tests/css/css-typed-om",
+      "exclude": [
+        "submodules/web-platform-tests/css/css-typed-om/background-image-gradient.html",
+        "submodules/web-platform-tests/css/css-typed-om/cycle-in-unparsed-value-crash.html",
+        "submodules/web-platform-tests/css/css-typed-om/idlharness.html",
+        "submodules/web-platform-tests/css/css-typed-om/stylevalue-normalization/normalize-image.html",
+        "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/declared/declared.tentative.html",
+        "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/background-position.html",
+        "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/object-position.html",
+        "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/offset-anchor.html",
+        "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/offset-position.html",
+        "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/perspective-origin.html",
+        "submodules/web-platform-tests/css/css-typed-om/width-by-clamp-px-em.html",
+        "submodules/web-platform-tests/css/css-typed-om/width-by-max-px-em.html",
+        "submodules/web-platform-tests/css/css-typed-om/width-by-min-px-em.html"
+      ]
+    },
+    "cssom": {
+      "path": "submodules/web-platform-tests/css/cssom",
+      "exclude": []
+    },
+    "css-syntax": {
+      "path": "submodules/web-platform-tests/css/css-syntax",
+      "exclude": []
+    },
+    "css-nesting": {
+      "path": "submodules/web-platform-tests/css/css-nesting",
+      "exclude": []
+    },
+    "css-variables": {
+      "path": "submodules/web-platform-tests/css/css-variables",
+      "exclude": []
+    },
+    "selectors": {
+      "path": "submodules/web-platform-tests/css/selectors",
+      "exclude": []
+    },
+    "mediaqueries": {
+      "path": "submodules/web-platform-tests/css/mediaqueries",
+      "exclude": []
+    }
+  }
+}

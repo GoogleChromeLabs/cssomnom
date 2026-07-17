@@ -1,4 +1,6 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM, createWptContext } from '../tests/wpt-shim.ts';
@@ -65,12 +67,14 @@ export function runWptFile(filePath: string): WptTest[] {
       if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
         return windowProxy;
       }
-      const val = target[prop];
-      if (val !== undefined) {
-        if (typeof val === 'function') {
-          return val.bind(target);
+      if (typeof prop === 'string') {
+        const val = target[prop];
+        if (val !== undefined) {
+          if (typeof val === 'function') {
+            return val.bind(target);
+          }
+          return val;
         }
-        return val;
       }
       return Reflect.get(sandbox, prop as string);
     },
@@ -78,10 +82,13 @@ export function runWptFile(filePath: string): WptTest[] {
       if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
         return true;
       }
-      return (target[prop] !== undefined) || (prop in sandbox);
+      if (typeof prop === 'string') {
+        return (target[prop] !== undefined) || (prop in sandbox);
+      }
+      return prop in sandbox;
     },
     set(target, prop, value) {
-      if (target[prop] !== undefined) {
+      if (typeof prop === 'string' && target[prop] !== undefined) {
         return Reflect.set(target, prop, value);
       }
       return Reflect.set(sandbox, prop as string, value);
@@ -142,7 +149,17 @@ export function runWptFile(filePath: string): WptTest[] {
   }
 
   const testQueue: WptTest[] = [];
-  for (const t of tests) {
+  for (const t of tests as any[]) {
+    if (t.executed) {
+      const wrappedFn = async () => {
+        if (t.status !== 0) {
+          throw new Error(t.message || `Test failed with status ${t.status}`);
+        }
+      };
+      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
+      continue;
+    }
+
     const cleanups: Function[] = [];
     const testHarnessParam = {
       add_cleanup(fn: Function) {
