@@ -253,6 +253,8 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
             console.error(`  ✖ ${testItem.name}`);
             console.error(err);
           }
+          // Yield to event loop to allow GC and timers to run
+          await new Promise(resolve => setTimeout(resolve, 5));
         }
         result.cleanup();
       } catch (err) {

@@ -48,6 +48,8 @@ async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>
       const currentIndex = index++;
       const item = items[currentIndex];
       results[currentIndex] = await fn(item);
+      // Yield to event loop to allow system process scheduler to settle
+      await new Promise(resolve => setTimeout(resolve, 20));
     }
   }
 
