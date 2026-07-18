@@ -163,6 +163,9 @@ Convenience methods on the `Parser` class for common tasks without manual tokeni
 ## Web Platform Test (WPT) Conformance
 
 <!-- WPT_CHROME_STATUS_START -->
+### Headless Chrome Conformance
+- **Pass Rate**: 94.72% (12075 / 12748 passed)
+- **Failed Assertions**: 673
 <!-- WPT_CHROME_STATUS_END -->
 
 ## Development
