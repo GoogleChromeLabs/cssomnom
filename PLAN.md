@@ -565,8 +565,7 @@ Objective: Support common and critical assertions in AI-generated graders (stati
     - [x] Add explicit handlers for `@starting-style` and `@view-transition` in `src/parser.ts`.
     - [x] Ensure robust parsing of `:has()` and `:popover-open` in selector parser.
     - [x] **Extract Fixtures from WPT**: Extracted test cases for `anchor()`, `anchor-size()`, `@starting-style`, `@view-transition`, `:has()`, and `:popover-open` into `tests/fixtures/wpt/wpt-modern-features.json`.
-- [ ] **Capabilities**:
-    - **Static Selector Matching**: (On hold) Implement a basic matcher to evaluate a parsed selector against a DOM element (e.g., for use with `linkedom`).
+- [x] **Capabilities**:
     - [x] **Specificity & Cascade Resolution**:
         - [x] Add tests for specificity calculation. (Spec: `selectors-4 #specificity-rules`)
         - [x] Implement structured selector parser.
@@ -1832,6 +1831,7 @@ Objective: Explore long-term ideas for WPT conformance, prototype patching optio
 #### 1. Spec-Compliance & API Surface Refinements
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
+- [ ] **Static Selector Matching**: Implement a basic CSS selector matcher to evaluate a parsed selector against a DOM element (e.g. for use with Linkedom).
 
 
 
