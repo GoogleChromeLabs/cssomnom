@@ -5,7 +5,6 @@ import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM, createWptContext } from './wpt-shim.ts';
 import type { WptSandboxTest } from './wpt-shim.ts';
-import { StylePropertyMapReadOnly } from '../src/typed-om.ts';
 
 test('window.getComputedStyle in sandbox shim', () => {
   const dom = parseHTML('<!DOCTYPE html><html><body><div id="test" style="color: red;"></div></body></html>');
