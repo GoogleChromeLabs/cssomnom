@@ -247,10 +247,10 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
           try {
             await testItem.fn();
             passed++;
-            console.log(`  ✔ ${testItem.name}`);
+            console.log(`  ✔ ${testItem.name.replace(/\n/g, '\\n')}`);
           } catch (err) {
             failed++;
-            console.error(`  ✖ ${testItem.name}`);
+            console.error(`  ✖ ${testItem.name.replace(/\n/g, '\\n')}`);
             console.error(err);
           }
           // Yield to event loop to allow GC and timers to run

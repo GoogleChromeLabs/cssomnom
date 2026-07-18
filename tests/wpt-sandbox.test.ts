@@ -153,7 +153,7 @@ if (process.env.RUN_SANDBOX_WPT === 'true' && fs.existsSync(failuresPath) && fs.
             const fileFailures = failureConfig.knownFailures[relativePath] || [];
 
             for (const testItem of fileResult.tests) {
-              const isKnownFailure = fileFailures.includes(testItem.name);
+              const isKnownFailure = fileFailures.includes(testItem.name) || fileFailures.includes(testItem.name.replace(/\n/g, '\\n'));
               
               if (isKnownFailure) {
                 it.skip(`[KNOWN FAILURE] ${testItem.name}`, async () => {

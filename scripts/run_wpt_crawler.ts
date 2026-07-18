@@ -161,7 +161,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
         if (options.updateBaseline) {
           const matches = mergedOutput.matchAll(/^\s*✖ (.*)/gm);
           for (const m of matches) {
-            failedTests.push(m[1].trim());
+            failedTests.push(m[1]);
           }
         }
       } catch (err: unknown) {
@@ -179,16 +179,21 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
           total = parseInt(match[2], 10);
         }
         if (options.updateBaseline) {
-          const loadErrorMatch = mergedOutput.match(/Failed to run file .*?: (.*)/);
-          if (loadErrorMatch) {
-            loadError = loadErrorMatch[1].trim();
+          const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || mergedOutput.includes('Runner timed out');
+          if (isTimeout) {
+            loadError = 'Runner timed out (execution took longer than 3.5s)';
           } else {
-            const matches = mergedOutput.matchAll(/^\s*✖ (.*)/gm);
-            for (const m of matches) {
-              failedTests.push(m[1].trim());
-            }
-            if (failedTests.length === 0) {
-              loadError = (err instanceof Error) ? err.message : String(err);
+            const loadErrorMatch = mergedOutput.match(/Failed to run file .*?: (.*)/);
+            if (loadErrorMatch) {
+              loadError = loadErrorMatch[1].trim();
+            } else {
+              const matches = mergedOutput.matchAll(/^\s*✖ (.*)/gm);
+              for (const m of matches) {
+                failedTests.push(m[1]);
+              }
+              if (failedTests.length === 0) {
+                loadError = (err instanceof Error) ? err.message : String(err);
+              }
             }
           }
         }
