@@ -160,8 +160,29 @@ export function extractScripts(htmlContent: string, htmlDir: string): { code: st
   return scriptsToRun;
 }
 
+let prototypesPatched = false;
+
 export function patchWindowForTypedOM(window: WindowType) {
   const win = window as unknown as Record<string, unknown>;
+
+  // --- 1. Instance-Specific Mocks (Always run for every new Window instance) ---
+
+  // Patch window.addEventListener to immediately invoke 'load' listener if load event has already been dispatched.
+  const originalAddEventListener = window.addEventListener;
+  win.addEventListener = function(this: typeof window, type: string, listener: any, options?: any) {
+    if (type === 'load' && win.__loadEventFired) {
+      queueMicrotask(() => {
+        try {
+          if (typeof listener === 'function') {
+            listener.call(window, new (window as any).Event('load'));
+          } else if (listener && typeof listener.handleEvent === 'function') {
+            listener.handleEvent(new (window as any).Event('load'));
+          }
+        } catch {}
+      });
+    }
+    return originalAddEventListener.call(this, type, listener, options);
+  };
 
   // Implement postMessage if missing
   if (!('postMessage' in win)) {
@@ -173,6 +194,133 @@ export function patchWindowForTypedOM(window: WindowType) {
     };
   }
 
+  // Inject createHTMLDocument on document.implementation
+  const doc = win.document as Record<string, unknown> | undefined;
+  if (doc) {
+    if (!doc.implementation) {
+      doc.implementation = {};
+    }
+    (doc.implementation as Record<string, unknown>).createHTMLDocument = function(title: string) {
+      const dom = parseHTML(`<!DOCTYPE html><html><head><title>${title}</title></head><body></body></html>`);
+      patchWindowForTypedOM(dom.window);
+      return dom.window.document;
+    };
+  }
+
+  // Mock window.getComputedStyle
+  win.getComputedStyle = function(el: Record<string, unknown>) {
+    const style = el.style as Record<string, unknown>;
+    if (!style) return style;
+    return new Proxy(style, {
+      get(target, prop) {
+        if (prop === 'styleMap') {
+          return typeof el.computedStyleMap === 'function' ? el.computedStyleMap() : undefined;
+        }
+        const val = target[prop as string];
+        if (typeof val === 'function') {
+          return val.bind(target);
+        }
+        return val;
+      },
+      has(target, prop) {
+        if (prop === 'styleMap') return true;
+        return prop in target;
+      }
+    });
+  };
+
+  // Mock window.matchMedia
+  win.matchMedia = function(media: string) {
+    return {
+      matches: false,
+      media,
+      onchange: null,
+      addListener() {},
+      removeListener() {},
+      addEventListener() {},
+      removeEventListener() {},
+      dispatchEvent() { return false; }
+    };
+  };
+
+  // --- 2. Shared Prototype Mocks (Only run once globally per Node process) ---
+  if (prototypesPatched) {
+    return;
+  }
+  prototypesPatched = true;
+
+  // Patch DOM elements prototype hierarchy to fire 'load' event on injected link stylesheets and iframes
+  const dummyElForPatch = win.document?.createElement?.('div');
+  if (dummyElForPatch) {
+    let proto = Object.getPrototypeOf(dummyElForPatch);
+    while (proto) {
+      if (Object.prototype.hasOwnProperty.call(proto, 'appendChild')) {
+        const originalAppendChild = proto.appendChild as (node: unknown) => unknown;
+        proto.appendChild = function(this: unknown, node: unknown) {
+          const res = originalAppendChild.call(this, node);
+          const nodeEl = node as { nodeName?: string; getAttribute?: (name: string) => string | null; dispatchEvent?: (ev: Event) => boolean } | null;
+          if (nodeEl && nodeEl.nodeName === 'LINK' && nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet') {
+            queueMicrotask(() => {
+              try {
+                if (nodeEl.dispatchEvent) {
+                  const doc = (this as any).ownerDocument || this;
+                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+                  nodeEl.dispatchEvent(new eventConstructor.Event('load'));
+                }
+              } catch {}
+            });
+          } else if (nodeEl && nodeEl.nodeName === 'IFRAME') {
+            queueMicrotask(() => {
+              try {
+                if (nodeEl.dispatchEvent) {
+                  const doc = (this as any).ownerDocument || this;
+                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+                  nodeEl.dispatchEvent(new eventConstructor.Event('load'));
+                }
+              } catch {}
+            });
+          }
+          return res;
+        };
+      }
+
+      if (Object.prototype.hasOwnProperty.call(proto, 'insertBefore')) {
+        const originalInsertBefore = proto.insertBefore as (node: unknown, child: unknown) => unknown;
+        proto.insertBefore = function(this: unknown, node: unknown, child: unknown) {
+          const res = originalInsertBefore.call(this, node, child);
+          const nodeEl = node as { nodeName?: string; getAttribute?: (name: string) => string | null; dispatchEvent?: (ev: Event) => boolean } | null;
+          if (nodeEl && nodeEl.nodeName === 'LINK' && nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet') {
+            queueMicrotask(() => {
+              try {
+                if (nodeEl.dispatchEvent) {
+                  const doc = (this as any).ownerDocument || this;
+                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+                  nodeEl.dispatchEvent(new eventConstructor.Event('load'));
+                }
+              } catch {}
+            });
+          } else if (nodeEl && nodeEl.nodeName === 'IFRAME') {
+            queueMicrotask(() => {
+              try {
+                if (nodeEl.dispatchEvent) {
+                  const doc = (this as any).ownerDocument || this;
+                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+                  nodeEl.dispatchEvent(new eventConstructor.Event('load'));
+                }
+              } catch {}
+            });
+          }
+          return res;
+        };
+      }
+      proto = Object.getPrototypeOf(proto);
+    }
+  }
+
   const htmlIframeEl = win.HTMLIFrameElement as { prototype: Record<string, unknown> } | undefined;
   if (htmlIframeEl) {
     Object.defineProperty(htmlIframeEl.prototype, 'contentDocument', {
@@ -180,74 +328,33 @@ export function patchWindowForTypedOM(window: WindowType) {
       enumerable: true,
       get() {
         if (!this._contentDocument) {
+          const iframeDom = parseHTML('<!DOCTYPE html><html><head></head><body></body></html>');
+          const iframeWindow = iframeDom.window;
+          patchWindowForTypedOM(iframeWindow);
+
+          // Route postMessage to parent window (main window)
+          iframeWindow.postMessage = function(this: typeof iframeWindow, data: unknown) {
+            const event = new window.CustomEvent('message');
+            Object.defineProperty(event, 'data', { value: data, enumerable: true });
+            Object.defineProperty(event, 'source', { value: this, enumerable: true });
+            window.dispatchEvent(event);
+          };
+
           let iframeSandbox: IframeSandboxContext | null = null;
-          const iframeWindowTarget: Partial<WindowType> = {};
-          const iframeWindow = new Proxy(iframeWindowTarget, {
-            get(target, prop) {
-              if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
-                return iframeWindow;
-              }
-              if (prop === 'postMessage') {
-                return (data: unknown) => {
-                  const event = new window.CustomEvent('message');
-                  Object.defineProperty(event, 'data', { value: data, enumerable: true });
-                  Object.defineProperty(event, 'source', { value: iframeWindow, enumerable: true });
-                  window.dispatchEvent(event);
-                };
-              }
-              return iframeSandbox ? iframeSandbox[prop as string] : undefined;
-            },
-            has(target, prop) {
-              if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
-                return true;
-              }
-              return iframeSandbox ? (prop in iframeSandbox) : false;
+          const iframeDocument = iframeDom.document;
+
+          this._contentDocument = iframeDocument;
+          this._contentWindow = iframeWindow;
+
+          (iframeDocument as any).write = function(src: string) {
+            const scripts = extractScripts(src, '');
+            const iframeTests: WptSandboxTest[] = [];
+            const titleMatch = /<title>(.*?)<\/title>/i.exec(src);
+            const iframeTitle = titleMatch ? titleMatch[1] : 'Document title';
+            if (titleMatch) {
+              iframeDocument.title = titleMatch[1];
             }
-          }) as WindowType;
-          this._contentDocument = {
-            write(src: string) {
-              const scripts = extractScripts(src, '');
-              const iframeTests: WptSandboxTest[] = [];
-              const titleMatch = /<title>(.*?)<\/title>/i.exec(src);
-              const iframeTitle = titleMatch ? titleMatch[1] : 'Document title';
-              const iframeDocument: Partial<DocumentType> = {
-                title: iframeTitle,
-                body: window.document.createElement('body'),
-                createElement: (name: string) => window.document.createElement(name),
-                querySelectorAll: () => window.document.createDocumentFragment().querySelectorAll('*'),
-                get styleSheets() {
-                  const styles = Array.from(this.querySelectorAll!('style'));
-                  const links = Array.from(this.querySelectorAll!('link[rel="stylesheet"]'));
-                  const sheets: CSSStyleSheet[] = [];
-                  for (const styleEl of styles) {
-                    if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-                      sheets.push(styleEl.sheet as CSSStyleSheet);
-                    }
-                  }
-                  for (const linkEl of links) {
-                    if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-                      sheets.push(linkEl.sheet as CSSStyleSheet);
-                    }
-                  }
-                  const list = sheets as CSSStyleSheet[] & { item(idx: number): CSSStyleSheet | null };
-                  Object.defineProperty(list, 'item', {
-                    value(idx: number) {
-                      return list[idx] || null;
-                    },
-                    configurable: true,
-                    enumerable: false
-                  });
-                  return list as StyleSheetList;
-                },
-                fonts: {
-                  ready: Promise.resolve(),
-                  addEventListener() {},
-                  removeEventListener() {},
-                  check() { return true; },
-                  load() { return Promise.resolve([]); }
-                } as unknown as FontFaceSet
-              };
-              iframeSandbox = createWptContext(window, iframeDocument, iframeTests) as IframeSandboxContext;
+            iframeSandbox = createWptContext(iframeWindow, iframeDocument as unknown as DocumentType, iframeTests) as IframeSandboxContext;
               
               iframeSandbox.parent = window;
               iframeSandbox.top = window;
@@ -511,11 +618,9 @@ export function patchWindowForTypedOM(window: WindowType) {
                 iframeWindow.postMessage(completeData);
                 process.off('unhandledRejection', rejectionHandler);
                 process.off('uncaughtException', exceptionHandler);
-              });
-            },
-            close() {}
+            });
           };
-          this._contentWindow = iframeWindow;
+          (iframeDocument as any).close = function() {};
         }
         return this._contentDocument;
       }
@@ -527,6 +632,33 @@ export function patchWindowForTypedOM(window: WindowType) {
       get() {
         void this.contentDocument;
         return this._contentWindow;
+      }
+    });
+
+    Object.defineProperty(htmlIframeEl.prototype, 'srcdoc', {
+      configurable: true,
+      enumerable: true,
+      get(this: unknown) {
+        const self = this as { _srcdoc?: string };
+        return self._srcdoc ?? '';
+      },
+      set(this: unknown, val: string) {
+        const self = this as { _srcdoc?: string; contentDocument?: { write?: (s: string) => void }; dispatchEvent?: (ev: Event) => boolean };
+        self._srcdoc = val;
+        const doc = self.contentDocument;
+        if (doc && typeof doc.write === 'function') {
+          try {
+            doc.write(val);
+          } catch {}
+        }
+        queueMicrotask(() => {
+          try {
+            if (self.dispatchEvent) {
+              const eventConstructor = window as unknown as { Event: new (type: string) => Event };
+              self.dispatchEvent(new eventConstructor.Event('load'));
+            }
+          } catch {}
+        });
       }
     });
   }
@@ -639,17 +771,6 @@ export function patchWindowForTypedOM(window: WindowType) {
     });
   }
 
-  const doc = win.document as Record<string, unknown> | undefined;
-  if (doc) {
-    if (!doc.implementation) {
-      doc.implementation = {};
-    }
-    (doc.implementation as Record<string, unknown>).createHTMLDocument = function(title: string) {
-      const dom = parseHTML(`<!DOCTYPE html><html><head><title>${title}</title></head><body></body></html>`);
-      patchWindowForTypedOM(dom.window);
-      return dom.window.document;
-    };
-  }
 
   Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
     get() {
@@ -800,40 +921,6 @@ export function patchWindowForTypedOM(window: WindowType) {
     },
     configurable: true,
   });
-
-  win.getComputedStyle = function(el: Record<string, unknown>) {
-    const style = el.style as Record<string, unknown>;
-    if (!style) return style;
-    return new Proxy(style, {
-      get(target, prop) {
-        if (prop === 'styleMap') {
-          return typeof el.computedStyleMap === 'function' ? el.computedStyleMap() : undefined;
-        }
-        const val = target[prop as string];
-        if (typeof val === 'function') {
-          return val.bind(target);
-        }
-        return val;
-      },
-      has(target, prop) {
-        if (prop === 'styleMap') return true;
-        return prop in target;
-      }
-    });
-  };
-
-  win.matchMedia = function(media: string) {
-    return {
-      matches: false,
-      media,
-      onchange: null,
-      addListener() {},
-      removeListener() {},
-      addEventListener() {},
-      removeEventListener() {},
-      dispatchEvent() { return false; }
-    };
-  };
 }
 
 function code_unit_str(char: string) {
@@ -880,6 +967,8 @@ export function createWptContext(
 ): Record<string, unknown> {
   let nextRafId = 1;
   const activeRafs = new Map<number, NodeJS.Timeout>();
+  const activeTimeouts = new Set<NodeJS.Timeout>();
+  const activeIntervals = new Set<NodeJS.Timeout>();
 
   const ctx = {
     window,
@@ -903,10 +992,33 @@ export function createWptContext(
     CSS: TypedOM.CSS,
     AssertionError: AssertionErrorProxy,
     OptionalFeatureUnsupportedError,
-    setTimeout: globalThis.setTimeout,
-    clearTimeout: globalThis.clearTimeout,
-    setInterval: globalThis.setInterval,
-    clearInterval: globalThis.clearInterval,
+    setTimeout: (cb: Function, delay?: number, ...args: unknown[]) => {
+      const timer = setTimeout(() => {
+        activeTimeouts.delete(timer);
+        try {
+          cb(...args);
+        } catch {}
+      }, delay);
+      activeTimeouts.add(timer);
+      return timer;
+    },
+    clearTimeout: (timer: unknown) => {
+      clearTimeout(timer as NodeJS.Timeout);
+      activeTimeouts.delete(timer as NodeJS.Timeout);
+    },
+    setInterval: (cb: Function, delay?: number, ...args: unknown[]) => {
+      const timer = setInterval(() => {
+        try {
+          cb(...args);
+        } catch {}
+      }, delay);
+      activeIntervals.add(timer);
+      return timer;
+    },
+    clearInterval: (timer: unknown) => {
+      clearInterval(timer as NodeJS.Timeout);
+      activeIntervals.delete(timer as NodeJS.Timeout);
+    },
     requestAnimationFrame: (cb: (time: number) => void) => {
       const id = nextRafId++;
       const timer = setTimeout(() => {
@@ -924,6 +1036,20 @@ export function createWptContext(
         clearTimeout(timer);
         activeRafs.delete(id);
       }
+    },
+    __cleanup: () => {
+      for (const timer of activeTimeouts) {
+        clearTimeout(timer);
+      }
+      activeTimeouts.clear();
+      for (const timer of activeIntervals) {
+        clearInterval(timer);
+      }
+      activeIntervals.clear();
+      for (const timer of activeRafs.values()) {
+        clearTimeout(timer);
+      }
+      activeRafs.clear();
     },
     setup: (properties?: { single_test?: boolean; allow_uncaught_exception?: boolean }) => {
       if (properties) {

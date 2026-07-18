@@ -20,7 +20,6 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const REPO_ROOT = process.cwd();
-const TARGET_DIR = path.join(REPO_ROOT, 'submodules/web-platform-tests/css/css-typed-om');
 const CONFIG_PATH = path.join(REPO_ROOT, 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
 
 function crawlDirectory(dir: string, fileList: string[] = []): string[] {
@@ -43,44 +42,68 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
 }
 
 async function main() {
-  console.log(`Scanning WPT HTML files under: ${TARGET_DIR}...`);
-  const allFiles = crawlDirectory(TARGET_DIR);
-  console.log(`Found ${allFiles.length} HTML test files.`);
+  const sandboxConfigPath = path.join(REPO_ROOT, 'tests/wpt-sandbox-config.json');
+  if (!fs.existsSync(sandboxConfigPath)) {
+    console.error(`Config not found at ${sandboxConfigPath}`);
+    process.exit(1);
+  }
+  const specConfig = JSON.parse(fs.readFileSync(sandboxConfigPath, 'utf-8')) as {
+    specs: Record<string, { path: string; exclude: string[] }>;
+  };
 
   const includeList: string[] = [];
   const knownFailures: Record<string, string[]> = {};
   const syntaxErrors: Record<string, string> = {};
 
-  for (const filePath of allFiles) {
-    const relativePath = path.relative(REPO_ROOT, filePath);
-    console.log(`Running: ${relativePath}...`);
-    
-    let queue;
-    try {
-      queue = runWptFile(filePath);
-    } catch (err: unknown) {
-      const error = err as Error;
-      console.warn(`  [Init Error - Excluded]: ${error.message}`);
-      syntaxErrors[relativePath] = error.message || String(err);
+  for (const [specName, specInfo] of Object.entries(specConfig.specs)) {
+    const targetDir = path.resolve(REPO_ROOT, specInfo.path);
+    if (!fs.existsSync(targetDir)) {
+      console.warn(`Target directory not found: ${targetDir}`);
       continue;
     }
+    console.log(`Scanning WPT HTML files under ${specName}: ${targetDir}...`);
+    const allFiles = crawlDirectory(targetDir).sort();
+    console.log(`Found ${allFiles.length} HTML test files.`);
 
-    includeList.push(relativePath);
-    const failures: string[] = [];
-
-    for (const testItem of queue) {
-      try {
-        await testItem.fn();
-      } catch (err: unknown) {
-        failures.push(testItem.name);
+    for (const filePath of allFiles) {
+      const relativePath = path.relative(REPO_ROOT, filePath);
+      
+      const isExcluded = specInfo.exclude.includes(relativePath) || specInfo.exclude.some(excl => relativePath.includes(excl));
+      if (isExcluded) {
+        syntaxErrors[relativePath] = "Excluded in spec config";
+        continue;
       }
-    }
 
-    if (failures.length > 0) {
-      knownFailures[relativePath] = failures;
-      console.log(`  -> ${failures.length} / ${queue.length} assertions failed (baselined)`);
-    } else {
-      console.log(`  -> All ${queue.length} assertions passed!`);
+      console.log(`Running: ${relativePath}...`);
+      
+      let result;
+      try {
+        result = runWptFile(filePath);
+      } catch (err: unknown) {
+        const error = err as Error;
+        console.warn(`  [Init Error - Excluded]: ${error.message}`);
+        syntaxErrors[relativePath] = error.message || String(err);
+        continue;
+      }
+
+      includeList.push(relativePath);
+      const failures: string[] = [];
+
+      for (const testItem of result.tests) {
+        try {
+          await testItem.fn();
+        } catch (err: unknown) {
+          failures.push(testItem.name);
+        }
+      }
+
+      if (failures.length > 0) {
+        knownFailures[relativePath] = failures;
+        console.log(`  -> ${failures.length} / ${result.tests.length} assertions failed (baselined)`);
+      } else {
+        console.log(`  -> All ${result.tests.length} assertions passed!`);
+      }
+      result.cleanup();
     }
   }
 

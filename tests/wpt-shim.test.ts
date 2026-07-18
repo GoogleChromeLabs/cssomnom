@@ -172,3 +172,26 @@ test('document.implementation.createHTMLDocument mock in sandbox context', () =>
   assert.strictEqual(doc2.title, 'my-title');
   assert.ok(doc2.body, 'document should have a body element');
 });
+
+test('patchWindowForTypedOM prototype patching guard', () => {
+  const dom1 = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  const dom2 = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  
+  const elementProto = dom1.window.Element.prototype;
+  
+  // Call patch once
+  patchWindowForTypedOM(dom1.window);
+  const firstPatchedAppend = elementProto.appendChild;
+  
+  // Call patch again with a different window
+  patchWindowForTypedOM(dom2.window);
+  const secondPatchedAppend = elementProto.appendChild;
+  
+  // They should be identical (guard prevents wrapping again)
+  assert.strictEqual(
+    firstPatchedAppend, 
+    secondPatchedAppend, 
+    'Should not wrap prototype methods multiple times'
+  );
+});
+

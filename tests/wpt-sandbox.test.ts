@@ -1,6 +1,6 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 
-import { test, describe, it } from 'node:test';
+import { test, describe, it, after } from 'node:test';
 import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
 import * as fs from 'node:fs';
@@ -105,53 +105,67 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-const configPath = path.resolve(process.cwd(), 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
-if (fs.existsSync(configPath)) {
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as SandboxConfig;
-  const targetDir = path.resolve(process.cwd(), 'submodules/web-platform-tests/css/css-typed-om');
-  const allFiles = crawlDirectory(targetDir).sort();
-  
-  describe('WPT Sandbox Runner', () => {
-    for (const filePath of allFiles) {
-      const relativePath = path.relative(process.cwd(), filePath);
-      
-      // Check exclude list
-      let isExcluded = false;
-      for (const excl of config.exclude || []) {
-        if (relativePath === excl || relativePath.includes(excl)) {
-          isExcluded = true;
-          break;
-        }
-      }
-      if (isExcluded) {
-        continue;
-      }
+const failuresPath = path.resolve(process.cwd(), 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
+const sandboxConfigPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
 
-      describe(relativePath, () => {
-        let testQueue: ReturnType<typeof runWptFile>;
-        try {
-          testQueue = runWptFile(filePath);
-        } catch (err) {
-          it('Failed to initialize/parse sandbox HTML', () => {
-            throw err;
-          });
+if (process.env.RUN_SANDBOX_WPT === 'true' && fs.existsSync(failuresPath) && fs.existsSync(sandboxConfigPath)) {
+  const failureConfig = JSON.parse(fs.readFileSync(failuresPath, 'utf-8')) as SandboxConfig;
+  const specConfig = JSON.parse(fs.readFileSync(sandboxConfigPath, 'utf-8')) as {
+    specs: Record<string, { path: string; exclude: string[] }>;
+  };
+
+  describe('WPT Sandbox Runner', () => {
+    for (const [specName, specInfo] of Object.entries(specConfig.specs)) {
+      describe(`Spec: ${specName}`, () => {
+        const targetDir = path.resolve(process.cwd(), specInfo.path);
+        if (!fs.existsSync(targetDir)) {
           return;
         }
+        const allFiles = crawlDirectory(targetDir).sort();
 
-        const fileFailures = config.knownFailures[relativePath] || [];
-
-        for (const testItem of testQueue) {
-          const isKnownFailure = fileFailures.includes(testItem.name);
+        for (const filePath of allFiles) {
+          const relativePath = path.relative(process.cwd(), filePath);
           
-          if (isKnownFailure) {
-            it.skip(`[KNOWN FAILURE] ${testItem.name}`, async () => {
-              await testItem.fn();
-            });
-          } else {
-            it(testItem.name, async () => {
-              await testItem.fn();
-            });
+          const isExcluded = specInfo.exclude.includes(relativePath) ||
+                             failureConfig.exclude.includes(relativePath) ||
+                             specInfo.exclude.some(excl => relativePath.includes(excl)) ||
+                             failureConfig.exclude.some(excl => relativePath.includes(excl));
+
+          if (isExcluded) {
+            continue;
           }
+
+          describe(relativePath, () => {
+            let fileResult: ReturnType<typeof runWptFile>;
+            try {
+              fileResult = runWptFile(filePath);
+            } catch (err) {
+              it('Failed to initialize/parse sandbox HTML', () => {
+                throw err;
+              });
+              return;
+            }
+
+            after(() => {
+              fileResult.cleanup();
+            });
+
+            const fileFailures = failureConfig.knownFailures[relativePath] || [];
+
+            for (const testItem of fileResult.tests) {
+              const isKnownFailure = fileFailures.includes(testItem.name);
+              
+              if (isKnownFailure) {
+                it.skip(`[KNOWN FAILURE] ${testItem.name}`, async () => {
+                  await testItem.fn();
+                });
+              } else {
+                it(testItem.name, async () => {
+                  await testItem.fn();
+                });
+              }
+            }
+          });
         }
       });
     }

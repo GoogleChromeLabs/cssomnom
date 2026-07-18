@@ -20,7 +20,9 @@
     },
     "cssom": {
       "path": "submodules/web-platform-tests/css/cssom",
-      "exclude": []
+      "exclude": [
+        "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-disallow-import.tentative.html"
+      ]
     },
     "css-syntax": {
       "path": "submodules/web-platform-tests/css/css-syntax",

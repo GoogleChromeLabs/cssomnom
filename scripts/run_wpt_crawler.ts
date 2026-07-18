@@ -58,7 +58,7 @@ async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>
   return results;
 }
 
-export async function runCrawler(options: { spec?: string; file?: string; verbose?: boolean } = {}): Promise<Record<string, SpecResult>> {
+export async function runCrawler(options: { spec?: string; file?: string; verbose?: boolean; concurrency?: number } = {}): Promise<Record<string, SpecResult>> {
   const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
   if (!fs.existsSync(configPath)) {
     console.error('Error: WPT sandbox config not found.');
@@ -68,7 +68,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as SandboxConfig;
   const specResults: Record<string, SpecResult> = {};
 
-  const concurrency = Math.max(1, os.availableParallelism() - 1);
+  const concurrency = options.concurrency ?? Math.min(4, Math.max(1, os.availableParallelism() - 1));
   if (options.verbose) {
     console.log(`Using parallel concurrency limit: ${concurrency}`);
   }
@@ -125,10 +125,23 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     let specPassing = 0;
 
     const results = await pool(concurrency, filteredFiles, async (filePath) => {
+      // Monitor system health and throttle if load is too high or free memory is low
+      const cpuCount = os.cpus().length;
+      let load = os.loadavg()[0];
+      let freeMem = os.freemem() / (1024 * 1024 * 1024); // GB
+      
+      if (load > cpuCount * 0.95 || freeMem < 1.5) {
+        console.warn(`[System Health Guard] High Load: ${load.toFixed(1)} (cores: ${cpuCount}), Free Mem: ${freeMem.toFixed(2)}GB. Pausing worker for 1000ms...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Refresh load stats after sleep
+        load = os.loadavg()[0];
+        freeMem = os.freemem() / (1024 * 1024 * 1024);
+      }
+
       let passing = 0;
       let total = 0;
       try {
-        const { stdout } = await execPromise(`node scripts/run_wpt_sandbox.ts "${filePath}"`, { timeout: 10000 });
+        const { stdout } = await execPromise(`"${process.execPath}" scripts/run_wpt_sandbox.ts "${filePath}"`, { timeout: 4000 });
         if (options.verbose) {
           console.log(stdout);
         }
@@ -173,6 +186,7 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
   let spec: string | undefined;
   let file: string | undefined;
   let verbose = false;
+  let concurrency: number | undefined;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--spec' && i + 1 < args.length) {
@@ -181,13 +195,16 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
     } else if (args[i] === '--file' && i + 1 < args.length) {
       file = args[i + 1];
       i++;
+    } else if (args[i] === '--concurrency' && i + 1 < args.length) {
+      concurrency = parseInt(args[i + 1], 10);
+      i++;
     } else if (args[i] === '--verbose') {
       verbose = true;
     }
   }
 
   (async () => {
-    const results = await runCrawler({ spec, file, verbose });
+    const results = await runCrawler({ spec, file, verbose, concurrency });
     let total = 0;
     let passing = 0;
     for (const [, res] of Object.entries(results)) {
