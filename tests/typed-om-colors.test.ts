@@ -185,11 +185,10 @@ test('color() function reification to CSSColor', () => {
   assert.strictEqual(c2.toString(), 'color(srgb 10% 20% 30%)');
 });
 
-test('CSSColor channels property has no public setter', () => {
+test('CSSColor channels property has public setter', () => {
   const c = new CSSColor('srgb', [0.1, 0.2, 0.3]);
-  assert.throws(() => {
-    (c as unknown as Record<string, unknown>).channels = [1, 1, 1];
-  }, TypeError);
+  c.channels = [1, 1, 1];
+  assert.deepEqual(c.channels.map(x => x.toString()), ['1', '1', '1']);
 });
 
 test('Alpha is omitted when unity in modern colors serialization', () => {

@@ -45,6 +45,28 @@ function checkBrand(obj: unknown, cls: Function): void {
   }
 }
 
+function isNumericValue(val: unknown): val is CSSNumericValue {
+  if (!val || typeof val !== 'object') return false;
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSNumericValue) || CSSNumericValue;
+  return val instanceof Cls;
+}
+
+function isKeywordValue(val: unknown): val is CSSKeywordValue {
+  if (!val || typeof val !== 'object') return false;
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSKeywordValue) || CSSKeywordValue;
+  return val instanceof Cls;
+}
+
+function createUnitValue(value: number, unit: string): CSSUnitValue {
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSUnitValue) || CSSUnitValue;
+  return new Cls(value, unit);
+}
+
+function createKeywordValue(value: string): CSSKeywordValue {
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSKeywordValue) || CSSKeywordValue;
+  return new Cls(value);
+}
+
 const LIST_PROPERTIES = new Set([
   'background',
   'background-image',
@@ -515,7 +537,7 @@ function rectifyColorChannel(
 
   if (v === undefined || v === null) {
     if (allowUndefined && v === undefined) {
-      return new CSSKeywordValue('undefined');
+      return createKeywordValue('undefined');
     }
     if (undefinedAsSyntaxError) {
       throw new DOMException(`Value cannot be null or undefined`, 'SyntaxError');
@@ -540,7 +562,7 @@ function rectifyColorChannel(
       } else if (unit === '') {
         unit = 'number';
       }
-      matchedValue = new CSSUnitValue(val, unit as CSSUnit);
+      matchedValue = createUnitValue(val, unit as CSSUnit);
     }
     
     if (matchedValue) {
@@ -549,18 +571,18 @@ function rectifyColorChannel(
       try {
         resolved = CSSNumericValue.parse(v);
       } catch {
-        resolved = new CSSKeywordValue(v);
+        resolved = createKeywordValue(v);
       }
     }
   } else {
     resolved = v;
   }
 
-  if (!(resolved instanceof CSSNumericValue) && !(resolved instanceof CSSKeywordValue)) {
+  if (!isNumericValue(resolved) && !isKeywordValue(resolved)) {
     throw new TypeError(`Invalid type for ${name}`);
   }
 
-  if (resolved instanceof CSSNumericValue) {
+  if (isNumericValue(resolved)) {
     if (validateNumeric(resolved.type())) {
       return resolved;
     }
@@ -577,7 +599,7 @@ function rectifyColorChannel(
 function rectifyColorRGBComp(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorRGBComp',
-    numberToUnit: (num) => new CSSUnitValue(num * 100, 'percent'),
+    numberToUnit: (num) => createUnitValue(num * 100, 'percent'),
     validateNumeric: (t) => matchesNumber(t) || matchesPercentage(t),
     undefinedAsSyntaxError: true
   });
@@ -586,7 +608,7 @@ function rectifyColorRGBComp(v: number | string | CSSNumericValue | CSSKeywordVa
 function rectifyColorPercent(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorPercent',
-    numberToUnit: (num) => new CSSUnitValue(num * 100, 'percent'),
+    numberToUnit: (num) => createUnitValue(num * 100, 'percent'),
     validateNumeric: matchesPercentage,
     undefinedAsSyntaxError: true
   });
@@ -595,7 +617,7 @@ function rectifyColorPercent(v: number | string | CSSNumericValue | CSSKeywordVa
 function rectifyColorNumber(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorNumber',
-    numberToUnit: (num) => new CSSUnitValue(num, 'number'),
+    numberToUnit: (num) => createUnitValue(num, 'number'),
     validateNumeric: matchesNumber
   });
 }
@@ -603,7 +625,7 @@ function rectifyColorNumber(v: number | string | CSSNumericValue | CSSKeywordVal
 function rectifyColorNumberOrPercent(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColor channel',
-    numberToUnit: (num) => new CSSUnitValue(num, 'number'),
+    numberToUnit: (num) => createUnitValue(num, 'number'),
     validateNumeric: (t) => matchesNumber(t) || matchesPercentage(t)
   });
 }
@@ -611,7 +633,7 @@ function rectifyColorNumberOrPercent(v: number | string | CSSNumericValue | CSSK
 function rectifyColorAngle(v: number | string | CSSNumericValue | CSSKeywordValue, allowUndefined = false): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorAngle',
-    numberToUnit: (num) => new CSSUnitValue(num, 'deg'),
+    numberToUnit: (num) => createUnitValue(num, 'deg'),
     validateNumeric: matchesAngle,
     allowUndefined
   });
@@ -970,10 +992,17 @@ export class CSSColor extends CSSColorValue {
   get colorSpace(): CSSKeywordValue { checkBrand(this, CSSColor); return this._colorSpace; }
   set colorSpace(val: CSSKeywordValue | string) {
     checkBrand(this, CSSColor);
-    this._colorSpace = typeof val === 'string' ? new CSSKeywordValue(val) : val;
+    this._colorSpace = typeof val === 'string' ? createKeywordValue(val) : val;
   }
 
   get channels(): (CSSNumericValue | CSSKeywordValue)[] { checkBrand(this, CSSColor); return this._channels; }
+  set channels(val: (number | string | CSSNumericValue | CSSKeywordValue)[]) {
+    checkBrand(this, CSSColor);
+    if (!Array.isArray(val)) {
+      throw new TypeError("channels must be an array");
+    }
+    this._channels = val.map(c => rectifyColorNumberOrPercent(c));
+  }
 
   get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSColor); return this._alpha; }
   set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) {

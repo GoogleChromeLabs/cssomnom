@@ -190,16 +190,26 @@ describe('Values & Typed OM', () => {
 
         test('color getters on prototypes should throw TypeError (brand check)', () => {
             assert.throws(() => {
-                // @ts-expect-error - testing getter on prototype
                 CSSLab.prototype.l;
             }, TypeError);
             assert.throws(() => {
-                // @ts-expect-error - testing getter on prototype
                 CSSColor.prototype.channels;
             }, TypeError);
             assert.throws(() => {
-                // @ts-expect-error - testing getter on prototype
                 CSSRGB.prototype.r;
+            }, TypeError);
+        });
+
+        test('CSSColor channels setter works and rectifies inputs', () => {
+            const color = new CSSColor('srgb', [0.1, 0.2, 0.3]);
+            color.channels = [0.4, 0.5, 0.6];
+            assert.deepEqual(
+                color.channels.map(x => x.toString()),
+                ['0.4', '0.5', '0.6']
+            );
+            assert.throws(() => {
+                // @ts-expect-error - testing invalid value
+                color.channels = "invalid";
             }, TypeError);
         });
     });

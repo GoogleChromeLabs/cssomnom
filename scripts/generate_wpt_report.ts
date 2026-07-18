@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const reportPath = path.resolve('dist/report-chrome.json');
-const outputPath = path.resolve('dist/wpt-chrome-expected.txt');
+const outputPath = path.resolve('tests/fixtures/baselines/wpt-chrome-expected.txt');
 const readmePath = path.resolve('README.md');
 
 try {
