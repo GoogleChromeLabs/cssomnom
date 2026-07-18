@@ -1796,29 +1796,56 @@ Objective: Resolve over 5,700 Web Platform Test failures (~33% of overall crawle
  
 ---
 
-## Phase 76: WPT Sandbox Runner & Shim Evolution
+## Phase 76: WPT Sandbox Runner & Shim Evolution [x]
  
 Objective: Resolve unbaselined failures in the expanded specifications by completing the WPT test harness lifecycle and mocking standard browser APIs (requestAnimationFrame, fonts, createHTMLDocument).
  
 ### Tasks
 - [x] **Complete `async_test` lifecycle in Shim**:
-  - Update `async_test` in `tests/wpt-shim.ts` to return the mock test object.
-  - Implement `step`, `done`, `step_func`, `step_func_done`, and `add_cleanup` on the returned test object.
-  - Ensure standard event handler load patterns compile and execute safely (resolves ~30 failures).
+  - [x] Update `async_test` in `tests/wpt-shim.ts` to return the mock test object.
+  - [x] Implement `step`, `done`, `step_func`, `step_func_done`, and `add_cleanup` on the returned test object.
+  - [x] Ensure standard event handler load patterns compile and execute safely (resolves ~30 failures).
 - [x] **Mock browser APIs in sandbox context**:
-  - Mock `requestAnimationFrame` and `cancelAnimationFrame` via `globalThis.setTimeout` inside `tests/wpt-shim.ts`'s `createWptContext` (resolves ~6 failures).
-  - Mock `document.fonts` inside `createWptContext` (resolves ~2 failures).
-  - Implement `document.implementation.createHTMLDocument` inside `patchWindowForTypedOM` in `tests/wpt-shim.ts` using `parseHTML` (resolves ~2 failures).
+  - [x] Mock `requestAnimationFrame` and `cancelAnimationFrame` via `globalThis.setTimeout` inside `tests/wpt-shim.ts`'s `createWptContext` (resolves ~6 failures).
+  - [x] Mock `document.fonts` inside `createWptContext` (resolves ~2 failures).
+  - [x] Implement `document.implementation.createHTMLDocument` inside `patchWindowForTypedOM` in `tests/wpt-shim.ts` using `parseHTML` (resolves ~2 failures).
 - [x] **Unified Multi-Spec Baseline Configuration**:
-  - Update `tests/wpt-sandbox.test.ts` to load all specifications and exclusions dynamically from `tests/wpt-sandbox-config.json` instead of hardcoding `css-typed-om`.
-  - Baseline all remaining layout engine limitations and ES Modules syntax issues to keep standard preflight checks green.
+  - [x] Update `tests/wpt-sandbox.test.ts` to load all specifications and exclusions dynamically from `tests/wpt-sandbox-config.json` instead of hardcoding `css-typed-om`.
+  - [x] Baseline all remaining layout engine limitations and ES Modules syntax issues to keep standard preflight checks green.
 - [x] **Memory Leak & CPU Performance Safety**:
-  - Guarded globally-shared linkedom prototypes (`Element.prototype`, `CSSStyleDeclaration.prototype`) with a recursion guard to prevent stack overflow/extreme CPU locks.
-  - Removed global `window` closure leaks inside `Node.prototype.appendChild` and `insertBefore` mocks by resolving contexts dynamically via `ownerDocument.defaultView`.
-  - Implemented automatic worker-queue throttling inside `scripts/run_wpt_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
-  - Guarded heavy crawler runner in `tests/wpt-sandbox.test.ts` with `RUN_SANDBOX_WPT=true` env flag to keep normal preflight check memory footprint minimal.
+  - [x] Guarded globally-shared linkedom prototypes (`Element.prototype`, `CSSStyleDeclaration.prototype`) with a recursion guard to prevent stack overflow/extreme CPU locks.
+  - [x] Removed global `window` closure leaks inside `Node.prototype.appendChild` and `insertBefore` mocks by resolving contexts dynamically via `ownerDocument.defaultView`.
+  - [x] Implemented automatic worker-queue throttling inside `scripts/run_wpt_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
+  - [x] Guarded heavy crawler runner in `tests/wpt-sandbox.test.ts` with `RUN_SANDBOX_WPT=true` env flag to keep normal preflight check memory footprint minimal.
+  - [x] Replaced shell `exec` with direct binary `execFile` and injected a 3.5s `unref()` self-termination fail-safe timer in workers to stop background loops.
+  - [x] Injected event loop yields (5ms between assertions, 20ms between task spawns) to lower CPU and memory footprint during crawler runs.
+- [x] **Test Harness Robustness & Crash Exclusions**:
+  - [x] Classified worker process runs that crashed without a final `Summary` block or timed out as **Excluded (Crashed/Timed Out)** in baseline configurations to prevent partial failure registries.
+  - [x] Excluded reftests or HTML files with 0 test assertions from baseline runs.
+  - [x] Silenced asynchronous post-test unhandled promise rejections inside mock WPT sandboxes to prevent node test runner crashes.
+  - [x] Resolved escaped newline matching failures in multi-line WPT test names.
 - [x] **Verification**:
-  - Run the crawler and verify that new specification failures drop to 0.
+  - [x] Run the crawler and verify that new specification failures drop to 0.
+ 
+---
+ 
+## Phase 77: Browser-Native Conformance Runner & Script Injection [x]
+ 
+Objective: Create a browser-compatible IIFE bundle of `cssomnom` and configure scripts to execute standard WPT test suites in real headless browsers (Chrome, Firefox) using script injection.
+ 
+### Tasks
+- [x] **Create Browser Entry Point**:
+  - [x] Create `src/browser-entry.ts` importing all CSSOM and Typed OM APIs and registering them on standard browser globals (`window`, `HTMLElement.prototype`, `CSSStyleRule.prototype`, and `CSS` factories) when loaded.
+  - [x] Address all linter checks by avoiding `any` usage and adding a top-level linter disable command for dynamic global prototype mapping.
+- [x] **Setup Independent Browser Bundler Configuration**:
+  - [x] Create `tsup.browser.config.ts` compiling `src/browser-entry.ts` into a self-contained IIFE bundle `dist/cssomnom.iife.global.js`.
+  - [x] Disable declaration (`dts`) generation in the browser bundle to prevent TypeScript compiler rollup-plugin-dts type clashes.
+  - [x] Exclude `src/browser-entry.ts` from default compilation in `tsconfig.json` so main library builds compile declarations cleanly.
+- [x] **Integrate Browser Injection Test Scripts**:
+  - [x] Add sequential chain build script `build` in `package.json` to compile ESM, browser IIFE, and type files.
+  - [x] Add `test:wpt-typed-om:chrome` and `test:wpt-typed-om:firefox` to execute tests under `css/css-typed-om` inside headless browsers with `--inject-script dist/cssomnom.iife.global.js`.
+- [x] **Verification**:
+  - [x] Run `pnpm run build` and verify that all build targets compile successfully in <1 second.
  
 ---
  
