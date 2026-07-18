@@ -9,29 +9,91 @@ if (typeof window !== 'undefined') {
   const g = window as any;
 
   const expectedLengths: Record<string, number> = {
+    CSSStyleValue: 0,
+    StylePropertyMapReadOnly: 0,
+    StylePropertyMap: 0,
+    CSSNumericArray: 0,
+    CSSTranslate: 2,
+    CSSRotate: 1,
+    CSSScale: 2,
+    CSSMatrixComponent: 1,
+    CSSImageValue: 0,
     CSSColorValue: 0,
-    CSSColor: 2,
+    CSSMathValue: 0,
+    CSSTransformComponent: 0,
+    CSSVariableReferenceValue: 1,
+    CSSRGB: 3,
+    CSSHSL: 3,
+    CSSHWB: 3,
     CSSLab: 3,
     CSSLCH: 3,
     CSSOKLab: 3,
-    CSSOKLCH: 3
+    CSSOKLCH: 3,
+    CSSColor: 2,
   };
 
-  function wrapConstructor(OriginalClass: any, ParentConstructor: any, className: string) {
+  const classNames = [
+    'CSSStyleValue',
+    'CSSKeywordValue',
+    'CSSVariableReferenceValue',
+    'CSSUnparsedValue',
+    'CSSImageValue',
+    'CSSNumericValue',
+    'CSSUnitValue',
+    'CSSMathValue',
+    'CSSMathSum',
+    'CSSMathProduct',
+    'CSSMathNegate',
+    'CSSMathInvert',
+    'CSSMathMin',
+    'CSSMathMax',
+    'CSSMathClamp',
+    'CSSNumericArray',
+    'CSSTransformValue',
+    'CSSTransformComponent',
+    'CSSTranslate',
+    'CSSRotate',
+    'CSSScale',
+    'CSSSkew',
+    'CSSSkewX',
+    'CSSSkewY',
+    'CSSPerspective',
+    'CSSMatrixComponent',
+    'CSSColorValue',
+    'CSSRGB',
+    'CSSHSL',
+    'CSSHWB',
+    'CSSLab',
+    'CSSLCH',
+    'CSSOKLab',
+    'CSSOKLCH',
+    'CSSColor',
+    'StylePropertyMapReadOnly',
+    'StylePropertyMap'
+  ];
+
+  const wrappedConstructors = new Map<any, any>();
+
+  function wrapConstructor(OriginalClass: any, className: string) {
+    const parentOriginal = Object.getPrototypeOf(OriginalClass);
+    let ParentConstructor: any = null;
+    if (parentOriginal && parentOriginal !== Function.prototype && parentOriginal !== Object.prototype) {
+      ParentConstructor = wrappedConstructors.get(parentOriginal) || parentOriginal;
+    }
+
     function Wrapper(this: any, ...args: any[]) {
       if (!new.target) {
-        throw new TypeError(`Failed to construct: Class constructor cannot be invoked without 'new'`);
+        throw new TypeError(`Failed to construct '${className}': Class constructor cannot be invoked without 'new'`);
       }
       const instance = Reflect.construct(OriginalClass, args, new.target);
       return instance;
     }
-    
+
     const len = expectedLengths[className] || 0;
 
     Object.defineProperty(Wrapper, 'name', { value: className, configurable: true });
     Object.defineProperty(Wrapper, 'length', { value: len, configurable: true });
 
-    // Define non-writable prototype property
     Object.defineProperty(Wrapper, 'prototype', {
       value: OriginalClass.prototype,
       writable: false,
@@ -55,82 +117,47 @@ if (typeof window !== 'undefined') {
       });
     }
 
-    if (ParentConstructor) {
+    if (ParentConstructor && ParentConstructor.prototype) {
       Object.setPrototypeOf(Wrapper, ParentConstructor);
       Object.setPrototypeOf(OriginalClass.prototype, ParentConstructor.prototype);
     }
 
-    // Copy static methods from OriginalClass to Wrapper
-    for (const key of Object.getOwnPropertyNames(OriginalClass)) {
-      if (key === 'prototype' || key === 'name' || key === 'length') continue;
-      const desc = Object.getOwnPropertyDescriptor(OriginalClass, key);
-      if (desc) {
-        Object.defineProperty(Wrapper, key, desc);
+    const copyStaticMethods = (fromCls: any) => {
+      if (!fromCls || fromCls === Function.prototype || fromCls === Object.prototype) return;
+      copyStaticMethods(Object.getPrototypeOf(fromCls));
+      for (const key of Object.getOwnPropertyNames(fromCls)) {
+        if (key === 'prototype' || key === 'name' || key === 'length') continue;
+        const desc = Object.getOwnPropertyDescriptor(fromCls, key);
+        if (desc) {
+          desc.enumerable = true;
+          Object.defineProperty(Wrapper, key, desc);
+          if (fromCls !== OriginalClass) {
+            Object.defineProperty(OriginalClass, key, desc);
+          }
+        }
       }
-    }
+    };
+    copyStaticMethods(OriginalClass);
 
-    // Make prototype accessors enumerable for WebIDL compliance
-    const descriptors = Object.getOwnPropertyDescriptors(OriginalClass.prototype);
-    for (const [name, desc] of Object.entries(descriptors)) {
-      if (name === 'constructor') continue;
-      if (desc.get || desc.set) {
+    if (OriginalClass.prototype) {
+      const descriptors = Object.getOwnPropertyDescriptors(OriginalClass.prototype);
+      for (const [name, desc] of Object.entries(descriptors)) {
+        if (name === 'constructor') continue;
         desc.enumerable = true;
         Object.defineProperty(OriginalClass.prototype, name, desc);
       }
     }
 
+    wrappedConstructors.set(OriginalClass, Wrapper);
     return Wrapper;
   }
 
-  let WrappedCSSColorValue = TypedOM.CSSColorValue;
-  let WrappedCSSColor = TypedOM.CSSColor;
-  let WrappedCSSLab = TypedOM.CSSLab;
-  let WrappedCSSLCH = TypedOM.CSSLCH;
-  let WrappedCSSOKLab = TypedOM.CSSOKLab;
-  let WrappedCSSOKLCH = TypedOM.CSSOKLCH;
+  const wrappedClasses: Record<string, any> = {};
 
-  if (typeof Object.setPrototypeOf === 'function') {
-    if (g.CSSColorValue) {
-      // Fix Chrome's native CSSColorValue prototype chain to inherit from CSSStyleValue
-      if (g.CSSStyleValue) {
-        try {
-          Object.setPrototypeOf(g.CSSColorValue, g.CSSStyleValue);
-          Object.setPrototypeOf(g.CSSColorValue.prototype, g.CSSStyleValue.prototype);
-        } catch (e) {
-          // ignore if native object is frozen
-        }
-      }
-      // CSSColorValue's parent is always native CSSStyleValue to pass the prototype of CSSColorValue test!
-      WrappedCSSColorValue = wrapConstructor(TypedOM.CSSColorValue, g.CSSStyleValue || TypedOM.CSSStyleValue, 'CSSColorValue');
-      WrappedCSSColor = wrapConstructor(TypedOM.CSSColor, WrappedCSSColorValue, 'CSSColor');
-      WrappedCSSLab = wrapConstructor(TypedOM.CSSLab, WrappedCSSColorValue, 'CSSLab');
-      WrappedCSSLCH = wrapConstructor(TypedOM.CSSLCH, WrappedCSSColorValue, 'CSSLCH');
-      WrappedCSSOKLab = wrapConstructor(TypedOM.CSSOKLab, WrappedCSSColorValue, 'CSSOKLab');
-      WrappedCSSOKLCH = wrapConstructor(TypedOM.CSSOKLCH, WrappedCSSColorValue, 'CSSOKLCH');
-
-      // Link native classes' prototype chains to our WrappedCSSColorValue
-      try {
-        if (g.CSSRGB) {
-          Object.setPrototypeOf(g.CSSRGB, WrappedCSSColorValue);
-          Object.setPrototypeOf(g.CSSRGB.prototype, WrappedCSSColorValue.prototype);
-        }
-        if (g.CSSHSL) {
-          Object.setPrototypeOf(g.CSSHSL, WrappedCSSColorValue);
-          Object.setPrototypeOf(g.CSSHSL.prototype, WrappedCSSColorValue.prototype);
-        }
-        if (g.CSSHWB) {
-          Object.setPrototypeOf(g.CSSHWB, WrappedCSSColorValue);
-          Object.setPrototypeOf(g.CSSHWB.prototype, WrappedCSSColorValue.prototype);
-        }
-      } catch (e) {}
-    } else if (g.CSSStyleValue) {
-      Object.setPrototypeOf(TypedOM.CSSColorValue.prototype, g.CSSStyleValue.prototype);
-      WrappedCSSColorValue = wrapConstructor(TypedOM.CSSColorValue, g.CSSStyleValue, 'CSSColorValue');
-      WrappedCSSColor = wrapConstructor(TypedOM.CSSColor, WrappedCSSColorValue, 'CSSColor');
-      WrappedCSSLab = wrapConstructor(TypedOM.CSSLab, WrappedCSSColorValue, 'CSSLab');
-      WrappedCSSLCH = wrapConstructor(TypedOM.CSSLCH, WrappedCSSColorValue, 'CSSLCH');
-      WrappedCSSOKLab = wrapConstructor(TypedOM.CSSOKLab, WrappedCSSColorValue, 'CSSOKLab');
-      WrappedCSSOKLCH = wrapConstructor(TypedOM.CSSOKLCH, WrappedCSSColorValue, 'CSSOKLCH');
+  for (const name of classNames) {
+    const OriginalClass = (TypedOM as any)[name] || (CSSOM as any)[name];
+    if (OriginalClass) {
+      wrappedClasses[name] = wrapConstructor(OriginalClass, name);
     }
   }
 
@@ -139,13 +166,13 @@ if (typeof window !== 'undefined') {
     ...TypedOM,
     ...CSSOM,
     CSSStyleDeclaration,
-    CSSColorValue: WrappedCSSColorValue,
-    CSSColor: WrappedCSSColor,
-    CSSLab: WrappedCSSLab,
-    CSSLCH: WrappedCSSLCH,
-    CSSOKLab: WrappedCSSOKLab,
-    CSSOKLCH: WrappedCSSOKLCH
+    ...wrappedClasses
   };
+
+  delete classes.CSSPositionValue;
+  try {
+    delete g.CSSPositionValue;
+  } catch (e) {}
 
   // Force-install classes on window
   for (const [name, cls] of Object.entries(classes)) {
@@ -161,7 +188,7 @@ if (typeof window !== 'undefined') {
     }
   }
 
-  // Patch global CSS namespace factories if missing
+  // Patch global CSS namespace factories
   if (!g.CSS) {
     g.CSS = {};
   }
@@ -170,9 +197,7 @@ if (typeof window !== 'undefined') {
     'deg', 'rad', 'grad', 'turn', 'ms', 's', 'Hz', 'kHz', 'dpi', 'dpcm', 'dppx', 'fr', 'percent'
   ];
   for (const unit of units) {
-    if (!g.CSS[unit]) {
-      g.CSS[unit] = (val: number) => new g.CSSUnitValue(val, unit);
-    }
+    g.CSS[unit] = (val: number) => new g.CSSUnitValue(val, unit);
   }
 
   // Patch Element.prototype.computedStyleMap

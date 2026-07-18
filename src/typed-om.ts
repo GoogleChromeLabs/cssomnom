@@ -25,6 +25,7 @@ import { tokenize } from './tokenizer.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { SHORTHANDS } from './shorthands.ts';
 import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/gen/units.ts';
+export type { CSSUnit };
 import { formatNumber } from './utils/format.ts';
 import { DOMMatrixReadOnly, DOMMatrix, setParseTransformListHook } from './DOMMatrix.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
@@ -47,23 +48,23 @@ function checkBrand(obj: unknown, cls: Function): void {
 
 function isNumericValue(val: unknown): val is CSSNumericValue {
   if (!val || typeof val !== 'object') return false;
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSNumericValue) || CSSNumericValue;
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSNumericValue as typeof CSSNumericValue) || CSSNumericValue;
   return val instanceof Cls;
 }
 
 function isKeywordValue(val: unknown): val is CSSKeywordValue {
   if (!val || typeof val !== 'object') return false;
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSKeywordValue) || CSSKeywordValue;
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSKeywordValue as typeof CSSKeywordValue) || CSSKeywordValue;
   return val instanceof Cls;
 }
 
-function createUnitValue(value: number, unit: string): CSSUnitValue {
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSUnitValue) || CSSUnitValue;
+function createUnitValue(value: number, unit: CSSUnit): CSSUnitValue {
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSUnitValue as typeof CSSUnitValue) || CSSUnitValue;
   return new Cls(value, unit);
 }
 
 function createKeywordValue(value: string): CSSKeywordValue {
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as any).CSSKeywordValue) || CSSKeywordValue;
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSKeywordValue as typeof CSSKeywordValue) || CSSKeywordValue;
   return new Cls(value);
 }
 
@@ -269,6 +270,8 @@ const STANDARD_PROPERTIES_SYNTAX: Record<string, string> = {
 
 
 
+const privateToken = Symbol.for('cssomnom-private-token');
+
 // CSS Typed OM: CSSStyleValue
 export class CSSStyleValue {
   get [Symbol.toStringTag]() {
@@ -277,7 +280,10 @@ export class CSSStyleValue {
   private _cssText?: string;
   _associatedProperty: string | null = null;
 
-  constructor(cssText?: string) {
+  constructor(cssText?: string, token?: unknown) {
+    if (token !== privateToken && this.constructor === CSSStyleValue) {
+      throw new TypeError("CSSStyleValue cannot be directly constructed");
+    }
     this._cssText = cssText;
   }
 
@@ -467,7 +473,7 @@ export class CSSStyleValue {
       if (sv) return sv;
     }
     
-    return new CSSStyleValue(serialize(trimmed).trim());
+    return new CSSStyleValue(serialize(trimmed).trim(), privateToken);
   }
 
   static parse(property: string, css: string): CSSStyleValue {
@@ -642,6 +648,12 @@ function rectifyColorAngle(v: number | string | CSSNumericValue | CSSKeywordValu
 
 // CSS Typed OM: CSSColorValue
 export abstract class CSSColorValue extends CSSStyleValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSColorValue) {
+      throw new TypeError("CSSColorValue cannot be directly constructed");
+    }
+  }
   static override parse(css: string): CSSColorValue | CSSKeywordValue {
     if (arguments.length < 1) {
       throw new TypeError("Failed to execute 'parse' on 'CSSColorValue': 1 argument required, but only 0 present.");
@@ -1162,10 +1174,19 @@ function isStandardCSSNumericValue(node: CSSNumericValue): boolean {
 
 // CSS Typed OM: CSSNumericValue
 export abstract class CSSNumericValue extends CSSStyleValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSNumericValue) {
+      throw new TypeError("CSSNumericValue cannot be directly constructed");
+    }
+  }
   abstract serialize(): string;
   abstract type(): CSSNumericType;
 
   to(unit: string): CSSUnitValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'to' on 'CSSNumericValue': 1 argument required, but only 0 present.");
+    }
     if (!unitToBase[unit]) {
       throw new DOMException(`Invalid unit: ${unit}`, 'SyntaxError');
     }
@@ -1511,11 +1532,12 @@ export class CSSUnitValue extends CSSNumericValue {
 
   constructor(value: number, unit: CSSUnit) {
     super();
-    if (!unitToBase[unit]) {
+    const normalizedUnit = typeof unit === 'string' ? unit.toLowerCase() as CSSUnit : unit;
+    if (!unitToBase[normalizedUnit]) {
       throw new TypeError(`Invalid unit: ${unit}`);
     }
     this.value = value;
-    this.unit = unit;
+    this.unit = normalizedUnit;
   }
 
   override toString(): string {
@@ -1554,6 +1576,9 @@ export class CSSUnitValue extends CSSNumericValue {
   }
 
   override to(unit: string): CSSUnitValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'to' on 'CSSNumericValue': 1 argument required, but only 0 present.");
+    }
     if (!unitToBase[unit]) {
       throw new DOMException(`Invalid unit: ${unit}`, 'SyntaxError');
     }
@@ -2222,6 +2247,12 @@ export class CSSUnparsedValue extends CSSStyleValue {
 
 // CSS Typed OM: CSSMathValue
 export abstract class CSSMathValue extends CSSNumericValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSMathValue) {
+      throw new TypeError("CSSMathValue cannot be directly constructed");
+    }
+  }
   abstract serialize(): string;
   override toString(): string {
     const s = this.serialize();
@@ -2770,6 +2801,12 @@ function matchesAngle(type: CSSNumericType): boolean {
 }
 
 export abstract class CSSTransformComponent extends CSSStyleValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSTransformComponent) {
+      throw new TypeError("CSSTransformComponent cannot be directly constructed");
+    }
+  }
   protected _is2D: boolean = true;
   get is2D(): boolean {
     return this._is2D;
@@ -3280,6 +3317,9 @@ export class CSSTransformValue extends CSSStyleValue {
   }
 
   static parse(css: string): CSSTransformValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSTransformValue': 1 argument required, but only 0 present.");
+    }
     const tokens = tokenize(css);
     const componentValues = ParseHooks.parseComponentValues(tokens);
     
@@ -3545,7 +3585,7 @@ export class StylePropertyMapReadOnly {
       const parsed = CSSStyleValue.parseAll(property, serialized);
       return parsed.length > 0 ? parsed[0] : null;
     } catch (e) {
-      return new CSSStyleValue(serialized);
+      return new CSSStyleValue(serialized, privateToken);
     }
   }
 
@@ -3579,7 +3619,7 @@ export class StylePropertyMapReadOnly {
     try {
       return CSSStyleValue.parseAll(property, serialized);
     } catch (e) {
-      return [new CSSStyleValue(serialized)];
+      return [new CSSStyleValue(serialized, privateToken)];
     }
   }
 }
@@ -3778,7 +3818,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       }
       return null;
     } catch (e) {
-      const res = new CSSStyleValue(value);
+      const res = new CSSStyleValue(value, privateToken);
       getStyleCache(this._style).set(propLower, [res]);
       return res;
     }
@@ -3824,7 +3864,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       getStyleCache(this._style).set(propLower, parsed);
       return parsed;
     } catch (e) {
-      const res = [new CSSStyleValue(value)];
+      const res = [new CSSStyleValue(value, privateToken)];
       getStyleCache(this._style).set(propLower, res);
       return res;
     }

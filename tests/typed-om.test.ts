@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSNumericValue, CSSUnitValue, CSSStyleValue, StylePropertyMap, CSSColorValue, CSSLab, CSSColor, CSSRGB } from '../src/typed-om.ts';
+import { CSSNumericValue, CSSUnitValue, CSSStyleValue, StylePropertyMap, CSSColorValue, CSSLab, CSSColor, CSSRGB, CSSMathSum, CSSTransformValue, CSSTransformComponent, CSSMathValue, type CSSUnit } from '../src/typed-om.ts';
 
 describe('Values & Typed OM', () => {
     test('math constants e and pi', () => {
@@ -190,13 +190,13 @@ describe('Values & Typed OM', () => {
 
         test('color getters on prototypes should throw TypeError (brand check)', () => {
             assert.throws(() => {
-                CSSLab.prototype.l;
+                void CSSLab.prototype.l;
             }, TypeError);
             assert.throws(() => {
-                CSSColor.prototype.channels;
+                void CSSColor.prototype.channels;
             }, TypeError);
             assert.throws(() => {
-                CSSRGB.prototype.r;
+                void CSSRGB.prototype.r;
             }, TypeError);
         });
 
@@ -211,6 +211,61 @@ describe('Values & Typed OM', () => {
                 // @ts-expect-error - testing invalid value
                 color.channels = "invalid";
             }, TypeError);
+        });
+
+        test('CSSNumericValue.parse and subclasses throw TypeError with too few arguments', () => {
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSNumericValue.parse();
+            }, TypeError);
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSMathSum.parse();
+            }, TypeError);
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSUnitValue.parse();
+            }, TypeError);
+        });
+
+        test('CSSNumericValue.prototype.to throws TypeError with too few arguments', () => {
+            const px = new CSSUnitValue(10, 'px');
+            assert.throws(() => {
+                // @ts-expect-error
+                px.to();
+            }, TypeError);
+        });
+
+        test('CSSTransformValue.parse throws TypeError with too few arguments', () => {
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSTransformValue.parse();
+            }, TypeError);
+        });
+
+        test('Abstract base classes are not directly constructible', () => {
+            assert.throws(() => {
+                new (CSSStyleValue as unknown as new () => CSSStyleValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSNumericValue as unknown as new () => CSSNumericValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSMathValue as unknown as new () => CSSMathValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSColorValue as unknown as new () => CSSColorValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSTransformComponent as unknown as new () => CSSTransformComponent)();
+            }, TypeError);
+        });
+
+        test('CSSUnitValue unit is case-insensitive normalized', () => {
+            const val1 = new CSSUnitValue(5, 'Hz' as unknown as CSSUnit);
+            assert.strictEqual(val1.unit, 'hz');
+            const val2 = new CSSUnitValue(10, 'kHz' as unknown as CSSUnit);
+            assert.strictEqual(val2.unit, 'khz');
         });
     });
 });
