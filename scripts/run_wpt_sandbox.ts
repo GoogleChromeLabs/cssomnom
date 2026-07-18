@@ -259,6 +259,7 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
         result.cleanup();
       } catch (err) {
         console.error(`Failed to run file ${filePattern}:`, err);
+        process.exit(1);
       }
     }
     

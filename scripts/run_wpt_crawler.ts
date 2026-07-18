@@ -72,7 +72,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   const allKnownFailures: Record<string, string[]> = {};
   const allSyntaxErrors: Record<string, string> = {};
 
-  const concurrency = options.concurrency ?? Math.min(4, Math.max(1, os.availableParallelism() - 1));
+  const concurrency = options.concurrency ?? Math.min(16, Math.max(1, os.availableParallelism() - 1));
   if (options.verbose) {
     console.log(`Using parallel concurrency limit: ${concurrency}`);
   }
