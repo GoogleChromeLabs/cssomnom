@@ -13,6 +13,11 @@ export interface WptTest {
   isAsync: boolean;
 }
 
+export interface WptFileResult {
+  tests: WptTest[];
+  cleanup: () => void;
+}
+
 const WPT_ROOT = path.resolve(process.cwd(), 'submodules/web-platform-tests');
 
 function getScriptContent(htmlDir: string, src: string): string {
@@ -40,7 +45,7 @@ function getScriptContent(htmlDir: string, src: string): string {
   return '';
 }
 
-export function runWptFile(filePath: string): WptTest[] {
+export function runWptFile(filePath: string): WptFileResult {
   const htmlContent = fs.readFileSync(filePath, 'utf-8');
   const dom = parseHTML(htmlContent);
   const win = dom.window;
@@ -60,7 +65,7 @@ export function runWptFile(filePath: string): WptTest[] {
     }
   }
 
-  const windowProxy = new Proxy(winObj, {
+  const windowProxy: unknown = new Proxy(winObj, {
     get(target, prop) {
       if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
         return windowProxy;
@@ -128,22 +133,43 @@ export function runWptFile(filePath: string): WptTest[] {
   const context = vm.createContext(sandbox);
   const htmlDir = path.dirname(filePath);
 
-  // Extract script tags
-  const scripts = dom.document.querySelectorAll('script');
-  for (let i = 0; i < scripts.length; i++) {
-    const scriptEl = scripts[i];
-    const src = scriptEl.getAttribute('src');
-    let code = '';
-    if (src) {
-      code = getScriptContent(htmlDir, src);
-    } else {
-      code = scriptEl.textContent || '';
+  const cleanup = () => {
+    const sandboxObj = sandbox as {[key: string]: unknown};
+    if (sandboxObj && typeof sandboxObj.__cleanup === 'function') {
+      (sandboxObj.__cleanup as () => void)();
     }
+  };
 
-    if (code.trim()) {
-      const script = new vm.Script(code, { filename: filePath + `#script-${i}` });
-      script.runInContext(context);
+  // Extract script tags
+  try {
+    const scripts = dom.document.querySelectorAll('script');
+    for (let i = 0; i < scripts.length; i++) {
+      const scriptEl = scripts[i];
+      const src = scriptEl.getAttribute('src');
+      let code = '';
+      if (src) {
+        code = getScriptContent(htmlDir, src);
+      } else {
+        code = scriptEl.textContent || '';
+      }
+
+      if (code.trim()) {
+        const script = new vm.Script(code, { filename: filePath + `#script-${i}` });
+        script.runInContext(context);
+      }
     }
+  } catch (err) {
+    cleanup();
+    throw err;
+  }
+
+  // Dispatch load event to unblock window onload / load event listeners
+  try {
+    // @ts-expect-error - internal load event tracking property
+    win.__loadEventFired = true;
+    win.dispatchEvent(new win.Event('load'));
+  } catch (err) {
+    console.error("Failed to dispatch load event:", err);
   }
 
   const testQueue: WptTest[] = [];
@@ -181,7 +207,15 @@ export function runWptFile(filePath: string): WptTest[] {
     };
     testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
   }
-  return testQueue;
+  return {
+    tests: testQueue,
+    cleanup: () => {
+      const sandboxObj = sandbox as {[key: string]: unknown};
+      if (sandboxObj && typeof sandboxObj.__cleanup === 'function') {
+        (sandboxObj.__cleanup as () => void)();
+      }
+    }
+  };
 }
 
 // Support running directly as a CLI script
@@ -201,8 +235,8 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
       const fullPath = path.resolve(process.cwd(), filePattern);
       console.log(`Running WPT file: ${filePattern}`);
       try {
-        const queue = runWptFile(fullPath);
-        for (const testItem of queue) {
+        const result = runWptFile(fullPath);
+        for (const testItem of result.tests) {
           total++;
           try {
             await testItem.fn();
@@ -214,6 +248,7 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
             console.error(err);
           }
         }
+        result.cleanup();
       } catch (err) {
         console.error(`Failed to run file ${filePattern}:`, err);
       }

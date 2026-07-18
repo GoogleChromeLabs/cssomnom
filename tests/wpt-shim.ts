@@ -167,16 +167,22 @@ export function patchWindowForTypedOM(window: WindowType) {
 
   // --- 1. Instance-Specific Mocks (Always run for every new Window instance) ---
 
-  // Patch window.addEventListener to immediately invoke 'load' listener if load event has already been dispatched.
   const originalAddEventListener = window.addEventListener;
-  win.addEventListener = function(this: typeof window, type: string, listener: any, options?: any) {
+  win.addEventListener = function(
+    this: typeof window,
+    type: string,
+    listener: EventListenerOrEventListenerObject,
+    options?: boolean | AddEventListenerOptions
+  ) {
     if (type === 'load' && win.__loadEventFired) {
       queueMicrotask(() => {
         try {
           if (typeof listener === 'function') {
-            listener.call(window, new (window as any).Event('load'));
+            const eventConstructor = window as unknown as { Event: new (type: string) => Event };
+            listener.call(window, new eventConstructor.Event('load'));
           } else if (listener && typeof listener.handleEvent === 'function') {
-            listener.handleEvent(new (window as any).Event('load'));
+            const eventConstructor = window as unknown as { Event: new (type: string) => Event };
+            listener.handleEvent(new eventConstructor.Event('load'));
           }
         } catch {}
       });
@@ -249,7 +255,7 @@ export function patchWindowForTypedOM(window: WindowType) {
   }
   prototypesPatched = true;
 
-  // Patch DOM elements prototype hierarchy to fire 'load' event on injected link stylesheets and iframes
+  // @ts-expect-error - Linkedom document types are incomplete
   const dummyElForPatch = win.document?.createElement?.('div');
   if (dummyElForPatch) {
     let proto = Object.getPrototypeOf(dummyElForPatch);
@@ -263,8 +269,9 @@ export function patchWindowForTypedOM(window: WindowType) {
             queueMicrotask(() => {
               try {
                 if (nodeEl.dispatchEvent) {
-                  const doc = (this as any).ownerDocument || this;
-                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const node = this as { ownerDocument?: Document } | null;
+                  const doc = node?.ownerDocument || node;
+                  const winContext = doc ? ((doc as Document).defaultView || window) : window;
                   const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
                   nodeEl.dispatchEvent(new eventConstructor.Event('load'));
                 }
@@ -274,8 +281,9 @@ export function patchWindowForTypedOM(window: WindowType) {
             queueMicrotask(() => {
               try {
                 if (nodeEl.dispatchEvent) {
-                  const doc = (this as any).ownerDocument || this;
-                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const node = this as { ownerDocument?: Document } | null;
+                  const doc = node?.ownerDocument || node;
+                  const winContext = doc ? ((doc as Document).defaultView || window) : window;
                   const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
                   nodeEl.dispatchEvent(new eventConstructor.Event('load'));
                 }
@@ -295,8 +303,9 @@ export function patchWindowForTypedOM(window: WindowType) {
             queueMicrotask(() => {
               try {
                 if (nodeEl.dispatchEvent) {
-                  const doc = (this as any).ownerDocument || this;
-                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const node = this as { ownerDocument?: Document } | null;
+                  const doc = node?.ownerDocument || node;
+                  const winContext = doc ? ((doc as Document).defaultView || window) : window;
                   const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
                   nodeEl.dispatchEvent(new eventConstructor.Event('load'));
                 }
@@ -306,8 +315,9 @@ export function patchWindowForTypedOM(window: WindowType) {
             queueMicrotask(() => {
               try {
                 if (nodeEl.dispatchEvent) {
-                  const doc = (this as any).ownerDocument || this;
-                  const winContext = doc ? (doc.defaultView || window) : window;
+                  const node = this as { ownerDocument?: Document } | null;
+                  const doc = node?.ownerDocument || node;
+                  const winContext = doc ? ((doc as Document).defaultView || window) : window;
                   const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
                   nodeEl.dispatchEvent(new eventConstructor.Event('load'));
                 }
@@ -346,7 +356,7 @@ export function patchWindowForTypedOM(window: WindowType) {
           this._contentDocument = iframeDocument;
           this._contentWindow = iframeWindow;
 
-          (iframeDocument as any).write = function(src: string) {
+          iframeDocument.write = function(src: string) {
             const scripts = extractScripts(src, '');
             const iframeTests: WptSandboxTest[] = [];
             const titleMatch = /<title>(.*?)<\/title>/i.exec(src);
@@ -620,7 +630,7 @@ export function patchWindowForTypedOM(window: WindowType) {
                 process.off('uncaughtException', exceptionHandler);
             });
           };
-          (iframeDocument as any).close = function() {};
+          iframeDocument.close = function() {};
         }
         return this._contentDocument;
       }
