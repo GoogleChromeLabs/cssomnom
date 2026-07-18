@@ -160,6 +160,11 @@ Convenience methods on the `Parser` class for common tasks without manual tokeni
 *   **`Parser.calculateSpecificity(selector: string | SelectorList)`**
     Calculates specificity arrays `[a, b, c]`.
 
+## Web Platform Test (WPT) Conformance
+
+<!-- WPT_CHROME_STATUS_START -->
+<!-- WPT_CHROME_STATUS_END -->
+
 ## Development
 
 Run type checking:
