@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSNumericValue, CSSUnitValue, CSSStyleValue, StylePropertyMap } from '../src/typed-om.ts';
+import { CSSNumericValue, CSSUnitValue, CSSStyleValue, StylePropertyMap, CSSColorValue, CSSLab, CSSColor, CSSRGB } from '../src/typed-om.ts';
 
 describe('Values & Typed OM', () => {
     test('math constants e and pi', () => {
@@ -161,6 +161,45 @@ describe('Values & Typed OM', () => {
             const map = new StylePropertyMap(el.style);
             assert.throws(() => {
                 map.append('background-image');
+            }, TypeError);
+        });
+    });
+
+    describe('Argument validation checks', () => {
+        test('parse methods should throw TypeError with too few arguments', () => {
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSNumericValue.parse();
+            }, TypeError);
+
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSStyleValue.parse('width');
+            }, TypeError);
+
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSStyleValue.parseAll('width');
+            }, TypeError);
+
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSColorValue.parse();
+            }, TypeError);
+        });
+
+        test('color getters on prototypes should throw TypeError (brand check)', () => {
+            assert.throws(() => {
+                // @ts-expect-error - testing getter on prototype
+                CSSLab.prototype.l;
+            }, TypeError);
+            assert.throws(() => {
+                // @ts-expect-error - testing getter on prototype
+                CSSColor.prototype.channels;
+            }, TypeError);
+            assert.throws(() => {
+                // @ts-expect-error - testing getter on prototype
+                CSSRGB.prototype.r;
             }, TypeError);
         });
     });

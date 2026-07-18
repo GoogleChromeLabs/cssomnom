@@ -39,6 +39,12 @@ function compareStrings(a: string, b: string): number {
   return a === b ? 0 : (a < b ? -1 : 1);
 }
 
+function checkBrand(obj: unknown, cls: Function): void {
+  if (!(obj instanceof cls)) {
+    throw new TypeError('Illegal invocation');
+  }
+}
+
 const LIST_PROPERTIES = new Set([
   'background',
   'background-image',
@@ -258,6 +264,9 @@ export class CSSStyleValue {
   }
 
   static parseAll(property: string, css: string): CSSStyleValue[] {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to execute 'parseAll' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
+    }
     if (property === '--') {
       throw new TypeError("Invalid property name: '--'");
     }
@@ -440,6 +449,9 @@ export class CSSStyleValue {
   }
 
   static parse(property: string, css: string): CSSStyleValue {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
+    }
     const all = this.parseAll(property, css);
     if (all.length === 0) {
       throw new TypeError(`Invalid value for property ${property}: ${css}`);
@@ -609,6 +621,9 @@ function rectifyColorAngle(v: number | string | CSSNumericValue | CSSKeywordValu
 // CSS Typed OM: CSSColorValue
 export abstract class CSSColorValue extends CSSStyleValue {
   static override parse(css: string): CSSColorValue | CSSKeywordValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSColorValue': 1 argument required, but only 0 present.");
+    }
     const tokens = tokenize(css);
     const componentValues = ParseHooks.parseComponentValues(tokens);
     
@@ -667,17 +682,17 @@ export class CSSRGB extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get r(): CSSNumericValue | CSSKeywordValue { return this._r; }
-  set r(val: number | string | CSSNumericValue | CSSKeywordValue) { this._r = rectifyColorRGBComp(val); }
+  get r(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._r; }
+  set r(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._r = rectifyColorRGBComp(val); }
 
-  get g(): CSSNumericValue | CSSKeywordValue { return this._g; }
-  set g(val: number | string | CSSNumericValue | CSSKeywordValue) { this._g = rectifyColorRGBComp(val); }
+  get g(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._g; }
+  set g(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._g = rectifyColorRGBComp(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorRGBComp(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._b = rectifyColorRGBComp(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     // CSS Color 4 #css-serialization-of-srgb:
@@ -714,17 +729,17 @@ export class CSSHSL extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val, true); }
+  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._h; }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._h = rectifyColorAngle(val, true); }
 
-  get s(): CSSNumericValue | CSSKeywordValue { return this._s; }
-  set s(val: number | string | CSSNumericValue | CSSKeywordValue) { this._s = rectifyColorPercent(val); }
+  get s(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._s; }
+  set s(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._s = rectifyColorPercent(val); }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._l = rectifyColorPercent(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -753,8 +768,9 @@ export class CSSHWB extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get h(): CSSNumericValue { return this._h; }
+  get h(): CSSNumericValue { checkBrand(this, CSSHWB); return this._h; }
   set h(val: number | string | CSSNumericValue) {
+    checkBrand(this, CSSHWB);
     const rectified = rectifyColorAngle(val);
     if (!(rectified instanceof CSSNumericValue)) {
       throw new TypeError(`CSSHWB.h must be a CSSNumericValue`);
@@ -762,14 +778,14 @@ export class CSSHWB extends CSSColorValue {
     this._h = rectified;
   }
 
-  get w(): CSSNumericValue | CSSKeywordValue { return this._w; }
-  set w(val: number | string | CSSNumericValue | CSSKeywordValue) { this._w = rectifyColorPercent(val); }
+  get w(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._w; }
+  set w(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHWB); this._w = rectifyColorPercent(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorPercent(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHWB); this._b = rectifyColorPercent(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHWB); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -798,17 +814,17 @@ export class CSSLab extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._l = rectifyColorPercent(val); }
 
-  get a(): CSSNumericValue | CSSKeywordValue { return this._a; }
-  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { this._a = rectifyColorNumber(val); }
+  get a(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._a; }
+  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._a = rectifyColorNumber(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorNumber(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._b = rectifyColorNumber(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -837,17 +853,17 @@ export class CSSLCH extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._l = rectifyColorPercent(val); }
 
-  get c(): CSSNumericValue | CSSKeywordValue { return this._c; }
-  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { this._c = rectifyColorPercent(val); }
+  get c(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._c; }
+  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._c = rectifyColorPercent(val); }
 
-  get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val, true); }
+  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._h; }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._h = rectifyColorAngle(val, true); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -876,17 +892,17 @@ export class CSSOKLab extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._l = rectifyColorPercent(val); }
 
-  get a(): CSSNumericValue | CSSKeywordValue { return this._a; }
-  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { this._a = rectifyColorNumber(val); }
+  get a(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._a; }
+  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._a = rectifyColorNumber(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorNumber(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._b = rectifyColorNumber(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -915,17 +931,17 @@ export class CSSOKLCH extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._l = rectifyColorPercent(val); }
 
-  get c(): CSSNumericValue | CSSKeywordValue { return this._c; }
-  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { this._c = rectifyColorPercent(val); }
+  get c(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._c; }
+  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._c = rectifyColorPercent(val); }
 
-  get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val, true); }
+  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._h; }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._h = rectifyColorAngle(val, true); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -951,15 +967,17 @@ export class CSSColor extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get colorSpace(): CSSKeywordValue { return this._colorSpace; }
+  get colorSpace(): CSSKeywordValue { checkBrand(this, CSSColor); return this._colorSpace; }
   set colorSpace(val: CSSKeywordValue | string) {
+    checkBrand(this, CSSColor);
     this._colorSpace = typeof val === 'string' ? new CSSKeywordValue(val) : val;
   }
 
-  get channels(): (CSSNumericValue | CSSKeywordValue)[] { return this._channels; }
+  get channels(): (CSSNumericValue | CSSKeywordValue)[] { checkBrand(this, CSSColor); return this._channels; }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSColor); return this._alpha; }
   set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) {
+    checkBrand(this, CSSColor);
     this._alpha = rectifyColorNumberOrPercent(val);
   }
 
@@ -1176,6 +1194,9 @@ export abstract class CSSNumericValue extends CSSStyleValue {
   }
 
   static parse(css: string): CSSNumericValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSNumericValue': 1 argument required, but only 0 present.");
+    }
     try {
       const tokens = tokenize(css);
       const componentValues = ParseHooks.parseComponentValues(tokens).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
