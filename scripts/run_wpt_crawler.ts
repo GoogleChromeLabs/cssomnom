@@ -3,10 +3,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { exec, execSync } from 'node:child_process';
+import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
-const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 
 interface SpecConfig {
   path: string;
@@ -146,37 +146,42 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout } = await execPromise(`"${process.execPath}" scripts/run_wpt_sandbox.ts "${filePath}" 2>&1`, { timeout: 4000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_sandbox.ts', filePath], { timeout: 4000 });
+        const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
-          console.log(stdout);
+          console.log(mergedOutput);
         }
-        const match = stdout.match(/Summary: (\d+)\/(\d+) passed/);
+        const match = mergedOutput.match(/Summary: (\d+)\/(\d+) passed/);
         if (match) {
           passing = parseInt(match[1], 10);
           total = parseInt(match[2], 10);
         }
         if (options.updateBaseline) {
-          const matches = stdout.matchAll(/^\s*✖ (.*)/gm);
+          const matches = mergedOutput.matchAll(/^\s*✖ (.*)/gm);
           for (const m of matches) {
             failedTests.push(m[1].trim());
           }
         }
       } catch (err: unknown) {
-        const stdout = (err && typeof err === 'object' && 'stdout' in err) ? String((err as Record<string, unknown>).stdout) : '';
+        const errorObj = err as Record<string, unknown>;
+        const stdout = typeof errorObj.stdout === 'string' ? errorObj.stdout : '';
+        const stderr = typeof errorObj.stderr === 'string' ? errorObj.stderr : '';
+        const mergedOutput = stdout + '\n' + stderr;
+        
         if (options.verbose) {
-          console.log(stdout);
+          console.log(mergedOutput);
         }
-        const match = stdout.match(/Summary: (\d+)\/(\d+) passed/);
+        const match = mergedOutput.match(/Summary: (\d+)\/(\d+) passed/);
         if (match) {
           passing = parseInt(match[1], 10);
           total = parseInt(match[2], 10);
         }
         if (options.updateBaseline) {
-          const loadErrorMatch = stdout.match(/Failed to run file .*?: (.*)/);
+          const loadErrorMatch = mergedOutput.match(/Failed to run file .*?: (.*)/);
           if (loadErrorMatch) {
             loadError = loadErrorMatch[1].trim();
           } else {
-            const matches = stdout.matchAll(/^\s*✖ (.*)/gm);
+            const matches = mergedOutput.matchAll(/^\s*✖ (.*)/gm);
             for (const m of matches) {
               failedTests.push(m[1].trim());
             }
