@@ -238,7 +238,14 @@ export function patchWindowForTypedOM(window: WindowType) {
                     enumerable: false
                   });
                   return list as StyleSheetList;
-                }
+                },
+                fonts: {
+                  ready: Promise.resolve(),
+                  addEventListener() {},
+                  removeEventListener() {},
+                  check() { return true; },
+                  load() { return Promise.resolve([]); }
+                } as unknown as FontFaceSet
               };
               iframeSandbox = createWptContext(window, iframeDocument, iframeTests) as IframeSandboxContext;
               
@@ -614,6 +621,34 @@ export function patchWindowForTypedOM(window: WindowType) {
       },
       configurable: true
     });
+
+    Object.defineProperty(documentConstructor.prototype, 'fonts', {
+      get() {
+        if (!this._fonts) {
+          this._fonts = {
+            ready: Promise.resolve(),
+            addEventListener() {},
+            removeEventListener() {},
+            check() { return true; },
+            load() { return Promise.resolve([]); }
+          } as unknown as FontFaceSet;
+        }
+        return this._fonts;
+      },
+      configurable: true
+    });
+  }
+
+  const doc = win.document as Record<string, unknown> | undefined;
+  if (doc) {
+    if (!doc.implementation) {
+      doc.implementation = {};
+    }
+    (doc.implementation as Record<string, unknown>).createHTMLDocument = function(title: string) {
+      const dom = parseHTML(`<!DOCTYPE html><html><head><title>${title}</title></head><body></body></html>`);
+      patchWindowForTypedOM(dom.window);
+      return dom.window.document;
+    };
   }
 
   Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
@@ -843,6 +878,9 @@ export function createWptContext(
   document: Partial<DocumentType>,
   tests: WptSandboxTest[]
 ): Record<string, unknown> {
+  let nextRafId = 1;
+  const activeRafs = new Map<number, NodeJS.Timeout>();
+
   const ctx = {
     window,
     document,
@@ -869,6 +907,24 @@ export function createWptContext(
     clearTimeout: globalThis.clearTimeout,
     setInterval: globalThis.setInterval,
     clearInterval: globalThis.clearInterval,
+    requestAnimationFrame: (cb: (time: number) => void) => {
+      const id = nextRafId++;
+      const timer = setTimeout(() => {
+        activeRafs.delete(id);
+        try {
+          cb(performance.now());
+        } catch {}
+      }, 16);
+      activeRafs.set(id, timer);
+      return id;
+    },
+    cancelAnimationFrame: (id: number) => {
+      const timer = activeRafs.get(id);
+      if (timer) {
+        clearTimeout(timer);
+        activeRafs.delete(id);
+      }
+    },
     setup: (properties?: { single_test?: boolean; allow_uncaught_exception?: boolean }) => {
       if (properties) {
         if (properties.single_test) {
@@ -1058,6 +1114,17 @@ export function createWptContext(
             testObj.resolve();
           }
         },
+        step_func: (stepFn: Function) => {
+          return function(this: unknown, ...args: unknown[]) {
+            tObj.step(() => stepFn.apply(this, args));
+          };
+        },
+        step_func_done: (stepFn: Function) => {
+          return function(this: unknown, ...args: unknown[]) {
+            tObj.step(() => stepFn.apply(this, args));
+            tObj.done();
+          };
+        },
         add_cleanup: (cleanFn: Function) => {
           if (!testObj.cleanups) {
             testObj.cleanups = [];
@@ -1093,6 +1160,8 @@ export function createWptContext(
         ctx.harnessErrorMessage = msg;
         ctx.harnessCompleted = true;
       }
+
+      return tObj;
     },
     assert_not_equals: (actual: unknown, expected: unknown, message?: string) => {
       assert.notStrictEqual(actual, expected, message ?? '');

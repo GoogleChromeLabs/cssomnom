@@ -3,7 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
-import { patchWindowForTypedOM } from './wpt-shim.ts';
+import { patchWindowForTypedOM, createWptContext } from './wpt-shim.ts';
+import type { WptSandboxTest } from './wpt-shim.ts';
 import { StylePropertyMapReadOnly } from '../src/typed-om.ts';
 
 test('window.getComputedStyle in sandbox shim', () => {
@@ -65,4 +66,109 @@ test('window.matchMedia in sandbox shim', () => {
   assert.strictEqual(mql.media, '(max-width: 600px)');
   assert.strictEqual(typeof mql.addListener, 'function');
   assert.strictEqual(typeof mql.removeListener, 'function');
+});
+
+test('async_test lifecycle mock in sandbox context', async () => {
+  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+
+  const tests: WptSandboxTest[] = [];
+  const ctx = createWptContext(win, win.document, tests);
+
+  const async_test = ctx.async_test as Function;
+  assert.strictEqual(typeof async_test, 'function');
+
+  let testRef: unknown;
+  const returnedTest = async_test((t: unknown) => {
+    testRef = t;
+  }, 'my-async-test') as {[key: string]: unknown};
+
+  assert.ok(returnedTest, 'should return a test object');
+  assert.strictEqual(returnedTest, testRef, 'returned object and callback argument should be the same');
+
+  assert.strictEqual(typeof returnedTest.step, 'function');
+  assert.strictEqual(typeof returnedTest.done, 'function');
+  assert.strictEqual(typeof returnedTest.step_func, 'function');
+  assert.strictEqual(typeof returnedTest.step_func_done, 'function');
+  assert.strictEqual(typeof returnedTest.add_cleanup, 'function');
+
+  let cleanCalled = false;
+  (returnedTest.add_cleanup as Function)(() => {
+    cleanCalled = true;
+  });
+
+  const stepFunc = returnedTest.step_func as Function;
+  const wrapped = stepFunc(() => {
+    assert.ok(true);
+  });
+  wrapped();
+
+  (returnedTest.done as Function)();
+  
+  await tests[0].promise;
+  
+  // Run cleanups manually to test it
+  for (const cleanup of tests[0].cleanups || []) {
+    cleanup();
+  }
+  assert.ok(cleanCalled, 'cleanup should be called');
+  assert.strictEqual(tests[0].status, 0, 'test should pass');
+});
+
+test('requestAnimationFrame and cancelAnimationFrame mock in sandbox context', async () => {
+  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+  const ctx = createWptContext(win, win.document, []);
+
+  const rAF = ctx.requestAnimationFrame as Function;
+  const cAF = ctx.cancelAnimationFrame as Function;
+
+  assert.strictEqual(typeof rAF, 'function');
+  assert.strictEqual(typeof cAF, 'function');
+
+  let called = false;
+  const id = rAF(() => {
+    called = true;
+  });
+  assert.strictEqual(typeof id, 'number');
+  assert.strictEqual(called, false, 'should run asynchronously');
+
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.strictEqual(called, true, 'should execute callback');
+
+  let cancelled = false;
+  const cancelId = rAF(() => {
+    cancelled = true;
+  });
+  cAF(cancelId);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.strictEqual(cancelled, false, 'should cancel callback');
+});
+
+test('document.fonts in sandbox context', () => {
+  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+  const ctx = createWptContext(win, win.document, []);
+
+  const doc = ctx.document as {[key: string]: unknown};
+  assert.ok(doc.fonts, 'fonts should be defined on document');
+  const fonts = doc.fonts as {[key: string]: unknown};
+  assert.ok(fonts.ready instanceof Promise, 'fonts.ready should be a Promise');
+});
+
+test('document.implementation.createHTMLDocument mock in sandbox context', () => {
+  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+
+  const doc = win.document;
+  assert.strictEqual(typeof doc.implementation.createHTMLDocument, 'function');
+  
+  const doc2 = doc.implementation.createHTMLDocument('my-title');
+  assert.ok(doc2);
+  assert.strictEqual(doc2.title, 'my-title');
+  assert.ok(doc2.body, 'document should have a body element');
 });
