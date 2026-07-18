@@ -1802,18 +1802,23 @@ Objective: Resolve over 5,700 Web Platform Test failures (~33% of overall crawle
 Objective: Resolve unbaselined failures in the expanded specifications by completing the WPT test harness lifecycle and mocking standard browser APIs (requestAnimationFrame, fonts, createHTMLDocument).
  
 ### Tasks
-- [ ] **Complete `async_test` lifecycle in Shim**:
+- [x] **Complete `async_test` lifecycle in Shim**:
   - Update `async_test` in `tests/wpt-shim.ts` to return the mock test object.
   - Implement `step`, `done`, `step_func`, `step_func_done`, and `add_cleanup` on the returned test object.
   - Ensure standard event handler load patterns compile and execute safely (resolves ~30 failures).
-- [ ] **Mock browser APIs in sandbox context**:
+- [x] **Mock browser APIs in sandbox context**:
   - Mock `requestAnimationFrame` and `cancelAnimationFrame` via `globalThis.setTimeout` inside `tests/wpt-shim.ts`'s `createWptContext` (resolves ~6 failures).
   - Mock `document.fonts` inside `createWptContext` (resolves ~2 failures).
   - Implement `document.implementation.createHTMLDocument` inside `patchWindowForTypedOM` in `tests/wpt-shim.ts` using `parseHTML` (resolves ~2 failures).
-- [ ] **Unified Multi-Spec Baseline Configuration**:
+- [x] **Unified Multi-Spec Baseline Configuration**:
   - Update `tests/wpt-sandbox.test.ts` to load all specifications and exclusions dynamically from `tests/wpt-sandbox-config.json` instead of hardcoding `css-typed-om`.
   - Baseline all remaining layout engine limitations and ES Modules syntax issues to keep standard preflight checks green.
-- [ ] **Verification**:
+- [x] **Memory Leak & CPU Performance Safety**:
+  - Guarded globally-shared linkedom prototypes (`Element.prototype`, `CSSStyleDeclaration.prototype`) with a recursion guard to prevent stack overflow/extreme CPU locks.
+  - Removed global `window` closure leaks inside `Node.prototype.appendChild` and `insertBefore` mocks by resolving contexts dynamically via `ownerDocument.defaultView`.
+  - Implemented automatic worker-queue throttling inside `scripts/run_wpt_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
+  - Guarded heavy crawler runner in `tests/wpt-sandbox.test.ts` with `RUN_SANDBOX_WPT=true` env flag to keep normal preflight check memory footprint minimal.
+- [x] **Verification**:
   - Run the crawler and verify that new specification failures drop to 0.
  
 ---
