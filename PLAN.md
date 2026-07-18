@@ -1858,6 +1858,20 @@ Objective: Improve WPT Chrome conformance rate by resolving prototype attribute 
 - [x] **Harden CSSNumericValue.parse argument check**: Ensure `CSSNumericValue.parse` throws TypeError if called with too few arguments, including on its subclasses.
 - [x] **Prototype Attribute Wrapping & Enumerability**: Wrap `CSSRGB`, `CSSHSL`, and `CSSHWB` constructors in `src/browser-entry.ts` and ensure their prototype attributes are enumerable.
 - [x] **Verification**: Run `pnpm run test:wpt-typed-om:chrome` and verify the conformance pass rate improvement.
+ 
+---
+ 
+## Potential roadmap items
+ 
+Objective: Explore long-term ideas for WPT conformance, prototype patching options, and parser shorthand completeness.
+ 
+### Ideas
+ 
+#### 1. Spec-Compliance & API Surface Refinements
+- [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
+- [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
+- [ ] **Static Selector Matching**: Implement a basic CSS selector matcher to evaluate a parsed selector against a DOM element (e.g. for use with Linkedom).
+- [ ] **Advanced Typed OM Value Parsing**: Implement complete support in `CSSStyleValue.parse()` and numeric constructors for advanced functions (e.g. `anchor()`, `calc()` math expressions, viewport units validation, and custom properties) to resolve the major Typed OM WPT conformance gap.
 
 
 
