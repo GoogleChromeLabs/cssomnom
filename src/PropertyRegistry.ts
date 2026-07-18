@@ -191,7 +191,7 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
         if (name === 'number') return isMathFunction || t.type === 'number';
         if (name === 'percentage') return isMathFunction || t.type === 'percentage';
         if (name === 'length-percentage') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || t.type === 'percentage' || (t.type === 'number' && t.value === 0);
-        if (name === 'integer') return t.type === 'number' && t.numberType === 'integer';
+        if (name === 'integer') return isMathFunction || (t.type === 'number' && t.numberType === 'integer');
         if (name === 'angle') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'angle');
         if (name === 'time') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'time');
         if (name === 'resolution') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'resolution');

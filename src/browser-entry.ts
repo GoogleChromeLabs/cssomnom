@@ -131,9 +131,6 @@ if (typeof window !== 'undefined') {
         if (desc) {
           desc.enumerable = true;
           Object.defineProperty(Wrapper, key, desc);
-          if (fromCls !== OriginalClass) {
-            Object.defineProperty(OriginalClass, key, desc);
-          }
         }
       }
     };
@@ -201,39 +198,42 @@ if (typeof window !== 'undefined') {
   }
 
   // Patch Element.prototype.computedStyleMap
-  if (!Element.prototype.computedStyleMap) {
-    Element.prototype.computedStyleMap = function computedStyleMap(this: Element) {
+  Object.defineProperty(Element.prototype, 'computedStyleMap', {
+    value: function computedStyleMap(this: Element) {
       if (!(this instanceof Element)) {
         throw new TypeError("Value of 'this' is not an Element");
       }
-      return new g.StylePropertyMapReadOnly(this, window.getComputedStyle(this));
-    } as any;
-  }
+      return new g.StylePropertyMapReadOnly(window.getComputedStyle(this), this);
+    },
+    writable: true,
+    configurable: true,
+    enumerable: true
+  });
 
   // Patch styleMap / attributeStyleMap
   const patchStyleMaps = (proto: any, brandCheck: (obj: any) => boolean) => {
-    if (proto && !proto.attributeStyleMap) {
+    if (proto) {
       Object.defineProperty(proto, 'attributeStyleMap', {
         get() {
           if (!brandCheck(this)) throw new TypeError("Value of 'this' is not of correct type");
           if (!this._attributeStyleMap) {
-            this._attributeStyleMap = new g.StylePropertyMap(this.style);
+            this._attributeStyleMap = new g.StylePropertyMap(this.style, this);
           }
           return this._attributeStyleMap;
         },
-        configurable: true
+        configurable: true,
+        enumerable: true
       });
-    }
-    if (proto && !proto.styleMap) {
       Object.defineProperty(proto, 'styleMap', {
         get() {
           if (!brandCheck(this)) throw new TypeError("Value of 'this' is not of correct type");
           if (!this._styleMap) {
-            this._styleMap = new g.StylePropertyMap(this.style);
+            this._styleMap = new g.StylePropertyMap(this.style, this);
           }
           return this._styleMap;
         },
-        configurable: true
+        configurable: true,
+        enumerable: true
       });
     }
   };
@@ -248,7 +248,7 @@ if (typeof window !== 'undefined') {
     patchStyleMaps(MathMLElement.prototype, (obj) => obj instanceof MathMLElement);
   }
 
-  if (typeof CSSStyleRule !== 'undefined' && !CSSStyleRule.prototype.styleMap) {
+  if (typeof CSSStyleRule !== 'undefined') {
     Object.defineProperty(CSSStyleRule.prototype, 'styleMap', {
       get() {
         if (!(this instanceof CSSStyleRule)) throw new TypeError("Value of 'this' is not a CSSStyleRule");
@@ -257,7 +257,8 @@ if (typeof window !== 'undefined') {
         }
         return this._styleMap;
       },
-      configurable: true
+      configurable: true,
+      enumerable: true
     });
   }
 }

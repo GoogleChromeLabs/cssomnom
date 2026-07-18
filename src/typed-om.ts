@@ -291,6 +291,24 @@ export class CSSStyleValue {
     return this._cssText || '';
   }
 
+  private static _shouldFallbackToCSSStyleValue(property: string, css: string): boolean {
+    const propLower = property.toLowerCase();
+    const valueLower = css.toLowerCase().trim();
+    
+    if (valueLower.includes('var(')) return false;
+    
+    if (propLower === 'will-change') {
+      return valueLower !== 'auto' && valueLower !== 'contents';
+    }
+    if (propLower === 'filter' || propLower === 'backdrop-filter') {
+      return valueLower !== 'none';
+    }
+    if (propLower === 'cursor') {
+      return valueLower.includes('url(');
+    }
+    return false;
+  }
+
   static parseAll(property: string, css: string): CSSStyleValue[] {
     if (arguments.length < 2) {
       throw new TypeError("Failed to execute 'parseAll' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
@@ -325,6 +343,10 @@ export class CSSStyleValue {
 
     if (isCSSWideKeyword) {
       return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
+    }
+
+    if (CSSStyleValue._shouldFallbackToCSSStyleValue(property, css)) {
+      return [new CSSStyleValue(css, privateToken)];
     }
 
     const shorthand = SHORTHANDS[property];
@@ -3490,21 +3512,54 @@ function parseNumeric(v: ComponentValue): CSSNumericValue {
 }
 
 
-export class StylePropertyMapReadOnly {
-  private declarations: Declaration[];
+export interface StyleReadOnlyLike {
+  length: number;
+  [index: number]: string;
+  getPropertyValue(property: string): string;
+  item(index: number): string;
+  declarations?: Declaration[];
+}
 
-  constructor(declarations: Declaration[]) {
-    this.declarations = declarations;
+export interface StyleLike extends StyleReadOnlyLike {
+  setProperty(property: string, value: string | null, priority?: string): void;
+  removeProperty(property: string): string;
+}
+
+export class StylePropertyMapReadOnly {
+  protected _style: StyleReadOnlyLike;
+  protected _element?: unknown;
+
+  constructor(styleOrDecls: StyleReadOnlyLike | Declaration[], element?: unknown) {
+    if (Array.isArray(styleOrDecls)) {
+      this._style = {
+        length: styleOrDecls.length,
+        getPropertyValue: (prop: string) => {
+          const decl = styleOrDecls.find(d => d.name === prop);
+          return decl ? serialize(decl.value).trim() : '';
+        },
+        item: (index: number) => styleOrDecls[index]?.name || '',
+        declarations: styleOrDecls,
+        ...Object.fromEntries(styleOrDecls.map((d, i) => [i, d.name]))
+      } as unknown as StyleReadOnlyLike;
+    } else {
+      this._style = styleOrDecls;
+    }
+    this._element = element;
   }
 
   protected _getDeclarations(): Declaration[] {
-    return this.declarations;
+    return this._style.declarations || [];
   }
 
   private _getKeys(): string[] {
     const keys = new Set<string>();
-    for (const decl of this._getDeclarations()) {
-      keys.add(decl.name);
+    if (this._style) {
+      for (let i = 0; i < this._style.length; i++) {
+        const prop = this._style[i];
+        if (prop) {
+          keys.add(prop);
+        }
+      }
     }
     return Array.from(keys);
   }
@@ -3553,49 +3608,79 @@ export class StylePropertyMapReadOnly {
   protected _getRaw(property: string): CSSStyleValue | null {
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
-      const longhandValues: Record<string, ComponentValue[]> = {};
-      let allSet = true;
-      for (const lh of shorthand.longhands) {
-        const decl = this.declarations.find(d => d.name === lh);
-        if (!decl) {
-          allSet = false;
-          break;
+      const declarations = this._getDeclarations();
+      if (declarations.length > 0) {
+        const longhandValues: Record<string, ComponentValue[]> = {};
+        let allSet = true;
+        for (const lh of shorthand.longhands) {
+          const decl = declarations.find(d => d.name === lh);
+          if (!decl) {
+            allSet = false;
+            break;
+          }
+          longhandValues[lh] = decl.value;
         }
-        longhandValues[lh] = decl.value;
-      }
-      if (allSet) {
-        const contracted = shorthand.contract(longhandValues);
-        if (contracted !== null) {
-          // Shorthands in Typed OM usually return CSSUnparsedValue
-          return new CSSUnparsedValue([contracted]);
+        if (allSet) {
+          const contracted = shorthand.contract(longhandValues);
+          if (contracted !== null) {
+            return new CSSUnparsedValue([contracted]);
+          }
+        }
+      } else {
+        const val = this._style.getPropertyValue(property);
+        if (val) {
+          return new CSSUnparsedValue([val]);
         }
       }
       return null;
     }
 
-    const decl = this.declarations.find((d: Declaration) => d.name === property);
-    if (!decl) return null;
-    if (property.startsWith('--')) {
-      return new CSSUnparsedValue(tokensToUnparsedSegments(decl.value));
-    }
-
-    
-    const serialized = serialize(decl.value).trim();
-    try {
-      const parsed = CSSStyleValue.parseAll(property, serialized);
-      return parsed.length > 0 ? parsed[0] : null;
-    } catch (e) {
-      return new CSSStyleValue(serialized, privateToken);
+    const declarations = this._getDeclarations();
+    if (declarations.length > 0) {
+      const decl = declarations.find((d: Declaration) => d.name === property);
+      if (!decl) return null;
+      if (property.startsWith('--')) {
+        return new CSSUnparsedValue(tokensToUnparsedSegments(decl.value));
+      }
+      const serialized = serialize(decl.value).trim();
+      try {
+        const parsed = CSSStyleValue.parseAll(property, serialized);
+        return parsed.length > 0 ? parsed[0] : null;
+      } catch (e) {
+        return new CSSStyleValue(serialized, privateToken);
+      }
+    } else {
+      const val = this._style.getPropertyValue(property);
+      if (val === '') return null;
+      if (property.startsWith('--')) {
+        const tokens = tokenize(val);
+        const componentValues = ParseHooks.parseComponentValues(tokens);
+        return new CSSUnparsedValue(tokensToUnparsedSegments(componentValues));
+      }
+      try {
+        const parsed = CSSStyleValue.parseAll(property, val);
+        return parsed.length > 0 ? parsed[0] : null;
+      } catch (e) {
+        return new CSSStyleValue(val, privateToken);
+      }
     }
   }
 
   has(property: string): boolean {
     validateProperty(property);
     const shorthand = SHORTHANDS[property];
-    if (shorthand) {
-      return shorthand.longhands.every(lh => this.declarations.some(d => d.name === lh));
+    const declarations = this._getDeclarations();
+    if (declarations.length > 0) {
+      if (shorthand) {
+        return shorthand.longhands.every(lh => declarations.some(d => d.name === lh));
+      }
+      return declarations.some((d: Declaration) => d.name === property);
+    } else {
+      if (shorthand) {
+        return shorthand.longhands.every(lh => this._style.getPropertyValue(lh) !== '');
+      }
+      return this._style.getPropertyValue(property) !== '';
     }
-    return this.declarations.some((d: Declaration) => d.name === property);
   }
 
   getAll(property: string): CSSStyleValue[] {
@@ -3608,18 +3693,32 @@ export class StylePropertyMapReadOnly {
   }
 
   protected _getAllRaw(property: string): CSSStyleValue[] {
-    const decl = this.declarations.find((d: Declaration) => d.name === property);
-    if (!decl) return [];
-    
-    if (property.startsWith('--')) {
-      return [new CSSUnparsedValue(tokensToUnparsedSegments(decl.value))];
-    }
-    
-    const serialized = serialize(decl.value).trim();
-    try {
-      return CSSStyleValue.parseAll(property, serialized);
-    } catch (e) {
-      return [new CSSStyleValue(serialized, privateToken)];
+    const declarations = this._getDeclarations();
+    if (declarations.length > 0) {
+      const decl = declarations.find((d: Declaration) => d.name === property);
+      if (!decl) return [];
+      if (property.startsWith('--')) {
+        return [new CSSUnparsedValue(tokensToUnparsedSegments(decl.value))];
+      }
+      const serialized = serialize(decl.value).trim();
+      try {
+        return CSSStyleValue.parseAll(property, serialized);
+      } catch (e) {
+        return [new CSSStyleValue(serialized, privateToken)];
+      }
+    } else {
+      const val = this._style.getPropertyValue(property);
+      if (val === '') return [];
+      if (property.startsWith('--')) {
+        const tokens = tokenize(val);
+        const componentValues = ParseHooks.parseComponentValues(tokens);
+        return [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
+      }
+      try {
+        return CSSStyleValue.parseAll(property, val);
+      } catch (e) {
+        return [new CSSStyleValue(val, privateToken)];
+      }
     }
   }
 }
@@ -3703,14 +3802,7 @@ function setPropertySafe(style: unknown, element: unknown, property: string, val
   }
 }
 
-interface StyleLike {
-  declarations: Declaration[];
-  getPropertyValue(property: string): string;
-  setProperty(property: string, value: string): void;
-  removeProperty(property: string): void;
-  length: number;
-  item(index: number): string;
-}
+
 
 function getShorthandForLonghand(longhand: string): string | null {
   for (const [shorthand, data] of Object.entries(SHORTHANDS)) {
@@ -3742,18 +3834,140 @@ function isEquivalent(a: string, b: string): boolean {
   return clean(a) === clean(b);
 }
 
+function getRepresentative(val: CSSUnitValue): CSSUnitValue {
+  const unit = val.unit.toLowerCase();
+  if (unit === 'number') return createUnitValue(1, 'number');
+  if (unit === 'percent') return createUnitValue(1, 'percent');
+
+  const base = unitToBase[unit];
+  if (base === 'length') return createUnitValue(1, 'px');
+  if (base === 'angle') return createUnitValue(1, 'deg');
+  if (base === 'time') return createUnitValue(1, 's');
+  if (base === 'frequency') return createUnitValue(1, 'hz');
+  if (base === 'resolution') return createUnitValue(1, 'dpi');
+  if (base === 'flex') return createUnitValue(1, 'fr');
+
+  return val;
+}
+
+let dummyStyle: CSSStyleDeclaration | null = null;
+function getDummyStyle(): CSSStyleDeclaration {
+  if (!dummyStyle) {
+    if (typeof globalThis.document === 'undefined') {
+      return {
+        cssText: '',
+        length: 0,
+        setProperty() {},
+        getPropertyValue() { return ''; },
+        removeProperty() {},
+        item() { return ''; }
+      } as unknown as CSSStyleDeclaration;
+    }
+    dummyStyle = globalThis.document.createElement('div').style;
+  }
+  return dummyStyle;
+}
+
+function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
+  const propLower = property.toLowerCase();
+  if (propLower.startsWith('--')) return false;
+
+  const temp = getDummyStyle();
+
+  // Test raw
+  temp.cssText = '';
+  try {
+    temp.setProperty(property, val.toString());
+    if (temp.getPropertyValue(property) !== '') {
+      return false;
+    }
+  } catch (e) {}
+
+  // Test calc
+  temp.cssText = '';
+  try {
+    temp.setProperty(property, `calc(${val.toString()})`);
+    return temp.getPropertyValue(property) !== '';
+  } catch (e) {}
+
+  return false;
+}
+
+function validateValuesForProperty(property: string, values: (CSSStyleValue | string)[]): string {
+  const propLower = property.toLowerCase();
+  const isList = LIST_PROPERTIES.has(propLower);
+
+  if (!isList && values.length > 1) {
+    throw new TypeError(`Property ${property} is not list-valued and cannot accept multiple values`);
+  }
+
+  if (values.length > 1) {
+    for (const val of values) {
+      if (val instanceof CSSUnparsedValue) {
+        throw new TypeError('Cannot mix CSSUnparsedValue with other values');
+      }
+      if (typeof val === 'string' && val.toLowerCase().includes('var(')) {
+        throw new TypeError('Cannot mix variable references with other values');
+      }
+    }
+  }
+
+  const valStrings: string[] = [];
+  const validationStrings: string[] = [];
+  for (const val of values) {
+    if (typeof val === 'string') {
+      valStrings.push(val);
+      validationStrings.push(val);
+    } else {
+      if (val._associatedProperty !== null && val._associatedProperty !== propLower) {
+        throw new TypeError(`CSSStyleValue is associated with ${val._associatedProperty}, not ${property}`);
+      }
+      if (val instanceof CSSUnitValue) {
+        if (shouldWrapInCalc(property, val)) {
+          valStrings.push(`calc(${val.toString()})`);
+        } else {
+          valStrings.push(val.toString());
+        }
+        validationStrings.push(getRepresentative(val).toString());
+      } else {
+        valStrings.push(val.toString());
+        validationStrings.push(val.toString());
+      }
+    }
+  }
+
+  const finalString = valStrings.join(isList ? ', ' : ' ');
+  const validationString = validationStrings.join(isList ? ', ' : ' ');
+
+  if (!propLower.startsWith('--')) {
+    if (typeof globalThis.document === 'undefined') {
+      try {
+        CSSStyleValue.parseAll(property, validationString);
+      } catch (e) {
+        throw new TypeError(`Invalid value for property ${property}: ${finalString}`);
+      }
+    } else {
+      const dummy = getDummyStyle();
+      dummy.cssText = '';
+      dummy.setProperty(property, validationString);
+      if (dummy.getPropertyValue(property) === '') {
+        throw new TypeError(`Invalid value for property ${property}: ${finalString}`);
+      }
+    }
+  }
+
+  return finalString;
+}
+
 export class StylePropertyMap extends StylePropertyMapReadOnly {
-  private _style: StyleLike;
-  private _element?: unknown;
+  declare protected _style: StyleLike;
 
   constructor(style: StyleLike, element?: unknown) {
-    super([]);
-    this._style = style;
-    this._element = element;
+    super(style, element);
   }
 
   protected override _getDeclarations(): Declaration[] {
-    return this._style.declarations;
+    return this._style.declarations || [];
   }
 
   private _checkPendingSubstitution(property: string): void {
@@ -3878,33 +4092,24 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   set(property: string, ...values: (CSSStyleValue | string)[]): void {
     validateProperty(property);
     this._checkPendingSubstitution(property);
-    for (const val of values) {
-      if (val instanceof CSSStyleValue && val._associatedProperty !== null && val._associatedProperty !== property) {
-        throw new TypeError(`Mismatched associated property: expected ${property}, got ${val._associatedProperty}`);
-      }
-    }
     if (values.length === 0) {
       throw new TypeError(`set() on property ${property} requires at least one value.`);
     }
     const propLower = property.toLowerCase();
-    const isList = LIST_PROPERTIES.has(propLower);
-    if (!isList && values.length > 1) {
-      throw new TypeError(`Property ${property} is not list-valued but multiple values were provided.`);
+    const finalString = validateValuesForProperty(property, values);
+    setPropertySafe(this._style, this._element, property, finalString);
+    try {
+      const parsed = CSSStyleValue.parseAll(property, finalString);
+      getStyleCache(this._style).set(propLower, parsed);
+    } catch (e) {
+      getStyleCache(this._style).delete(propLower);
     }
-    const separator = isList ? ', ' : ' ';
-    const serialized = values.map(v => v.toString()).join(separator);
-    const parsed = CSSStyleValue.parseAll(property, serialized);
-    setPropertySafe(this._style, this._element, property, serialized);
-    getStyleCache(this._style).set(propLower, parsed);
   }
 
   append(property: string, ...values: (CSSStyleValue | string)[]): void {
     validateProperty(property);
     this._checkPendingSubstitution(property);
     for (const val of values) {
-      if (val instanceof CSSStyleValue && val._associatedProperty !== null && val._associatedProperty !== property) {
-        throw new TypeError(`Mismatched associated property: expected ${property}, got ${val._associatedProperty}`);
-      }
       if (val instanceof CSSUnparsedValue || val instanceof CSSVariableReferenceValue) {
         throw new TypeError("Cannot append CSSUnparsedValue or CSSVariableReferenceValue.");
       }
@@ -3916,12 +4121,34 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     if (!LIST_PROPERTIES.has(propLower)) {
       throw new TypeError(`Property ${property} is not list-valued and cannot be appended to.`);
     }
+    const finalString = validateValuesForProperty(property, values);
     const current = getPropertyValueSafe(this._style, property);
-    const serialized = values.map(v => v.toString()).join(', ');
-    const newValue = current ? `${current}, ${serialized}` : serialized;
-    const parsed = CSSStyleValue.parseAll(property, newValue);
+    const newValue = current ? `${current}, ${finalString}` : finalString;
+
+    if (!propLower.startsWith('--')) {
+      if (typeof globalThis.document === 'undefined') {
+        try {
+          CSSStyleValue.parseAll(property, newValue);
+        } catch (e) {
+          throw new TypeError(`Invalid combined value for property ${property}: ${newValue}`);
+        }
+      } else {
+        const dummy = getDummyStyle();
+        dummy.cssText = '';
+        dummy.setProperty(property, newValue);
+        if (dummy.getPropertyValue(property) === '') {
+          throw new TypeError(`Invalid combined value for property ${property}: ${newValue}`);
+        }
+      }
+    }
+
     setPropertySafe(this._style, this._element, property, newValue);
-    getStyleCache(this._style).set(propLower, parsed);
+    try {
+      const parsed = CSSStyleValue.parseAll(property, newValue);
+      getStyleCache(this._style).set(propLower, parsed);
+    } catch (e) {
+      getStyleCache(this._style).delete(propLower);
+    }
   }
 
   delete(property: string): void {
