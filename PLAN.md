@@ -1832,6 +1832,7 @@ Objective: Explore long-term ideas for WPT conformance, prototype patching optio
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
 - [ ] **Static Selector Matching**: Implement a basic CSS selector matcher to evaluate a parsed selector against a DOM element (e.g. for use with Linkedom).
+- [ ] **Advanced Typed OM Value Parsing**: Implement complete support in `CSSStyleValue.parse()` and numeric constructors for advanced functions (e.g. `anchor()`, `calc()` math expressions, viewport units validation, and custom properties) to resolve the major Typed OM WPT conformance gap.
 
 
 

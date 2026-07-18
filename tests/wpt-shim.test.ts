@@ -14,15 +14,9 @@ test('window.getComputedStyle in sandbox shim', () => {
 
   assert.ok('getComputedStyle' in win, 'getComputedStyle should be in win');
   const el = win.document.getElementById('test')!;
-  const style = win.getComputedStyle(el);
-  assert.ok(style, 'getComputedStyle(el) should return style');
-  assert.strictEqual(style.color, 'red');
-
-  // styleMap on computed style is a StylePropertyMapReadOnly
-  assert.ok('styleMap' in style, 'styleMap should be in style');
-  const styleMap = (style as Record<string, unknown>).styleMap as StylePropertyMapReadOnly;
-  assert.ok(styleMap, 'styleMap should be defined');
-  assert.strictEqual(styleMap.get('color')?.toString(), 'rgb(255, 0, 0)'); // computed map maps red to rgb(255, 0, 0) in our mock ComputedStylePropertyMap
+  assert.throws(() => {
+    win.getComputedStyle(el);
+  }, /getComputedStyle is not supported/);
 });
 
 test('document.styleSheets in sandbox shim', () => {

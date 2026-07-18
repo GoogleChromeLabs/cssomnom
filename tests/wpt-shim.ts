@@ -213,26 +213,10 @@ export function patchWindowForTypedOM(window: WindowType) {
     };
   }
 
-  // Mock window.getComputedStyle
-  win.getComputedStyle = function(el: Record<string, unknown>) {
-    const style = el.style as Record<string, unknown>;
-    if (!style) return style;
-    return new Proxy(style, {
-      get(target, prop) {
-        if (prop === 'styleMap') {
-          return typeof el.computedStyleMap === 'function' ? el.computedStyleMap() : undefined;
-        }
-        const val = target[prop as string];
-        if (typeof val === 'function') {
-          return val.bind(target);
-        }
-        return val;
-      },
-      has(target, prop) {
-        if (prop === 'styleMap') return true;
-        return prop in target;
-      }
-    });
+  // getComputedStyle cannot be supported meaningfully in Linkedom without a visual layout engine.
+  // We throw explicitly to ensure tests requiring getComputedStyle fail predictably rather than returning incorrect empty results.
+  win.getComputedStyle = function() {
+    throw new Error('getComputedStyle is not supported in the linkedom sandbox environment (requires a full layout engine)');
   };
 
   // Mock window.matchMedia

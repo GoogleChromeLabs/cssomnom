@@ -3,7 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { exec } from 'node:child_process';
+import { exec, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const execPromise = promisify(exec);
@@ -58,7 +58,7 @@ async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>
   return results;
 }
 
-export async function runCrawler(options: { spec?: string; file?: string; verbose?: boolean; concurrency?: number } = {}): Promise<Record<string, SpecResult>> {
+export async function runCrawler(options: { spec?: string; file?: string; verbose?: boolean; concurrency?: number; updateProgress?: boolean; updateBaseline?: boolean } = {}): Promise<Record<string, SpecResult>> {
   const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
   if (!fs.existsSync(configPath)) {
     console.error('Error: WPT sandbox config not found.');
@@ -67,6 +67,8 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
 
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as SandboxConfig;
   const specResults: Record<string, SpecResult> = {};
+  const allKnownFailures: Record<string, string[]> = {};
+  const allSyntaxErrors: Record<string, string> = {};
 
   const concurrency = options.concurrency ?? Math.min(4, Math.max(1, os.availableParallelism() - 1));
   if (options.verbose) {
@@ -140,8 +142,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
 
       let passing = 0;
       let total = 0;
+      const failedTests: string[] = [];
+      let loadError: string | undefined;
+
       try {
-        const { stdout } = await execPromise(`"${process.execPath}" scripts/run_wpt_sandbox.ts "${filePath}"`, { timeout: 4000 });
+        const { stdout } = await execPromise(`"${process.execPath}" scripts/run_wpt_sandbox.ts "${filePath}" 2>&1`, { timeout: 4000 });
         if (options.verbose) {
           console.log(stdout);
         }
@@ -149,32 +154,163 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
         if (match) {
           passing = parseInt(match[1], 10);
           total = parseInt(match[2], 10);
+        }
+        if (options.updateBaseline) {
+          const matches = stdout.matchAll(/^\s*✖ (.*)/gm);
+          for (const m of matches) {
+            failedTests.push(m[1].trim());
+          }
         }
       } catch (err: unknown) {
         const stdout = (err && typeof err === 'object' && 'stdout' in err) ? String((err as Record<string, unknown>).stdout) : '';
         if (options.verbose) {
           console.log(stdout);
-          if (err instanceof Error) {
-            console.error(err.message);
-          }
         }
         const match = stdout.match(/Summary: (\d+)\/(\d+) passed/);
         if (match) {
           passing = parseInt(match[1], 10);
           total = parseInt(match[2], 10);
         }
+        if (options.updateBaseline) {
+          const loadErrorMatch = stdout.match(/Failed to run file .*?: (.*)/);
+          if (loadErrorMatch) {
+            loadError = loadErrorMatch[1].trim();
+          } else {
+            const matches = stdout.matchAll(/^\s*✖ (.*)/gm);
+            for (const m of matches) {
+              failedTests.push(m[1].trim());
+            }
+            if (failedTests.length === 0) {
+              loadError = (err instanceof Error) ? err.message : String(err);
+            }
+          }
+        }
       }
-      return { passing, total };
+      return { passing, total, failedTests: failedTests.length > 0 ? failedTests : undefined, loadError };
     });
 
-    for (const res of results) {
+    for (let i = 0; i < filteredFiles.length; i++) {
+      const filePath = filteredFiles[i];
+      const relativePath = path.relative(process.cwd(), filePath);
+      const res = results[i];
       specTotal += res.total;
       specPassing += res.passing;
+
+      if (options.updateBaseline) {
+        if (res.loadError) {
+          allSyntaxErrors[relativePath] = res.loadError;
+        } else if (res.failedTests) {
+          allKnownFailures[relativePath] = res.failedTests;
+        }
+      }
     }
 
     specResults[specName] = { passing: specPassing, total: specTotal };
     if (options.verbose || specsToRun.length > 1 || options.file) {
       console.log(`- Spec ${specName}: ${specPassing}/${specTotal} passed.`);
+    }
+  }
+
+  if (options.updateBaseline) {
+    const baselinePath = path.resolve(process.cwd(), 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
+    const excludeList = Object.keys(allSyntaxErrors).sort();
+    const lines: string[] = [];
+    lines.push('{');
+    lines.push('  "exclude": [');
+    for (let i = 0; i < excludeList.length; i++) {
+      const isLast = i === excludeList.length - 1;
+      lines.push(`    "${excludeList[i]}"${isLast ? '' : ','}`);
+    }
+    lines.push('  ],');
+    lines.push('  "knownFailures": {');
+    const failureEntries = Object.entries(allKnownFailures).sort((a, b) => a[0].localeCompare(b[0]));
+    for (let i = 0; i < failureEntries.length; i++) {
+      const [file, fails] = failureEntries[i];
+      const isLast = i === failureEntries.length - 1;
+      const failsJson = JSON.stringify(fails);
+      lines.push(`    "${file}": ${failsJson}${isLast ? '' : ','}`);
+    }
+    lines.push('  }');
+    lines.push('}');
+    fs.writeFileSync(baselinePath, lines.join('\n') + '\n', 'utf-8');
+    console.log(`\nSuccessfully updated baseline configuration at: ${baselinePath}`);
+  }
+
+  if (options.updateProgress) {
+    const SPEC_DISPLAY_NAMES: Record<string, string> = {
+      'css-typed-om': 'Typed OM',
+      'cssom': 'CSSOM',
+      'css-nesting': 'Nesting',
+      'css-syntax': 'Syntax',
+      'css-variables': 'Variables',
+      'selectors': 'Selectors',
+      'mediaqueries': 'MQ'
+    };
+    const specOrder = ['css-typed-om', 'cssom', 'css-nesting', 'css-syntax', 'css-variables', 'selectors', 'mediaqueries'];
+
+    let grandTotal = 0;
+    let grandPassing = 0;
+    for (const [, res] of Object.entries(specResults)) {
+      grandTotal += res.total;
+      grandPassing += res.passing;
+    }
+    const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
+
+    // Get git details
+    let commitHash = 'unknown';
+    let isDirty = false;
+    try {
+      commitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
+      const status = execSync('git status --porcelain', { encoding: 'utf-8' }).trim();
+      isDirty = status.length > 0;
+    } catch {}
+    const commitStr = commitHash + (isDirty ? '*' : '');
+    const dateStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+    const progressFilePath = path.resolve(process.cwd(), 'wpt-progress.md');
+    const fileExists = fs.existsSync(progressFilePath);
+    
+    const rowParts = [dateStr, `\`${commitStr}\``];
+    for (const key of specOrder) {
+      const res = specResults[key] || { passing: 0, total: 0 };
+      rowParts.push(`${res.passing}/${res.total}`);
+    }
+    rowParts.push(`${grandPassing}/${grandTotal}`);
+    rowParts.push(`${overallPassRate}%`);
+    const newRow = `| ${rowParts.join(' | ')} |`;
+
+    if (!fileExists) {
+      const headers = ['Date & Time (UTC)', 'Commit'];
+      const alignments = [':---', ':---'];
+      for (const key of specOrder) {
+        const displayName = SPEC_DISPLAY_NAMES[key] || key;
+        headers.push(`${displayName}`);
+        alignments.push(':---:');
+      }
+      headers.push('Overall');
+      alignments.push(':---:');
+      headers.push('Pass Rate');
+      alignments.push(':---:');
+
+      const initialContent = `# WPT Multi-Spec Conformance Sandbox Progress Log\n\n` +
+        `This file tracks the conformance progress of the CSSOM / Typed OM implementations across major W3C Web Platform Tests spec suites.\n\n` +
+        `| ${headers.join(' | ')} |\n` +
+        `| ${alignments.join(' | ')} |\n` +
+        `${newRow}\n`;
+      fs.writeFileSync(progressFilePath, initialContent, 'utf-8');
+      console.log(`Created ${progressFilePath} with first entry.`);
+    } else {
+      const content = fs.readFileSync(progressFilePath, 'utf-8');
+      const lines = content.split('\n');
+      const delimiterIndex = lines.findIndex(line => line.includes(':---'));
+      if (delimiterIndex !== -1) {
+        lines.splice(delimiterIndex + 1, 0, newRow);
+        fs.writeFileSync(progressFilePath, lines.join('\n'), 'utf-8');
+        console.log(`Inserted new progress entry into ${progressFilePath}.`);
+      } else {
+        fs.appendFileSync(progressFilePath, `${newRow}\n`, 'utf-8');
+        console.log(`Appended new progress entry to ${progressFilePath} (fallback).`);
+      }
     }
   }
 
@@ -187,6 +323,8 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
   let file: string | undefined;
   let verbose = false;
   let concurrency: number | undefined;
+  let updateProgress = false;
+  let updateBaseline = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--spec' && i + 1 < args.length) {
@@ -200,11 +338,15 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
       i++;
     } else if (args[i] === '--verbose') {
       verbose = true;
+    } else if (args[i] === '--update-progress') {
+      updateProgress = true;
+    } else if (args[i] === '--update-baseline') {
+      updateBaseline = true;
     }
   }
 
   (async () => {
-    const results = await runCrawler({ spec, file, verbose, concurrency });
+    const results = await runCrawler({ spec, file, verbose, concurrency, updateProgress, updateBaseline });
     let total = 0;
     let passing = 0;
     for (const [, res] of Object.entries(results)) {
