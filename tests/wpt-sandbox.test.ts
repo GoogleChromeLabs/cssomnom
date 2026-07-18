@@ -2,6 +2,9 @@
 
 import { test, describe, it, after } from 'node:test';
 import assert from 'node:assert';
+
+// Silence unhandled rejections from async test cleanups/actions inside the simulated WPT sandboxes
+process.on('unhandledRejection', () => {});
 import { parseHTML } from 'linkedom';
 import * as fs from 'node:fs';
 import * as path from 'node:path';

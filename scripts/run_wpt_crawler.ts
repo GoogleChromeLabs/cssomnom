@@ -180,8 +180,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
         }
         if (options.updateBaseline) {
           const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || mergedOutput.includes('Runner timed out');
+          const hasSummary = mergedOutput.includes('Summary:');
           if (isTimeout) {
             loadError = 'Runner timed out (execution took longer than 3.5s)';
+          } else if (!hasSummary) {
+            loadError = 'Process crashed during test execution';
           } else {
             const loadErrorMatch = mergedOutput.match(/Failed to run file .*?: (.*)/);
             if (loadErrorMatch) {
@@ -211,6 +214,8 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       if (options.updateBaseline) {
         if (res.loadError) {
           allSyntaxErrors[relativePath] = res.loadError;
+        } else if (res.total === 0) {
+          allSyntaxErrors[relativePath] = 'Reftest or no harness tests found';
         } else if (res.failedTests) {
           allKnownFailures[relativePath] = res.failedTests;
         }
