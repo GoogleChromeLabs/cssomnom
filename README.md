@@ -164,8 +164,8 @@ Convenience methods on the `Parser` class for common tasks without manual tokeni
 
 <!-- WPT_CHROME_STATUS_START -->
 ### Headless Chrome Conformance
-- **Pass Rate**: 94.72% (12075 / 12748 passed)
-- **Failed Assertions**: 673
+- **Pass Rate**: 68.61% (8747 / 12748 passed)
+- **Failed Assertions**: 4001
 <!-- WPT_CHROME_STATUS_END -->
 
 ## Development
