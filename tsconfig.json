@@ -19,6 +19,7 @@
   },
   "exclude": [
     "submodules",
-    "dist"
+    "dist",
+    "src/browser-entry.ts"
   ]
 }
