@@ -1398,7 +1398,7 @@ Objective: Build a Node-based VM sandbox runner using `linkedom` to execute brow
 
 #### 2. Sandbox VM Execution Script [x]
 - [x] **Runner script**: Create `scripts/run_wpt_sandbox.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
-- [x] **Sandbox configuration**: Support a config file (`tests/wpt-sandbox-config.json`) defining whitelisted/skipped suites and baseline failures.
+- [x] **Sandbox configuration**: Support a config file (`tests/wpt-sandbox-config.json`) defining allowlisted/skipped suites and baseline failures.
 
 #### 3. Integrate into Preflight [x]
 - [x] **Preflight hook**: Hook `scripts/run_wpt_sandbox.ts` into our node test run to enforce dynamic browser WPT checks.
