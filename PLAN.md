@@ -596,7 +596,7 @@ Objective: Resolve circular dependencies between `Parser` and `Typed OM` and loc
 ### Tasks
 - [x] **Resolve Circular Dependencies**: Used Dependency Inversion via `ParseHooks` to inject parser implementations into Typed OM classes.
 - [x] **API Lockdown**: Added `tests/api-surface.test.ts` to lock down the API surface.
-- [x] **Documentation**: Documented spec boundaries in `API_BOUNDARIES.md`.
+- [x] **Documentation**: Documented spec boundaries in `README.md`.
 
 ## Phase 34: Static Selector Matching Enhancements
 
@@ -1454,7 +1454,7 @@ Objective: Implement the findings from our consolidated spec compliance report a
 
 #### 4. CSSOM [x]
 - [x] **CSSPageRule selectorText**: Convert to getter/setter with syntax validation and serialization normalization.
-- [x] **CSSImportRule styleSheet doc**: Document `CSSImportRule.styleSheet` returning `null` in `API_BOUNDARIES.md`.
+- [x] **CSSImportRule styleSheet doc**: Document `CSSImportRule.styleSheet` returning `null` in `README.md`.
 - [x] **CSSKeyframesRule methods**: Implement `appendRule`, `deleteRule`, and `findRule`.
 - [x] **Missing rules**: Add stub classes for `CSSCounterStyleRule` and `CSSFontFeatureValuesRule`.
 #### 5. Selectors & Specificity [x]
