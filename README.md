@@ -166,12 +166,31 @@ const streamingTokens = tokenizer.getTokens();
 console.log(streamingTokens);
 ```
 
+## API Reference Summary
+
+This library implements standard W3C CSSOM interfaces (refer to [MDN Web Docs on CSSOM](https://developer.mozilla.org/en-US/docs/Web/API/CSS_Object_Model)).
+
+Below are the primary entry points and custom utilities:
+
+*   **`parse(css: string): CSSStyleSheet`** — Parses a CSS string directly into a `CSSStyleSheet`.
+*   **`tokenize(css: string): Token[]`** — Synchronous low-level tokenizer.
+*   **`serialize(nodes: ComponentValue[] | Token[]): string`** — Serializes AST nodes or tokens back to CSS text.
+*   **`new StreamingTokenizer()`** — Class for processing chunked CSS streams.
+*   **`getCascadedStyle(element: MatchableElement, rules: Rule[]): CSSStyleDeclaration`** — Computes cascaded styles against a mock/linkedom element.
+*   **`Parser` static methods**:
+    *   `Parser.parseRuleText(css: string): Rule` — Parses a single CSS rule string.
+    *   `Parser.parseStyleSheetText(css: string): Rule[]` — Parses a stylesheet string into an array of rules.
+    *   `Parser.parseSelector(css: string): string | null` — Parses and validates a selector string.
+    *   `Parser.parseSelectorAST(css: string): SelectorList | null` — Parses a selector string into an AST.
+    *   `Parser.calculateSpecificity(selector: string | SelectorList)` — Calculates specificity tuple `[a, b, c]`.
+    *   `Parser.resolveVariables(style: CSSStyleDeclaration, property: string)` — Resolves `var()` and `env()` functions.
+
 ## Architecture & Spec Boundaries
 
-This document outlines the boundaries between standard CSSOM specifications and custom extensions in this library.
+This section outlines the boundaries between standard CSSOM specifications and custom extensions in this library.
 
 ### 1. Standard CSSOM Layer (Legacy)
-These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification. They are designed to mimic the standard browser APIs.
+These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification. They are designed to mimic standard browser APIs.
 
 **Interfaces**
 - `CSSStyleSheet`
@@ -235,6 +254,10 @@ These APIs are NOT part of any W3C specification. They exist to make the library
 
 **Interfaces & Methods**
 - **`Parser` class static utilities**:
+    - `parseRuleText(css)`: Parses a single CSS rule string.
+    - `parseStyleSheetText(css)`: Parses a stylesheet string into an array of rules.
+    - `parseSelector(css)`: Parses and validates a selector string.
+    - `parseSelectorAST(css)`: Parses a selector string into an AST.
     - `calculateSpecificity(selector)`: Calculates the specificity of a selector.
     - `getCascadedStyle(element, rules)`: Calculates computed styles against a static DOM (like `linkedom`).
     - `resolveVariables(style, property, envMap?)`: Expands `var()` and `env()` functions with fallbacks.
