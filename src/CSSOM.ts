@@ -535,7 +535,8 @@ export class CSSGroupingRule extends CSSRule {
 
   // 6.16 The CSSGroupingRule Interface
   insertRule(rule: string, index: number = 0): number {
-    const parsedRule = this._parseRuleInBlock(rule, true);
+    const isNested = this instanceof CSSStyleRule || this.parentRule !== null;
+    const parsedRule = this._parseRuleInBlock(rule, isNested);
     if (!parsedRule) {
       throw new DOMException('Syntax error', 'SyntaxError');
     }

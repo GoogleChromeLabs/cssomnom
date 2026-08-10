@@ -32,6 +32,7 @@ function main() {
             pseudoClasses.add(name.substring(1).replace('()', '').toLowerCase());
         }
     }
+    pseudoClasses.add('heading');
 
     let tsContent = `/**
  * @license

@@ -17,7 +17,8 @@
 import type { 
   SelectorList, ComplexSelector, CompoundSelector, SimpleSelector, 
   Combinator, ComponentValue, Token, SimpleBlock, CSSFunction,
-  InvalidSelector, IdentToken, DelimToken, HashToken, StringToken
+  InvalidSelector, IdentToken, DelimToken, HashToken, StringToken,
+  NumberToken, DimensionToken
 } from './types.ts';
 import { 
   PSEUDO_CLASSES, 
@@ -43,6 +44,14 @@ export function isHashToken(val: ComponentValue | undefined): val is HashToken {
 
 export function isStringToken(val: ComponentValue | undefined): val is StringToken {
   return val !== undefined && (val.type === 'string' || val.type === 'bad-string');
+}
+
+export function isNumberToken(val: ComponentValue | undefined): val is NumberToken {
+  return val !== undefined && val.type === 'number';
+}
+
+export function isDimensionToken(val: ComponentValue | undefined): val is DimensionToken {
+  return val !== undefined && val.type === 'dimension';
 }
 
 export function isSimpleBlock(val: ComponentValue | undefined, associatedType?: string): val is SimpleBlock {
@@ -177,8 +186,14 @@ export class SelectorParser {
         if (this.forgiving) {
           this.cursor.skipToNextComma();
           
-          const failedTokens = this.cursor.slice(start, this.cursor.i);
-          if (this.hasAmpersand(failedTokens)) {
+          const rawSlice = this.cursor.slice(start, this.cursor.i);
+          let trimmedStart = 0;
+          while (trimmedStart < rawSlice.length && rawSlice[trimmedStart].type === 'whitespace') trimmedStart++;
+          let trimmedEnd = rawSlice.length - 1;
+          while (trimmedEnd >= trimmedStart && rawSlice[trimmedEnd].type === 'whitespace') trimmedEnd--;
+          
+          const failedTokens = rawSlice.slice(trimmedStart, trimmedEnd + 1);
+          if (failedTokens.length > 0) {
             selectors.push({ type: 'invalid-selector', tokens: failedTokens });
           }
         } else {
@@ -259,10 +274,6 @@ export class SelectorParser {
     // selectors-4 #grammar
     if (items.length === 0) {
       throw new SyntaxError('Complex selector cannot be empty');
-    }
-    
-    if (this.insideHas && items.length > 0 && items[0].type !== 'combinator') {
-      items.unshift({ type: 'combinator', value: ' ' });
     }
     
     const end = this.cursor.i;
@@ -649,33 +660,40 @@ export class SelectorParser {
       }
 
       if (['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type'].includes(lowerName)) {
-           let ofIdx = -1;
-           for(let k=0; k<func.value.length; k++) {
-             const v = func.value[k];
-             if (isIdentToken(v) && v.value.toLowerCase() === 'of') {
-               ofIdx = k;
-               break;
-             }
-           }
-           if (ofIdx !== -1) {
-             if (['nth-of-type', 'nth-last-of-type'].includes(lowerName)) {
-               throw new SyntaxError(`'of' is not allowed in :${name}()`);
-             }
-             const nth = func.value.slice(0, ofIdx);
-             this.validateAnPlusB(nth);
-             const subParserOf = new SelectorParser(func.value.slice(ofIdx + 1), {
-               insideHas: this.insideHas,
-               forbidPseudo: true,
-               declaredNamespaces: this.declaredNamespaces
-             });
-             return { type: 'pseudo-class-selector', name, argument: subParserOf.parse(), nth };
-           } else {
-             this.validateAnPlusB(func.value);
-           }
+        let ofIdx = -1;
+        for (let k = 0; k < func.value.length; k++) {
+          const v = func.value[k];
+          if (isIdentToken(v) && v.value.toLowerCase() === 'of') {
+            ofIdx = k;
+            break;
+          }
+        }
+        if (ofIdx !== -1) {
+          if (['nth-of-type', 'nth-last-of-type'].includes(lowerName)) {
+            throw new SyntaxError(`'of' is not allowed in :${name}()`);
+          }
+          const nth = func.value.slice(0, ofIdx);
+          this.validateAnPlusB(nth);
+          const subParserOf = new SelectorParser(func.value.slice(ofIdx + 1), {
+            insideHas: this.insideHas,
+            forbidPseudo: true,
+            allowRelative: false,
+            declaredNamespaces: this.declaredNamespaces,
+            strictSupports: this.strictSupports
+          });
+          return { type: 'pseudo-class-selector', name, argument: subParserOf.parse(), nth };
+        } else {
+          this.validateAnPlusB(func.value);
+          return { type: 'pseudo-class-selector', name, argument: func.value, nth: func.value };
+        }
       }
 
       if (lowerName === 'dir') {
         this.validateDir(func.value);
+      }
+
+      if (lowerName === 'heading') {
+        this.validateHeading(func.value);
       }
 
       if (lowerName === 'lang') {
@@ -688,16 +706,46 @@ export class SelectorParser {
     throw new SyntaxError('Expected identifier or function after colon in pseudo-selector');
   }
 
-  private validateAnPlusB(values: ComponentValue[]): void {
-    const text = getOriginalText(values).trim();
-    const oddEven = /^(?:odd|even)$/i;
-    const integer = /^[+-]?\d+$/;
-    const anPlusB = /^[+-]?\d*n\s*(?:[+-]\s*\d+)?$/i;
-
-    if (oddEven.test(text) || integer.test(text) || anPlusB.test(text)) {
-      return;
+  private validateAnPlusB(values: ComponentValue[]): { a: number; b: number } {
+    const res = parseAnPlusB(values);
+    if (!res) {
+      const text = getOriginalText(values).trim();
+      throw new SyntaxError(`Invalid An+B expression: ${text}`);
     }
-    throw new SyntaxError(`Invalid An+B expression: ${text}`);
+    return res;
+  }
+
+  private validateHeading(values: ComponentValue[]): void {
+    const nonComment = values.filter(v => v.type !== 'comment');
+    let start = 0;
+    while (start < nonComment.length && nonComment[start].type === 'whitespace') start++;
+    let end = nonComment.length - 1;
+    while (end >= start && nonComment[end].type === 'whitespace') end--;
+    if (start > end) {
+      throw new SyntaxError('Argument to :heading() cannot be empty');
+    }
+    const tokens = nonComment.slice(start, end + 1);
+    let expectInteger = true;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (t.type === 'whitespace') continue;
+      if (expectInteger) {
+        if (t.type === 'number' && (t as { numberType?: string }).numberType === 'integer') {
+          expectInteger = false;
+        } else {
+          throw new SyntaxError('Argument to :heading() must be comma-separated integers');
+        }
+      } else {
+        if (t.type === 'comma' || (t.type === 'delim' && t.value === ',')) {
+          expectInteger = true;
+        } else {
+          throw new SyntaxError('Expected comma in :heading() arguments');
+        }
+      }
+    }
+    if (expectInteger) {
+      throw new SyntaxError('Trailing comma in :heading() arguments');
+    }
   }
 
   private validateDir(values: ComponentValue[]): void {
@@ -708,8 +756,8 @@ export class SelectorParser {
     }
     const val = firstToken.value.toLowerCase();
 
-    if (val !== 'ltr' && val !== 'rtl') {
-       throw new SyntaxError('Argument to :dir() must be ltr or rtl');
+    if (val !== 'ltr' && val !== 'rtl' && val !== 'auto') {
+       throw new SyntaxError('Argument to :dir() must be ltr, rtl, or auto');
     }
   }
 
@@ -737,4 +785,143 @@ export class SelectorParser {
       throw new SyntaxError('Trailing comma in :lang() argument');
     }
   }
+}
+
+export interface AnPlusBValue {
+  a: number;
+  b: number;
+}
+
+/**
+ * Parses An+B microsyntax according to CSS Syntax 3 / Selectors 4.
+ * @see https://drafts.csswg.org/css-syntax-3/#anb-production
+ */
+export function parseAnPlusB(values: ComponentValue[]): AnPlusBValue | null {
+  const nonComment = values.filter(v => v.type !== 'comment');
+  let start = 0;
+  while (start < nonComment.length && nonComment[start].type === 'whitespace') start++;
+  let end = nonComment.length - 1;
+  while (end >= start && nonComment[end].type === 'whitespace') end--;
+
+  if (start > end) return null;
+  const tokens = nonComment.slice(start, end + 1);
+
+  const isIntegerNumber = (t: ComponentValue | undefined): t is NumberToken => {
+    return isNumberToken(t) && t.numberType === 'integer';
+  };
+
+  if (tokens.length === 1) {
+    const t = tokens[0];
+    if (isIdentToken(t)) {
+      const lower = t.value.toLowerCase();
+      if (lower === 'odd') return { a: 2, b: 1 };
+      if (lower === 'even') return { a: 2, b: 0 };
+      if (lower === 'n') return { a: 1, b: 0 };
+      if (lower === '-n') return { a: -1, b: 0 };
+      const matchNdashDigit = lower.match(/^n-(\d+)$/);
+      if (matchNdashDigit) return { a: 1, b: -parseInt(matchNdashDigit[1], 10) };
+      const matchDashNdashDigit = lower.match(/^-n-(\d+)$/);
+      if (matchDashNdashDigit) return { a: -1, b: -parseInt(matchDashNdashDigit[1], 10) };
+      return null;
+    }
+    if (isIntegerNumber(t)) {
+      return { a: 0, b: Number(t.value) };
+    }
+    if (isDimensionToken(t) && t.numberType === 'integer') {
+      const unit = (t.unit || '').toLowerCase();
+      if (unit === 'n') return { a: Number(t.value), b: 0 };
+      const matchDim = unit.match(/^n-(\d+)$/);
+      if (matchDim) return { a: Number(t.value), b: -parseInt(matchDim[1], 10) };
+      return null;
+    }
+    return null;
+  }
+
+  let idx = 0;
+  let plusPrefix = false;
+  if (isDelimToken(tokens[0], '+')) {
+    plusPrefix = true;
+    idx = 1;
+    if (tokens[1]?.type === 'whitespace') {
+      return null;
+    }
+  }
+
+  const nextNonWs = (from: number): number => {
+    let p = from;
+    while (p < tokens.length && tokens[p].type === 'whitespace') p++;
+    return p;
+  };
+
+  const t1 = tokens[idx];
+  if (!t1) return null;
+
+  let a: number | null = null;
+  let hasDashAfterN = false;
+
+  if (isIdentToken(t1)) {
+    const lower = t1.value.toLowerCase();
+    if (lower === 'n') {
+      a = 1;
+    } else if (lower === '-n' && !plusPrefix) {
+      a = -1;
+    } else if (lower === 'n-') {
+      a = 1;
+      hasDashAfterN = true;
+    } else if (lower === '-n-' && !plusPrefix) {
+      a = -1;
+      hasDashAfterN = true;
+    } else if (lower.startsWith('n-')) {
+      const match = lower.match(/^n-(\d+)$/);
+      if (match && idx === tokens.length - 1) return { a: 1, b: -parseInt(match[1], 10) };
+    }
+  } else if (isDimensionToken(t1) && t1.numberType === 'integer' && !plusPrefix) {
+    const unit = (t1.unit || '').toLowerCase();
+    if (unit === 'n') {
+      a = Number(t1.value);
+    } else if (unit === 'n-') {
+      a = Number(t1.value);
+      hasDashAfterN = true;
+    }
+  }
+
+  if (a === null) return null;
+
+  const afterT1 = nextNonWs(idx + 1);
+  if (afterT1 >= tokens.length) {
+    if (!hasDashAfterN) return { a, b: 0 };
+    return null;
+  }
+
+  const t2 = tokens[afterT1];
+
+  if (hasDashAfterN) {
+    if (isIntegerNumber(t2) && !t2.sign) {
+      const afterT2 = nextNonWs(afterT1 + 1);
+      if (afterT2 < tokens.length) return null;
+      return { a, b: -Number(t2.value) };
+    }
+    return null;
+  }
+
+  if (isIntegerNumber(t2) && t2.sign) {
+    const afterT2 = nextNonWs(afterT1 + 1);
+    if (afterT2 < tokens.length) return null;
+    return { a, b: Number(t2.value) };
+  }
+
+  if (isDelimToken(t2, '+') || isDelimToken(t2, '-')) {
+    const sign = t2.value === '+' ? 1 : -1;
+    const afterT2 = nextNonWs(afterT1 + 1);
+    if (afterT2 >= tokens.length) return null;
+    const t3 = tokens[afterT2];
+    if (isIntegerNumber(t3) && !t3.sign) {
+      const afterT3 = nextNonWs(afterT2 + 1);
+      if (afterT3 < tokens.length) return null;
+      return { a, b: sign * Number(t3.value) };
+    }
+    return null;
+  }
+
+  return null;
 }

@@ -77,30 +77,32 @@ test('Forgiving selector list in :where()', () => {
   assert.ok(Parser.parseSelectorAST('div:where(.foo, > .bar)'));
 });
 
-test('Forgiving selector list in :is() drops invalid complex selectors with trailing garbage', () => {
+test('Forgiving selector list in :is() parses valid selectors and preserves invalid items as AST nodes', () => {
   const ast = Parser.parseSelectorAST('div:is(.foo, .bar @invalid)');
   assert.ok(ast);
   const compound = (ast.selectors[0] as ComplexSelector).items[0] as CompoundSelector;
   const pseudo = compound.selectors[1] as PseudoClassSelector;
   const isArg = pseudo.argument as unknown as { selectors: unknown[] };
-  assert.strictEqual(isArg.selectors.length, 1);
+  assert.strictEqual(isArg.selectors.length, 2);
   const subComplex = isArg.selectors[0] as { items: unknown[] };
   const subCompound = subComplex.items[0] as CompoundSelector;
   const classSel = subCompound.selectors[0] as ClassSelector;
   assert.strictEqual(classSel.name, 'foo');
+  assert.strictEqual((isArg.selectors[1] as { type: string }).type, 'invalid-selector');
 });
 
-test('Forgiving selector list in :is() drops invalid complex selectors that throw during parsing', () => {
+test('Forgiving selector list in :is() preserves invalid complex selectors that throw during parsing', () => {
   const ast = Parser.parseSelectorAST('div:is(.foo, .bar ++ .baz)');
   assert.ok(ast);
   const compound = (ast.selectors[0] as ComplexSelector).items[0] as CompoundSelector;
   const pseudo = compound.selectors[1] as PseudoClassSelector;
   const isArg = pseudo.argument as unknown as { selectors: unknown[] };
-  assert.strictEqual(isArg.selectors.length, 1);
+  assert.strictEqual(isArg.selectors.length, 2);
   const subComplex = isArg.selectors[0] as { items: unknown[] };
   const subCompound = subComplex.items[0] as CompoundSelector;
   const classSel = subCompound.selectors[0] as ClassSelector;
   assert.strictEqual(classSel.name, 'foo');
+  assert.strictEqual((isArg.selectors[1] as { type: string }).type, 'invalid-selector');
 });
 
 test('Harden :has() implementation', () => {
@@ -114,15 +116,14 @@ test('Harden :has() implementation', () => {
   assert.strictEqual(Parser.parseSelectorAST('div:has(:before)'), null); // legacy
 });
 
-test(':has() prepends implicit descendant combinator', () => {
+test(':has() relative selector AST structure', () => {
   const ast1 = Parser.parseSelectorAST('div:has(p)');
   assert.ok(ast1);
   const compound1 = (ast1.selectors[0] as ComplexSelector).items[0] as CompoundSelector;
   const pseudo1 = compound1.selectors[1] as PseudoClassSelector;
   const hasArg1 = pseudo1.argument as unknown as { selectors: ComplexSelector[] };
   const firstSelector1 = hasArg1.selectors[0];
-  assert.strictEqual(firstSelector1.items[0].type, 'combinator');
-  assert.strictEqual((firstSelector1.items[0] as Combinator).value, ' ');
+  assert.strictEqual(firstSelector1.items[0].type, 'compound-selector');
 
   const ast2 = Parser.parseSelectorAST('div:has(> p)');
   assert.ok(ast2);

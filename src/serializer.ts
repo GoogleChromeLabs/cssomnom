@@ -17,6 +17,7 @@
 import type { Token, ComponentValue, Declaration, CSSFunction, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
 import { SHORTHANDS } from './shorthands.ts';
 import { formatNumber } from './utils/format.ts';
+import { parseAnPlusB } from './SelectorParser.ts';
 
 export function serialize(nodes: ComponentValue[], preserveCase: boolean = false, propertyName?: string): string {
   if (propertyName === 'font-family') {
@@ -760,60 +761,30 @@ function serializeComplexSelector(complex: ComplexSelector, hasDefaultNamespace 
 }
 
 function formatAnPlusB(tokens: ComponentValue[]): string {
-  let text = serialize(tokens).replace(/\s+/g, '').toLowerCase();
-  
-  if (text === 'odd') {
-    text = '2n+1';
-  } else if (text === 'even') {
-    text = '2n';
+  const parsed = parseAnPlusB(tokens);
+  if (parsed !== null) {
+    const { a, b } = parsed;
+    if (a === 0) {
+      return b.toString();
+    }
+    let partA = '';
+    if (a === 1) {
+      partA = 'n';
+    } else if (a === -1) {
+      partA = '-n';
+    } else {
+      partA = a + 'n';
+    }
+
+    if (b === 0) {
+      return partA;
+    } else if (b > 0) {
+      return partA + '+' + b;
+    } else {
+      return partA + b;
+    }
   }
-  
-  if (/^[+-]?\d+$/.test(text)) {
-    return parseInt(text, 10).toString();
-  }
-  
-  const nIdx = text.indexOf('n');
-  if (nIdx === -1) {
-    return text;
-  }
-  
-  const left = text.slice(0, nIdx);
-  const right = text.slice(nIdx + 1);
-  
-  let a = 1;
-  if (left === '-') {
-    a = -1;
-  } else if (left === '+') {
-    a = 1;
-  } else if (left !== '') {
-    a = parseInt(left, 10);
-  }
-  
-  let b = 0;
-  if (right !== '') {
-    b = parseInt(right, 10);
-  }
-  
-  if (a === 0) {
-    return b.toString();
-  }
-  
-  let partA = '';
-  if (a === 1) {
-    partA = 'n';
-  } else if (a === -1) {
-    partA = '-n';
-  } else {
-    partA = a + 'n';
-  }
-  
-  if (b === 0) {
-    return partA;
-  } else if (b > 0) {
-    return partA + '+' + b;
-  } else {
-    return partA + b;
-  }
+  return serialize(tokens).trim();
 }
 
 function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = false): string {
@@ -852,7 +823,7 @@ function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = f
         if (simple.namespace === '*') {
           attr += '*|';
         } else if (simple.namespace === '') {
-          attr += '|';
+          // Null namespace omits pipe in attribute selectors
         } else {
           attr += serializeIdentifier(simple.namespace) + '|';
         }

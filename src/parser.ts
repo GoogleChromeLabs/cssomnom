@@ -803,7 +803,7 @@ export class Parser {
     return declarations;
   }
 
-  private consumeBlockContents(stream: ComponentValueStream, nested: boolean = false): Rule[] {
+  private consumeBlockContents(stream: ComponentValueStream, nested: boolean = false, isNestedStyleRule: boolean = nested): Rule[] {
     const rules: Rule[] = [];
     let decls: Declaration[] = [];
 
@@ -838,7 +838,7 @@ export class Parser {
           decls.push(decl);
         } else {
           stream.position = pos;
-          const rule = this.consumeNestedQualifiedRuleFromStream(stream, nested, 'semicolon');
+          const rule = this.consumeNestedQualifiedRuleFromStream(stream, isNestedStyleRule, 'semicolon');
           if (rule) {
             flushDecls();
             rules.push(rule);
@@ -1407,7 +1407,7 @@ export class Parser {
     const tokens = tokenize(wrapped);
     const parser = new Parser(tokens);
     const block = parser.consumeBlock(parser.consumeToken());
-    const contents = parser.consumeBlockContents(new ArrayComponentValueStream(block.value), nested);
+    const contents = parser.consumeBlockContents(new ArrayComponentValueStream(block.value), true, nested);
     if (contents.length !== 1) {
       throw new DOMException('Syntax error', 'SyntaxError');
     }
