@@ -1900,9 +1900,9 @@ Objective: Resolve high-frequency failure clusters in `css-nesting` and `css-var
 
 ---
  
-## Phase 81: WPT Multi-Spec Conformance Drive (Wave 2: Selectors & Forgiving Parsing) [x]
+## Phase 81: WPT Multi-Spec Conformance Drive (Wave 2: Selectors & Forgiving Parsing) & Documentation [x]
 
-Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing forgiving selector list parsing, complex pseudo-class arguments, and pseudo-element normalization in `src/SelectorParser.ts`.
+Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing forgiving selector list parsing, complex pseudo-class arguments, and pseudo-element normalization in `src/SelectorParser.ts`, and expand public API documentation.
 
 **Spec References**:
 - Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs`
@@ -1918,6 +1918,10 @@ Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing for
   - Support relative selector parsing for `:has(> .child)` and pseudo-element argument validation.
 - [x] **Selector Serialization & Normalization**:
   - Ensure spec-compliant stringification of complex selector lists, combinators, and pseudo-class arguments.
+- [x] **API Documentation & Architecture Consolidation**:
+  - Merge `API_BOUNDARIES.md` into `README.md` under a dedicated Architecture & Spec Boundaries section.
+  - Add comprehensive quickstarts for dual-path TS/ESM execution, CSSOM rule traversal, Typed OM math & units, and Houdini custom properties.
+  - Document `getComputedStyle` intentional non-goal and adopt `wpt:node` vs. `wpt:browser` taxonomy.
 - [x] **Verification**:
   - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and measure conformance improvement.
   - Run `pnpm run preflight` to guarantee 0 regressions across all suites.
@@ -1930,12 +1934,14 @@ Objective: Explore long-term ideas for WPT conformance, prototype patching optio
 
 ### Ideas
 
-- [ ] **WPT Multi-Spec Conformance Drive**: Broaden test coverage and resolve failure clusters across `css-variables`, `css-nesting`, `selectors`, and `cssom` in the multi-spec sandbox runner to push overall WPT conformance higher.
-- [ ] **API Documentation & Quickstarts**: Add comprehensive usage walkthroughs and code examples to `README.md` demonstrating stylesheet parsing, Typed OM manipulation in Node.js (with native erasable syntax), AST traversal, and serialization.
+- [ ] **WPT Multi-Spec Conformance Drive**:
+  - [ ] **Wave 3: CSSOM Core Conformance (`css/cssom`)**: Rule index bounds and exception validation (`insertRule`/`deleteRule`), priority flag (`!important`) serialization, `parentStyleSheet`/`parentRule` back-references, and namespace prefixes.
+  - [ ] **Wave 4: CSS Syntax & Tokenizer Conformance (`css/css-syntax`)**: String/ident escape sequence normalization, CDO/CDC comment tokens, bad URL recovery, and whitespace trimming rules.
+  - [ ] **Wave 5: Media Queries Conformance (`css/mediaqueries`)**: `@media` condition parsing, range syntax (`width >= 600px`), Boolean media feature validation, and media list serialization.
+  - [ ] **Wave 6: Advanced Typed OM Value Reification (`css/css-typed-om`)**: Viewport units, calculation expression trees, `anchor()` functions, and custom property value reification in `StylePropertyMap`.
+- [ ] **Static Selector Matching Engine (`matches(element, selector)`)**: Implement a pure-AST, zero-layout selector matching engine (`src/matcher.ts`) that evaluates combinators (`>`, `+`, `~`, descendant) and structural pseudo-classes (`:is`, `:where`, `:not`, `:has`, `:first-child`, `:last-child`, `:nth-child`) directly against Linkedom / DOM elements for static analysis and offline query tooling without requiring a full browser engine.
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
-- [ ] **Static Selector Matching Engine (`matches(element, selector)`)**: Implement a pure-AST, zero-layout selector matching engine (`src/matcher.ts`) that evaluates combinators (`>`, `+`, `~`, descendant) and structural pseudo-classes (`:is`, `:where`, `:not`, `:has`, `:first-child`, `:last-child`, `:nth-child`) directly against Linkedom / DOM elements for static analysis and offline query tooling without requiring a full browser engine.
-- [ ] **Advanced Typed OM Value Parsing**: Implement complete support in `CSSStyleValue.parse()` and numeric constructors for advanced functions (e.g. `anchor()`, `calc()` math expressions, viewport units validation, and custom properties) to resolve the major Typed OM WPT conformance gap.
 
 
 
