@@ -189,82 +189,104 @@ Below are the primary entry points and custom utilities:
 
 This section outlines the boundaries between standard CSSOM specifications and custom extensions in this library.
 
-### 1. Standard CSSOM Layer (Legacy)
-These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification. They are designed to mimic standard browser APIs.
+### 1. Standard CSSOM Layer
+These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification and related module extensions (CSS Conditional Rules, CSS Nesting, CSS Fonts, CSS Animations, CSS Paged Media, CSS View Transitions, and CSS Cascade). They are designed to mirror standard browser CSSOM APIs in Node.js and headless environments.
 
-**Interfaces**
-- `CSSStyleSheet`
-- `CSSStyleRule`
-- `CSSMediaRule`
-- `CSSSupportsRule`
-- `CSSFontFaceRule`
-- `CSSPageRule`
-- `CSSKeyframesRule`
-- `CSSKeyframeRule`
-- `CSSNamespaceRule`
-- `CSSImportRule`
-- `CSSStyleDeclaration`
-- `MediaList`
-- `StyleSheetList`
-- `LinkStyle`
+**Interfaces & Classes**
+- **Base Hierarchy & Collections**: `StyleSheet`, `CSSStyleSheet`, `StyleSheetList`, `CSSRule`, `CSSRuleList`, `CSSGroupingRule`, `MediaList`, `LinkStyle` (TypeScript interface)
+- **Style Rules & Nesting**: `CSSStyleRule`, `CSSNestedDeclarations`
+- **Conditional & Grouping Rules**: `CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSScopeRule`, `CSSStartingStyleRule`
+- **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSAtRule`
+- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`
 
-**Deviations/Extensions**
-- **Constructors**: Standard CSSOM usually instantiates these via the DOM. We allow direct instantiation with parameters (e.g., `new CSSStyleSheet(rules)`) to make them usable in Node.js without a full browser environment.
-- **Parsing**: Standard CSSOM does not expose static parsing methods on these classes. We use the `Parser` class (see below) to bridge this gap.
-- **`CSSImportRule.styleSheet`**: Hardcoded to `null` because the library is a static, offline parser and does not perform network fetches or local I/O to load external imported stylesheets.
+**Deviations & Extensions**
+- **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. We allow direct instantiation of rule classes with explicit AST and token parameters (e.g., `new CSSStyleRule(selector, decls, rules)`) for headless manipulation. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
+- **AST Accessors**: `CSSStyleRule.prototype.selectorAST` and `MediaList.prototype.mediaQueriesAST` expose parsed AST structures directly on CSSOM objects for tooling integration.
+- **Synchronous `CSSStyleSheet.prototype.replace()`**: While the CSSOM-1 specification specifies parallel parsing for `replace()`, our implementation executes parsing synchronously via `replaceSync()` and returns `Promise.resolve(this)`.
+- **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
+- **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
 
 ---
 
 ### 2. Houdini Layer (Modern & Experimental)
-These APIs are defined in newer Houdini drafts and are intended to expose lower-level parsing and typed values.
+These APIs expose low-level parsing, property registration, and typed values defined in Houdini and CSS Values specifications.
 
 **Specifications Followed**
-- **CSS Typed OM**: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
+- **CSS Typed OM Level 1**: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
+- **CSS Typed OM Level 2 / CSS Color API**: `submodules/css-houdini-drafts/css-typed-om-2/Overview.bs`
+- **CSS Properties and Values API Level 1**: `submodules/css-houdini-drafts/css-properties-values-api/Overview.bs`
 - **CSS Parser API**: Based on the [WICG CSS Parser API](https://github.com/WICG/css-parser-api) draft.
+- **CSS Values and Units Level 4**: `submodules/csswg-drafts/css-values-4/Overview.bs` (Calculation trees, math functions, color models).
 
 **Interfaces & Methods**
-- `CSS.parseStylesheet()`
-- `CSS.parseRuleList()`
-- `CSS.parseRule()`
-- `CSS.parseDeclarationList()`
-- `CSS.parseDeclaration()`
-- `CSS.parseValue()`
-- `CSS.parseValueList()`
-- `CSS.parseCommaValueList()`
-- `CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`
-- `CSSParserDeclaration`, `CSSParserBlock`, `CSSParserFunction`
-- `CSSNumericValue`, `CSSUnitValue`, `CSSMathValue` (and subclasses)
-- `CSSTransformValue`, `CSSTransformComponent` (and subclasses)
-- `StylePropertyMap` (Read-Write and Read-Only)
+- **Parser API Methods (`CSS.*` and standalone)**:
+    - `CSS.parseStylesheet()`, `CSS.parseStylesheetSync()`
+    - `CSS.parseRuleList()`, `CSS.parseRuleListSync()`
+    - `CSS.parseRule()`, `CSS.parseRuleSync()`
+    - `CSS.parseDeclarationList()`, `CSS.parseDeclarationListSync()`
+    - `CSS.parseDeclaration()`, `CSS.parseDeclarationSync()`
+    - `CSS.parseValue()` (alias for `parseValueSync`)
+    - `CSS.parseValueList()` (alias for `parseValueListSync`)
+    - `CSS.parseCommaValueList()` (alias for `parseCommaValueListSync`)
+    - `CSS.parseComponentValue()`, `CSS.parseComponentValueSync()`
+- **Parser API AST Nodes**:
+    - `CSSParserValue`, `CSSParserToken`, `CSSParserBlock`, `CSSParserFunction`
+    - `CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`, `CSSParserDeclaration`
+- **Typed OM Values & Math**:
+    - `CSSStyleValue` (base class, `CSSStyleValue.parse()`, `CSSStyleValue.parseAll()`)
+    - `CSSKeywordValue`, `CSSUnparsedValue`, `CSSVariableReferenceValue`, `CSSPositionValue`, `CSSImageValue`, `CSSNumericArray`, `createCSSStyleValue`
+    - `CSSNumericValue`, `CSSUnitValue`, `CSSMathValue`
+    - Math subclasses: `CSSMathSum`, `CSSMathProduct`, `CSSMathNegate`, `CSSMathInvert`, `CSSMathMin`, `CSSMathMax`, `CSSMathClamp`, `CSSMathRound`, `CSSMathFunction`
+    - Unit factory methods on `CSS` (`CSS.px()`, `CSS.em()`, `CSS.rem()`, `CSS.deg()`, `CSS.s()`, `CSS.Hz()`, `CSS.kHz()`, `CSS.Q()`, etc.)
+- **Color Typed OM**:
+    - `CSSColorValue` (base class)
+    - `CSSColor`, `CSSRGB`, `CSSHSL`, `CSSHWB`, `CSSLab`, `CSSLCH`, `CSSOKLab`, `CSSOKLCH`
+- **Transforms & Geometry**:
+    - `CSSTransformValue`, `CSSTransformComponent`
+    - Transform subclasses: `CSSTranslate`, `CSSRotate`, `CSSScale`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSPerspective`, `CSSMatrixComponent`
+    - `DOMMatrix`, `DOMMatrixReadOnly`
+- **Style Property Maps**:
+    - `StylePropertyMap`, `StylePropertyMapReadOnly`
+- **Custom Properties & Feature Detection**:
+    - `CSS.registerProperty()` (CSS Properties and Values API)
+    - `CSS.supports()` (CSS Conditional Rules Level 3 & 4)
+    - `CSS.resolveNestedSelector()` (Tooling extension)
 
-**Deviations/Extensions**
-- **String Boxing**: The spec defines `CSSToken` as `typedef (DOMString or CSSStyleValue or CSSParserValue) CSSToken;`. We box strings in `CSSParserToken` instead of allowing raw strings directly.
-- **Synchronous Execution**: `parseRule` and `parseDeclarationList` are implemented synchronously instead of returning Promises.
-- **Immutability**: Properties like `prelude`, `body`, and `args` are mutable arrays instead of `FrozenArray`.
-- **Constructor Arguments**: The `body` parameter is mandatory in some constructors (e.g., `CSSParserQualifiedRule`) where the spec makes it optional.
-- **Math Functions**: We support new math functions from CSS Values 4 (like `sin()`, `cos()`, `abs()`, etc.) via a custom `CSSMathFunction` class. Since the CSS Typed OM 1 spec only defines operators for `sum`, `product`, `negate`, `invert`, `min`, `max`, and `clamp`, `CSSMathFunction.operator` returns `'sum'` as a fallback for these new functions to satisfy the type system, which is a known spec gap.
-- **WebIDL Dictionary Bindings**: In a browser, the WebIDL bindings layer automatically checks dictionary constraints (like checking that the `name` parameter in `CSS.registerProperty()` options is present and throwing a `TypeError`). In our headless Node runtime, we perform these validations manually in JavaScript.
-- **`CSSTransformComponent` Inheritance**: In the CSS Typed OM Level 1 specification, `CSSTransformComponent` does not inherit from `CSSStyleValue`. However, to support properties like `translate` and `rotate` which reify directly to transform components, and to allow them to be returned from `CSSStyleValue.parseAll()` and `StylePropertyMap.get()` (which return `CSSStyleValue`), we make `CSSTransformComponent` extend `CSSStyleValue`. This matches the implementation in modern browsers (like Blink/Chrome).
-- **Math Simplification & AST Structure Preservation**: In accordance with CSS Values 4 (Calculation Trees), we preserve the raw parsed AST structure of mathematical expressions in `CSSNumericValue.parse()` and `StylePropertyMap` parsing rather than performing eager simplification of compatible units (which is expected by older/Level 1 WPT tests). Eager simplification is deferred to computed-value time or manual `.simplify()` calls.
+**Deviations & Extensions**
+- **String Boxing**: The spec defines `CSSToken` as `typedef (DOMString or CSSStyleValue or CSSParserValue) CSSToken;`. We box raw strings in `CSSParserToken` instead of using raw string primitives.
+- **Synchronous Execution & Sync Variants**: `parseRule`, `parseDeclarationList`, `parseDeclaration`, and `parseComponentValue` are executed synchronously. In addition, explicit `*Sync` variants (`parseStylesheetSync`, `parseRuleListSync`) are provided for asynchronous methods.
+- **Immutability**: AST properties (`prelude`, `body`, `args`) are mutable TypeScript arrays rather than `FrozenArray`.
+- **Constructor Arguments**: `body` is mandatory in `CSSParserQualifiedRule` constructor (`constructor(prelude, body)`).
+- **CSS Values 4 Math Functions (`CSSMathFunction`)**: New math functions (`sin()`, `cos()`, `abs()`, etc.) are represented by `CSSMathFunction`. Its `operator` getter returns the function's identifier name (e.g. `'sin'`).
+- **WebIDL Dictionary Bindings**: Dictionary constraints and computationally independent initial value validations for `CSS.registerProperty()` are enforced natively in JavaScript.
+- **`CSSTransformComponent` Inheritance**: `CSSTransformComponent` inherits from `CSSStyleValue`, aligning with browser implementations (Blink, WebKit) and enabling reification from `CSSStyleValue.parseAll()` and `StylePropertyMap.get()`.
+- **Math Simplification & AST Structure Preservation**: Calculation trees from `CSSNumericValue.parse()` and `StylePropertyMap` preserve AST structure per CSS Values 4 rather than performing eager unit reduction at parse time.
 
 ---
 
 ### 3. Custom Bridge & Utility Layer
-These APIs are NOT part of any W3C specification. They exist to make the library usable for static analysis, testing, and in non-browser environments.
+These APIs are custom utilities for static analysis, cascading, variable resolution, and headless manipulation.
 
 **Interfaces & Methods**
-- **`Parser` class static utilities**:
-    - `parseRuleText(css)`: Parses a single CSS rule string.
-    - `parseStyleSheetText(css)`: Parses a stylesheet string into an array of rules.
-    - `parseSelector(css)`: Parses and validates a selector string.
-    - `parseSelectorAST(css)`: Parses a selector string into an AST.
-    - `calculateSpecificity(selector)`: Calculates the specificity of a selector.
-    - `getCascadedStyle(element, rules)`: Calculates computed styles against a static DOM (like `linkedom`).
-    - `resolveVariables(style, property, envMap?)`: Expands `var()` and `env()` functions with fallbacks.
-- **Standalone Utilities**:
-    - `tokenize(text)`: Exposes the low-level tokenizer.
-    - `serialize(ast)`: Exposes the low-level serializer.
-    - `StreamingTokenizer`: For memory-efficient streaming tokenization.
+- **`Parser` Static Utilities**:
+    - `Parser.parseRuleText(css)`: Parses a single CSS rule string into a `Rule` AST.
+    - `Parser.parseStyleSheetText(css)`: Parses a stylesheet string into `Rule[]`.
+    - `Parser.parseRuleInBlockText(css, nested?)`: Parses a rule within a nested/block context.
+    - `Parser.parseSelector(css)`: Validates and serializes a selector string.
+    - `Parser.parseSelectorAST(css)`: Parses a selector string into a `SelectorList` AST.
+    - `Parser.calculateSpecificity(selector)`: Calculates selector specificity `[a, b, c]`.
+    - `Parser.getCascadedStyle(element, rules)`: Computes cascaded styles against a DOM element.
+    - `Parser.resolveVariables(style, property, envMap?)`: Resolves `var()` and `env()` substitutions with fallback handling.
+    - `Parser.validateCustomPropertyValue(values)`: Validates component values for custom property declarations.
+    - `Parser.isValidDashedIdent(name)`: Validates custom property `--*` identifiers.
+    - `Parser.isCustomPropertyDeclaration(decl)`: Checks whether a declaration represents a custom property.
+- **Standalone Top-Level Utilities**:
+    - `parse(css)`: Direct parser returning a constructable `CSSStyleSheet`.
+    - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
+    - `serialize(ast)`: Low-level serializer turning AST nodes into CSS text.
+    - `getCascadedStyle(element, rules)`: Standalone cascading function.
+    - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
+    - Standalone Parser API exports for tree-shaking (`parseStylesheet`, `parseStylesheetSync`, `parseRule`, `parseRuleSync`, `parseDeclaration`, `parseDeclarationSync`, `supports`, etc.).
 
 **API Surface Verification**
 The public API surface area is locked down and verified by [api-surface.test.ts](./tests/api-surface.test.ts). Any additions or removals of public exports must be reflected in that test to ensure intentional API changes.
