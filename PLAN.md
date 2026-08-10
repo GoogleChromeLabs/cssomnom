@@ -1900,6 +1900,30 @@ Objective: Resolve high-frequency failure clusters in `css-nesting` and `css-var
 
 ---
  
+## Phase 81: WPT Multi-Spec Conformance Drive (Wave 2: Selectors & Forgiving Parsing)
+
+Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing forgiving selector list parsing, complex pseudo-class arguments, and pseudo-element normalization in `src/SelectorParser.ts`.
+
+**Spec References**:
+- Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs`
+- CSS Syntax 3: `submodules/csswg-drafts/css-syntax-3/Overview.bs`
+
+### Tasks
+- [ ] **Diagnostic Failure Clustering on `selectors`**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` to identify top error patterns across the 3,103 tests.
+- [ ] **Forgiving Selector List Parsing (`:is()`, `:where()`)**:
+  - Implement forgiving parsing per Selectors 4 #forgiving-selector: invalid or unsupported selectors in the argument list do not invalidate the entire selector or the pseudo-class.
+- [ ] **Complex Pseudo-Class & Pseudo-Element Arguments**:
+  - Support `:nth-child(An+B of <selector-list>)` and `:nth-last-child(An+B of <selector-list>)` argument parsing and AST representation.
+  - Support relative selector parsing for `:has(> .child)` and pseudo-element argument validation.
+- [ ] **Selector Serialization & Normalization**:
+  - Ensure spec-compliant stringification of complex selector lists, combinators, and pseudo-class arguments.
+- [ ] **Verification**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and measure conformance improvement.
+  - Run `pnpm run preflight` to guarantee 0 regressions across all suites.
+
+---
+ 
 ## Potential roadmap items
 
 Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
