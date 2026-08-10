@@ -293,6 +293,12 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 
 ---
 
+### Intentional Non-Goals & Boundaries
+
+- **No `getComputedStyle()` Support**: We intentionally **do not** implement or expose `window.getComputedStyle()`. Resolving true computed styles requires a full visual rendering and layout engine (calculating font metrics, line heights, box-model geometry, viewport dimensions, and interaction states like `:hover` / `:focus`). In a server-side, headless Node.js environment, a partially correct `getComputedStyle()` produces subtle, misleading bugs and false confidence (**"if it cannot be completely correct, partially correct is harmful"**). Instead, `cssomnom` provides [`getCascadedStyle(element, rules)`](#static-analysis--cascade-resolution) to resolve deterministic, declarative cascade and specificity order, leaving visual layout to real browsers.
+
+---
+
 **Guidelines for Maintainers**
 - When adding new features, clearly identify which layer they belong to.
 - Prefer implementing standard APIs (Houdini or CSSOM) over custom ones whenever possible.

@@ -1934,7 +1934,7 @@ Objective: Explore long-term ideas for WPT conformance, prototype patching optio
 - [ ] **API Documentation & Quickstarts**: Add comprehensive usage walkthroughs and code examples to `README.md` demonstrating stylesheet parsing, Typed OM manipulation in Node.js (with native erasable syntax), AST traversal, and serialization.
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
-- [ ] **Static Selector Matching**: Implement a basic CSS selector matcher to evaluate a parsed selector against a DOM element (e.g. for use with Linkedom).
+- [ ] **Static Selector Matching Engine (`matches(element, selector)`)**: Implement a pure-AST, zero-layout selector matching engine (`src/matcher.ts`) that evaluates combinators (`>`, `+`, `~`, descendant) and structural pseudo-classes (`:is`, `:where`, `:not`, `:has`, `:first-child`, `:last-child`, `:nth-child`) directly against Linkedom / DOM elements for static analysis and offline query tooling without requiring a full browser engine.
 - [ ] **Advanced Typed OM Value Parsing**: Implement complete support in `CSSStyleValue.parse()` and numeric constructors for advanced functions (e.g. `anchor()`, `calc()` math expressions, viewport units validation, and custom properties) to resolve the major Typed OM WPT conformance gap.
 
 
