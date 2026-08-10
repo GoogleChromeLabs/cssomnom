@@ -300,9 +300,24 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 
 ## Web Platform Test (WPT) Conformance
 
+### Multi-Spec Sandbox Conformance
+We benchmark against 7 major W3C Web Platform Tests (WPT) spec suites (15,900+ total tests) in an isolated, headless DOM sandbox runner. Detailed progress history is tracked in [`wpt-progress.md`](./wpt-progress.md).
+
+| Specification Suite | Passing / Total | Pass Rate |
+| :--- | :---: | :---: |
+| **CSS Typed OM Level 1 & 2** (`css/css-typed-om`) | 5,677 / 10,682 | 53.1% |
+| **CSSOM Level 1** (`css/cssom`) | 247 / 775 | 31.9% |
+| **CSS Syntax Level 3** (`css/css-syntax`) | 207 / 404 | 51.2% |
+| **CSS Nesting Module Level 1** (`css/css-nesting`) | 47 / 117 | 40.2% |
+| **CSS Custom Properties Level 1** (`css/css-variables`) | 57 / 468 | 12.2% |
+| **Selectors Level 4** (`css/selectors`) | 461 / 3,083 | 15.0% |
+| **Media Queries Level 4** (`css/mediaqueries`) | 102 / 384 | 26.6% |
+| **Overall Multi-Spec Conformance** | **6,798 / 15,913** | **42.72%** |
+
 <!-- WPT_CHROME_STATUS_START -->
-### Headless Chrome Conformance
-- **Pass Rate**: 93.58% (11929 / 12748 passed)
+### Headless Chrome Conformance (Typed OM)
+Evaluated directly against the official browser WPT harness (`wpt run chrome css/css-typed-om`):
+- **Pass Rate**: 93.58% (11,929 / 12,748 passed)
 - **Failed Assertions**: 819
 <!-- WPT_CHROME_STATUS_END -->
 

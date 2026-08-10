@@ -21,7 +21,7 @@ graph TD
 ### The Personas & Segregation of Duties
 
 1.  **The Orchestrator**:
-    *   *Role*: Plans roadmaps (`PLAN.md`), updates progress logs (`wpt-progress.md`, `wpt-typed-om-progress.md`), and delegates tasks.
+    *   *Role*: Plans roadmaps (`PLAN.md`), updates progress logs (`wpt-progress.md`), and delegates tasks.
     *   *Constraint*: The Orchestrator **never writes code or runs manual fixes**. It coordinates subagents and enforces the gate transitions.
 2.  **The Developer (`champ`)**:
     *   *Role*: Implements features, writes tests, runs `pnpm run preflight`, and commits changes to git.
