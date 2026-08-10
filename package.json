@@ -1,10 +1,39 @@
 {
   "name": "cssomnom",
   "version": "0.1.0",
+  "description": "Fast, spec-compliant CSS Object Model (CSSOM) and Typed OM parser in pure TypeScript",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/GoogleChromeLabs/cssomnom.git"
+  },
+  "bugs": {
+    "url": "https://github.com/GoogleChromeLabs/cssomnom/issues"
+  },
+  "homepage": "https://github.com/GoogleChromeLabs/cssomnom#readme",
+  "keywords": [
+    "css",
+    "cssom",
+    "typed-om",
+    "parser",
+    "ast",
+    "stylesheet",
+    "w3c"
+  ],
   "type": "module",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
   "exports": {
-    "import": "./dist/index.js",
-    "types": "./dist/index.d.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,7 +42,8 @@
   },
   "packageManager": "pnpm@11.10.0",
   "scripts": {
-    "build": "tsup && tsup --config tsup.browser.config.ts && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build": "tsup && tsup --config tsup.browser.config.ts && tsc -p tsconfig.build.json",
+    "prepublishOnly": "pnpm run preflight && pnpm run build",
     "test": "pnpm run preflight",
     "test:node": "node --test --test-reporter=dot 'tests/**/*.test.ts'",
     "test:wpt-typed-om:chrome": "pnpm run build && (python3 submodules/web-platform-tests/wpt run --processes 16 --headless -y --log-wptreport dist/report-chrome.json --log-wptscreenshot dist/chrome-screenshots.txt --log-html dist/report-chrome.html --inject-script dist/cssomnom.iife.global.js chrome css/css-typed-om || true) && node scripts/generate_wpt_report.ts",
