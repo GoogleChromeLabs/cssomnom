@@ -93,7 +93,7 @@ async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>
   return results;
 }
 
-async function analyzeSpec(specName: string, specPath: string, excludes: string[] = []) {
+async function analyzeSpec(specName: string, specPath: string, excludes: string[] = [], customConcurrency?: number) {
   const fullSpecPath = path.resolve(process.cwd(), specPath);
   console.log(`\n================================================================================`);
   console.log(`🔍 Scanning WPT Spec: "${specName}" (${specPath})`);
@@ -107,7 +107,7 @@ async function analyzeSpec(specName: string, specPath: string, excludes: string[
     return;
   }
 
-  const concurrency = Math.min(8, Math.max(1, Math.floor((os.availableParallelism?.() || 4) / 2)));
+  const concurrency = customConcurrency ?? Math.min(16, Math.max(1, os.availableParallelism() - 1));
   console.log(`Processing ${files.length} test files with concurrency: ${concurrency} (with health throttling & 25ms worker yields)...`);
 
   const fileResults = await pool(concurrency, files, async (filePath) => {
@@ -251,9 +251,13 @@ async function analyzeSpec(specName: string, specPath: string, excludes: string[
 async function main() {
   const args = process.argv.slice(2);
   let targetSpec = '';
+  let customConcurrency: number | undefined;
+
   for (const arg of args) {
     if (arg.startsWith('--spec=')) {
       targetSpec = arg.split('=')[1];
+    } else if (arg.startsWith('--concurrency=')) {
+      customConcurrency = parseInt(arg.split('=')[1], 10);
     }
   }
 
@@ -266,10 +270,10 @@ async function main() {
       console.error(`Error: Spec "${targetSpec}" not found in tests/wpt-sandbox-config.json`);
       process.exit(1);
     }
-    await analyzeSpec(targetSpec, specInfo.path, specInfo.exclude);
+    await analyzeSpec(targetSpec, specInfo.path, specInfo.exclude, customConcurrency);
   } else {
     for (const [name, specInfo] of Object.entries(config.specs)) {
-      await analyzeSpec(name, (specInfo as { path: string; exclude?: string[] }).path, (specInfo as { exclude?: string[] }).exclude);
+      await analyzeSpec(name, (specInfo as { path: string; exclude?: string[] }).path, (specInfo as { exclude?: string[] }).exclude, customConcurrency);
     }
   }
 }
