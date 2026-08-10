@@ -1900,7 +1900,7 @@ Objective: Resolve high-frequency failure clusters in `css-nesting` and `css-var
 
 ---
  
-## Phase 81: WPT Multi-Spec Conformance Drive (Wave 2: Selectors & Forgiving Parsing)
+## Phase 81: WPT Multi-Spec Conformance Drive (Wave 2: Selectors & Forgiving Parsing) [x]
 
 Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing forgiving selector list parsing, complex pseudo-class arguments, and pseudo-element normalization in `src/SelectorParser.ts`.
 

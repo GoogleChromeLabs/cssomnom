@@ -126,7 +126,7 @@ async function analyzeSpec(specName: string, specPath: string, excludes: string[
     let fileTotal = 0;
 
     try {
-      const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_sandbox.ts', filePath], { timeout: 3500 });
+      const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], { timeout: 3500 });
       const merged = stdout + '\n' + stderr;
       const summaryMatch = merged.match(/Summary: (\d+)\/(\d+) passed/);
       if (summaryMatch) {
@@ -261,13 +261,13 @@ async function main() {
     }
   }
 
-  const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
+  const configPath = path.resolve(process.cwd(), 'tests/wpt-node-config.json');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
   if (targetSpec) {
     const specInfo = config.specs[targetSpec];
     if (!specInfo) {
-      console.error(`Error: Spec "${targetSpec}" not found in tests/wpt-sandbox-config.json`);
+      console.error(`Error: Spec "${targetSpec}" not found in tests/wpt-node-config.json`);
       process.exit(1);
     }
     await analyzeSpec(targetSpec, specInfo.path, specInfo.exclude, customConcurrency);

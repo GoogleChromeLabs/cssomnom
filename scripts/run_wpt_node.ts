@@ -219,10 +219,10 @@ export function runWptFile(filePath: string): WptFileResult {
 }
 
 // Support running directly as a CLI script
-if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_sandbox.ts'))) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_node.ts'))) {
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    console.error('Usage: node scripts/run_wpt_sandbox.ts <wpt-html-file-paths...>');
+    console.error('Usage: node scripts/run_wpt_node.ts <wpt-html-file-paths...>');
     process.exit(1);
   }
   

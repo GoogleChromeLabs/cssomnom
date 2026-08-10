@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { CSSStyleRule } from '../src/CSSOM.ts';
 import { StylePropertyMap, StylePropertyMapReadOnly } from '../src/typed-om.ts';
 import { patchWindowForTypedOM } from './wpt-shim.ts';
-import { runWptFile } from '../scripts/run_wpt_sandbox.ts';
+import { runWptFile } from '../scripts/run_wpt_node.ts';
 
 interface StyleElementMock {
   textContent?: string | null;
@@ -109,7 +109,7 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
 }
 
 const failuresPath = path.resolve(process.cwd(), 'tests/fixtures/baselines/wpt-sandbox-known-failures.json');
-const sandboxConfigPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
+const sandboxConfigPath = path.resolve(process.cwd(), 'tests/wpt-node-config.json');
 
 if (process.env.RUN_SANDBOX_WPT === 'true' && fs.existsSync(failuresPath) && fs.existsSync(sandboxConfigPath)) {
   const failureConfig = JSON.parse(fs.readFileSync(failuresPath, 'utf-8')) as SandboxConfig;

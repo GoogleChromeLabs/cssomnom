@@ -61,9 +61,9 @@ async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>
 }
 
 export async function runCrawler(options: { spec?: string; file?: string; verbose?: boolean; concurrency?: number; updateProgress?: boolean; updateBaseline?: boolean } = {}): Promise<Record<string, SpecResult>> {
-  const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
+  const configPath = path.resolve(process.cwd(), 'tests/wpt-node-config.json');
   if (!fs.existsSync(configPath)) {
-    console.error('Error: WPT sandbox config not found.');
+    console.error('Error: WPT node config not found.');
     process.exit(1);
   }
 
@@ -148,7 +148,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_sandbox.ts', filePath], { timeout: 4000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], { timeout: 4000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -334,7 +334,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   return specResults;
 }
 
-if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_node_crawler.ts') || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
   const args = process.argv.slice(2);
   let spec: string | undefined;
   let file: string | undefined;
