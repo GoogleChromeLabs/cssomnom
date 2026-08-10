@@ -18,32 +18,11 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as vm from 'vm';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
 
-const parseSpecPath = path.resolve(import.meta.dirname, '../submodules/rrweb-cssom/spec/parse.spec.js');
-const parseSpecCode = fs.readFileSync(parseSpecPath, 'utf8');
-
-const specificTests: unknown[] = [];
-const sandbox: Record<string, unknown> = {
-  describe: (_name: string, fn: () => void) => fn(),
-  given: (input: string, fn: () => void) => specificTests.push({ input, fn }),
-  expect: (_actual: unknown) => ({
-    toEqualOwnProperties: (_expected: unknown) => {},
-    toBe: (_expected: unknown) => {}
-  }),
-  uncircularOwnProperties: () => {},
-  removeUnderscored: () => {},
-  CSSOM: {
-    parse: () => ({ cssRules: [{ style: {} }] })
-  }
-};
-
-vm.createContext(sandbox);
-vm.runInContext(parseSpecCode, sandbox);
-
-const tests = sandbox.TESTS as Array<{ input: string, result: { cssRules: unknown } }>;
+const fixturesPath = path.resolve(import.meta.dirname, 'fixtures/external/rrweb-tests.json');
+const tests = JSON.parse(fs.readFileSync(fixturesPath, 'utf8')) as Array<{ input: string, result: { cssRules: unknown } }>;
 
 const normalizeQuotes = (s: string) => s.replace(/'/g, '"');
 const normalizeWhitespace = (s: string) => s.replace(/\s+/g, ' ').trim();
