@@ -1,0 +1,38 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write # Required for OIDC provenance authentication
+  contents: read  # Required for repository checkout
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Preflight and build
+        run: |
+          pnpm run preflight
+          pnpm run build
+
+      - name: Publish to npm with provenance
+        run: npm publish --provenance --access public --registry https://registry.npmjs.org/
