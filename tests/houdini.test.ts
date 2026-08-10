@@ -36,7 +36,7 @@ interface PropertyTest {
 }
 
 describe('Houdini Properties and Values API (WPT)', () => {
-  const fixturesPath = path.join(process.cwd(), 'tests/fixtures/properties-values-api.json');
+  const fixturesPath = path.join(process.cwd(), 'tests/fixtures/wpt/wpt-properties-values.json');
   const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf-8'));
 
   describe('@property rules', () => {

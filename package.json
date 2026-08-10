@@ -12,17 +12,24 @@
     "node": ">=24.11.0"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsup --config tsup.browser.config.ts && tsc --emitDeclarationOnly --declaration --outDir dist",
     "test": "pnpm run preflight",
     "test:node": "node --test --test-reporter=dot 'tests/**/*.test.ts'",
+    "test:wpt-typed-om:chrome": "pnpm run build && (python3 submodules/web-platform-tests/wpt run --processes 16 --headless -y --log-wptreport dist/report-chrome.json --log-wptscreenshot dist/chrome-screenshots.txt --log-html dist/report-chrome.html --inject-script dist/cssomnom.iife.global.js chrome css/css-typed-om || true) && node scripts/generate_wpt_report.ts",
+    "test:wpt-typed-om:firefox": "pnpm run build && (python3 submodules/web-platform-tests/wpt run --processes 16 --headless -y --log-wptreport dist/report-firefox.json --log-wptscreenshot dist/firefox-screenshots.txt --log-html dist/report-firefox.html --inject-script dist/cssomnom.iife.global.js firefox css/css-typed-om || true) && node scripts/generate_wpt_report.ts",
     "typecheck": "tsc --noEmit",
     "preflight": "pnpm typecheck && pnpm lint && pnpm test:node",
     "lint": "oxlint",
-    "fixtures:generate": "node scripts/generate_fixtures.ts",
+    "fixtures:generate": "node scripts/extract_external_suites.ts",
+    "external:extract": "node scripts/extract_external_suites.ts",
+    "baselines:prune": "node scripts/prune_resolved_failures.ts",
+    "wpt:sandbox": "node scripts/run_wpt_sandbox.ts",
+    "wpt:baseline": "node scripts/run_wpt_crawler.ts --update-baseline",
+    "wpt:progress": "node scripts/run_wpt_crawler.ts --update-progress",
     "submodules:update": "git submodule update --init --recursive",
     "submodules:upgrade": "git submodule update --init --remote && pnpm run submodules:update",
     "codegen": "node scripts/generate_all.ts",
-    "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run fixtures:generate && pnpm run preflight"
+    "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run external:extract && pnpm run preflight"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",

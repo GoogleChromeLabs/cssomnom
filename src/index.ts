@@ -22,6 +22,6 @@ export { StreamingTokenizer } from './streaming-tokenizer.ts';
 export type { Token, TokenType, ComponentValue, SimpleBlock, CSSFunction, ASTAtRule, Rule, Declaration } from './types.ts';
 export * from './CSSOM.ts';
 export { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
-export { CSSStyleProperties } from './data/properties.ts';
+export { CSSStyleProperties } from './data/gen/properties.ts';
 export * from './typed-om.ts';
 export * from './parser-api.ts';

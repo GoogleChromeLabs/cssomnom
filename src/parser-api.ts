@@ -31,7 +31,7 @@ import { tokenize } from './tokenizer.ts';
 import type { ComponentValue, SimpleBlock, CSSFunction, ASTAtRule, Declaration } from './types.ts';
 import { serialize } from './serializer.ts';
 import { PropertyRegistry, type PropertyDefinition } from './PropertyRegistry.ts';
-import { CSSFactories } from './data/css-factories.ts';
+import { CSSFactories } from './data/gen/css-factories.ts';
 import { resolveNestedSelector } from './cascade.ts';
 
 

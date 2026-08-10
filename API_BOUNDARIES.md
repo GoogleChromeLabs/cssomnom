@@ -32,7 +32,7 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 These APIs are defined in newer Houdini drafts and are intended to expose lower-level parsing and typed values.
 
 ### Specifications Followed
-- **CSS Typed OM**: `submodules/csswg-drafts/css-typed-om-1/Overview.bs`
+- **CSS Typed OM**: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
 - **CSS Parser API**: Based on the [WICG CSS Parser API](https://github.com/WICG/css-parser-api) draft.
 
 ### Interfaces & Methods

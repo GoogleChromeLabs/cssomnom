@@ -42,7 +42,7 @@ We are **mostly** a drop-in replacement for standard usage, but there is one cri
 
 ## 3. Proposal for Compatibility Layer
 
-To support existing users of both `NV/CSSOM` and `rrweb-io/CSSOM` and allow `cssomnom` to act as a drop-in replacement, we propose adding a small compatibility shim module (e.g., `src/compat.ts`) that provides the following features:
+To support existing users of both `NV/CSSOM` and `rrweb-io/CSSOM` and allow `cssomnom` to act as a drop-in replacement, we propose adding a hypothetical compatibility module that provides the following features:
 
 ### Synchronous `parse` Entry Point
 Provide a synchronous `parse` function that mimics the legacy behavior:

@@ -21,7 +21,7 @@ import * as path from 'path';
 import { CSSStyleSheet } from '../src/index.ts';
 import { Parser } from '../src/parser.ts';
 
-const fixturesPath = path.resolve(import.meta.dirname, 'fixtures/external/csstree_errors.json');
+const fixturesPath = path.resolve(import.meta.dirname, 'fixtures/external/csstree-errors.json');
 const tests = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
 // Known skips for CSSTree error fixtures with detailed rationale.

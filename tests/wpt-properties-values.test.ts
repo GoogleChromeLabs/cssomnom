@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { PropertyRegistry, type PropertyDefinition } from '../src/PropertyRegistry.ts';
 import { Parser } from '../src/parser.ts';
 
-const fixturesPath = new URL('./fixtures/properties-values-api.json', import.meta.url);
+const fixturesPath = new URL('./fixtures/wpt/wpt-properties-values.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
 interface WptTestCase {

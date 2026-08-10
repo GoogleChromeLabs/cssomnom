@@ -20,10 +20,10 @@ import fs from 'node:fs';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 
-const fixturesPath = new URL('./fixtures/lightningcss.json', import.meta.url);
+const fixturesPath = new URL('./fixtures/external/lightningcss.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
-const baselinePath = new URL('./fixtures/external/lightning_known_failures.json', import.meta.url);
+const baselinePath = new URL('./fixtures/baselines/lightning-known-failures.json', import.meta.url);
 const knownFailuresSet = new Set<string>(JSON.parse(fs.readFileSync(baselinePath, 'utf8')));
 
 describe('LightningCSS Extracted Tests', () => {

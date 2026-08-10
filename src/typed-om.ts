@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 import type { Token, Declaration, ComponentValue, CSSFunction, IdentToken, HashToken } from './types.ts';
-import { NAMED_COLORS } from './data/colors.ts';
+import { NAMED_COLORS } from './data/gen/colors.ts';
 import { matchesSyntax, PropertyRegistry } from './PropertyRegistry.ts';
 
 
@@ -24,13 +24,48 @@ import { parseMathFunction, simplify } from './math-parser.ts';
 import { tokenize } from './tokenizer.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { SHORTHANDS } from './shorthands.ts';
-import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/units.ts';
+import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/gen/units.ts';
+export type { CSSUnit };
 import { formatNumber } from './utils/format.ts';
 import { DOMMatrixReadOnly, DOMMatrix, setParseTransformListHook } from './DOMMatrix.ts';
-import { SUPPORTED_PROPERTIES } from './data/property-list.ts';
+import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
+
+function validateProperty(property: string): void {
+  if (!property.startsWith('--') && !SUPPORTED_PROPERTIES.has(property.toLowerCase())) {
+    throw new TypeError(`Invalid property name "${property}"`);
+  }
+}
 
 function compareStrings(a: string, b: string): number {
   return a === b ? 0 : (a < b ? -1 : 1);
+}
+
+function checkBrand(obj: unknown, cls: Function): void {
+  if (!(obj instanceof cls)) {
+    throw new TypeError('Illegal invocation');
+  }
+}
+
+function isNumericValue(val: unknown): val is CSSNumericValue {
+  if (!val || typeof val !== 'object') return false;
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSNumericValue as typeof CSSNumericValue) || CSSNumericValue;
+  return val instanceof Cls;
+}
+
+function isKeywordValue(val: unknown): val is CSSKeywordValue {
+  if (!val || typeof val !== 'object') return false;
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSKeywordValue as typeof CSSKeywordValue) || CSSKeywordValue;
+  return val instanceof Cls;
+}
+
+function createUnitValue(value: number, unit: CSSUnit): CSSUnitValue {
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSUnitValue as typeof CSSUnitValue) || CSSUnitValue;
+  return new Cls(value, unit);
+}
+
+function createKeywordValue(value: string): CSSKeywordValue {
+  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSKeywordValue as typeof CSSKeywordValue) || CSSKeywordValue;
+  return new Cls(value);
 }
 
 const LIST_PROPERTIES = new Set([
@@ -235,6 +270,8 @@ const STANDARD_PROPERTIES_SYNTAX: Record<string, string> = {
 
 
 
+const privateToken = Symbol.for('cssomnom-private-token');
+
 // CSS Typed OM: CSSStyleValue
 export class CSSStyleValue {
   get [Symbol.toStringTag]() {
@@ -243,7 +280,10 @@ export class CSSStyleValue {
   private _cssText?: string;
   _associatedProperty: string | null = null;
 
-  constructor(cssText?: string) {
+  constructor(cssText?: string, token?: unknown) {
+    if (token !== privateToken && this.constructor === CSSStyleValue) {
+      throw new TypeError("CSSStyleValue cannot be directly constructed");
+    }
     this._cssText = cssText;
   }
 
@@ -251,7 +291,28 @@ export class CSSStyleValue {
     return this._cssText || '';
   }
 
+  private static _shouldFallbackToCSSStyleValue(property: string, css: string): boolean {
+    const propLower = property.toLowerCase();
+    const valueLower = css.toLowerCase().trim();
+    
+    if (valueLower.includes('var(')) return false;
+    
+    if (propLower === 'will-change') {
+      return valueLower !== 'auto' && valueLower !== 'contents';
+    }
+    if (propLower === 'filter' || propLower === 'backdrop-filter') {
+      return valueLower !== 'none';
+    }
+    if (propLower === 'cursor') {
+      return valueLower.includes('url(');
+    }
+    return false;
+  }
+
   static parseAll(property: string, css: string): CSSStyleValue[] {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to execute 'parseAll' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
+    }
     if (property === '--') {
       throw new TypeError("Invalid property name: '--'");
     }
@@ -282,6 +343,18 @@ export class CSSStyleValue {
 
     if (isCSSWideKeyword) {
       return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
+    }
+
+    if (CSSStyleValue._shouldFallbackToCSSStyleValue(property, css)) {
+      return [new CSSStyleValue(css, privateToken)];
+    }
+
+    const shorthand = SHORTHANDS[property];
+    if (shorthand && !hasVarFunction(trimmed)) {
+      const expanded = shorthand.expand(trimmed);
+      if (expanded === null) {
+        throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
+      }
     }
 
     if (hasVarFunction(trimmed)) {
@@ -422,10 +495,13 @@ export class CSSStyleValue {
       if (sv) return sv;
     }
     
-    return new CSSStyleValue(serialize(trimmed).trim());
+    return new CSSStyleValue(serialize(trimmed).trim(), privateToken);
   }
 
   static parse(property: string, css: string): CSSStyleValue {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
+    }
     const all = this.parseAll(property, css);
     if (all.length === 0) {
       throw new TypeError(`Invalid value for property ${property}: ${css}`);
@@ -476,7 +552,7 @@ interface RectifyOptions {
   numberToUnit: (v: number) => CSSUnitValue;
   validateNumeric: (type: CSSNumericType) => boolean;
   allowUndefined?: boolean;
-  useTypeError?: boolean;
+  undefinedAsSyntaxError?: boolean;
 }
 
 const SIMPLE_NUMERIC = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+))([a-zA-Z%]*)$/;
@@ -485,18 +561,16 @@ function rectifyColorChannel(
   v: number | string | CSSNumericValue | CSSKeywordValue | undefined,
   options: RectifyOptions
 ): CSSNumericValue | CSSKeywordValue {
-  const { name, numberToUnit, validateNumeric, allowUndefined = false, useTypeError = false } = options;
+  const { name, numberToUnit, validateNumeric, allowUndefined = false, undefinedAsSyntaxError = false } = options;
 
-  if (v === undefined) {
-    if (allowUndefined) {
-      return new CSSKeywordValue('undefined');
+  if (v === undefined || v === null) {
+    if (allowUndefined && v === undefined) {
+      return createKeywordValue('undefined');
     }
-    const errMessage = `Value cannot be undefined`;
-    if (useTypeError) {
-      throw new TypeError(errMessage);
-    } else {
-      throw new DOMException(errMessage, 'SyntaxError');
+    if (undefinedAsSyntaxError) {
+      throw new DOMException(`Value cannot be null or undefined`, 'SyntaxError');
     }
+    throw new TypeError(`Value cannot be null or undefined`);
   }
 
   if (typeof v === 'number') {
@@ -516,7 +590,7 @@ function rectifyColorChannel(
       } else if (unit === '') {
         unit = 'number';
       }
-      matchedValue = new CSSUnitValue(val, unit as CSSUnit);
+      matchedValue = createUnitValue(val, unit as CSSUnit);
     }
     
     if (matchedValue) {
@@ -525,18 +599,18 @@ function rectifyColorChannel(
       try {
         resolved = CSSNumericValue.parse(v);
       } catch {
-        resolved = new CSSKeywordValue(v);
+        resolved = createKeywordValue(v);
       }
     }
   } else {
     resolved = v;
   }
 
-  if (!(resolved instanceof CSSNumericValue) && !(resolved instanceof CSSKeywordValue)) {
+  if (!isNumericValue(resolved) && !isKeywordValue(resolved)) {
     throw new TypeError(`Invalid type for ${name}`);
   }
 
-  if (resolved instanceof CSSNumericValue) {
+  if (isNumericValue(resolved)) {
     if (validateNumeric(resolved.type())) {
       return resolved;
     }
@@ -547,34 +621,31 @@ function rectifyColorChannel(
     }
   }
 
-  const errMessage = `Invalid ${name} value`;
-  if (useTypeError) {
-    throw new TypeError(errMessage);
-  } else {
-    throw new DOMException(errMessage, 'SyntaxError');
-  }
+  throw new DOMException(`Invalid ${name} value`, 'SyntaxError');
 }
 
 function rectifyColorRGBComp(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorRGBComp',
-    numberToUnit: (num) => new CSSUnitValue(num * 100, 'percent'),
-    validateNumeric: (t) => matchesNumber(t) || matchesPercentage(t)
+    numberToUnit: (num) => createUnitValue(num * 100, 'percent'),
+    validateNumeric: (t) => matchesNumber(t) || matchesPercentage(t),
+    undefinedAsSyntaxError: true
   });
 }
 
 function rectifyColorPercent(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorPercent',
-    numberToUnit: (num) => new CSSUnitValue(num * 100, 'percent'),
-    validateNumeric: matchesPercentage
+    numberToUnit: (num) => createUnitValue(num * 100, 'percent'),
+    validateNumeric: matchesPercentage,
+    undefinedAsSyntaxError: true
   });
 }
 
 function rectifyColorNumber(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorNumber',
-    numberToUnit: (num) => new CSSUnitValue(num, 'number'),
+    numberToUnit: (num) => createUnitValue(num, 'number'),
     validateNumeric: matchesNumber
   });
 }
@@ -582,7 +653,7 @@ function rectifyColorNumber(v: number | string | CSSNumericValue | CSSKeywordVal
 function rectifyColorNumberOrPercent(v: number | string | CSSNumericValue | CSSKeywordValue): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColor channel',
-    numberToUnit: (num) => new CSSUnitValue(num, 'number'),
+    numberToUnit: (num) => createUnitValue(num, 'number'),
     validateNumeric: (t) => matchesNumber(t) || matchesPercentage(t)
   });
 }
@@ -590,17 +661,25 @@ function rectifyColorNumberOrPercent(v: number | string | CSSNumericValue | CSSK
 function rectifyColorAngle(v: number | string | CSSNumericValue | CSSKeywordValue, allowUndefined = false): CSSNumericValue | CSSKeywordValue {
   return rectifyColorChannel(v, {
     name: 'CSSColorAngle',
-    numberToUnit: (num) => new CSSUnitValue(num, 'deg'),
+    numberToUnit: (num) => createUnitValue(num, 'deg'),
     validateNumeric: matchesAngle,
-    allowUndefined,
-    useTypeError: true
+    allowUndefined
   });
 }
 
 
 // CSS Typed OM: CSSColorValue
 export abstract class CSSColorValue extends CSSStyleValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSColorValue) {
+      throw new TypeError("CSSColorValue cannot be directly constructed");
+    }
+  }
   static override parse(css: string): CSSColorValue | CSSKeywordValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSColorValue': 1 argument required, but only 0 present.");
+    }
     const tokens = tokenize(css);
     const componentValues = ParseHooks.parseComponentValues(tokens);
     
@@ -659,17 +738,17 @@ export class CSSRGB extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get r(): CSSNumericValue | CSSKeywordValue { return this._r; }
-  set r(val: number | string | CSSNumericValue | CSSKeywordValue) { this._r = rectifyColorRGBComp(val); }
+  get r(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._r; }
+  set r(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._r = rectifyColorRGBComp(val); }
 
-  get g(): CSSNumericValue | CSSKeywordValue { return this._g; }
-  set g(val: number | string | CSSNumericValue | CSSKeywordValue) { this._g = rectifyColorRGBComp(val); }
+  get g(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._g; }
+  set g(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._g = rectifyColorRGBComp(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorRGBComp(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._b = rectifyColorRGBComp(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSRGB); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     // CSS Color 4 #css-serialization-of-srgb:
@@ -706,17 +785,17 @@ export class CSSHSL extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val); }
+  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._h; }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._h = rectifyColorAngle(val, true); }
 
-  get s(): CSSNumericValue | CSSKeywordValue { return this._s; }
-  set s(val: number | string | CSSNumericValue | CSSKeywordValue) { this._s = rectifyColorPercent(val); }
+  get s(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._s; }
+  set s(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._s = rectifyColorPercent(val); }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._l = rectifyColorPercent(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHSL); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -745,8 +824,9 @@ export class CSSHWB extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get h(): CSSNumericValue { return this._h; }
+  get h(): CSSNumericValue { checkBrand(this, CSSHWB); return this._h; }
   set h(val: number | string | CSSNumericValue) {
+    checkBrand(this, CSSHWB);
     const rectified = rectifyColorAngle(val);
     if (!(rectified instanceof CSSNumericValue)) {
       throw new TypeError(`CSSHWB.h must be a CSSNumericValue`);
@@ -754,14 +834,14 @@ export class CSSHWB extends CSSColorValue {
     this._h = rectified;
   }
 
-  get w(): CSSNumericValue | CSSKeywordValue { return this._w; }
-  set w(val: number | string | CSSNumericValue | CSSKeywordValue) { this._w = rectifyColorPercent(val); }
+  get w(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._w; }
+  set w(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHWB); this._w = rectifyColorPercent(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorPercent(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHWB); this._b = rectifyColorPercent(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSHWB); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -790,17 +870,17 @@ export class CSSLab extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._l = rectifyColorPercent(val); }
 
-  get a(): CSSNumericValue | CSSKeywordValue { return this._a; }
-  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { this._a = rectifyColorNumber(val); }
+  get a(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._a; }
+  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._a = rectifyColorNumber(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorNumber(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._b = rectifyColorNumber(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLab); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -829,17 +909,17 @@ export class CSSLCH extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._l = rectifyColorPercent(val); }
 
-  get c(): CSSNumericValue | CSSKeywordValue { return this._c; }
-  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { this._c = rectifyColorPercent(val); }
+  get c(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._c; }
+  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._c = rectifyColorPercent(val); }
 
-  get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val); }
+  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._h; }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._h = rectifyColorAngle(val, true); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSLCH); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -868,17 +948,17 @@ export class CSSOKLab extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._l = rectifyColorPercent(val); }
 
-  get a(): CSSNumericValue | CSSKeywordValue { return this._a; }
-  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { this._a = rectifyColorNumber(val); }
+  get a(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._a; }
+  set a(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._a = rectifyColorNumber(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { return this._b; }
-  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { this._b = rectifyColorNumber(val); }
+  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._b; }
+  set b(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._b = rectifyColorNumber(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLab); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -907,17 +987,17 @@ export class CSSOKLCH extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { return this._l; }
-  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { this._l = rectifyColorPercent(val); }
+  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._l; }
+  set l(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._l = rectifyColorPercent(val); }
 
-  get c(): CSSNumericValue | CSSKeywordValue { return this._c; }
-  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { this._c = rectifyColorPercent(val); }
+  get c(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._c; }
+  set c(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._c = rectifyColorPercent(val); }
 
-  get h(): CSSNumericValue | CSSKeywordValue { return this._h; }
-  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { this._h = rectifyColorAngle(val); }
+  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._h; }
+  set h(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._h = rectifyColorAngle(val, true); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
-  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { this._alpha = rectifyColorPercent(val); }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._alpha; }
+  set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) { checkBrand(this, CSSOKLCH); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
     if (isAlphaUnity(this.alpha)) {
@@ -943,15 +1023,24 @@ export class CSSColor extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get colorSpace(): CSSKeywordValue { return this._colorSpace; }
+  get colorSpace(): CSSKeywordValue { checkBrand(this, CSSColor); return this._colorSpace; }
   set colorSpace(val: CSSKeywordValue | string) {
-    this._colorSpace = typeof val === 'string' ? new CSSKeywordValue(val) : val;
+    checkBrand(this, CSSColor);
+    this._colorSpace = typeof val === 'string' ? createKeywordValue(val) : val;
   }
 
-  get channels(): (CSSNumericValue | CSSKeywordValue)[] { return this._channels; }
+  get channels(): (CSSNumericValue | CSSKeywordValue)[] { checkBrand(this, CSSColor); return this._channels; }
+  set channels(val: (number | string | CSSNumericValue | CSSKeywordValue)[]) {
+    checkBrand(this, CSSColor);
+    if (!Array.isArray(val)) {
+      throw new TypeError("channels must be an array");
+    }
+    this._channels = val.map(c => rectifyColorNumberOrPercent(c));
+  }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { return this._alpha; }
+  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSColor); return this._alpha; }
   set alpha(val: number | string | CSSNumericValue | CSSKeywordValue) {
+    checkBrand(this, CSSColor);
     this._alpha = rectifyColorNumberOrPercent(val);
   }
 
@@ -1107,10 +1196,19 @@ function isStandardCSSNumericValue(node: CSSNumericValue): boolean {
 
 // CSS Typed OM: CSSNumericValue
 export abstract class CSSNumericValue extends CSSStyleValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSNumericValue) {
+      throw new TypeError("CSSNumericValue cannot be directly constructed");
+    }
+  }
   abstract serialize(): string;
   abstract type(): CSSNumericType;
 
   to(unit: string): CSSUnitValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'to' on 'CSSNumericValue': 1 argument required, but only 0 present.");
+    }
     if (!unitToBase[unit]) {
       throw new DOMException(`Invalid unit: ${unit}`, 'SyntaxError');
     }
@@ -1168,6 +1266,9 @@ export abstract class CSSNumericValue extends CSSStyleValue {
   }
 
   static parse(css: string): CSSNumericValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSNumericValue': 1 argument required, but only 0 present.");
+    }
     try {
       const tokens = tokenize(css);
       const componentValues = ParseHooks.parseComponentValues(tokens).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
@@ -1453,11 +1554,12 @@ export class CSSUnitValue extends CSSNumericValue {
 
   constructor(value: number, unit: CSSUnit) {
     super();
-    if (!unitToBase[unit]) {
+    const normalizedUnit = typeof unit === 'string' ? unit.toLowerCase() as CSSUnit : unit;
+    if (!unitToBase[normalizedUnit]) {
       throw new TypeError(`Invalid unit: ${unit}`);
     }
     this.value = value;
-    this.unit = unit;
+    this.unit = normalizedUnit;
   }
 
   override toString(): string {
@@ -1496,6 +1598,9 @@ export class CSSUnitValue extends CSSNumericValue {
   }
 
   override to(unit: string): CSSUnitValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'to' on 'CSSNumericValue': 1 argument required, but only 0 present.");
+    }
     if (!unitToBase[unit]) {
       throw new DOMException(`Invalid unit: ${unit}`, 'SyntaxError');
     }
@@ -2164,6 +2269,12 @@ export class CSSUnparsedValue extends CSSStyleValue {
 
 // CSS Typed OM: CSSMathValue
 export abstract class CSSMathValue extends CSSNumericValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSMathValue) {
+      throw new TypeError("CSSMathValue cannot be directly constructed");
+    }
+  }
   abstract serialize(): string;
   override toString(): string {
     const s = this.serialize();
@@ -2712,6 +2823,12 @@ function matchesAngle(type: CSSNumericType): boolean {
 }
 
 export abstract class CSSTransformComponent extends CSSStyleValue {
+  constructor() {
+    super();
+    if (this.constructor === CSSTransformComponent) {
+      throw new TypeError("CSSTransformComponent cannot be directly constructed");
+    }
+  }
   protected _is2D: boolean = true;
   get is2D(): boolean {
     return this._is2D;
@@ -3222,6 +3339,9 @@ export class CSSTransformValue extends CSSStyleValue {
   }
 
   static parse(css: string): CSSTransformValue {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'parse' on 'CSSTransformValue': 1 argument required, but only 0 present.");
+    }
     const tokens = tokenize(css);
     const componentValues = ParseHooks.parseComponentValues(tokens);
     
@@ -3392,21 +3512,54 @@ function parseNumeric(v: ComponentValue): CSSNumericValue {
 }
 
 
-export class StylePropertyMapReadOnly {
-  private declarations: Declaration[];
+export interface StyleReadOnlyLike {
+  length: number;
+  [index: number]: string;
+  getPropertyValue(property: string): string;
+  item(index: number): string;
+  declarations?: Declaration[];
+}
 
-  constructor(declarations: Declaration[]) {
-    this.declarations = declarations;
+export interface StyleLike extends StyleReadOnlyLike {
+  setProperty(property: string, value: string | null, priority?: string): void;
+  removeProperty(property: string): string;
+}
+
+export class StylePropertyMapReadOnly {
+  protected _style: StyleReadOnlyLike;
+  protected _element?: unknown;
+
+  constructor(styleOrDecls: StyleReadOnlyLike | Declaration[], element?: unknown) {
+    if (Array.isArray(styleOrDecls)) {
+      this._style = {
+        length: styleOrDecls.length,
+        getPropertyValue: (prop: string) => {
+          const decl = styleOrDecls.find(d => d.name === prop);
+          return decl ? serialize(decl.value).trim() : '';
+        },
+        item: (index: number) => styleOrDecls[index]?.name || '',
+        declarations: styleOrDecls,
+        ...Object.fromEntries(styleOrDecls.map((d, i) => [i, d.name]))
+      } as unknown as StyleReadOnlyLike;
+    } else {
+      this._style = styleOrDecls;
+    }
+    this._element = element;
   }
 
   protected _getDeclarations(): Declaration[] {
-    return this.declarations;
+    return this._style.declarations || [];
   }
 
   private _getKeys(): string[] {
     const keys = new Set<string>();
-    for (const decl of this._getDeclarations()) {
-      keys.add(decl.name);
+    if (this._style) {
+      for (let i = 0; i < this._style.length; i++) {
+        const prop = this._style[i];
+        if (prop) {
+          keys.add(prop);
+        }
+      }
     }
     return Array.from(keys);
   }
@@ -3443,6 +3596,7 @@ export class StylePropertyMapReadOnly {
   }
 
   get(property: string): CSSStyleValue | undefined {
+    validateProperty(property);
     const res = this._getRaw(property);
     if (res) {
       res._associatedProperty = property;
@@ -3454,51 +3608,83 @@ export class StylePropertyMapReadOnly {
   protected _getRaw(property: string): CSSStyleValue | null {
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
-      const longhandValues: Record<string, ComponentValue[]> = {};
-      let allSet = true;
-      for (const lh of shorthand.longhands) {
-        const decl = this.declarations.find(d => d.name === lh);
-        if (!decl) {
-          allSet = false;
-          break;
+      const declarations = this._getDeclarations();
+      if (declarations.length > 0) {
+        const longhandValues: Record<string, ComponentValue[]> = {};
+        let allSet = true;
+        for (const lh of shorthand.longhands) {
+          const decl = declarations.find(d => d.name === lh);
+          if (!decl) {
+            allSet = false;
+            break;
+          }
+          longhandValues[lh] = decl.value;
         }
-        longhandValues[lh] = decl.value;
-      }
-      if (allSet) {
-        const contracted = shorthand.contract(longhandValues);
-        if (contracted !== null) {
-          // Shorthands in Typed OM usually return CSSUnparsedValue
-          return new CSSUnparsedValue([contracted]);
+        if (allSet) {
+          const contracted = shorthand.contract(longhandValues);
+          if (contracted !== null) {
+            return new CSSUnparsedValue([contracted]);
+          }
+        }
+      } else {
+        const val = this._style.getPropertyValue(property);
+        if (val) {
+          return new CSSUnparsedValue([val]);
         }
       }
       return null;
     }
 
-    const decl = this.declarations.find((d: Declaration) => d.name === property);
-    if (!decl) return null;
-    if (property.startsWith('--')) {
-      return new CSSUnparsedValue(tokensToUnparsedSegments(decl.value));
-    }
-
-    
-    const serialized = serialize(decl.value).trim();
-    try {
-      const parsed = CSSStyleValue.parseAll(property, serialized);
-      return parsed.length > 0 ? parsed[0] : null;
-    } catch (e) {
-      return new CSSStyleValue(serialized);
+    const declarations = this._getDeclarations();
+    if (declarations.length > 0) {
+      const decl = declarations.find((d: Declaration) => d.name === property);
+      if (!decl) return null;
+      if (property.startsWith('--')) {
+        return new CSSUnparsedValue(tokensToUnparsedSegments(decl.value));
+      }
+      const serialized = serialize(decl.value).trim();
+      try {
+        const parsed = CSSStyleValue.parseAll(property, serialized);
+        return parsed.length > 0 ? parsed[0] : null;
+      } catch (e) {
+        return new CSSStyleValue(serialized, privateToken);
+      }
+    } else {
+      const val = this._style.getPropertyValue(property);
+      if (val === '') return null;
+      if (property.startsWith('--')) {
+        const tokens = tokenize(val);
+        const componentValues = ParseHooks.parseComponentValues(tokens);
+        return new CSSUnparsedValue(tokensToUnparsedSegments(componentValues));
+      }
+      try {
+        const parsed = CSSStyleValue.parseAll(property, val);
+        return parsed.length > 0 ? parsed[0] : null;
+      } catch (e) {
+        return new CSSStyleValue(val, privateToken);
+      }
     }
   }
 
   has(property: string): boolean {
+    validateProperty(property);
     const shorthand = SHORTHANDS[property];
-    if (shorthand) {
-      return shorthand.longhands.every(lh => this.declarations.some(d => d.name === lh));
+    const declarations = this._getDeclarations();
+    if (declarations.length > 0) {
+      if (shorthand) {
+        return shorthand.longhands.every(lh => declarations.some(d => d.name === lh));
+      }
+      return declarations.some((d: Declaration) => d.name === property);
+    } else {
+      if (shorthand) {
+        return shorthand.longhands.every(lh => this._style.getPropertyValue(lh) !== '');
+      }
+      return this._style.getPropertyValue(property) !== '';
     }
-    return this.declarations.some((d: Declaration) => d.name === property);
   }
 
   getAll(property: string): CSSStyleValue[] {
+    validateProperty(property);
     const res = this._getAllRaw(property);
     for (const val of res) {
       val._associatedProperty = property;
@@ -3507,18 +3693,32 @@ export class StylePropertyMapReadOnly {
   }
 
   protected _getAllRaw(property: string): CSSStyleValue[] {
-    const decl = this.declarations.find((d: Declaration) => d.name === property);
-    if (!decl) return [];
-    
-    if (property.startsWith('--')) {
-      return [new CSSUnparsedValue(tokensToUnparsedSegments(decl.value))];
-    }
-    
-    const serialized = serialize(decl.value).trim();
-    try {
-      return CSSStyleValue.parseAll(property, serialized);
-    } catch (e) {
-      return [new CSSStyleValue(serialized)];
+    const declarations = this._getDeclarations();
+    if (declarations.length > 0) {
+      const decl = declarations.find((d: Declaration) => d.name === property);
+      if (!decl) return [];
+      if (property.startsWith('--')) {
+        return [new CSSUnparsedValue(tokensToUnparsedSegments(decl.value))];
+      }
+      const serialized = serialize(decl.value).trim();
+      try {
+        return CSSStyleValue.parseAll(property, serialized);
+      } catch (e) {
+        return [new CSSStyleValue(serialized, privateToken)];
+      }
+    } else {
+      const val = this._style.getPropertyValue(property);
+      if (val === '') return [];
+      if (property.startsWith('--')) {
+        const tokens = tokenize(val);
+        const componentValues = ParseHooks.parseComponentValues(tokens);
+        return [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
+      }
+      try {
+        return CSSStyleValue.parseAll(property, val);
+      } catch (e) {
+        return [new CSSStyleValue(val, privateToken)];
+      }
     }
   }
 }
@@ -3602,14 +3802,7 @@ function setPropertySafe(style: unknown, element: unknown, property: string, val
   }
 }
 
-interface StyleLike {
-  declarations: Declaration[];
-  getPropertyValue(property: string): string;
-  setProperty(property: string, value: string): void;
-  removeProperty(property: string): void;
-  length: number;
-  item(index: number): string;
-}
+
 
 function getShorthandForLonghand(longhand: string): string | null {
   for (const [shorthand, data] of Object.entries(SHORTHANDS)) {
@@ -3641,18 +3834,140 @@ function isEquivalent(a: string, b: string): boolean {
   return clean(a) === clean(b);
 }
 
+function getRepresentative(val: CSSUnitValue): CSSUnitValue {
+  const unit = val.unit.toLowerCase();
+  if (unit === 'number') return createUnitValue(1, 'number');
+  if (unit === 'percent') return createUnitValue(1, 'percent');
+
+  const base = unitToBase[unit];
+  if (base === 'length') return createUnitValue(1, 'px');
+  if (base === 'angle') return createUnitValue(1, 'deg');
+  if (base === 'time') return createUnitValue(1, 's');
+  if (base === 'frequency') return createUnitValue(1, 'hz');
+  if (base === 'resolution') return createUnitValue(1, 'dpi');
+  if (base === 'flex') return createUnitValue(1, 'fr');
+
+  return val;
+}
+
+let dummyStyle: CSSStyleDeclaration | null = null;
+function getDummyStyle(): CSSStyleDeclaration {
+  if (!dummyStyle) {
+    if (typeof globalThis.document === 'undefined') {
+      return {
+        cssText: '',
+        length: 0,
+        setProperty() {},
+        getPropertyValue() { return ''; },
+        removeProperty() {},
+        item() { return ''; }
+      } as unknown as CSSStyleDeclaration;
+    }
+    dummyStyle = globalThis.document.createElement('div').style;
+  }
+  return dummyStyle;
+}
+
+function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
+  const propLower = property.toLowerCase();
+  if (propLower.startsWith('--')) return false;
+
+  const temp = getDummyStyle();
+
+  // Test raw
+  temp.cssText = '';
+  try {
+    temp.setProperty(property, val.toString());
+    if (temp.getPropertyValue(property) !== '') {
+      return false;
+    }
+  } catch (e) {}
+
+  // Test calc
+  temp.cssText = '';
+  try {
+    temp.setProperty(property, `calc(${val.toString()})`);
+    return temp.getPropertyValue(property) !== '';
+  } catch (e) {}
+
+  return false;
+}
+
+function validateValuesForProperty(property: string, values: (CSSStyleValue | string)[]): string {
+  const propLower = property.toLowerCase();
+  const isList = LIST_PROPERTIES.has(propLower);
+
+  if (!isList && values.length > 1) {
+    throw new TypeError(`Property ${property} is not list-valued and cannot accept multiple values`);
+  }
+
+  if (values.length > 1) {
+    for (const val of values) {
+      if (val instanceof CSSUnparsedValue) {
+        throw new TypeError('Cannot mix CSSUnparsedValue with other values');
+      }
+      if (typeof val === 'string' && val.toLowerCase().includes('var(')) {
+        throw new TypeError('Cannot mix variable references with other values');
+      }
+    }
+  }
+
+  const valStrings: string[] = [];
+  const validationStrings: string[] = [];
+  for (const val of values) {
+    if (typeof val === 'string') {
+      valStrings.push(val);
+      validationStrings.push(val);
+    } else {
+      if (val._associatedProperty !== null && val._associatedProperty !== propLower) {
+        throw new TypeError(`CSSStyleValue is associated with ${val._associatedProperty}, not ${property}`);
+      }
+      if (val instanceof CSSUnitValue) {
+        if (shouldWrapInCalc(property, val)) {
+          valStrings.push(`calc(${val.toString()})`);
+        } else {
+          valStrings.push(val.toString());
+        }
+        validationStrings.push(getRepresentative(val).toString());
+      } else {
+        valStrings.push(val.toString());
+        validationStrings.push(val.toString());
+      }
+    }
+  }
+
+  const finalString = valStrings.join(isList ? ', ' : ' ');
+  const validationString = validationStrings.join(isList ? ', ' : ' ');
+
+  if (!propLower.startsWith('--')) {
+    if (typeof globalThis.document === 'undefined') {
+      try {
+        CSSStyleValue.parseAll(property, validationString);
+      } catch (e) {
+        throw new TypeError(`Invalid value for property ${property}: ${finalString}`);
+      }
+    } else {
+      const dummy = getDummyStyle();
+      dummy.cssText = '';
+      dummy.setProperty(property, validationString);
+      if (dummy.getPropertyValue(property) === '') {
+        throw new TypeError(`Invalid value for property ${property}: ${finalString}`);
+      }
+    }
+  }
+
+  return finalString;
+}
+
 export class StylePropertyMap extends StylePropertyMapReadOnly {
-  private _style: StyleLike;
-  private _element?: unknown;
+  declare protected _style: StyleLike;
 
   constructor(style: StyleLike, element?: unknown) {
-    super([]);
-    this._style = style;
-    this._element = element;
+    super(style, element);
   }
 
   protected override _getDeclarations(): Declaration[] {
-    return this._style.declarations;
+    return this._style.declarations || [];
   }
 
   private _checkPendingSubstitution(property: string): void {
@@ -3666,6 +3981,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   }
 
   override get(property: string): CSSStyleValue | undefined {
+    validateProperty(property);
     const res = this._getRaw(property);
     if (res) {
       res._associatedProperty = property;
@@ -3716,13 +4032,14 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       }
       return null;
     } catch (e) {
-      const res = new CSSStyleValue(value);
+      const res = new CSSStyleValue(value, privateToken);
       getStyleCache(this._style).set(propLower, [res]);
       return res;
     }
   }
 
   override getAll(property: string): CSSStyleValue[] {
+    validateProperty(property);
     const res = this._getAllRaw(property);
     for (const val of res) {
       val._associatedProperty = property;
@@ -3761,44 +4078,38 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       getStyleCache(this._style).set(propLower, parsed);
       return parsed;
     } catch (e) {
-      const res = [new CSSStyleValue(value)];
+      const res = [new CSSStyleValue(value, privateToken)];
       getStyleCache(this._style).set(propLower, res);
       return res;
     }
   }
 
   override has(property: string): boolean {
+    validateProperty(property);
     return getPropertyValueSafe(this._style, property) !== '';
   }
 
   set(property: string, ...values: (CSSStyleValue | string)[]): void {
+    validateProperty(property);
     this._checkPendingSubstitution(property);
-    for (const val of values) {
-      if (val instanceof CSSStyleValue && val._associatedProperty !== null && val._associatedProperty !== property) {
-        throw new TypeError(`Mismatched associated property: expected ${property}, got ${val._associatedProperty}`);
-      }
-    }
     if (values.length === 0) {
       throw new TypeError(`set() on property ${property} requires at least one value.`);
     }
     const propLower = property.toLowerCase();
-    const isList = LIST_PROPERTIES.has(propLower);
-    if (!isList && values.length > 1) {
-      throw new TypeError(`Property ${property} is not list-valued but multiple values were provided.`);
+    const finalString = validateValuesForProperty(property, values);
+    setPropertySafe(this._style, this._element, property, finalString);
+    try {
+      const parsed = CSSStyleValue.parseAll(property, finalString);
+      getStyleCache(this._style).set(propLower, parsed);
+    } catch (e) {
+      getStyleCache(this._style).delete(propLower);
     }
-    const separator = isList ? ', ' : ' ';
-    const serialized = values.map(v => v.toString()).join(separator);
-    const parsed = CSSStyleValue.parseAll(property, serialized);
-    setPropertySafe(this._style, this._element, property, serialized);
-    getStyleCache(this._style).set(propLower, parsed);
   }
 
   append(property: string, ...values: (CSSStyleValue | string)[]): void {
+    validateProperty(property);
     this._checkPendingSubstitution(property);
     for (const val of values) {
-      if (val instanceof CSSStyleValue && val._associatedProperty !== null && val._associatedProperty !== property) {
-        throw new TypeError(`Mismatched associated property: expected ${property}, got ${val._associatedProperty}`);
-      }
       if (val instanceof CSSUnparsedValue || val instanceof CSSVariableReferenceValue) {
         throw new TypeError("Cannot append CSSUnparsedValue or CSSVariableReferenceValue.");
       }
@@ -3810,15 +4121,38 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     if (!LIST_PROPERTIES.has(propLower)) {
       throw new TypeError(`Property ${property} is not list-valued and cannot be appended to.`);
     }
+    const finalString = validateValuesForProperty(property, values);
     const current = getPropertyValueSafe(this._style, property);
-    const serialized = values.map(v => v.toString()).join(', ');
-    const newValue = current ? `${current}, ${serialized}` : serialized;
-    const parsed = CSSStyleValue.parseAll(property, newValue);
+    const newValue = current ? `${current}, ${finalString}` : finalString;
+
+    if (!propLower.startsWith('--')) {
+      if (typeof globalThis.document === 'undefined') {
+        try {
+          CSSStyleValue.parseAll(property, newValue);
+        } catch (e) {
+          throw new TypeError(`Invalid combined value for property ${property}: ${newValue}`);
+        }
+      } else {
+        const dummy = getDummyStyle();
+        dummy.cssText = '';
+        dummy.setProperty(property, newValue);
+        if (dummy.getPropertyValue(property) === '') {
+          throw new TypeError(`Invalid combined value for property ${property}: ${newValue}`);
+        }
+      }
+    }
+
     setPropertySafe(this._style, this._element, property, newValue);
-    getStyleCache(this._style).set(propLower, parsed);
+    try {
+      const parsed = CSSStyleValue.parseAll(property, newValue);
+      getStyleCache(this._style).set(propLower, parsed);
+    } catch (e) {
+      getStyleCache(this._style).delete(propLower);
+    }
   }
 
   delete(property: string): void {
+    validateProperty(property);
     this._checkPendingSubstitution(property);
     setPropertySafe(this._style, this._element, property, null);
     getStyleCache(this._style).delete(property.toLowerCase());

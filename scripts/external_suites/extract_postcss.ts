@@ -70,7 +70,7 @@ async function run() {
     });
   }
 
-  const outputPath = path.resolve(import.meta.dirname, '../../tests/fixtures/external/postcss_tests.json');
+  const outputPath = path.resolve(import.meta.dirname, '../../tests/fixtures/external/postcss-tests.json');
   fs.writeFileSync(outputPath, JSON.stringify(results, null, 2));
   console.log(`Saved ${results.length} tests to ${outputPath}`);
 }

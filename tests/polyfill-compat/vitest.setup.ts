@@ -49,19 +49,8 @@ if (typeof HTMLElement !== 'undefined') {
 if (typeof Element !== 'undefined') {
   // Read-only wrapper for computedStyleMap
   class ComputedStylePropertyMap extends StylePropertyMapReadOnly {
-    private _style: any;
     constructor(style: any) {
-      super([]);
-      this._style = style;
-    }
-    override get(property: string) {
-      return new StylePropertyMap(this._style).get(property);
-    }
-    override getAll(property: string) {
-      return new StylePropertyMap(this._style).getAll(property);
-    }
-    override has(property: string) {
-      return new StylePropertyMap(this._style).has(property);
+      super(style);
     }
   }
 

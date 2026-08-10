@@ -94,19 +94,15 @@ const knownSkips = new Map<string, string>([
   ],
   [
     '@starting-style { @media screen { body { background: red; } } }',
-    '@starting-style expected to be unsupported but we might parse it as a specific rule. We skip for now until verified.'
+    'Fixture expects unexpanded background shorthand, but our parser expands shorthands to longhands.'
   ],
   [
     '@media screen { @starting-style { body { background: red; } } }',
     '@starting-style expected to be unsupported but we might parse it as a specific rule. We skip for now until verified.'
   ],
   [
-    '@-webkit-keyframes mymovepercent {\n0% {top:0px;}\n50% {top:200px;}\n100% {top:300px;}}',
-    'BUG: Our parser drops percentage keyframe selectors (e.g. `0% { ... }`) because it treats them as qualified rules and `0%` is not a valid CSS selector. Ident-based keyframes (like `from`) bypass this because they are valid type selectors.'
-  ],
-  [
     '@-some-ridiculously-long-vendor-prefix-that-must-be-supported-keyframes therulename /*comment*/{0%{top:0px; left:0px; background:red;}100% {top:4em; left:40px; background:maroon;}}',
-    'BUG: Same issue as mymovepercent, our parser drops percentage keyframe selectors.'
+    'Fixture expects background shorthand to be preserved as-is, but we expand it to longhands.'
   ]
 ]);
 

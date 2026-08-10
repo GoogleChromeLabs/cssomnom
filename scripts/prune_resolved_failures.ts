@@ -85,14 +85,14 @@ function main() {
   console.log('Starting verification of skips...');
 
   // --- 1. LightningCSS Verification ---
-  const lightningFixturesPath = path.join(REPO_ROOT, 'tests/fixtures/lightningcss.json');
-  const lightningBaselinePath = path.join(REPO_ROOT, 'tests/fixtures/external/lightning_known_failures.json');
+  const lightningFixturesPath = path.join(REPO_ROOT, 'tests/fixtures/external/lightningcss.json');
+  const lightningBaselinePath = path.join(REPO_ROOT, 'tests/fixtures/baselines/lightning-known-failures.json');
 
   const lightningFixtures = JSON.parse(fs.readFileSync(lightningFixturesPath, 'utf8')) as LightningFixture[];
   let lightningFailures = JSON.parse(fs.readFileSync(lightningBaselinePath, 'utf8')) as unknown[];
   let lightningMigrated = false;
   if (lightningFailures.length > 0 && typeof lightningFailures[0] === 'object' && lightningFailures[0] !== null) {
-    console.log('Migrating lightning_known_failures.json to collapsed key string format...');
+    console.log('Migrating lightning-known-failures.json to collapsed key string format...');
     lightningFailures = (lightningFailures as LightningFixture[]).map(kf => kf.type + '|' + normalize(kf.source));
     lightningMigrated = true;
   }
@@ -133,14 +133,14 @@ function main() {
   }
 
   // --- 2. WPT Extracted Verification ---
-  const wptFixturesPath = path.join(REPO_ROOT, 'tests/fixtures/wpt_extracted.json');
-  const wptBaselinePath = path.join(REPO_ROOT, 'tests/fixtures/external/wpt_extracted_known_failures.json');
+  const wptFixturesPath = path.join(REPO_ROOT, 'tests/fixtures/wpt/wpt-cssom.json');
+  const wptBaselinePath = path.join(REPO_ROOT, 'tests/fixtures/baselines/wpt-cssom-known-failures.json');
 
   const wptFixtures = JSON.parse(fs.readFileSync(wptFixturesPath, 'utf8')) as Record<string, unknown>;
   let wptFailures = JSON.parse(fs.readFileSync(wptBaselinePath, 'utf8')) as unknown[];
   let wptMigrated = false;
   if (wptFailures.length > 0 && typeof wptFailures[0] === 'object' && wptFailures[0] !== null) {
-    console.log('Migrating wpt_extracted_known_failures.json to collapsed key string format...');
+    console.log('Migrating wpt-cssom-known-failures.json to collapsed key string format...');
     wptFailures = (wptFailures as LegacyWptFailure[]).map(kf => `${kf.key}|${kf.property}|${normalize(kf.input)}`);
     wptMigrated = true;
   }

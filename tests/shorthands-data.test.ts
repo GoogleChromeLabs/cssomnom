@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { SHORTHANDS_DATA } from '../src/data/shorthands.ts';
+import { SHORTHANDS_DATA } from '../src/data/gen/shorthands.ts';
 
 test('shorthands data compliance: physical box shorthands have exactly 4 physical longhands', () => {
   const boxShorthands = ['margin', 'padding', 'inset', 'border-width', 'border-style', 'border-color'];

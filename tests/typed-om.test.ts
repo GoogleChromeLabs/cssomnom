@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSNumericValue, CSSUnitValue, CSSStyleValue, StylePropertyMap } from '../src/typed-om.ts';
+import { CSSNumericValue, CSSUnitValue, CSSStyleValue, StylePropertyMap, CSSColorValue, CSSLab, CSSColor, CSSRGB, CSSMathSum, CSSTransformValue, CSSTransformComponent, CSSMathValue, type CSSUnit } from '../src/typed-om.ts';
 
 describe('Values & Typed OM', () => {
     test('math constants e and pi', () => {
@@ -162,6 +162,110 @@ describe('Values & Typed OM', () => {
             assert.throws(() => {
                 map.append('background-image');
             }, TypeError);
+        });
+    });
+
+    describe('Argument validation checks', () => {
+        test('parse methods should throw TypeError with too few arguments', () => {
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSNumericValue.parse();
+            }, TypeError);
+
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSStyleValue.parse('width');
+            }, TypeError);
+
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSStyleValue.parseAll('width');
+            }, TypeError);
+
+            assert.throws(() => {
+                // @ts-expect-error - testing too few arguments
+                CSSColorValue.parse();
+            }, TypeError);
+        });
+
+        test('color getters on prototypes should throw TypeError (brand check)', () => {
+            assert.throws(() => {
+                void CSSLab.prototype.l;
+            }, TypeError);
+            assert.throws(() => {
+                void CSSColor.prototype.channels;
+            }, TypeError);
+            assert.throws(() => {
+                void CSSRGB.prototype.r;
+            }, TypeError);
+        });
+
+        test('CSSColor channels setter works and rectifies inputs', () => {
+            const color = new CSSColor('srgb', [0.1, 0.2, 0.3]);
+            color.channels = [0.4, 0.5, 0.6];
+            assert.deepEqual(
+                color.channels.map(x => x.toString()),
+                ['0.4', '0.5', '0.6']
+            );
+            assert.throws(() => {
+                // @ts-expect-error - testing invalid value
+                color.channels = "invalid";
+            }, TypeError);
+        });
+
+        test('CSSNumericValue.parse and subclasses throw TypeError with too few arguments', () => {
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSNumericValue.parse();
+            }, TypeError);
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSMathSum.parse();
+            }, TypeError);
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSUnitValue.parse();
+            }, TypeError);
+        });
+
+        test('CSSNumericValue.prototype.to throws TypeError with too few arguments', () => {
+            const px = new CSSUnitValue(10, 'px');
+            assert.throws(() => {
+                // @ts-expect-error
+                px.to();
+            }, TypeError);
+        });
+
+        test('CSSTransformValue.parse throws TypeError with too few arguments', () => {
+            assert.throws(() => {
+                // @ts-expect-error
+                CSSTransformValue.parse();
+            }, TypeError);
+        });
+
+        test('Abstract base classes are not directly constructible', () => {
+            assert.throws(() => {
+                new (CSSStyleValue as unknown as new () => CSSStyleValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSNumericValue as unknown as new () => CSSNumericValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSMathValue as unknown as new () => CSSMathValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSColorValue as unknown as new () => CSSColorValue)();
+            }, TypeError);
+            assert.throws(() => {
+                new (CSSTransformComponent as unknown as new () => CSSTransformComponent)();
+            }, TypeError);
+        });
+
+        test('CSSUnitValue unit is case-insensitive normalized', () => {
+            const val1 = new CSSUnitValue(5, 'Hz' as unknown as CSSUnit);
+            assert.strictEqual(val1.unit, 'hz');
+            const val2 = new CSSUnitValue(10, 'kHz' as unknown as CSSUnit);
+            assert.strictEqual(val2.unit, 'khz');
         });
     });
 });

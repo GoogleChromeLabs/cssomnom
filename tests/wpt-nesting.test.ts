@@ -6,7 +6,7 @@ import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import { CSSStyleRule } from '../src/CSSOM.ts';
 
-const fixturesPath = new URL('./fixtures/wpt_nesting_parsing.json', import.meta.url);
+const fixturesPath = new URL('./fixtures/wpt/wpt-nesting.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
 describe('WPT Nesting Selector Parsing', () => {

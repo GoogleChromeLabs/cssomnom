@@ -80,6 +80,6 @@ for (const target of TARGET_DIRS) {
   extractTestsFromDir(target.name, target.dir);
 }
 
-const outputPath = path.join(REPO_ROOT, 'tests/fixtures/wpt-feature-parser-serialization.json');
+const outputPath = path.join(REPO_ROOT, 'tests/fixtures/wpt/wpt-modern-features.json');
 fs.writeFileSync(outputPath, JSON.stringify(allFixtures, null, 2));
 console.log(`\nSuccessfully saved all fixtures to ${outputPath}`);

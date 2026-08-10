@@ -17,7 +17,7 @@
 import fs from 'node:fs';
 
 const WEBREF_CSS_PATH = 'node_modules/@webref/css/css.json';
-const OUTPUT_PATH = 'src/data/math-functions.ts';
+const OUTPUT_PATH = 'src/data/gen/math-functions.ts';
 
 function main() {
     const css = JSON.parse(fs.readFileSync(WEBREF_CSS_PATH, 'utf8'));

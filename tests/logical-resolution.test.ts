@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { resolveLogicalProperty } from '../src/data/LogicalMapping.ts';
+import { resolveLogicalProperty } from '../src/data/gen/LogicalMapping.ts';
 
 test('resolveLogicalProperty mappings in vertical-rl', () => {
   const writingMode = 'vertical-rl';

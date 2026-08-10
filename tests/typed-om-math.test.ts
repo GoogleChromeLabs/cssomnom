@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { CSSStyleValue, CSSUnitValue, CSSNumericValue, StylePropertyMap, CSS, CSSMathClamp, CSSMathSum, CSSMathNegate, CSSMathInvert, CSSMathMin, CSSMathMax, CSSMathFunction, CSSMathProduct, CSSMathRound } from '../src/typed-om.ts';
-import type { CSSUnit } from '../src/data/units.ts';
+import type { CSSUnit } from '../src/data/gen/units.ts';
 import { CSSStyleDeclaration } from '../src/index.ts';
 import { simplify } from '../src/math-parser.ts';
 

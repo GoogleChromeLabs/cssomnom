@@ -155,14 +155,14 @@ test('CSS Color compliance tasks (Phase 68 Task 10)', () => {
   assert.strictEqual(canvasParsed.value, 'canvas');
 });
 
-test('rectifyColorAngle throws TypeError instead of SyntaxError DOMException on invalid angles', () => {
+test('rectifyColorAngle throws SyntaxError DOMException on invalid angles', () => {
   const hsl = new CSSHSL(120, 50, 50);
   assert.throws(() => {
     hsl.h = 'invalid-angle';
-  }, TypeError);
+  }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
   assert.throws(() => {
     hsl.h = new CSSUnitValue(10, 'px');
-  }, TypeError);
+  }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
 });
 
 test('color() function reification to CSSColor', () => {
@@ -185,11 +185,10 @@ test('color() function reification to CSSColor', () => {
   assert.strictEqual(c2.toString(), 'color(srgb 10% 20% 30%)');
 });
 
-test('CSSColor channels property has no public setter', () => {
+test('CSSColor channels property has public setter', () => {
   const c = new CSSColor('srgb', [0.1, 0.2, 0.3]);
-  assert.throws(() => {
-    (c as unknown as Record<string, unknown>).channels = [1, 1, 1];
-  }, TypeError);
+  c.channels = [1, 1, 1];
+  assert.deepEqual(c.channels.map(x => x.toString()), ['1', '1', '1']);
 });
 
 test('Alpha is omitted when unity in modern colors serialization', () => {
