@@ -1648,6 +1648,7 @@ ParseHooks.parseComponentValues = (tokens) => new Parser(tokens).parseComponentV
 ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
 ParseHooks.parseSelectorAST = (text, declaredNamespaces, allowRelative) => Parser.parseSelectorAST(text, declaredNamespaces, allowRelative);
 ParseHooks.validateCustomPropertyValue = (values) => Parser.validateCustomPropertyValue(values);
+ParseHooks.isValidDashedIdent = (name) => Parser.isValidDashedIdent(name);
 
 export function parse(css: string): CSSStyleSheet {
   return new Parser(tokenize(css)).parseStyleSheet();

@@ -266,8 +266,12 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         return serialize(winner.value);
       }
       const isCustom = winner.name.startsWith('--');
-      if (isCustom && winner.value.length === 0) {
-        return ' ';
+      if (isCustom) {
+        const serialized = serialize(winner.value, isCustom).trim();
+        if (serialized === '') {
+          return ' ';
+        }
+        return serialized;
       }
       return serialize(winner.value, isCustom);
     }
@@ -469,6 +473,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const existing = this._declMap.get(property);
     
     if (property.startsWith('--')) {
+      if (!ParseHooks.isValidDashedIdent(property)) {
+        return;
+      }
       const componentValues = ParseHooks.parseComponentValues(tokens);
       if (!ParseHooks.validateCustomPropertyValue(componentValues)) {
         return;

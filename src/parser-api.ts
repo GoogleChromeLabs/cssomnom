@@ -28,11 +28,17 @@
 
 import { Parser } from './parser.ts';
 import { tokenize } from './tokenizer.ts';
-import type { ComponentValue, SimpleBlock, CSSFunction, ASTAtRule, Declaration } from './types.ts';
+import type { ComponentValue, SimpleBlock, CSSFunction, ASTAtRule, Declaration, Token } from './types.ts';
 import { serialize } from './serializer.ts';
-import { PropertyRegistry, type PropertyDefinition } from './PropertyRegistry.ts';
+import { PropertyRegistry, type PropertyDefinition, matchesSyntax } from './PropertyRegistry.ts';
 import { CSSFactories } from './data/gen/css-factories.ts';
 import { resolveNestedSelector } from './cascade.ts';
+import { ParseHooks } from './parse-hooks.ts';
+import { SHORTHANDS } from './shorthands.ts';
+import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from './standard-syntax.ts';
+import { SelectorParser } from './SelectorParser.ts';
+
 
 
 
@@ -384,12 +390,189 @@ export function parseComponentValue(css: string, options: CSSParserOptions = {})
   return parseComponentValueSync(css, options);
 }
 
+function hasVarFunction(values: ComponentValue[]): boolean {
+  for (const v of values) {
+    if (v.type === 'function') {
+      if ((v as CSSFunction).name.toLowerCase() === 'var') {
+        return true;
+      }
+      if (hasVarFunction((v as CSSFunction).value)) {
+        return true;
+      }
+    }
+    if (v.type === 'simple-block' && hasVarFunction((v as SimpleBlock).value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function evaluateSupportsDeclaration(property: string, value: string): boolean {
+  property = property.trim();
+  value = value.trim();
+  if (property === '' || property === '--') return false;
+
+  if (property.startsWith('--')) {
+    if (!Parser.isValidDashedIdent(property)) return false;
+    const tokens = tokenize(value);
+    const componentValues = ParseHooks.parseComponentValues(tokens);
+    return ParseHooks.validateCustomPropertyValue(componentValues);
+  }
+
+  const prop = property.toLowerCase();
+  if (prop === 'unicode-range') return false;
+
+  const isSupported = SUPPORTED_PROPERTIES.has(prop) || SHORTHANDS[prop] !== undefined;
+  if (!isSupported) return false;
+
+  const tokens = tokenize(value);
+  if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) return false;
+
+  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const nonWs = componentValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+  if (nonWs.length === 0) return false;
+
+  if (hasVarFunction(componentValues)) {
+    return true;
+  }
+
+  if (nonWs.length === 1 && nonWs[0].type === 'ident') {
+    const valStr = String((nonWs[0] as Token).value).toLowerCase();
+    if (['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(valStr)) {
+      return true;
+    }
+  }
+
+  const shorthand = SHORTHANDS[prop];
+  if (shorthand) {
+    return shorthand.expand(componentValues) !== null;
+  }
+
+  const syntax = STANDARD_PROPERTIES_SYNTAX[prop];
+  if (syntax) {
+    return matchesSyntax(componentValues, syntax);
+  }
+
+  return true;
+}
+
+function evalSupportsInParens(item: ComponentValue): boolean {
+  if (item.type === 'function' && (item as CSSFunction).name.toLowerCase() === 'selector') {
+    const selValues = (item as CSSFunction).value;
+    const nonWsSel = selValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+    if (nonWsSel.length === 0) return false;
+    if (selValues.some(v => v.type === 'comma')) return false;
+    try {
+      const selParser = new SelectorParser(selValues, { strictSupports: true });
+      const list = selParser.parse();
+      if (list.selectors.length !== 1 || list.selectors[0].type === 'invalid-selector') return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  if (item.type === 'simple-block' && (item as SimpleBlock).associatedToken.value === '(') {
+    const blockValues = (item as SimpleBlock).value;
+    const nonWsBlock = blockValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+    if (nonWsBlock.length === 0) return false;
+
+    const hasTopLevelOp = nonWsBlock.some(v => v.type === 'ident' && ['and', 'or', 'not'].includes(String((v as Token).value).toLowerCase()));
+    if (hasTopLevelOp || (nonWsBlock.length === 1 && nonWsBlock[0].type === 'simple-block')) {
+      return evalSupportsConditionValues(nonWsBlock);
+    }
+
+    const colonIdx = blockValues.findIndex(v => v.type === 'colon');
+    if (colonIdx > 0) {
+      const propValues = blockValues.slice(0, colonIdx).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+      if (propValues.length === 1 && propValues[0].type === 'ident') {
+        const propName = String((propValues[0] as Token).value);
+        const valTokens = blockValues.slice(colonIdx + 1);
+        const valStr = serialize(valTokens);
+        return evaluateSupportsDeclaration(propName, valStr);
+      }
+    }
+    return false;
+  }
+
+  return false;
+}
+
+function evalSupportsConditionValues(values: ComponentValue[]): boolean {
+  const items = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+  if (items.length === 0) return false;
+
+  if (items[0].type === 'ident' && String((items[0] as Token).value).toLowerCase() === 'not') {
+    if (items.length === 2) {
+      return !evalSupportsInParens(items[1]);
+    }
+    return false;
+  }
+
+  if (items.length === 1) {
+    return evalSupportsInParens(items[0]);
+  }
+
+  if (items.length % 2 === 0) return false;
+
+  const firstOp = String((items[1] as Token).value || '').toLowerCase();
+  if (firstOp !== 'and' && firstOp !== 'or') return false;
+
+  for (let i = 1; i < items.length; i += 2) {
+    const op = String((items[i] as Token).value || '').toLowerCase();
+    if (op !== firstOp) return false;
+  }
+
+  const inParensItems: ComponentValue[] = [];
+  for (let i = 0; i < items.length; i += 2) {
+    inParensItems.push(items[i]);
+  }
+
+  if (firstOp === 'and') {
+    return inParensItems.every(item => evalSupportsInParens(item));
+  } else {
+    return inParensItems.some(item => evalSupportsInParens(item));
+  }
+}
+
+export function supports(propertyOrCondition: string, value?: string): boolean {
+  if (typeof value === 'string') {
+    return evaluateSupportsDeclaration(propertyOrCondition, value);
+  }
+  const condition = propertyOrCondition.trim();
+  if (condition === '') return false;
+
+  const tokens = tokenize(condition);
+  const parser = new Parser(tokens);
+  const componentValues = parser.parseComponentValues();
+
+  // If top-level condition is a bare declaration (e.g. "color: red" or "--foo: blah")
+  const nonWs = componentValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+  if (nonWs.length > 0 && nonWs[0].type === 'ident') {
+    const colonIdx = componentValues.findIndex(v => v.type === 'colon');
+    if (colonIdx > 0) {
+      const propValues = componentValues.slice(0, colonIdx).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+      if (propValues.length === 1 && propValues[0].type === 'ident') {
+        const propName = String((propValues[0] as Token).value);
+        const valTokens = componentValues.slice(colonIdx + 1);
+        const valStr = serialize(valTokens);
+        return evaluateSupportsDeclaration(propName, valStr);
+      }
+    }
+  }
+
+  return evalSupportsConditionValues(componentValues);
+}
+
 export const CSS = {
     // Typed OM Factories
     ...CSSFactories,
 
     // Tooling Extensions
     resolveNestedSelector,
+
+    // Feature Detection
+    supports,
 
     // Parser API
     parseStylesheet,
@@ -404,5 +587,6 @@ export const CSS = {
     parseComponentValue,
     registerProperty: (definition: PropertyDefinition) => PropertyRegistry.register(definition),
 };
+
 
 

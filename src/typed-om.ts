@@ -29,6 +29,7 @@ export type { CSSUnit };
 import { formatNumber } from './utils/format.ts';
 import { DOMMatrixReadOnly, DOMMatrix, setParseTransformListHook } from './DOMMatrix.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from './standard-syntax.ts';
 
 function validateProperty(property: string): void {
   if (!property.startsWith('--') && !SUPPORTED_PROPERTIES.has(property.toLowerCase())) {
@@ -153,122 +154,6 @@ const COLOR_PROPERTIES = new Set([
   'color', 'background-color', 'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
   'outline-color', 'text-decoration-color', 'column-rule-color', 'caret-color', 'fill', 'stroke'
 ]);
-
-// STANDARD_PROPERTIES_SYNTAX registry maps CSS property names to Houdini-compliant syntax strings.
-//
-// WHY MANUALLY MAINTAINED?
-// CSS specifications contain complex grammars (space-separated, brackets, ||/&& combinators)
-// that cannot be parsed by matchesSyntax/parseSyntax (which strictly conform to the Houdini
-// Custom Properties API syntax specification, prohibiting space separators, groupings, etc.).
-//
-// RULES FOR ADDING PROPERTIES:
-// 1. Only add properties if we explicitly want to validate them in CSSStyleValue.parse().
-// 2. The syntax MUST be Houdini-compliant: basic types, '|' alternatives, and simple multipliers.
-// 3. DO NOT add properties with complex syntaxes (e.g. space-separated values, complex sequences),
-//    as they will cause false-positives and reject valid standard CSS values.
-//
-// Omitted properties bypass validation and always pass, preserving CSSOM robustness.
-const STANDARD_PROPERTIES_SYNTAX: Record<string, string> = {
-  'alignment-baseline': 'baseline | text-bottom | alphabetic | ideographic | middle | central | mathematical | text-top',
-  'backface-visibility': 'visible | hidden',
-  'background-color': '<color>',
-  'border-bottom-color': '<color>',
-  'border-collapse': 'separate | collapse',
-  'border-color': '<color>',
-  'border-left-color': '<color>',
-  'border-right-color': '<color>',
-  'border-top-color': '<color>',
-  'bottom': '<length-percentage> | auto',
-  'box-sizing': 'content-box | border-box',
-  'break-inside': 'auto | avoid | avoid-column | avoid-page | avoid-region',
-  'caption-side': 'top | bottom',
-  'clear': 'none | left | right | both',
-  'clip-rule': 'nonzero | evenodd',
-  'color': '<color>',
-  'color-interpolation': 'auto | srgb | linearrgb',
-  'column-span': 'none | all',
-  'container-type': 'normal | size | inline-size',
-  'direction': 'ltr | rtl',
-  'dominant-baseline': 'auto | text-bottom | alphabetic | ideographic | middle | central | mathematical | hanging | text-top',
-  'empty-cells': 'show | hide',
-  'fill-rule': 'nonzero | evenodd',
-  'flex-direction': 'row | row-reverse | column | column-reverse',
-  'flex-wrap': 'nowrap | wrap | wrap-reverse',
-  'float': 'left | right | none',
-  'font-kerning': 'auto | normal | none',
-  'font-optical-sizing': 'auto | none',
-  'font-palette': 'normal | light | dark',
-  'font-presentation': 'auto | text | emoji',
-  'font-variant-alternates': 'normal | historical-forms',
-  'font-variant-caps': 'normal | small-caps | all-small-caps | petite-caps | all-petite-caps | unicase | titling-caps',
-  'font-variant-emoji': 'normal | text | emoji | unicode',
-  'height': '<length-percentage> | auto | fit-content | max-content | min-content',
-  'hyphens': 'none | manual | auto',
-  'image-rendering': 'auto | smooth | high-quality | crisp-edges | pixelated',
-  'isolation': 'auto | isolate',
-  'left': '<length-percentage> | auto',
-  'letter-spacing': 'normal | <length-percentage>',
-  'line-break': 'auto | loose | normal | strict | anywhere',
-  'list-style-position': 'inside | outside',
-  'margin-bottom': '<length-percentage> | auto',
-  'margin-left': '<length-percentage> | auto',
-  'margin-right': '<length-percentage> | auto',
-  'margin-top': '<length-percentage> | auto',
-  'mask-type': 'luminance | alpha',
-  'mix-blend-mode': 'normal | multiply | screen | overlay | darken | lighten | color-dodge | color-burn | hard-light | soft-light | difference | exclusion | hue | saturation | color | luminosity',
-  'object-fit': 'fill | contain | cover | none | scale-down',
-  'offset-distance': '<length-percentage>',
-  'opacity': '<number> | <percentage>',
-  'outline-offset': '<length>',
-  'outline-style': 'auto | none | dotted | dashed | solid | double | groove | ridge | inset | outset',
-  'overflow-anchor': 'auto | none',
-  'overflow-wrap': 'normal | break-word | break-spaces',
-  'padding-bottom': '<length-percentage>',
-  'padding-left': '<length-percentage>',
-  'padding-right': '<length-percentage>',
-  'padding-top': '<length-percentage>',
-  'pointer-events': 'bounding-box | visiblepainted | visiblefill | visiblestroke | visible | painted | fill | stroke | all | none',
-  'position-visibility': 'always | anchors-valid | anchors-visible | no-overflow',
-  'position': 'static | relative | absolute | sticky | fixed',
-  'resize': 'none | both | horizontal | vertical',
-  'right': '<length-percentage> | auto',
-  'scroll-behavior': 'auto | smooth',
-  'scroll-snap-stop': 'normal | always',
-  'scrollbar-gutter': 'auto | stable',
-  'scrollbar-width': 'auto | thin | none',
-  'speak': 'auto | never | always',
-  'stroke-linecap': 'butt | round | square',
-  'table-layout': 'auto | fixed',
-  'text-align': 'start | end | left | right | center | justify',
-  'text-align-last': 'auto | start | end | left | right | center | justify',
-  'text-anchor': 'start | middle | end',
-  'text-box-trim': 'none | trim-both | trim-start | trim-end',
-  'text-combine-upright': 'none | all',
-  'text-decoration-skip-ink': 'auto | none',
-  'text-decoration-style': 'solid | double | dotted | dashed | wavy',
-  'text-indent': '<length-percentage>',
-  'text-justify': 'auto | none | inter-word | inter-character',
-  'text-orientation': 'mixed | upright | sideways',
-  'text-rendering': 'auto | optimizespeed | optimizelegibility | geometricprecision',
-  'text-transform': 'none | capitalize | uppercase | lowercase | full-width',
-  'top': '<length-percentage> | auto',
-  'transform': '<transform-list> | none',
-  'transform-box': 'border-box | fill-box | view-box',
-  'transform-style': 'flat | preserve-3d',
-  'unicode-bidi': 'normal | embed | isolate | bidi-override | isolate-override | plaintext',
-  'user-select': 'auto | text | none | contain | all',
-  'vector-effect': 'non-scaling-stroke | none',
-  'vertical-align': 'baseline | sub | super | top | text-top | middle | bottom | text-bottom | <length-percentage>',
-  'visibility': 'visible | hidden | collapse',
-  'width': '<length-percentage> | auto | fit-content | max-content | min-content',
-  'word-break': 'normal | keep-all | break-all',
-  'word-wrap': 'normal | break-word | break-spaces',
-  'writing-mode': 'horizontal-tb | vertical-rl | vertical-lr | sideways-rl | sideways-lr',
-  'z-index': 'auto | <integer>',
-};
-
-
-
 
 const privateToken = Symbol.for('cssomnom-private-token');
 
@@ -3725,79 +3610,21 @@ export class StylePropertyMapReadOnly {
 
 function getPropertyValueSafe(style: unknown, property: string): string {
   if (!style || typeof style !== 'object') return '';
-  let privateSymbol: symbol | undefined = undefined;
-  let proto = Object.getPrototypeOf(style);
-  while (proto) {
-    const symbols = Object.getOwnPropertySymbols(proto);
-    const found = symbols.find(s => s.toString() === 'Symbol(private)');
-    if (found) {
-      privateSymbol = found;
-      break;
-    }
-    proto = Object.getPrototypeOf(proto);
-  }
-
-  if (privateSymbol && privateSymbol in style) {
-    const lenVal = (style as { length?: unknown }).length;
-    const _len = typeof lenVal === 'number' ? lenVal : undefined;
-    const map = (style as Record<symbol, unknown>)[privateSymbol];
-    if (map instanceof Map) {
-      return (map.get(property) as string | undefined) || '';
-    }
-  }
-
-  if ('getPropertyValue' in style && typeof style.getPropertyValue === 'function') {
-    return (style.getPropertyValue as (prop: string) => string)(property);
+  if ('getPropertyValue' in style && typeof (style as { getPropertyValue: unknown }).getPropertyValue === 'function') {
+    return (style as { getPropertyValue: (prop: string) => string }).getPropertyValue(property);
   }
   return '';
 }
 
-function setPropertySafe(style: unknown, element: unknown, property: string, value: string | null): void {
+function setPropertySafe(style: unknown, _element: unknown, property: string, value: string | null): void {
   if (!style || typeof style !== 'object') return;
-  let privateSymbol: symbol | undefined = undefined;
-  let proto = Object.getPrototypeOf(style);
-  while (proto) {
-    const symbols = Object.getOwnPropertySymbols(proto);
-    const found = symbols.find(s => s.toString() === 'Symbol(private)');
-    if (found) {
-      privateSymbol = found;
-      break;
-    }
-    proto = Object.getPrototypeOf(proto);
-  }
-
-  if (element && typeof element === 'object' && 'setAttribute' in element && typeof element.setAttribute === 'function' && privateSymbol && privateSymbol in style) {
-    const map = (style as Record<symbol, unknown>)[privateSymbol];
-    if (map instanceof Map) {
-      const keys = Symbol.iterator in style ? Array.from(style as Iterable<unknown>) as string[] : [];
-      const entries: [string, string][] = [];
-      for (const k of keys) {
-        if (k !== property) {
-          const val = getPropertyValueSafe(style, k);
-          if (val) {
-            entries.push([k, val]);
-          }
-        }
-      }
-      if (value !== null) {
-        map.set(property, value);
-        entries.push([property, value]);
-      } else {
-        map.delete(property);
-      }
-      const serialized = entries.map(([k, v]) => `${k}: ${v};`).join(' ');
-      (element.setAttribute as (name: string, val: string) => void)('style', serialized);
-      return;
-    }
-  }
-
   if (value !== null) {
-    if ('setProperty' in style && typeof style.setProperty === 'function') {
-      (style.setProperty as (prop: string, val: string) => void)(property, value);
+    if ('setProperty' in style && typeof (style as { setProperty: unknown }).setProperty === 'function') {
+      (style as { setProperty: (prop: string, val: string) => void }).setProperty(property, value);
     }
   } else {
-    if ('removeProperty' in style && typeof style.removeProperty === 'function') {
-      (style.removeProperty as (prop: string) => void)(property);
+    if ('removeProperty' in style && typeof (style as { removeProperty: unknown }).removeProperty === 'function') {
+      (style as { removeProperty: (prop: string) => void }).removeProperty(property);
     }
   }
 }

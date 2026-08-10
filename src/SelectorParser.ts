@@ -115,6 +115,7 @@ export interface SelectorParserOptions {
   insideHas?: boolean;
   forbidPseudo?: boolean;
   declaredNamespaces?: Set<string>;
+  strictSupports?: boolean;
 }
 
 /**
@@ -132,6 +133,7 @@ export class SelectorParser {
   private insideHas: boolean;
   private forbidPseudo: boolean;
   private declaredNamespaces?: Set<string>;
+  private strictSupports: boolean;
 
   constructor(values: ComponentValue[], options: SelectorParserOptions = {}) {
     this.cursor = new ComponentValueCursor(values);
@@ -140,6 +142,7 @@ export class SelectorParser {
     this.insideHas = options.insideHas ?? false;
     this.forbidPseudo = options.forbidPseudo ?? false;
     this.declaredNamespaces = options.declaredNamespaces;
+    this.strictSupports = options.strictSupports ?? false;
   }
 
 
@@ -543,7 +546,7 @@ export class SelectorParser {
         if (this.forbidPseudo || this.insideHas) {
           throw new SyntaxError('Pseudo-elements are not allowed in this context');
         }
-        if (!(PSEUDO_ELEMENTS as unknown as Set<string>).has(effectiveLowerName) && !effectiveLowerName.startsWith('-webkit-')) {
+        if (!(PSEUDO_ELEMENTS as unknown as Set<string>).has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
           throw new SyntaxError(`Unknown pseudo-element ::${name}`);
         }
         return { type: 'pseudo-element-selector', name };
@@ -557,7 +560,7 @@ export class SelectorParser {
         return { type: 'pseudo-element-selector', name };
       }
       
-      if (!(PSEUDO_CLASSES as unknown as Set<string>).has(effectiveLowerName) && !effectiveLowerName.startsWith('-webkit-')) {
+      if (!(PSEUDO_CLASSES as unknown as Set<string>).has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
         throw new SyntaxError(`Unknown pseudo-class :${name}`);
       }
       return { type: 'pseudo-class-selector', name };
@@ -578,7 +581,8 @@ export class SelectorParser {
           const subParser = new SelectorParser(func.value, {
             insideHas: this.insideHas,
             forbidPseudo: true,
-            declaredNamespaces: this.declaredNamespaces
+            declaredNamespaces: this.declaredNamespaces,
+            strictSupports: this.strictSupports
           });
           subParser.cursor.skipWhitespace();
           const compound = subParser.consumeCompoundSelector();
@@ -609,14 +613,15 @@ export class SelectorParser {
         if (isHas && this.insideHas) {
           throw new SyntaxError(':has() cannot be nested');
         }
-        const isForgiving = ['is', 'where', 'matches'].includes(lowerName);
+        const isForgiving = !this.strictSupports && ['is', 'where', 'matches'].includes(lowerName);
         const isLogicalPseudo = ['is', 'where', 'not', 'matches'].includes(lowerName);
         const subParser = new SelectorParser(func.value, {
           allowRelative: isHas,
           forgiving: isForgiving,
           insideHas: isHas || this.insideHas,
           forbidPseudo: isLogicalPseudo || isHas || this.forbidPseudo,
-          declaredNamespaces: this.declaredNamespaces
+          declaredNamespaces: this.declaredNamespaces,
+          strictSupports: this.strictSupports
         });
         return { type: 'pseudo-class-selector', name, argument: subParser.parse() };
       }

@@ -1,4 +1,6 @@
-import { parseStyleSheet } from '../src/parser.ts';
+import { parseStyleSheet, parseRule } from '../src/parser.ts';
+import { CSSStyleSheet } from '../src/CSSOM.ts';
+import { ParseHooks } from '../src/parse-hooks.ts';
 
 export interface WptSandboxTest {
   type: 'setup' | 'test' | 'promise_test' | 'async_test';
@@ -667,21 +669,9 @@ export function patchWindowForTypedOM(window: WindowType) {
         if (!this._sheet || this._sheetSource !== currentText) {
           this._sheetSource = currentText;
           const rules = parseStyleSheet(currentText);
-          this._sheet = {
-            cssRules: rules,
-            rules,
-            insertRule(text: string, idx = 0) {
-              const rule = parseStyleSheet(text)[0];
-              if (!rule) {
-                throw new Error('SyntaxError: Failed to parse rule');
-              }
-              rules.splice(idx, 0, rule);
-              return idx;
-            },
-            deleteRule(idx: number) {
-              rules.splice(idx, 1);
-            }
-          };
+          const sheet = CSSStyleSheet.createInternal(rules, parseRule);
+          Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
+          this._sheet = sheet;
         }
         return this._sheet;
       }
@@ -695,22 +685,9 @@ export function patchWindowForTypedOM(window: WindowType) {
       enumerable: true,
       get() {
         if (!this._sheet) {
-          const rules: unknown[] = [];
-          this._sheet = {
-            cssRules: rules,
-            rules,
-            insertRule(text: string, idx = 0) {
-              const rule = parseStyleSheet(text)[0];
-              if (!rule) {
-                throw new Error('SyntaxError: Failed to parse rule');
-              }
-              rules.splice(idx, 0, rule);
-              return idx;
-            },
-            deleteRule(idx: number) {
-              rules.splice(idx, 1);
-            }
-          };
+          const sheet = CSSStyleSheet.createInternal([], parseRule);
+          Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
+          this._sheet = sheet;
         }
         return this._sheet;
       }
@@ -727,23 +704,16 @@ export function patchWindowForTypedOM(window: WindowType) {
         const sheets: CSSStyleSheet[] = [];
         for (const styleEl of styles) {
           if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-            sheets.push(styleEl.sheet as CSSStyleSheet);
+            sheets.push(styleEl.sheet as unknown as CSSStyleSheet);
           }
         }
         for (const linkEl of links) {
           if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-            sheets.push(linkEl.sheet as CSSStyleSheet);
+            sheets.push(linkEl.sheet as unknown as CSSStyleSheet);
           }
         }
-        const list = sheets as CSSStyleSheet[] & { item(idx: number): CSSStyleSheet | null };
-        Object.defineProperty(list, 'item', {
-          value(idx: number) {
-            return list[idx] || null;
-          },
-          configurable: true,
-          enumerable: false
-        });
-        return list as StyleSheetList;
+        const list = sheets as unknown as StyleSheetList;
+        return list;
       },
       configurable: true
     });
@@ -802,7 +772,7 @@ export function patchWindowForTypedOM(window: WindowType) {
     });
   }
 
-  // Patch CSSStyleDeclaration prototype to support case-preserving custom properties
+  // Patch CSSStyleDeclaration prototype to validate custom property names and preserve casing
   const dummyEl = window.document.createElement('div');
   const cssStyleDecl = dummyEl.style.constructor as unknown as { prototype: Record<string, unknown> };
   if (cssStyleDecl) {
@@ -826,83 +796,31 @@ export function patchWindowForTypedOM(window: WindowType) {
     const declProto = cssStyleDecl.prototype;
     const origGet = declProto.getPropertyValue as (name: string) => string;
     const origSet = declProto.setProperty as (name: string, value: string | null, priority?: string) => void;
-    const origRemove = declProto.removeProperty as (name: string) => string;
 
-    declProto.getPropertyValue = function (this: Record<string, unknown> & { cssText: string }, name: string) {
+    declProto.getPropertyValue = function (this: unknown, name: string) {
       if (name.startsWith('--')) {
-        void this.cssText;
-        const privSym = getPrivateSymbol(this);
-        const map = privSym ? ((this[privSym as unknown as string] as Map<string, string>) || this) : this;
-        if (map instanceof Map) {
-          return map.get(name) ?? '';
+        void (this as { cssText?: string }).cssText;
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym];
+          if (map && typeof (map as { get?: unknown }).get === 'function') {
+            const val = (map as { get: (k: string) => unknown }).get(name);
+            if (typeof val === 'string') {
+              return val;
+            }
+          }
         }
-        return '';
       }
       return origGet.call(this, name);
     };
 
-    declProto.setProperty = function (
-      this: Record<string, unknown> & { cssText: string; _element?: { setAttribute(name: string, val: string): void } },
-      name: string,
-      value: string | null,
-      priority?: string
-    ) {
+    declProto.setProperty = function (this: unknown, name: string, value: string | null, priority?: string) {
       if (name.startsWith('--')) {
-        const privSym = getPrivateSymbol(this);
-        const map = privSym ? ((this[privSym as unknown as string] as Map<string, string>) || this) : this;
-        void this.cssText;
-
-        if (map instanceof Map) {
-          if (value === null || value === undefined || value === '') {
-            map.delete(name);
-          } else {
-            map.set(name, value);
-          }
-
-          const entries: [string, string][] = [];
-          for (const [k, v] of map.entries()) {
-            if (typeof k === 'string') {
-              entries.push([k, v]);
-            }
-          }
-          const serialized = entries.map(([k, v]) => `${k}: ${v};`).join(' ');
-          if (this._element) {
-            this._element.setAttribute('style', serialized);
-          }
+        if (!ParseHooks.isValidDashedIdent(name)) {
+          return;
         }
-        return;
       }
       return origSet.call(this, name, value, priority);
-    };
-
-    declProto.removeProperty = function (
-      this: Record<string, unknown> & { cssText: string; _element?: { setAttribute(name: string, val: string): void } },
-      name: string
-    ) {
-      if (name.startsWith('--')) {
-        const privSym = getPrivateSymbol(this);
-        const map = privSym ? ((this[privSym as unknown as string] as Map<string, string>) || this) : this;
-        void this.cssText;
-        if (map instanceof Map) {
-          const hasProp = map.has(name);
-          if (hasProp) {
-            map.delete(name);
-            const entries: [string, string][] = [];
-            for (const [k, v] of map.entries()) {
-              if (typeof k === 'string') {
-                entries.push([k, v]);
-              }
-            }
-            const serialized = entries.map(([k, v]) => `${k}: ${v};`).join(' ');
-            if (this._element) {
-              this._element.setAttribute('style', serialized);
-            }
-          }
-          return hasProp ? name : '';
-        }
-        return '';
-      }
-      return origRemove.call(this, name);
     };
   }
 

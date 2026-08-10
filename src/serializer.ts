@@ -116,7 +116,7 @@ function serializeToken(token: Token, preserveCase: boolean): string {
     case 'string':
       return serializeString(token.value);
     case 'url':
-      return `url(${serializeString(token.value)})`;
+      return preserveCase ? serializeUrlToken(token.value, token.originalText) : serializeUrl(token.value);
     case 'delim':
       return token.value;
     case 'number':
@@ -281,6 +281,35 @@ export function serializeString(s: string): string {
   }
   result += '"';
   return result;
+}
+
+export function serializeUrl(val: string): string {
+  return `url(${serializeString(val)})`;
+}
+
+export function serializeUrlToken(val: string, originalText?: string): string {
+  if (originalText) {
+    return originalText;
+  }
+  let result = '';
+  for (let i = 0; i < val.length; i++) {
+    const charCode = val.charCodeAt(i);
+    const char = val[i];
+    if (
+      charCode === 0x0022 /* " */ ||
+      charCode === 0x0027 /* ' */ ||
+      charCode === 0x0028 /* ( */ ||
+      charCode === 0x0029 /* ) */ ||
+      charCode === 0x005C /* \ */ ||
+      charCode <= 0x0020 ||
+      charCode === 0x007F
+    ) {
+      result += '\\' + char;
+    } else {
+      result += char;
+    }
+  }
+  return `url(${result})`;
 }
 
 function escapeAsCodePoint(charCode: number): string {

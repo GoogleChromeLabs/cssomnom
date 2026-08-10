@@ -1880,6 +1880,26 @@ Objective: Reach maximum pass rate in Chrome WPT suite by hardening Typed OM int
 
 ---
  
+## Phase 80: WPT Multi-Spec Conformance Drive (Wave 1: Nesting & Variables)
+
+Objective: Resolve high-frequency failure clusters in `css-nesting` and `css-variables` identified by failure cluster diagnostics.
+
+### Tasks
+- [x] **CSSStyleSheet Lifecycle & Legacy Aliases**:
+  - Ensure `CSSStyleSheet.prototype.removeRule` and `addRule` aliases are available on all sheet instances in sandbox shims and CSSOM.
+  - Implement `CSS.supports(property, value)` and `CSS.supports(conditionText)` validation in `src/` and sandbox environment.
+- [x] **URL Token Serialization in Custom Properties**:
+  - Preserve unescaped periods, slashes, colons, and hash tokens in `url()` serialization per WPT `url-token-serialization.html`.
+- [x] **Whitespace & Fallback Serialization in CSS Variables**:
+  - Ensure whitespace preservation in custom property value tokens.
+  - Fix `var()` fallback parsing and serialization in `src/parser.ts` and `src/serializer.ts`.
+- [x] **Verification**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=css-nesting` and verify pass rate jumps.
+  - Run `node scripts/wpt_cluster_failures.ts --spec=css-variables` and verify pass rate jumps.
+  - Run `pnpm run preflight` to ensure 0 regressions.
+
+---
+ 
 ## Potential roadmap items
 
 Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
