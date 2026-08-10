@@ -1,5 +1,4 @@
-# Source & internal development
-src/
+# Internal development & tests
 scripts/
 tests/
 benchmarks/

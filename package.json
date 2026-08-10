@@ -27,6 +27,7 @@
   },
   "files": [
     "dist",
+    "src",
     "API_BOUNDARIES.md",
     "pnpm-lock.yaml",
     "pnpm-workspace.yaml"
@@ -36,6 +37,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./ts": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
     }
   },
   "main": "./dist/index.js",
