@@ -1881,16 +1881,18 @@ Objective: Reach maximum pass rate in Chrome WPT suite by hardening Typed OM int
 ---
  
 ## Potential roadmap items
- 
-Objective: Explore long-term ideas for WPT conformance, prototype patching options, and parser shorthand completeness.
- 
+
+Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
+
 ### Ideas
- 
-#### 1. Spec-Compliance & API Surface Refinements
+
+- [ ] **WPT Multi-Spec Conformance Drive**: Broaden test coverage and resolve failure clusters across `css-variables`, `css-nesting`, `selectors`, and `cssom` in the multi-spec sandbox runner to push overall WPT conformance higher.
+- [ ] **API Documentation & Quickstarts**: Add comprehensive usage walkthroughs and code examples to `README.md` demonstrating stylesheet parsing, Typed OM manipulation in Node.js (with native erasable syntax), AST traversal, and serialization.
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
 - [ ] **Static Selector Matching**: Implement a basic CSS selector matcher to evaluate a parsed selector against a DOM element (e.g. for use with Linkedom).
 - [ ] **Advanced Typed OM Value Parsing**: Implement complete support in `CSSStyleValue.parse()` and numeric constructors for advanced functions (e.g. `anchor()`, `calc()` math expressions, viewport units validation, and custom properties) to resolve the major Typed OM WPT conformance gap.
+
 
 
 
