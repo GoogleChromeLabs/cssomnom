@@ -694,6 +694,14 @@ export function patchWindowForTypedOM(window: WindowType) {
     });
   }
 
+class StyleSheetListImpl extends Array<CSSStyleSheet> {
+  item(index: number): CSSStyleSheet | null {
+    return this[index] || null;
+  }
+}
+
+const styleToElement = new WeakMap<object, Element>();
+
   const documentConstructor = win.Document as { prototype: Record<string, unknown> } | undefined;
   if (documentConstructor) {
     Object.defineProperty(documentConstructor.prototype, 'styleSheets', {
@@ -701,18 +709,17 @@ export function patchWindowForTypedOM(window: WindowType) {
         const styles = Array.from(this.querySelectorAll('style'));
         const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
         
-        const sheets: CSSStyleSheet[] = [];
+        const list = new StyleSheetListImpl();
         for (const styleEl of styles) {
           if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-            sheets.push(styleEl.sheet as unknown as CSSStyleSheet);
+            list.push(styleEl.sheet as unknown as CSSStyleSheet);
           }
         }
         for (const linkEl of links) {
           if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-            sheets.push(linkEl.sheet as unknown as CSSStyleSheet);
+            list.push(linkEl.sheet as unknown as CSSStyleSheet);
           }
         }
-        const list = sheets as unknown as StyleSheetList;
         return list;
       },
       configurable: true
@@ -756,16 +763,12 @@ export function patchWindowForTypedOM(window: WindowType) {
     Object.defineProperty(proto, 'style', {
       get() {
         const styleObj = styleDescriptor.get!.call(this);
-        Object.defineProperty(styleObj, '_element', {
-          value: this,
-          configurable: true,
-          writable: true,
-          enumerable: false
-        });
+        styleToElement.set(styleObj, this);
         return styleObj;
       },
       set(value: string) {
         const styleObj = styleDescriptor.get!.call(this);
+        styleToElement.set(styleObj, this);
         styleObj.cssText = value;
       },
       configurable: true,
@@ -796,6 +799,7 @@ export function patchWindowForTypedOM(window: WindowType) {
     const declProto = cssStyleDecl.prototype;
     const origGet = declProto.getPropertyValue as (name: string) => string;
     const origSet = declProto.setProperty as (name: string, value: string | null, priority?: string) => void;
+    const origRemove = declProto.removeProperty as (name: string) => string;
 
     declProto.getPropertyValue = function (this: unknown, name: string) {
       if (name.startsWith('--')) {
@@ -819,8 +823,57 @@ export function patchWindowForTypedOM(window: WindowType) {
         if (!ParseHooks.isValidDashedIdent(name)) {
           return;
         }
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym];
+          if (map && typeof (map as { set?: unknown }).set === 'function') {
+            const mapObj = map as Map<string | symbol, string>;
+            if (value === null || value === undefined || value === '') {
+              mapObj.delete(name);
+            } else {
+              mapObj.set(name, value);
+            }
+            const el = styleToElement.get(this as object);
+            if (el && typeof el.setAttribute === 'function') {
+              const entries: string[] = [];
+              for (const [k, v] of mapObj.entries()) {
+                if (typeof k === 'string' && typeof v === 'string' && k !== '-') {
+                  entries.push(`${k}: ${v}`);
+                }
+              }
+              el.setAttribute('style', entries.join('; '));
+            }
+            return;
+          }
+        }
       }
       return origSet.call(this, name, value, priority);
+    };
+
+    declProto.removeProperty = function (this: unknown, name: string) {
+      if (name.startsWith('--')) {
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym];
+          if (map && typeof (map as { delete?: unknown }).delete === 'function') {
+            const mapObj = map as Map<string | symbol, string>;
+            const hasProp = mapObj.has(name);
+            mapObj.delete(name);
+            const el = styleToElement.get(this as object);
+            if (el && typeof el.setAttribute === 'function') {
+              const entries: string[] = [];
+              for (const [k, v] of mapObj.entries()) {
+                if (typeof k === 'string' && typeof v === 'string' && k !== '-') {
+                  entries.push(`${k}: ${v}`);
+                }
+              }
+              el.setAttribute('style', entries.join('; '));
+            }
+            return hasProp ? name : '';
+          }
+        }
+      }
+      return origRemove.call(this, name);
     };
   }
 

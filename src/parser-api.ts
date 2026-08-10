@@ -545,22 +545,6 @@ export function supports(propertyOrCondition: string, value?: string): boolean {
   const tokens = tokenize(condition);
   const parser = new Parser(tokens);
   const componentValues = parser.parseComponentValues();
-
-  // If top-level condition is a bare declaration (e.g. "color: red" or "--foo: blah")
-  const nonWs = componentValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (nonWs.length > 0 && nonWs[0].type === 'ident') {
-    const colonIdx = componentValues.findIndex(v => v.type === 'colon');
-    if (colonIdx > 0) {
-      const propValues = componentValues.slice(0, colonIdx).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-      if (propValues.length === 1 && propValues[0].type === 'ident') {
-        const propName = String((propValues[0] as Token).value);
-        const valTokens = componentValues.slice(colonIdx + 1);
-        const valStr = serialize(valTokens);
-        return evaluateSupportsDeclaration(propName, valStr);
-      }
-    }
-  }
-
   return evalSupportsConditionValues(componentValues);
 }
 

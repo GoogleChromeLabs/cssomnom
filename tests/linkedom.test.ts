@@ -56,8 +56,8 @@ describe('Linkedom Integration Tests', () => {
     // Verify case preservation in serialized style attribute
     const styleAttr = el.getAttribute('style');
     assert.ok(styleAttr);
-    assert.ok(styleAttr.includes('--FooBar: green') || styleAttr.includes('--FooBar:green'));
-    assert.ok(styleAttr.includes('--MyNewVar') || styleAttr.includes('--my-new-var'));
+    assert.ok(styleAttr.includes('--FooBar: green'));
+    assert.ok(styleAttr.includes('--MyNewVar: blue'));
   });
 
   test('Dynamic Sheet Mutation on HTMLStyleElement', () => {
