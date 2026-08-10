@@ -1880,7 +1880,7 @@ Objective: Reach maximum pass rate in Chrome WPT suite by hardening Typed OM int
 
 ---
  
-## Phase 80: WPT Multi-Spec Conformance Drive (Wave 1: Nesting & Variables)
+## Phase 80: WPT Multi-Spec Conformance Drive (Wave 1: Nesting & Variables) [x]
 
 Objective: Resolve high-frequency failure clusters in `css-nesting` and `css-variables` identified by failure cluster diagnostics.
 
