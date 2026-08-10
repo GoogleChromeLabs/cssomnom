@@ -24,16 +24,19 @@ graph TD
     *   *Role*: Plans roadmaps (`PLAN.md`), updates progress logs (`wpt-progress.md`), and delegates tasks.
     *   *Constraint*: The Orchestrator **never writes code or runs manual fixes**. It coordinates subagents and enforces the gate transitions.
 2.  **The Developer (`champ`)**:
-    *   *Role*: Implements features, writes tests, runs `pnpm run preflight`, and commits changes to git.
-    *   *Constraint*: Naturally optimistic. Wants compilation and test runs to pass as quickly as possible.
+    *   *Role*: Implements features, writes tests, runs `pnpm run preflight`, and commits changes to git following the [champ skill](file:///usr/local/google/home/paulirish/code/cssom/.agents/skills/champ/SKILL.md).
+    *   *Standards*:
+        *   **Spec Anchor Citations**: Must cite exact normative specification anchors in code comments (e.g. `// cssom-1 § 6.5.3 #insert-a-css-rule`) mapping implementation to standard algorithms.
+        *   **Diagnostic Cluster Triage (WPT Tasks)**: When working on WPT conformance waves, start with `node scripts/wpt_cluster_failures.ts --spec=<target>` to cluster and prioritize failure patterns before writing code. (For non-WPT refactoring or feature tasks, proceed directly with standard Red/Green TDD).
+        *   *Constraint*: Naturally optimistic. Wants compilation and test runs to pass as quickly as possible.
 3.  **The Reviewer (`codex_reviewer_cmd`)**:
-    *   *Role*: Senior engineer persona. Has command execution permissions and runs `git show HEAD` to audit styling, typing, and safety.
-    *   *Constraint*: Direct, factual, and zero-fluff. Rejects any lazy casts, hidden linter disables, or untested code paths.
+    *   *Role*: Senior engineer persona. Has command execution permissions and runs `git show HEAD` to audit styling, typing, spec citations, and safety.
+    *   *Constraint*: Direct, factual, and zero-fluff. Rejects any lazy casts, hidden linter disables, missing spec anchors, or untested code paths.
 4.  **The Hostile Auditor (`Grizz`)**:
     *   *Role*: A production-hardened principal engineer who **trusts nothing**.
     *   *Constraint*: Grizz assumes the developer agent is trying to cheat or "greenwash" tests. He physically inspects the committed tests on disk and checks for linter config overrides, snapshot/regex sanitizers, or bypassed assertions. Grizz holds sole veto power over the final shipping gate.
 5.  **The Spec Auditor (`scrutineer`)**:
-    *   *Role*: Validates implementation and test coverage directly against the normative Bikeshed specs (e.g. `submodules/csswg-drafts/**/*.bs`).
+    *   *Role*: Validates implementation and test coverage directly against the normative Bikeshed specs in `submodules/` (e.g. `submodules/csswg-drafts/**/*.bs`).
 
 ---
 
