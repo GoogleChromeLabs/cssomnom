@@ -1,0 +1,37 @@
+# Source & internal development
+src/
+scripts/
+tests/
+benchmarks/
+tools/
+scratch/
+submodules/
+.worktrees/
+.agents/
+.github/
+.gemini/
+.vscode/
+_venv3/
+docs/
+
+# Configs & planning docs
+tsconfig*.json
+tsup*.config.ts
+.oxlintrc.json
+.eslintignore
+PLAN.md
+LOOP.md
+MAINTENANCE.md
+AGENTS.md
+CONTRIBUTING.md
+wpt-progress.md
+wpt-typed-om-progress.md
+
+# Logs & temp files
+*.log
+*.tgz
+.DS_Store
+
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!API_BOUNDARIES.md
