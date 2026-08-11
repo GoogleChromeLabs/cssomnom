@@ -3195,6 +3195,8 @@ export class CSSScale extends CSSTransformComponent {
   }
 }
 
+// css-typed-om-1 § 7.3 #dom-cssrotate-angle
+// css-transforms-2 § 3 #transform-functions
 function normalizeAngleUnits(node: CSSNumericValue): CSSNumericValue {
   if (node instanceof CSSUnitValue) {
     if (node.unit === 'turn') return new CSSUnitValue(node.value * 360, 'deg');
