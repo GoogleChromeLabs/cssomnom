@@ -1928,7 +1928,7 @@ Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing for
 
 ---
  
-## Phase 82: WPT Multi-Spec Conformance Drive (Wave 3: CSSOM Core Conformance)
+## Phase 82: WPT Multi-Spec Conformance Drive (Wave 3: CSSOM Core Conformance) [x]
 
 Objective: Drive WPT `css/cssom/` conformance (>770 tests) by hardening stylesheet insertion/deletion boundary rules, priority flag serialization, and rule hierarchy back-references in `src/CSSOM.ts` and `src/CSSStyleDeclaration.ts`.
 
