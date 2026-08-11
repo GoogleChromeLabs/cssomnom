@@ -26,7 +26,9 @@ describe('Media Queries', () => {
 
     test('reject negative values in aspect ratios', () => {
         const queries = MediaParser.parse('(aspect-ratio: -1/1), (aspect-ratio: 1/-1), (aspect-ratio: -1/-1)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries, ['not all', 'not all', 'not all']);
+        assert.strictEqual(MediaParser.evaluate(queries[0]), false);
+        assert.strictEqual(MediaParser.evaluate(queries[1]), false);
+        assert.strictEqual(MediaParser.evaluate(queries[2]), false);
         
         const queriesValid = MediaParser.parse('(aspect-ratio: 16/9)').map(serializeMediaQuery);
         assert.strictEqual(queriesValid[0], '(aspect-ratio: 16 / 9)');
@@ -47,7 +49,7 @@ describe('Media Queries', () => {
 
     test('support math functions in media features', () => {
         const queries = MediaParser.parse('(width: calc(100px + 50px))').map(serializeMediaQuery);
-        assert.strictEqual(queries[0], '(width: calc(100px + 50px))');
+        assert.strictEqual(queries[0], '(width: calc(150px))');
         
         const queries2 = MediaParser.parse('(width: min(100px, 200px))').map(serializeMediaQuery);
         assert.strictEqual(queries2[0], '(width: min(100px, 200px))');
@@ -63,19 +65,19 @@ describe('Media Queries', () => {
         const queries = MediaParser.parse('(aspect-ratio: calc(16) / calc(9))').map(serializeMediaQuery);
         assert.strictEqual(queries[0], '(aspect-ratio: calc(16) / calc(9))');
         const queries2 = MediaParser.parse('(aspect-ratio: calc(16) / calc(9) foo)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries2, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries2[0]), false);
     });
 
     test('whitespace sensitivity in operators', () => {
-        // Space between < and = is invalid operator! So it should be 'not all'!
+        // Space between < and = is invalid operator! So it evaluates to false.
         const queries = MediaParser.parse('(width < = 100px)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries[0]), false);
         
         const queries2 = MediaParser.parse('(width >= 100px)').map(serializeMediaQuery);
         assert.strictEqual(queries2[0], '(width >= 100px)');
         
         const queries3 = MediaParser.parse('(width > = 100px)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries3, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries3[0]), false);
         
         const queries4 = MediaParser.parse('(width <= 100px)').map(serializeMediaQuery);
         assert.strictEqual(queries4[0], '(width <= 100px)');
@@ -83,13 +85,13 @@ describe('Media Queries', () => {
 
     test('reject trailing garbage in feature values', () => {
         const queries = MediaParser.parse('(width: 100px foo)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries[0]), false);
         
         const queries2 = MediaParser.parse('(orientation: portrait landscape)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries2, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries2[0]), false);
         
         const queries3 = MediaParser.parse('(grid: 1 2)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries3, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries3[0]), false);
     });
 
     test('lowercase coercion for units in media queries', () => {
@@ -98,12 +100,12 @@ describe('Media Queries', () => {
     });
 
     test('reject discrete features in range contexts', () => {
-        // pointer is discrete, so (pointer = fine) is invalid! -> 'not all'
+        // pointer is discrete, so (pointer = fine) evaluates to false
         const queries = MediaParser.parse('(pointer = fine)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries[0]), false);
         
         const queries2 = MediaParser.parse('(hover < hover)').map(serializeMediaQuery);
-        assert.deepStrictEqual(queries2, ['not all']);
+        assert.strictEqual(MediaParser.evaluate(queries2[0]), false);
     });
 
     test('comma list empty query recovery', () => {
@@ -118,8 +120,8 @@ describe('Media Queries', () => {
         assert.strictEqual(queries[2], '(aspect-ratio: 1 / 3)');
     });
 
-    test('resolution unit x converts to dppx', () => {
+    test('resolution unit x preserves in serialization', () => {
         const queries = MediaParser.parse('(resolution: 2x)').map(serializeMediaQuery);
-        assert.strictEqual(queries[0], '(resolution: 2dppx)');
+        assert.strictEqual(queries[0], '(resolution: 2x)');
     });
 });

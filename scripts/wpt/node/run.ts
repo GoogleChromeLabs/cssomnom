@@ -70,6 +70,9 @@ export function runWptFile(filePath: string): WptFileResult {
       if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
         return windowProxy;
       }
+      if (prop === 'navigator') {
+        return sandbox.navigator;
+      }
       if (typeof prop === 'string') {
         const val = target[prop];
         if (val !== undefined) {
@@ -197,12 +200,25 @@ export function runWptFile(filePath: string): WptFileResult {
     const testHarnessParam = {
       add_cleanup(fn: Function) {
         cleanups.push(fn);
-      }
+      },
+      step_timeout(fn: Function, delay: number) {
+        return setTimeout(fn, delay);
+      },
+      step_func(fn: Function) {
+        return fn;
+      },
+      step_func_done(fn: Function) {
+        return () => { fn(); };
+      },
+      step(fn: Function) {
+        return fn();
+      },
+      done() {}
     };
     const wrappedFn = async () => {
       try {
         if (t.fn) {
-          await t.fn(testHarnessParam);
+          await t.fn.call(testHarnessParam, testHarnessParam);
         }
       } finally {
         for (const cleanup of cleanups) {

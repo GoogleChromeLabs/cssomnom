@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, Rule, ComponentValue, SelectorList } from './types.ts';
+import type { Token, Rule, ComponentValue, SelectorList, MediaQuery } from './types.ts';
 import type { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 
 export const ParseHooks = {
@@ -35,6 +35,9 @@ export const ParseHooks = {
   },
   parseSelectorAST: (_text: string, _declaredNamespaces?: Set<string>, _allowRelative?: boolean): SelectorList | null => {
     throw new Error('parseSelectorAST not injected');
+  },
+  parseMediaQueryList: (_text: string): MediaQuery[] => {
+    throw new Error('parseMediaQueryList not injected');
   },
 
   validateCustomPropertyValue: (_values: ComponentValue[]): boolean => {

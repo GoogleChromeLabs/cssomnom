@@ -24,10 +24,12 @@ import {
   CSSLayerBlockRule,
   CSSLayerStatementRule,
   CSSStyleSheet,
+  CSSMediaRule,
 } from './CSSOM.ts';
 import { tokenize } from './tokenizer.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
 import { Parser, parseStyleSheet } from './parser.ts';
+import { MediaParser } from './MediaParser.ts';
 import { SelectorParser } from './SelectorParser.ts';
 import { serialize, serializeSelectorList } from './serializer.ts';
 import { matches, isElement } from './matcher.ts';
@@ -45,6 +47,7 @@ import type {
   ComponentValue,
   Declaration,
   ASTAtRule,
+  MediaEnvironment,
 } from './types.ts';
 
 interface MatchedDeclaration {
@@ -219,6 +222,46 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         const layerName = currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName;
         const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
         walkRules(childRules, parentSelector, layerName, scopeNode);
+      } else if (
+        rule instanceof CSSMediaRule ||
+        ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'media')
+      ) {
+        const mediaText = rule instanceof CSSMediaRule ? rule.media.mediaText : serialize((rule as ASTAtRule).prelude || []).trim();
+        const doc = (element as { ownerDocument?: { defaultView?: Record<string, unknown> } }).ownerDocument;
+        const win = doc?.defaultView;
+        let env: Partial<MediaEnvironment> | undefined;
+        if (win) {
+          let width = 800;
+          let height = 600;
+          if (typeof win.innerWidth === 'number' && !isNaN(win.innerWidth)) width = win.innerWidth;
+          if (typeof win.innerHeight === 'number' && !isNaN(win.innerHeight)) height = win.innerHeight;
+          const frameEl = win.frameElement as { width?: string | number; height?: string | number; style?: { width?: string; height?: string }; getAttribute?: (n: string) => string | null } | undefined;
+          if (frameEl) {
+            const styleW = frameEl.style?.width || (frameEl.width !== undefined ? String(frameEl.width) : null) || frameEl.getAttribute?.('width');
+            if (styleW) {
+              const parsed = parseFloat(styleW);
+              if (!isNaN(parsed) && parsed > 0) width = parsed;
+            }
+            const styleH = frameEl.style?.height || (frameEl.height !== undefined ? String(frameEl.height) : null) || frameEl.getAttribute?.('height');
+            if (styleH) {
+              const parsed = parseFloat(styleH);
+              if (!isNaN(parsed) && parsed > 0) height = parsed;
+            }
+          }
+          env = {
+            width,
+            height,
+            deviceWidth: width,
+            deviceHeight: height,
+            aspectRatio: [width, height],
+            deviceAspectRatio: [width, height],
+            orientation: width > height ? 'landscape' : 'portrait',
+          };
+        }
+        if (MediaParser.evaluate(mediaText, env)) {
+          const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
+          walkRules(childRules, parentSelector, currentLayer, scopeNode);
+        }
       } else if (rule instanceof CSSScopeRule) {
         const childRules = (rule as CSSGroupingRule).cssRules || [];
         walkRules(childRules, '', currentLayer, isElement(element) ? element : undefined);

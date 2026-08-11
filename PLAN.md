@@ -2113,6 +2113,45 @@ Objective: Implement spec-compliant `CSSPositionValue` parsing, keyword coordina
 
 ---
 
+## Phase 88: Media Queries Level 4/5 Parsing, Evaluation & MediaList Conformance (`css/mediaqueries`)
+
+Objective: Implement modern Media Queries Level 4/5 range syntax, media feature evaluation against environment settings, custom media query evaluation (`@custom-media`), canonical `MediaList` serialization, and Kleene 3-valued logic error recovery, achieving 100% pass rate (417/417 passed) on WPT `css/mediaqueries`.
+
+**Spec References**:
+- Media Queries Level 4: `submodules/csswg-drafts/mediaqueries-4/Overview.bs`
+  - § 2 Structure of Media Queries (`#structure`), § 2.4 Syntax (`<general-enclosed>`), § 2.5 Error Handling (`#error-handling`)
+  - § 3 Media Types & Media Features (`#media-types`)
+  - § 4 Evaluating Media Features in a Media Context (`#evaluating-features`), § 4.3 Orientation (`#orientation`)
+  - § 5 Syntax (`#mq-syntax`) & § 5.2 Error Handling (`#error-handling`)
+- Media Queries Level 5: `submodules/csswg-drafts/mediaqueries-5/Overview.bs`
+  - § 2 Syntax & Evaluation (`#syntax`), § 2.3 Custom Media (`#custom-mq`)
+  - § 3 User Preference Media Features (`#user-preference-features`), § 3.1 Script-based preferences (`#script-control-user-prefs`)
+  - § 6.5 Dynamic Range (`#dynamic-range`)
+- CSSOM 1: `submodules/csswg-drafts/cssom-1/Overview.bs` (§ 6.2 The `MediaList` Interface `#the-medialist-interface`)
+
+### Tasks
+- [x] **Media Feature Codegen & Discovery (`scripts/codegen/generate_media_features.ts` & `src/data/gen/media-features.ts`)**:
+  - Emitted `KNOWN_FEATURES`, `RANGE_FEATURES`, `FEATURE_VALUE_TYPES`, and `FEATURE_ALLOWED_IDENTS` covering all modern MQ4/5 media features (dimensions, display modes, script preferences, environment blending, dynamic range, video color gamut).
+- [x] **MQ4 Range Syntax Parsing & Kleene 3-Valued Logic (`src/MediaParser.ts`)**:
+  - Implemented `<general-enclosed>` AST nodes for forward-compatible syntax error handling and unknown features.
+  - Implemented full range syntax comparison operators (`<`, `<=`, `>`, `>=`, `=`) and two-sided bounded range contexts (`100px <= width <= 800px`).
+  - Implemented unit conversion and numeric evaluation for lengths (`px`, `em`, `rem`, `vw`, `vh`, etc.), resolutions (`dpi`, `dpcm`, `dppx`, `x`), ratios (`aspect-ratio: 16/9`), and discrete keywords.
+  - Implemented Kleene 3-valued logic (`evalNot3`, `evalAnd3`, `evalOr3`) evaluating `<general-enclosed>` and invalid features to `unknown` (which behaves as `false` in boolean context).
+- [x] **`CSSCustomMediaRule` & `@custom-media` Evaluation (`src/CSSOM.ts` & `src/parser.ts`)**:
+  - Implemented `CSSCustomMediaRule` with `name`, `query` (boolean or `MediaList`), and spec-compliant `cssText` serialization.
+  - Added custom media query resolution support in `MediaParser.evaluate` via `env.customMedia`.
+- [x] **`MediaList` & Cascade Integration (`src/CSSOM.ts` & `src/cascade.ts`)**:
+  - Implemented canonical `MediaList` serialization, index getters/item, `appendMedium`, and `deleteMedium` throwing `NotFoundError`.
+  - Integrated `@media` rule evaluation in `getCascadedStyle` against window environment dimensions (`win.innerWidth`, `win.innerHeight`, frame element dimensions).
+- [x] **Unit Tests & Parity Suite (`tests/mediaqueries-modern.test.ts`)**:
+  - Added unit test suite covering range evaluation, unit conversions, ratio ranges, custom media, and `MediaList` methods.
+- [x] **Mandatory Pre/Post Cluster Delta Reconciliation**:
+  - Pre-implementation baseline: 113 / 417 passed (27.10% pass rate).
+  - Post-implementation result: **417 / 417 passed (100.00% pass rate, 0 failures across all 102 WPT test files)**!
+  - Preflight verification: `pnpm run preflight` 100% clean (0 TypeScript type errors, 0 linter warnings, all test suites passing).
+
+---
+
 ## Potential roadmap items
 
 Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
@@ -2121,7 +2160,6 @@ Objective: Explore long-term ideas for WPT conformance, prototype patching optio
 
 - [ ] **WPT Multi-Spec Conformance Drive**:
   - [ ] **Wave 4: CSS Syntax & Tokenizer Conformance (`css/css-syntax`)**: String/ident escape sequence normalization, CDO/CDC comment tokens, bad URL recovery, and whitespace trimming rules.
-  - [ ] **Wave 5: Media Queries Conformance (`css/mediaqueries`)**: `@media` condition parsing, range syntax (`width >= 600px`), Boolean media feature validation, and media list serialization.
   - [ ] **Wave 6: Advanced Typed OM Value Reification (`css/css-typed-om`)**: Viewport units, calculation expression trees, `anchor()` functions, and custom property value reification in `StylePropertyMap`.
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.

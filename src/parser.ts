@@ -14,13 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, FunctionToken } from './types.ts';
+import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, FunctionToken, CustomMediaQuery } from './types.ts';
 
 
 import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
 
 import { tokenize } from './tokenizer.ts';
-import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSRule, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule } from './CSSOM.ts';
+import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSRule, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule, MediaList } from './CSSOM.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
 
@@ -74,6 +74,7 @@ export class Parser {
     namespace: (parser, rule) => parser.handleNamespaceRule(rule),
     'counter-style': (parser, rule, block) => block ? parser.handleCounterStyleRule(rule, block) : null,
     'font-feature-values': (parser, rule, block) => block ? parser.handleFontFeatureValuesRule(rule, block) : null,
+    'custom-media': (parser, rule) => parser.handleCustomMediaRule(rule),
   };
 
   private getAtRuleHandler(name: string): ((parser: Parser, rule: ASTAtRule, block?: SimpleBlock, nested?: boolean) => Rule | null) | undefined {
@@ -812,6 +813,41 @@ export class Parser {
     const nsRule = new CSSNamespaceRule(prefix, namespaceURI);
     this.declaredNamespaces.add(nsRule.prefix);
     return nsRule;
+  }
+
+  // Media Queries 5 § 2.3 #custom-mq
+  private handleCustomMediaRule(rule: ASTAtRule): Rule | null {
+    const prelude = rule.prelude;
+    let i = 0;
+    while (i < prelude.length && prelude[i].type === 'whitespace') i++;
+    if (i >= prelude.length) return null;
+
+    const nameToken = prelude[i];
+    if (nameToken.type !== 'ident' || !nameToken.value.startsWith('--')) {
+      return null;
+    }
+    const name = nameToken.value;
+    i++;
+
+    const remainingTokens = prelude.slice(i).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+
+    let query: CustomMediaQuery;
+    if (remainingTokens.length === 0) {
+      query = new MediaList('');
+    } else if (remainingTokens.length === 1 && remainingTokens[0].type === 'ident' && remainingTokens[0].value.toLowerCase() === 'true') {
+      query = true;
+    } else if (remainingTokens.length === 1 && remainingTokens[0].type === 'ident' && remainingTokens[0].value.toLowerCase() === 'false') {
+      query = false;
+    } else {
+      const mediaText = serialize(prelude.slice(i)).trim();
+      const parsed = ParseHooks.parseMediaQueryList(mediaText);
+      if (parsed.length === 0 || parsed.some(q => q.invalid)) {
+        return null;
+      }
+      query = new MediaList(mediaText);
+    }
+
+    return new CSSCustomMediaRule(name, query);
   }
 
   /**

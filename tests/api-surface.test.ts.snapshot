@@ -6,6 +6,7 @@ exports[`API Surface Area 1`] = `
   "CSSColorValue",
   "CSSContainerRule",
   "CSSCounterStyleRule",
+  "CSSCustomMediaRule",
   "CSSFontFaceDescriptors",
   "CSSFontFaceRule",
   "CSSFontFeatureValuesMap",

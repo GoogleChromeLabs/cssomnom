@@ -326,6 +326,13 @@ export interface MediaList {
   [index: number]: string;
 }
 
+export type CustomMediaQuery = MediaList | boolean;
+
+export interface CSSCustomMediaRule extends CSSRule {
+  readonly name: string;
+  readonly query: CustomMediaQuery;
+}
+
 export interface CSSImportRule extends CSSRule {
   readonly href: string;
   media: MediaList;
@@ -528,5 +535,49 @@ export interface MediaQueryList {
   type: 'media-query-list';
   queries: MediaQuery[];
 }
+
+export interface MediaEnvironment {
+  mediaType: string;
+  width: number;
+  height: number;
+  deviceWidth: number;
+  deviceHeight: number;
+  aspectRatio: [number, number];
+  deviceAspectRatio: [number, number];
+  orientation: 'portrait' | 'landscape';
+  resolution: number; // in dpi
+  color: number;
+  colorIndex: number;
+  monochrome: number;
+  colorGamut: 'srgb' | 'p3' | 'rec2020';
+  videoColorGamut: 'srgb' | 'p3' | 'rec2020';
+  pointer: 'none' | 'coarse' | 'fine';
+  hover: 'none' | 'hover';
+  anyPointer: 'none' | 'coarse' | 'fine';
+  anyHover: 'none' | 'hover';
+  grid: number;
+  scan: 'interlace' | 'progressive';
+  update: 'none' | 'slow' | 'fast';
+  overflowBlock: 'none' | 'scroll' | 'paged';
+  overflowInline: 'none' | 'scroll';
+  displayMode: 'fullscreen' | 'standalone' | 'minimal-ui' | 'browser' | 'window-controls-overlay' | 'borderless' | 'picture-in-picture';
+  displayState: 'fullscreen' | 'maximized' | 'minimized' | 'normal';
+  prefersColorScheme: 'light' | 'dark' | 'no-preference';
+  uaColorScheme: 'light' | 'dark' | 'no-preference';
+  prefersContrast: 'no-preference' | 'more' | 'less' | 'custom';
+  prefersReducedMotion: 'no-preference' | 'reduce';
+  prefersReducedTransparency: 'no-preference' | 'reduce';
+  prefersReducedData: 'no-preference' | 'reduce';
+  forcedColors: 'none' | 'active';
+  invertedColors: 'none' | 'inverted';
+  dynamicRange: 'standard' | 'high';
+  videoDynamicRange: 'standard' | 'high';
+  scripting: 'none' | 'initial-only' | 'enabled';
+  environmentBlending: 'opaque' | 'additive' | 'subtractive';
+  navControls: 'none' | 'back';
+  resizable?: boolean;
+  customMedia?: Record<string, boolean | string | unknown> | Map<string, boolean | string | unknown>;
+}
+
 
 

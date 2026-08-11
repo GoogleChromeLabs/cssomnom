@@ -53,6 +53,16 @@ function main() {
         if (syntax.includes('<mq-boolean>')) types.push('integer'); // <mq-boolean> is 0 or 1
         
         const idents = syntax.split('|').map((s: string) => s.trim()).filter((s: string) => !s.startsWith('<') && s !== 'infinite');
+        if (f.name === 'display-mode') {
+            for (const extra of ['window-controls-overlay', 'unframed', 'borderless', 'tabbed']) {
+                if (!idents.includes(extra)) idents.push(extra);
+            }
+        }
+        if (f.name === 'nav-controls' || f.name === 'navigation-controls') {
+            for (const extra of ['back-button', 'none']) {
+                if (!idents.includes(extra)) idents.push(extra);
+            }
+        }
         if (idents.length > 0) {
             types.push('ident');
             featureAllowedIdents[f.name] = idents;
@@ -66,6 +76,15 @@ function main() {
             }
         }
     }
+
+    // Incubation & tentative features
+    knownFeatures.add('navigation-controls');
+    featureValueTypes['navigation-controls'] = ['ident'];
+    featureAllowedIdents['navigation-controls'] = ['back-button', 'none'];
+
+    knownFeatures.add('resizable');
+    featureValueTypes['resizable'] = ['ident'];
+    featureAllowedIdents['resizable'] = ['true', 'false'];
 
     let tsContent = `/**
  * @license

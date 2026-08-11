@@ -1,10 +1,12 @@
 import { parseStyleSheet, parseRule } from '../src/parser.ts';
-import { CSSStyleSheet } from '../src/CSSOM.ts';
+import { CSSStyleSheet, MediaList } from '../src/CSSOM.ts';
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { ParseHooks } from '../src/parse-hooks.ts';
 import { getCascadedStyle } from '../src/cascade.ts';
 import { matches, querySelectorAll, querySelector } from '../src/matcher.ts';
 import { camelToDashed } from '../src/utils.ts';
+import { MediaParser } from '../src/MediaParser.ts';
+import type { MediaEnvironment } from '../src/types.ts';
 
 export interface WptSandboxTest {
   type: 'setup' | 'test' | 'promise_test' | 'async_test';
@@ -257,12 +259,154 @@ export function extractScripts(htmlContent: string, htmlDir: string): { code: st
   return scriptsToRun;
 }
 
+interface PreferenceItem<T extends string> {
+  readonly validValues: readonly T[];
+  readonly value: T;
+  readonly override: T | null;
+  requestOverride(val: T | null | ''): Promise<void>;
+  clearOverride(): Promise<void>;
+  onchange: ((ev: Event) => void) | null;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject): void;
+  dispatchEvent(ev: Event): boolean;
+}
+
+function createPreference<T extends string>(defaultValue: T, validValues: readonly T[]): PreferenceItem<T> {
+  let currentOverride: T | null = null;
+  const listeners: Set<EventListenerOrEventListenerObject> = new Set();
+  let onchangeHandler: ((ev: Event) => void) | null = null;
+
+  const item: PreferenceItem<T> = {
+    validValues,
+    get value() {
+      return currentOverride !== null ? currentOverride : defaultValue;
+    },
+    get override() {
+      return currentOverride;
+    },
+    async requestOverride(val: T | null | '') {
+      if (val === '') {
+        val = null;
+      }
+      if (val !== null && !validValues.includes(val as T)) {
+        throw new DOMException(`Invalid preference value: ${val}`, 'InvalidModificationError');
+      }
+      currentOverride = val as T | null;
+      queueMicrotask(() => {
+        const ev = { type: 'change' } as Event;
+        if (typeof onchangeHandler === 'function') {
+          try {
+            onchangeHandler(ev);
+          } catch {}
+        }
+        for (const l of Array.from(listeners)) {
+          try {
+            if (typeof l === 'function') l(ev);
+            else if (l && typeof l.handleEvent === 'function') l.handleEvent(ev);
+          } catch {}
+        }
+      });
+    },
+    async clearOverride() {
+      await item.requestOverride(null);
+    },
+    get onchange() {
+      return onchangeHandler;
+    },
+    set onchange(fn) {
+      onchangeHandler = fn;
+    },
+    addEventListener(type, listener) {
+      if (type === 'change') listeners.add(listener);
+    },
+    removeEventListener(type, listener) {
+      if (type === 'change') listeners.delete(listener);
+    },
+    dispatchEvent(ev) {
+      if (typeof onchangeHandler === 'function') onchangeHandler(ev);
+      for (const l of listeners) {
+        if (typeof l === 'function') l(ev);
+        else if (l && typeof l.handleEvent === 'function') l.handleEvent(ev);
+      }
+      return true;
+    }
+  };
+  return item;
+}
+
+function createNavigatorPreferences() {
+  return {
+    colorScheme: createPreference('light', ['light', 'dark'] as const),
+    contrast: createPreference('no-preference', ['no-preference', 'more', 'less'] as const),
+    reducedMotion: createPreference('no-preference', ['no-preference', 'reduce'] as const),
+    reducedTransparency: createPreference('no-preference', ['no-preference', 'reduce'] as const),
+    reducedData: createPreference('no-preference', ['no-preference', 'reduce'] as const),
+  };
+}
+
+function getMediaEnvForWindow(winContext: unknown): Partial<MediaEnvironment> {
+  const win = winContext as Record<string, unknown> | null;
+  if (!win) return {};
+
+  let width = 800;
+  let height = 600;
+
+  if (typeof win.innerWidth === 'number' && !isNaN(win.innerWidth)) {
+    width = win.innerWidth;
+  }
+  if (typeof win.innerHeight === 'number' && !isNaN(win.innerHeight)) {
+    height = win.innerHeight;
+  }
+
+  const frameEl = win.frameElement as { style?: { width?: string; height?: string }; getAttribute?: (n: string) => string | null } | undefined;
+  if (frameEl) {
+    const styleW = frameEl.style?.width || frameEl.getAttribute?.('width');
+    if (styleW) {
+      const parsed = parseFloat(styleW);
+      if (!isNaN(parsed) && parsed > 0) width = parsed;
+    }
+    const styleH = frameEl.style?.height || frameEl.getAttribute?.('height');
+    if (styleH) {
+      const parsed = parseFloat(styleH);
+      if (!isNaN(parsed) && parsed > 0) height = parsed;
+    }
+  }
+
+  const nav = (win as { __navigator?: { preferences?: ReturnType<typeof createNavigatorPreferences> } })?.__navigator || (win?.navigator as { preferences?: ReturnType<typeof createNavigatorPreferences> });
+  const prefs = nav?.preferences;
+
+  return {
+    width,
+    height,
+    deviceWidth: width,
+    deviceHeight: height,
+    aspectRatio: [width, height],
+    deviceAspectRatio: [width, height],
+    orientation: width > height ? 'landscape' : 'portrait',
+    prefersColorScheme: prefs?.colorScheme?.value ?? 'light',
+    prefersContrast: prefs?.contrast?.value ?? 'no-preference',
+    prefersReducedMotion: prefs?.reducedMotion?.value ?? 'no-preference',
+    prefersReducedTransparency: prefs?.reducedTransparency?.value ?? 'no-preference',
+    prefersReducedData: prefs?.reducedData?.value ?? 'no-preference',
+  };
+}
+
 let prototypesPatched = false;
 
 export function patchWindowForTypedOM(window: WindowType) {
   const win = window as unknown as Record<string, unknown>;
 
   // --- 1. Instance-Specific Mocks (Always run for every new Window instance) ---
+
+  const prefs = createNavigatorPreferences();
+  const navObj = {
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36',
+    preferences: prefs
+  };
+  win.__navigator = navObj;
+
+  const resizeListeners = new Set<Function>();
+  win.__resizeListeners = resizeListeners;
 
   const originalAddEventListener = window.addEventListener;
   win.addEventListener = function(
@@ -271,6 +415,13 @@ export function patchWindowForTypedOM(window: WindowType) {
     listener: EventListenerOrEventListenerObject,
     options?: boolean | AddEventListenerOptions
   ) {
+    if (type === 'resize') {
+      if (typeof listener === 'function') {
+        resizeListeners.add(listener);
+      } else if (listener && typeof (listener as EventListenerObject).handleEvent === 'function') {
+        resizeListeners.add((e: Event) => (listener as EventListenerObject).handleEvent(e));
+      }
+    }
     if (type === 'load' && win.__loadEventFired) {
       queueMicrotask(() => {
         try {
@@ -323,16 +474,60 @@ export function patchWindowForTypedOM(window: WindowType) {
 
   // Mock window.matchMedia
   win.matchMedia = function(media: string) {
-    return {
-      matches: false,
-      media,
-      onchange: null,
-      addListener() {},
-      removeListener() {},
-      addEventListener() {},
-      removeEventListener() {},
-      dispatchEvent() { return false; }
+    const mediaList = new MediaList(media);
+    const mediaText = mediaList.mediaText;
+    const listeners = new Set<Function>();
+    let onchangeHandler: Function | null = null;
+    let lastMatches = MediaParser.evaluate(media, getMediaEnvForWindow(win));
+
+    const mql = {
+      get matches() {
+        return MediaParser.evaluate(media, getMediaEnvForWindow(win));
+      },
+      get media() {
+        return mediaText;
+      },
+      get onchange() {
+        return onchangeHandler;
+      },
+      set onchange(fn: Function | null) {
+        onchangeHandler = fn;
+      },
+      addListener(fn: Function) {
+        if (typeof fn === 'function') listeners.add(fn);
+      },
+      removeListener(fn: Function) {
+        listeners.delete(fn);
+      },
+      addEventListener(type: string, fn: Function) {
+        if (type === 'change' && typeof fn === 'function') listeners.add(fn);
+      },
+      removeEventListener(type: string, fn: Function) {
+        if (type === 'change') listeners.delete(fn);
+      },
+      dispatchEvent(ev: Event) {
+        if (typeof onchangeHandler === 'function') onchangeHandler(ev);
+        for (const l of listeners) {
+          l(ev);
+        }
+        return true;
+      },
+      _checkChange() {
+        const curMatches = mql.matches;
+        if (curMatches !== lastMatches) {
+          lastMatches = curMatches;
+          const ev = new ((win.Event as { new(t: string): Event }) || Event)('change');
+          mql.dispatchEvent(ev);
+        }
+      }
     };
+
+    if (!win.__activeMqls) {
+      win.__activeMqls = new Set();
+    }
+    (win.__activeMqls as Set<typeof mql>).add(mql);
+
+    return mql;
   };
 
   // --- 2. Shared Prototype Mocks (Only run once globally per Node process) ---
@@ -426,6 +621,9 @@ export function patchWindowForTypedOM(window: WindowType) {
         if (!this._contentDocument) {
           const iframeDom = parseHTML('<!DOCTYPE html><html><head></head><body></body></html>');
           const iframeWindow = iframeDom.window;
+          (iframeWindow as unknown as Record<string, unknown>).frameElement = this;
+          (iframeWindow as unknown as Record<string, unknown>).__lastWidth = 100;
+          (iframeWindow as unknown as Record<string, unknown>).__lastHeight = 100;
           patchWindowForTypedOM(iframeWindow);
 
           // Route postMessage to parent window (main window)
@@ -443,6 +641,14 @@ export function patchWindowForTypedOM(window: WindowType) {
           this._contentWindow = iframeWindow;
 
           iframeDocument.write = function(src: string) {
+            const htmlToParse = src.includes('<html') ? src : `<!doctype html><html><head>${src}</head><body></body></html>`;
+            const parsedDom = parseHTML(htmlToParse);
+            if (iframeDocument.head && parsedDom.document.head) {
+              iframeDocument.head.innerHTML = parsedDom.document.head.innerHTML;
+            }
+            if (iframeDocument.body && parsedDom.document.body) {
+              iframeDocument.body.innerHTML = parsedDom.document.body.innerHTML;
+            }
             const scripts = extractScripts(src, '');
             const iframeTests: WptSandboxTest[] = [];
             const titleMatch = /<title>(.*?)<\/title>/i.exec(src);
@@ -1069,6 +1275,50 @@ const styleToElement = new WeakMap<object, Element>();
     }
   }
 
+  Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', {
+    get() {
+      if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
+        return 800;
+      }
+      const styleW = (this as HTMLElement).style?.width;
+      if (styleW) {
+        const val = parseFloat(styleW);
+        if (styleW.endsWith('px')) return val;
+        if (styleW.endsWith('em') || styleW.endsWith('rem') || styleW.endsWith('ic')) return val * 16;
+        if (styleW.endsWith('ex') || styleW.endsWith('ch')) return val * 8;
+        if (styleW.endsWith('in')) return val * 96;
+        if (styleW.endsWith('cm')) return (val * 96) / 2.54;
+        if (styleW.endsWith('mm')) return (val * 96) / 25.4;
+        if (styleW.endsWith('pt')) return (val * 96) / 72;
+        if (styleW.endsWith('pc')) return (val * 96) / 6;
+      }
+      return 0;
+    },
+    configurable: true,
+  });
+
+  Object.defineProperty(window.HTMLElement.prototype, 'offsetHeight', {
+    get() {
+      if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
+        return 600;
+      }
+      const styleH = (this as HTMLElement).style?.height;
+      if (styleH) {
+        const val = parseFloat(styleH);
+        if (styleH.endsWith('px')) return val;
+        if (styleH.endsWith('em') || styleH.endsWith('rem') || styleH.endsWith('ic')) return val * 16;
+        if (styleH.endsWith('ex') || styleH.endsWith('ch')) return val * 8;
+        if (styleH.endsWith('in')) return val * 96;
+        if (styleH.endsWith('cm')) return (val * 96) / 2.54;
+        if (styleH.endsWith('mm')) return (val * 96) / 25.4;
+        if (styleH.endsWith('pt')) return (val * 96) / 72;
+        if (styleH.endsWith('pc')) return (val * 96) / 6;
+      }
+      return 0;
+    },
+    configurable: true,
+  });
+
   Object.defineProperty(window.Element.prototype, 'computedStyleMap', {
     value() {
       if (!this._computedStyleMap) {
@@ -1142,7 +1392,7 @@ export function createWptContext(
     DOMException: (window as { DOMException?: unknown }).DOMException,
     Event: (window as { Event?: unknown }).Event,
     CustomEvent: (window as { CustomEvent?: unknown }).CustomEvent,
-    navigator: (window as { navigator?: unknown }).navigator,
+    navigator: (window as { __navigator?: unknown }).__navigator || { preferences: createNavigatorPreferences() },
     location: (window as { location?: unknown }).location || { href: 'http://localhost/test.html', origin: 'http://localhost' },
     ...Object.fromEntries(Object.entries(TypedOM).filter(([k]) => k !== 'CSSPositionValue')),
     DOMMatrix: (globalThis as { DOMMatrix?: unknown }).DOMMatrix,
@@ -1182,6 +1432,50 @@ export function createWptContext(
       const timer = setTimeout(() => {
         activeRafs.delete(id);
         try {
+          const checkWindow = (w: Record<string, unknown>) => {
+            const env = getMediaEnvForWindow(w);
+            const prevW = w.__lastWidth as number | undefined;
+            const prevH = w.__lastHeight as number | undefined;
+            if (prevW !== undefined && prevH !== undefined && (prevW !== env.width || prevH !== env.height)) {
+              w.__lastWidth = env.width;
+              w.__lastHeight = env.height;
+              const resizeEv = new ((w.Event as { new(t: string): Event }) || Event)('resize');
+              if (typeof (w.dispatchEvent as (e: Event) => boolean) === 'function') {
+                (w.dispatchEvent as (e: Event) => boolean).call(w, resizeEv);
+              }
+              if (w.__resizeListeners instanceof Set) {
+                for (const l of w.__resizeListeners) {
+                  try {
+                    l.call(w, resizeEv);
+                  } catch {}
+                }
+              }
+              if (typeof (w as { onresize?: (e: Event) => void }).onresize === 'function') {
+                try {
+                  (w as { onresize: (e: Event) => void }).onresize(resizeEv);
+                } catch {}
+              }
+            } else {
+              w.__lastWidth = env.width;
+              w.__lastHeight = env.height;
+            }
+            if (w.__activeMqls instanceof Set) {
+              for (const m of w.__activeMqls) {
+                if (typeof m._checkChange === 'function') {
+                  m._checkChange();
+                }
+              }
+            }
+          };
+
+          checkWindow(window as unknown as Record<string, unknown>);
+          const iframes = (window.document?.querySelectorAll ? Array.from(window.document.querySelectorAll('iframe')) : []) as unknown as Array<{ contentWindow?: unknown }>;
+          for (const ifr of iframes) {
+            if (ifr && ifr.contentWindow) {
+              checkWindow(ifr.contentWindow as Record<string, unknown>);
+            }
+          }
+
           cb(performance.now());
         } catch {}
       }, 16);
@@ -1295,7 +1589,19 @@ export function createWptContext(
         cleanups,
         add_cleanup: (cleanFn: Function) => {
           cleanups.push(cleanFn);
-        }
+        },
+        step: (stepFn: Function) => stepFn(),
+        step_timeout: (cb: Function, delay: number) => {
+          return setTimeout(() => {
+            try {
+              cb();
+            } catch (e) {
+              status = 1;
+              message = messageOf(e);
+            }
+          }, delay);
+        },
+        done: () => {}
       };
 
       try {
@@ -1393,7 +1699,9 @@ export function createWptContext(
       const tObj = {
         step: (stepFn: Function) => {
           try {
-            stepFn();
+            if (typeof stepFn === 'function') {
+              stepFn();
+            }
           } catch (e: unknown) {
             testObj.status = 1; // FAIL
             testObj.message = messageOf(e);
@@ -1403,20 +1711,40 @@ export function createWptContext(
           }
         },
         done: () => {
+          if ((testObj as unknown as { completed?: boolean }).completed) return;
+          (testObj as unknown as { completed?: boolean }).completed = true;
+          const cleanups = testObj.cleanups || [];
+          testObj.cleanups = [];
+          for (const cleanFn of cleanups) {
+            try {
+              cleanFn();
+            } catch {}
+          }
           if (testObj.resolve) {
             testObj.resolve();
           }
         },
-        step_func: (stepFn: Function) => {
+        step_func: (stepFn?: Function) => {
           return function(this: unknown, ...args: unknown[]) {
-            tObj.step(() => stepFn.apply(this, args));
+            tObj.step(() => {
+              if (typeof stepFn === 'function') {
+                stepFn.apply(this, args);
+              }
+            });
           };
         },
-        step_func_done: (stepFn: Function) => {
+        step_func_done: (stepFn?: Function) => {
           return function(this: unknown, ...args: unknown[]) {
-            tObj.step(() => stepFn.apply(this, args));
+            tObj.step(() => {
+              if (typeof stepFn === 'function') {
+                stepFn.apply(this, args);
+              }
+            });
             tObj.done();
           };
+        },
+        step_timeout: (stepFn: Function, delay: number) => {
+          return setTimeout(tObj.step_func(stepFn), delay);
         },
         add_cleanup: (cleanFn: Function) => {
           if (!testObj.cleanups) {
@@ -1555,6 +1883,18 @@ export function createWptContext(
     },
     assert_false: (actual: unknown, description?: string) => {
       assert.strictEqual(actual, false, description ?? '');
+    },
+    assert_less_than: (actual: unknown, expected: unknown, description?: string) => {
+      assert.ok(Number(actual) < Number(expected), `${description || ''}: expected ${actual} < ${expected}`);
+    },
+    assert_greater_than: (actual: unknown, expected: unknown, description?: string) => {
+      assert.ok(Number(actual) > Number(expected), `${description || ''}: expected ${actual} > ${expected}`);
+    },
+    assert_less_than_equal: (actual: unknown, expected: unknown, description?: string) => {
+      assert.ok(Number(actual) <= Number(expected), `${description || ''}: expected ${actual} <= ${expected}`);
+    },
+    assert_greater_than_equal: (actual: unknown, expected: unknown, description?: string) => {
+      assert.ok(Number(actual) >= Number(expected), `${description || ''}: expected ${actual} >= ${expected}`);
     },
     assert_in_array: (actual: unknown, expected: unknown[], description?: string) => {
       assert.ok(expected.includes(actual), `${description || ''}: expected ${actual} to be in array ${JSON.stringify(expected)}`);

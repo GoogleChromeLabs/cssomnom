@@ -18,7 +18,7 @@ import { ParseHooks } from './parse-hooks.ts';
 import { serialize, serializeDeclarations, serializeString, serializeIdentifier, serializeSelectorList } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import { StylePropertyMap } from './typed-om.ts';
-import type { Declaration, Rule, ASTAtRule, ComponentValue, MediaQuery } from './types.ts';
+import type { Declaration, Rule, ASTAtRule, ComponentValue, MediaQuery, CustomMediaQuery } from './types.ts';
 import { MediaParser, serializeMediaQuery } from './MediaParser.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { createIndexedProxy, deleteRuleFromArray } from './utils.ts';
@@ -778,11 +778,42 @@ export class CSSMediaRule extends CSSGroupingRule {
     this.media = new MediaList(mediaText);
   }
 
+  get conditionText(): string {
+    return this.media.mediaText;
+  }
+
+  set conditionText(value: string) {
+    this.media.mediaText = value;
+  }
+
   get type() { return 4; }
 
   // 6.17 The CSSMediaRule Interface
   get cssText() {
     return serializeGroupingRule('media', this.media.mediaText, this._rules);
+  }
+
+  set cssText(_value: string) {
+    // Do nothing as per spec
+  }
+}
+
+// Media Queries 5 § 2.3 #custom-mq
+export class CSSCustomMediaRule extends CSSRule {
+  readonly name: string;
+  readonly query: CustomMediaQuery;
+
+  constructor(name: string, query: CustomMediaQuery) {
+    super();
+    this.name = name;
+    this.query = query;
+  }
+
+  get type() { return 0; }
+
+  get cssText(): string {
+    const queryStr = typeof this.query === 'boolean' ? String(this.query) : this.query.mediaText;
+    return `@custom-media ${this.name}${queryStr ? ' ' + queryStr : ''};`;
   }
 
   set cssText(_value: string) {
