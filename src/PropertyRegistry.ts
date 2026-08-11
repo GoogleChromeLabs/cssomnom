@@ -31,7 +31,7 @@ export interface PropertyDefinition {
 const VALID_COMPONENTS = new Set([
   'length', 'number', 'percentage', 'length-percentage',
   'color', 'image', 'url', 'integer', 'angle', 'time',
-  'resolution', 'transform-function', 'transform-list', 'custom-ident', 'string'
+  'resolution', 'transform-function', 'transform-list', 'custom-ident', 'string', 'flex'
 ]);
 
 const VIEWPORT_UNITS = new Set([
@@ -195,6 +195,7 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
         if (name === 'angle') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'angle');
         if (name === 'time') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'time');
         if (name === 'resolution') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'resolution');
+        if (name === 'flex') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'flex');
 
         if (name === 'color') {
           if (t.type === 'hash') {

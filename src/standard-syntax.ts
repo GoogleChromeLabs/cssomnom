@@ -15,27 +15,21 @@
  * limitations under the License.
  */
 
+import { GENERATED_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
+
 // STANDARD_PROPERTIES_SYNTAX registry maps CSS property names to Houdini-compliant syntax strings.
 //
-// WHY MANUALLY MAINTAINED?
-// CSS specifications contain complex grammars (space-separated, brackets, ||/&& combinators)
-// that cannot be parsed by matchesSyntax/parseSyntax (which strictly conform to the Houdini
-// Custom Properties API syntax specification, prohibiting space separators, groupings, etc.).
-//
-// RULES FOR ADDING PROPERTIES:
-// 1. Only add properties if we explicitly want to validate them in CSSStyleValue.parse() / CSS.supports().
-// 2. The syntax MUST be Houdini-compliant: basic types, '|' alternatives, and simple multipliers.
-// 3. DO NOT add properties with complex syntaxes (e.g. space-separated values, complex sequences),
-//    as they will cause false-positives and reject valid standard CSS values.
-//
-// Omitted properties bypass validation and always pass, preserving CSSOM robustness.
-export const STANDARD_PROPERTIES_SYNTAX: Record<string, string> = {
+// Generated standard syntax definitions are merged with manual overrides for specialized validation.
+const MANUAL_OVERRIDES: Record<string, string> = {
   'alignment-baseline': 'baseline | text-bottom | alphabetic | ideographic | middle | central | mathematical | text-top',
   'backface-visibility': 'visible | hidden',
   'background-color': '<color>',
   'border-bottom-color': '<color>',
   'border-collapse': 'separate | collapse',
   'border-color': '<color>',
+  'caret-color': 'auto | <color>',
+  'fill': '<color>',
+  'stroke': '<color>',
   'border-left-color': '<color>',
   'border-right-color': '<color>',
   'border-top-color': '<color>',
@@ -127,3 +121,9 @@ export const STANDARD_PROPERTIES_SYNTAX: Record<string, string> = {
   'writing-mode': 'horizontal-tb | vertical-rl | vertical-lr | sideways-rl | sideways-lr',
   'z-index': 'auto | <integer>',
 };
+
+export const STANDARD_PROPERTIES_SYNTAX: Record<string, string> = {
+  ...GENERATED_PROPERTIES_SYNTAX,
+  ...MANUAL_OVERRIDES,
+};
+

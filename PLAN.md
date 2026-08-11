@@ -2025,6 +2025,34 @@ Objective: Implement a pure-AST static selector matcher and declarative cascade 
 
 ---
  
+## Phase 85: Typed OM Standard Property Syntax Codegen & StylePropertyMap Validation
+
+Objective: Generate standard property syntax definitions for all 800+ CSS properties from `@webref/css` into `src/data/gen/standard-syntax.ts` to enforce spec-compliant Typed OM value validation in `StylePropertyMap.set()`, `CSSStyleValue.parse()`, and `CSSStyleValue.parseAll()`, unlocking ~5,000 WPT tests in `css-typed-om`.
+
+**Spec References**:
+- CSS Typed OM 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
+  - § 2.2 CSSStyleValue.parse() & parseAll() (`#dom-cssstylevalue-parse`)
+  - § 3.2 StylePropertyMap (`#the-stylepropertymap`)
+- CSS Properties & Values API: `submodules/css-houdini-drafts/css-properties-values-api/Overview.bs`
+  - § 3 Syntax Strings (`#syntax-strings`)
+
+### Tasks
+- [x] **Property Syntax Codegen (`scripts/codegen/generate_standard_syntax.ts`)**:
+  - Read `node_modules/@webref/css/css.json` containing all 815 standard CSS properties.
+  - Convert standard W3C syntax expressions into Houdini-compliant syntax definitions (`<color>`, `<length-percentage>`, `<length>`, `<percentage>`, `<number>`, `<time>`, `<angle>`, keyword combinations).
+  - Emit `src/data/gen/standard-syntax.ts` (810 properties) and integrate with `scripts/generate_all.ts` / `pnpm run codegen`.
+- [x] **Syntax Validation in `src/typed-om.ts` & `src/standard-syntax.ts`**:
+  - Merge `GENERATED_PROPERTIES_SYNTAX` into `STANDARD_PROPERTIES_SYNTAX`.
+  - Implemented `matchesStyleValueSyntax` and updated `StylePropertyMap.set()`, `StylePropertyMap.append()`, `CSSStyleValue.parse()`, and `CSSStyleValue.parseAll()` to validate values against syntax and throw `TypeError` on invalid combinations.
+- [x] **Unit Tests & Parity Suite (`tests/typed-om-syntax.test.ts`)**:
+  - Added unit test suite verifying invalid and valid Typed OM value assignments across standard CSS properties.
+- [x] **Mandatory Pre/Post Cluster Delta Reconciliation**:
+  - Pre-implementation baseline: 6,074 / 12,150 passed (49.99% pass rate), Cluster #1 had 5,121 failures ("Expected to throw JS exception").
+  - Post-implementation result: 10,991 / 12,150 passed (90.46% pass rate), Cluster #1 failures dropped from 5,121 down to 98 (over 5,000 WPT failures resolved).
+  - Preflight verification: `pnpm run preflight` 100% clean (0 TypeScript type errors, 0 linter warnings, all tests pass).
+
+---
+
 ## Potential roadmap items
 
 Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.

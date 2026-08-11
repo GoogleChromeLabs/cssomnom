@@ -24,6 +24,7 @@ import { parseMathFunction, simplify } from './math-parser.ts';
 import { tokenize } from './tokenizer.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { SHORTHANDS } from './shorthands.ts';
+import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/gen/units.ts';
 export type { CSSUnit };
 import { formatNumber } from './utils/format.ts';
@@ -240,6 +241,13 @@ export class CSSStyleValue {
       if (expanded === null) {
         throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
       }
+      for (const [longhand, longhandTokens] of Object.entries(expanded)) {
+        const longhandSyntax = STANDARD_PROPERTIES_SYNTAX[longhand.toLowerCase()];
+        if (longhandSyntax && !matchesSyntax(longhandTokens, longhandSyntax)) {
+          throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
+        }
+      }
+      return [new CSSStyleValue(css, privateToken)];
     }
 
     if (hasVarFunction(trimmed)) {
@@ -255,14 +263,84 @@ export class CSSStyleValue {
 
     const propLower = property.toLowerCase();
 
+    if (POSITION_PROPERTIES.has(propLower)) {
+      const posVal = tryParsePosition(trimmed, property);
+      if (posVal) return [posVal];
+      return [new CSSStyleValue(css, privateToken)];
+    }
+
+    if (propLower === 'transform') {
+      if (trimmed.length === 1 && trimmed[0].type === 'ident' && trimmed[0].value.toLowerCase() === 'none') {
+        return [new CSSKeywordValue('none')];
+      }
+      return [CSSTransformValue.parse(css)];
+    }
+
+    if ((property in SHORTHANDS_DATA) && !hasVarFunction(trimmed)) {
+      if (LIST_PROPERTIES.has(propLower) && componentValues.some(t => t.type === 'comma')) {
+        const segments: ComponentValue[][] = [[]];
+        for (const t of componentValues) {
+          if (t.type === 'comma') {
+            segments.push([]);
+          } else {
+            segments[segments.length - 1].push(t);
+          }
+        }
+        return segments
+          .map(seg => seg.filter(v => v.type !== 'comment'))
+          .filter(seg => seg.some(v => v.type !== 'whitespace'))
+          .map(seg => CSSStyleValue.createValueFromTokens(seg, property));
+      }
+      return [new CSSStyleValue(css, privateToken)];
+    }
+    if (propLower === 'translate') {
+      const args = trimmed.filter(v => v.type !== 'comma');
+      if (args.length < 1 || args.length > 3) {
+        throw new TypeError(`translate expects 1, 2, or 3 arguments, got ${args.length}`);
+      }
+      return [parseTranslate('translate', args)];
+    }
+    if (propLower === 'rotate') {
+      const args = trimmed.filter(v => v.type !== 'comma');
+      if (args.length !== 1 && args.length !== 4) {
+        throw new TypeError(`rotate expects 1 or 4 arguments, got ${args.length}`);
+      }
+      return [parseRotate('rotate', args)];
+    }
+    if (propLower === 'scale') {
+      const args = trimmed.filter(v => v.type !== 'comma');
+      if (args.length < 1 || args.length > 3) {
+        throw new TypeError(`scale expects 1, 2, or 3 arguments, got ${args.length}`);
+      }
+      return [parseScale('scale', args)];
+    }
+
     let syntax: string | undefined = STANDARD_PROPERTIES_SYNTAX[propLower];
     if (!syntax && property.startsWith('--')) {
       syntax = PropertyRegistry.get(property)?.syntax;
     }
 
     if (syntax && !hasVarFunction(trimmed)) {
-      if (!matchesSyntax(trimmed, syntax)) {
-        throw new TypeError(`Value '${css}' does not match syntax '${syntax}' for property '${property}'`);
+      const isListProperty = LIST_PROPERTIES.has(propLower);
+      if (isListProperty && trimmed.some(t => t.type === 'comma')) {
+        const segments: ComponentValue[][] = [[]];
+        for (const t of trimmed) {
+          if (t.type === 'comma') {
+            segments.push([]);
+          } else {
+            segments[segments.length - 1].push(t);
+          }
+        }
+        for (const seg of segments) {
+          const segTrimmed = seg.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+          if (segTrimmed.length > 0 && !matchesSyntax(segTrimmed, syntax)) {
+            throw new TypeError(`Value '${css}' does not match syntax '${syntax}' for property '${property}'`);
+          }
+        }
+      } else {
+        if (!matchesSyntax(trimmed, syntax)) {
+          throw new TypeError(`Value '${css}' does not match syntax '${syntax}' for property '${property}'`);
+        }
       }
     }
 
@@ -294,31 +372,6 @@ export class CSSStyleValue {
           if (styleValue) return [styleValue];
         }
       }
-    }
-
-    if (propLower === 'transform') {
-      return [CSSTransformValue.parse(css)];
-    }
-    if (propLower === 'translate') {
-      const args = trimmed.filter(v => v.type !== 'comma');
-      if (args.length < 1 || args.length > 3) {
-        throw new TypeError(`translate expects 1, 2, or 3 arguments, got ${args.length}`);
-      }
-      return [parseTranslate('translate', args)];
-    }
-    if (propLower === 'rotate') {
-      const args = trimmed.filter(v => v.type !== 'comma');
-      if (args.length !== 1 && args.length !== 4) {
-        throw new TypeError(`rotate expects 1 or 4 arguments, got ${args.length}`);
-      }
-      return [parseRotate('rotate', args)];
-    }
-    if (propLower === 'scale') {
-      const args = trimmed.filter(v => v.type !== 'comma');
-      if (args.length < 1 || args.length > 3) {
-        throw new TypeError(`scale expects 1, 2, or 3 arguments, got ${args.length}`);
-      }
-      return [parseScale('scale', args)];
     }
     const results: CSSStyleValue[] = [];
     const isListProperty = LIST_PROPERTIES.has(property);
@@ -2707,6 +2760,148 @@ function matchesAngle(type: CSSNumericType): boolean {
          (type.percentHint === null || type.percentHint === undefined || type.percentHint === 'angle');
 }
 
+function matchesTime(type: CSSNumericType): boolean {
+  return (type.time || 0) === 1 &&
+         (type.length || 0) === 0 &&
+         (type.angle || 0) === 0 &&
+         (type.frequency || 0) === 0 &&
+         (type.resolution || 0) === 0 &&
+         (type.flex || 0) === 0 &&
+         (type.percent || 0) === 0 &&
+         (type.percentHint === null || type.percentHint === undefined || type.percentHint === 'time');
+}
+
+function matchesFrequency(type: CSSNumericType): boolean {
+  return (type.frequency || 0) === 1 &&
+         (type.length || 0) === 0 &&
+         (type.angle || 0) === 0 &&
+         (type.time || 0) === 0 &&
+         (type.resolution || 0) === 0 &&
+         (type.flex || 0) === 0 &&
+         (type.percent || 0) === 0 &&
+         (type.percentHint === null || type.percentHint === undefined || type.percentHint === 'frequency');
+}
+
+function matchesResolution(type: CSSNumericType): boolean {
+  return (type.resolution || 0) === 1 &&
+         (type.length || 0) === 0 &&
+         (type.angle || 0) === 0 &&
+         (type.time || 0) === 0 &&
+         (type.frequency || 0) === 0 &&
+         (type.flex || 0) === 0 &&
+         (type.percent || 0) === 0 &&
+         (type.percentHint === null || type.percentHint === undefined || type.percentHint === 'resolution');
+}
+
+function matchesFlex(type: CSSNumericType): boolean {
+  return (type.flex || 0) === 1 &&
+         (type.length || 0) === 0 &&
+         (type.angle || 0) === 0 &&
+         (type.time || 0) === 0 &&
+         (type.frequency || 0) === 0 &&
+         (type.resolution || 0) === 0 &&
+         (type.percent || 0) === 0 &&
+         (type.percentHint === null || type.percentHint === undefined || type.percentHint === 'flex');
+}
+
+// css-typed-om § 3.2 #the-stylepropertymap
+// css-properties-values-api § 3 #syntax-strings
+function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propLower: string): boolean {
+  if (value instanceof CSSUnparsedValue || value instanceof CSSVariableReferenceValue) {
+    return true;
+  }
+  if (value.constructor === CSSStyleValue) {
+    if (value._associatedProperty !== null && value._associatedProperty !== propLower) {
+      return false;
+    }
+    return true;
+  }
+  if (syntax === '*' || !syntax) {
+    return true;
+  }
+
+  if (value instanceof CSSKeywordValue) {
+    const kw = value.value.toLowerCase();
+    const CSS_WIDE = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default']);
+    if (CSS_WIDE.has(kw)) return true;
+
+    if (syntax.includes('<custom-ident>') || syntax.includes('<string>')) return true;
+
+    const parts = syntax.split('|').map(s => s.trim().toLowerCase());
+    if (parts.includes(kw)) return true;
+
+    if (syntax.includes('<color>')) {
+      const SYSTEM_COLORS = new Set([
+        'canvas', 'canvastext', 'linktext', 'visitedtext', 'activeborder', 'activecaption', 'appworkspace',
+        'background', 'buttonface', 'buttonhighlight', 'buttonshadow', 'buttontext', 'captiontext', 'graytext',
+        'highlight', 'highlighttext', 'inactiveborder', 'inactivecaption', 'inactivecaptiontext', 'infobackground',
+        'infotext', 'menu', 'menutext', 'scrollbar', 'threeddarkshadow', 'threedface', 'threedhighlight',
+        'threedlightshadow', 'threedshadow', 'window', 'windowframe', 'windowtext', 'currentcolor'
+      ]);
+      if (kw in NAMED_COLORS || SYSTEM_COLORS.has(kw) || kw === 'currentcolor') {
+        return true;
+      }
+    }
+
+    if (syntax.includes('<position>') && ['left', 'right', 'center', 'top', 'bottom'].includes(kw)) {
+      return true;
+    }
+
+    if ((syntax.includes('<image>') || syntax.includes('<transform-list>')) && kw === 'none') {
+      return true;
+    }
+
+    return false;
+  }
+
+  if (value instanceof CSSNumericValue) {
+    const t = value.type();
+    const hasLengthPct = syntax.includes('<length-percentage>');
+    const hasLength = syntax.includes('<length>') || hasLengthPct;
+    const hasPercentage = syntax.includes('<percentage>') || hasLengthPct;
+    const hasNumber = syntax.includes('<number>') || syntax.includes('<integer>');
+    const hasAngle = syntax.includes('<angle>');
+    const hasTime = syntax.includes('<time>');
+    const hasFrequency = syntax.includes('<frequency>');
+    const hasResolution = syntax.includes('<resolution>');
+    const hasFlex = syntax.includes('<flex>');
+
+    if (matchesLengthPercentage(t)) {
+      if (matchesLength(t) && hasLength) return true;
+      if (matchesPercentage(t) && hasPercentage) return true;
+      if (hasLengthPct) return true;
+    }
+    if (matchesNumber(t) && hasNumber) return true;
+    if (matchesPercentage(t) && hasPercentage) return true;
+    if (matchesAngle(t) && hasAngle) return true;
+    if (matchesTime(t) && hasTime) return true;
+    if (matchesFrequency(t) && hasFrequency) return true;
+    if (matchesResolution(t) && hasResolution) return true;
+    if (matchesFlex(t) && hasFlex) return true;
+
+    return false;
+  }
+
+  if (value instanceof CSSTransformValue || value instanceof CSSTransformComponent) {
+    return syntax.includes('<transform-list>') || syntax.includes('<transform-function>') ||
+      propLower === 'transform' || propLower === 'translate' || propLower === 'rotate' || propLower === 'scale';
+  }
+
+  if (value instanceof CSSColorValue) {
+    return syntax.includes('<color>') || COLOR_PROPERTIES.has(propLower);
+  }
+
+  if (value instanceof CSSImageValue) {
+    return syntax.includes('<image>') || syntax.includes('<url>');
+  }
+
+  if (value instanceof CSSPositionValue) {
+    return syntax.includes('<position>') || syntax.includes('<length-percentage>') || POSITION_PROPERTIES.has(propLower);
+  }
+
+  return false;
+}
+
 export abstract class CSSTransformComponent extends CSSStyleValue {
   constructor() {
     super();
@@ -3657,24 +3852,8 @@ function getStyleCache(style: unknown): Map<string, CSSStyleValue[]> {
 }
 
 function isEquivalent(a: string, b: string): boolean {
-  const clean = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
+  const clean = (s: unknown) => (typeof s === 'string' ? s : String(s || '')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
   return clean(a) === clean(b);
-}
-
-function getRepresentative(val: CSSUnitValue): CSSUnitValue {
-  const unit = val.unit.toLowerCase();
-  if (unit === 'number') return createUnitValue(1, 'number');
-  if (unit === 'percent') return createUnitValue(1, 'percent');
-
-  const base = unitToBase[unit];
-  if (base === 'length') return createUnitValue(1, 'px');
-  if (base === 'angle') return createUnitValue(1, 'deg');
-  if (base === 'time') return createUnitValue(1, 's');
-  if (base === 'frequency') return createUnitValue(1, 'hz');
-  if (base === 'resolution') return createUnitValue(1, 'dpi');
-  if (base === 'flex') return createUnitValue(1, 'fr');
-
-  return val;
 }
 
 let dummyStyle: CSSStyleDeclaration | null = null;
@@ -3720,7 +3899,9 @@ function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
   return false;
 }
 
+// css-typed-om § 3.2 #the-stylepropertymap
 function validateValuesForProperty(property: string, values: (CSSStyleValue | string)[]): string {
+  validateProperty(property);
   const propLower = property.toLowerCase();
   const isList = LIST_PROPERTIES.has(propLower);
 
@@ -3739,15 +3920,25 @@ function validateValuesForProperty(property: string, values: (CSSStyleValue | st
     }
   }
 
+  const syntax = propLower.startsWith('--') ? PropertyRegistry.get(property)?.syntax : STANDARD_PROPERTIES_SYNTAX[propLower];
+
   const valStrings: string[] = [];
-  const validationStrings: string[] = [];
   for (const val of values) {
     if (typeof val === 'string') {
+      if (!propLower.startsWith('--')) {
+        try {
+          CSSStyleValue.parseAll(property, val);
+        } catch (e) {
+          throw new TypeError(`Invalid value for property ${property}: ${val}`);
+        }
+      }
       valStrings.push(val);
-      validationStrings.push(val);
     } else {
       if (val._associatedProperty !== null && val._associatedProperty !== propLower) {
         throw new TypeError(`CSSStyleValue is associated with ${val._associatedProperty}, not ${property}`);
+      }
+      if (syntax && !matchesStyleValueSyntax(val, syntax, propLower)) {
+        throw new TypeError(`Invalid value of type ${val.constructor.name} for property ${property}`);
       }
       if (val instanceof CSSUnitValue) {
         if (shouldWrapInCalc(property, val)) {
@@ -3755,31 +3946,19 @@ function validateValuesForProperty(property: string, values: (CSSStyleValue | st
         } else {
           valStrings.push(val.toString());
         }
-        validationStrings.push(getRepresentative(val).toString());
       } else {
         valStrings.push(val.toString());
-        validationStrings.push(val.toString());
       }
     }
   }
 
   const finalString = valStrings.join(isList ? ', ' : ' ');
-  const validationString = validationStrings.join(isList ? ', ' : ' ');
 
   if (!propLower.startsWith('--')) {
-    if (typeof globalThis.document === 'undefined') {
-      try {
-        CSSStyleValue.parseAll(property, validationString);
-      } catch (e) {
-        throw new TypeError(`Invalid value for property ${property}: ${finalString}`);
-      }
-    } else {
-      const dummy = getDummyStyle();
-      dummy.cssText = '';
-      dummy.setProperty(property, validationString);
-      if (dummy.getPropertyValue(property) === '') {
-        throw new TypeError(`Invalid value for property ${property}: ${finalString}`);
-      }
+    try {
+      CSSStyleValue.parseAll(property, finalString);
+    } catch (e) {
+      throw new TypeError(`Invalid value for property ${property}: ${finalString}`);
     }
   }
 
@@ -3953,19 +4132,10 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     const newValue = current ? `${current}, ${finalString}` : finalString;
 
     if (!propLower.startsWith('--')) {
-      if (typeof globalThis.document === 'undefined') {
-        try {
-          CSSStyleValue.parseAll(property, newValue);
-        } catch (e) {
-          throw new TypeError(`Invalid combined value for property ${property}: ${newValue}`);
-        }
-      } else {
-        const dummy = getDummyStyle();
-        dummy.cssText = '';
-        dummy.setProperty(property, newValue);
-        if (dummy.getPropertyValue(property) === '') {
-          throw new TypeError(`Invalid combined value for property ${property}: ${newValue}`);
-        }
+      try {
+        CSSStyleValue.parseAll(property, newValue);
+      } catch (e) {
+        throw new TypeError(`Invalid combined value for property ${property}: ${newValue}`);
       }
     }
 
