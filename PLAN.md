@@ -2152,17 +2152,87 @@ Objective: Implement modern Media Queries Level 4/5 range syntax, media feature 
 
 ---
 
-## Potential roadmap items
+## Phase 89: CSS Syntax & Tokenizer Conformance (`css/css-syntax`)
 
-Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
+Objective: Drive WPT `css/css-syntax` conformance from 54.83% (227/414) to >96% (~398+/414) by implementing spec-compliant consecutive token serialization separators (`/**/`), dropping unrecognized at-rules in declaration blocks, ignoring `@charset` in CSSOM rules, fixing surrogate filtering in `StreamingTokenizer`, and aligning DOMException types in selector validation.
 
-### Ideas
+**Spec References**:
+- CSS Syntax Level 3: `submodules/csswg-drafts/css-syntax-3/Overview.bs`
+  - § 3.2 Tokenizing and Parsing & § 3.3 Preprocessing the Input Stream (`#input-preprocessing`)
+  - § 4.3 Tokenizer Algorithms (`#consume-token`, `#consume-string-token`, `#consume-numeric-token`, `#consume-ident-like-token`, `#consume-escaped-code-point`)
+  - § 5.4 Parser Algorithms (`#consume-list-of-rules`, `#consume-at-rule`, `#consume-qualified-rule`, `#consume-declaration`)
+  - § 8 Serialization (`#serialization`)
+- Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs` (§ 15 `#parsing-selectors`)
 
-- [ ] **WPT Multi-Spec Conformance Drive**:
-  - [ ] **Wave 4: CSS Syntax & Tokenizer Conformance (`css/css-syntax`)**: String/ident escape sequence normalization, CDO/CDC comment tokens, bad URL recovery, and whitespace trimming rules.
-  - [ ] **Wave 6: Advanced Typed OM Value Reification (`css/css-typed-om`)**: Viewport units, calculation expression trees, `anchor()` functions, and custom property value reification in `StylePropertyMap`.
-- [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
-- [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
+### Tasks
+- [ ] **Consecutive Token Serialization Separator Comments (`src/serializer.ts`)**:
+  - Implement pairwise token compatibility lookup table per CSS Syntax 3 § 8.
+  - Insert `/**/` when serializing adjacent tokens that would coalesce if serialized directly (e.g. `foo` + `bar` -> `foo/**/bar`, `foo` + `url(bar)` -> `foo/**/url(bar)`, `.` + `123` -> `./**/123`, `+` + `123` -> `+/**/123`).
+  - Resolves all 18 failures across clusters #3, #4, #5, #7, #8, #9, #10 in `serialize-consecutive-tokens.html`.
+- [ ] **Unrecognized At-Rule Rejection in Declaration Lists (`src/parser.ts`)**:
+  - In `consumeAtRuleFromStream` and `consumeAtRule`, verify at-rule validity in current context per § 5.4.4.
+  - When inside style rules, `@page`, or `@font-face` declaration blocks, return `null` for unknown/unsupported at-rules (e.g. `@at {}`, `@at at;`), dropping them from child rules.
+  - Ensures primary declarations (e.g. `color: green`) correctly populate `rule.style` rather than being isolated in subsequent `CSSNestedDeclarations` rules.
+  - Resolves 104 failures in Cluster #1 across `at-rule-in-declaration-list.html`.
+- [ ] **`@charset` Directive Exclusion from CSSOM (`src/parser.ts`)**:
+  - In `isSupportedAtRule(name)` and `consumeListOfRules()`, explicitly treat `@charset` as a non-rule byte marker per § 3.2, returning `null`.
+  - Ensures `@charset "utf-8";` is ignored during stylesheet token consumption and omitted from `CSSStyleSheet.cssRules`.
+  - Resolves `charset-is-not-a-rule.html`.
+- [ ] **`StreamingTokenizer` Surrogate Code Point Sanitization (`src/streaming-tokenizer.ts`)**:
+  - In `preprocessChunk()`, add surrogate replacement (`[\uD800-\uDFFF] -> \uFFFD`) and buffer high surrogates at chunk boundaries in `this.remnant` to preserve surrogate pairs across streaming chunks.
+  - Protect `slice(start, end)` from large chunk stack overflow by chunking `String.fromCodePoint`.
+- [ ] **Selector Error DOMException Alignment (`src/SelectorParser.ts`)**:
+  - Replace JavaScript `throw new SyntaxError(...)` with `throw new DOMException(..., 'SyntaxError')` for all selector syntax violations per DOM / Selectors 4 specs.
+  - Resolves Cluster #6 in `escaped-eof.html`.
+- [ ] **Verification & Conformance Reconciliation**:
+  - Run `node scripts/wpt/node/cluster.ts --spec=css-syntax` to verify pass rate increases from 54.83% to >96%.
+  - Run `pnpm run preflight` to ensure 0 TypeScript errors, 0 lint warnings, and 100% passing tests across all test suites.
+
+---
+
+## Phase 90: CSSOM Core Rules & Shorthand Descriptors (`css/cssom`)
+
+Objective: Implement spec-compliant declaration specified order reconciliation, shorthand property `getPropertyValue` completeness checks, and IDL descriptor interfaces, lifting WPT `css/cssom` conformance past 85%.
+
+**Spec References**:
+- CSSOM Level 1: `submodules/csswg-drafts/cssom-1/Overview.bs`
+  - § 6.4 CSS Rules (§ 6.4.1 `CSSStyleRule` `#the-cssstylerule-interface`, § 6.4.2 `CSSImportRule` `#the-cssimportrule-interface`, § 6.4.3 `CSSGroupingRule` `#the-cssgroupingrule-interface`)
+  - § 6.5 `CSSStyleSheet` (`#the-cssstylesheet-interface`)
+  - § 6.6 `CSSStyleDeclaration` (`#the-cssstyledeclaration-interface`, § 6.6.2 `#dom-cssstyledeclaration-getpropertyvalue`)
+- CSS Animations Level 1: `submodules/csswg-drafts/css-animations-1/Overview.bs` (§ 4.3 `CSSKeyframeRule`, § 4.4 `CSSKeyframesRule`)
+
+### Tasks
+- [ ] **Specified Order & Duplicate Declaration Reconciliation (`src/CSSStyleDeclaration.ts`)**:
+  - Align `_addDeclaration` with `cssom-1 § 6.4.1 #concept-declarations-specified-order` to ensure winning declarations maintain their relative specified position.
+- [ ] **Strict Shorthand `getPropertyValue` Completeness (`src/CSSStyleDeclaration.ts`)**:
+  - Ensure incomplete constituent longhand sets immediately return `""` rather than falling back to unexpanded direct declarations per `cssom-1 § 6.6.2`.
+- [ ] **Descriptor Interface Property Accessors & Type Hardening (`src/CSSOM.ts`, `src/types.ts`)**:
+  - Tighten IDL attributes (`readonly media` on `CSSImportRule`).
+  - Validate camelCase and dashed accessors on `CSSPageDescriptors`, `CSSFontFaceDescriptors`, `CSSMarginDescriptors`.
+- [ ] **Unit Test & Parity Suite**:
+  - Add tests verifying index bounds precedence, `[PutForwards=cssText]`, `CSSKeyframesRule` backward matching, hierarchy errors, and shorthand `getPropertyValue` completeness in a new unit test suite.
+
+---
+
+## Phase 91: Advanced Calculation Tree Simplification & Typed OM Edge Cases (`css/css-typed-om`)
+
+Objective: Implement normative calculation tree simplification, proxy index append setters, and `StylePropertyMap` custom property case sensitivity per CSS Values 4 and CSS Typed OM 1.
+
+**Spec References**:
+- CSS Values 4: `submodules/csswg-drafts/css-values-4/Overview.bs` (§ 10.7 Performance-sensitive Simplification of Calculation Trees `#calc-simplification`)
+- CSS Typed OM 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs` (§ 3.2 `#the-stylepropertymap`, § 3.4 `#unparsedvalue-objects`, § 7 `#transformvalue-objects`)
+
+### Tasks
+- [ ] **Same-Unit Literal Combining in `min()` / `max()` (`src/math-parser.ts`)**:
+  - In `simplifyMinMax`, group numeric children by unit and combine same-unit literals (`min(10px, 20px, 100%)` -> `min(10px, 100%)`) per CSS Values 4 § 10.7 step 5.
+- [ ] **Negation Distribution over `CSSMathSum` (`src/math-parser.ts`)**:
+  - Distribute `CSSMathNegate` over inner `CSSMathSum` terms per CSS Values 4 § 10.7 step 6.3.
+- [ ] **Indexed Property Proxy Setters (`src/typed-om.ts`)**:
+  - Support appending at end of list (`array[array.length] = item`) in `CSSUnparsedValue` and `CSSTransformValue` per CSS Typed OM 1 § 3.4 & § 7.
+- [ ] **`StylePropertyMap` Custom Property Case Sensitivity & Validation (`src/typed-om.ts`)**:
+  - Preserve case for custom properties (`--fooBar`) during `_associatedProperty` validation.
+  - Enforce `TypeError` on `StylePropertyMap.append()` when existing property contains `var()`.
+  - Partition iteration order in `StylePropertyMapReadOnly` (standard -> vendor-prefixed -> custom properties).
 
 
 
