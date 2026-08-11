@@ -596,7 +596,7 @@ Objective: Resolve circular dependencies between `Parser` and `Typed OM` and loc
 ### Tasks
 - [x] **Resolve Circular Dependencies**: Used Dependency Inversion via `ParseHooks` to inject parser implementations into Typed OM classes.
 - [x] **API Lockdown**: Added `tests/api-surface.test.ts` to lock down the API surface.
-- [x] **Documentation**: Documented spec boundaries in `API_BOUNDARIES.md`.
+- [x] **Documentation**: Documented spec boundaries in `README.md`.
 
 ## Phase 34: Static Selector Matching Enhancements
 
@@ -1396,11 +1396,11 @@ Objective: Build a Node-based VM sandbox runner using `linkedom` to execute brow
 - [x] **HTMLElement attributeStyleMap**: Define `HTMLElement.prototype.attributeStyleMap` and `Element.prototype.computedStyleMap()` getters using our `StylePropertyMap` wrapper.
 
 #### 2. Sandbox VM Execution Script [x]
-- [x] **Runner script**: Create `scripts/run_wpt_sandbox.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
-- [x] **Sandbox configuration**: Support a config file (`tests/wpt-sandbox-config.json`) defining allowlisted/skipped suites and baseline failures.
+- [x] **Runner script**: Create `scripts/run_wpt_node.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
+- [x] **Sandbox configuration**: Support a config file (`tests/wpt-node-config.json`) defining allowlisted/skipped suites and baseline failures.
 
 #### 3. Integrate into Preflight [x]
-- [x] **Preflight hook**: Hook `scripts/run_wpt_sandbox.ts` into our node test run to enforce dynamic browser WPT checks.
+- [x] **Preflight hook**: Hook `scripts/run_wpt_node.ts` into our node test run to enforce dynamic browser WPT checks.
 
 ---
 
@@ -1454,7 +1454,7 @@ Objective: Implement the findings from our consolidated spec compliance report a
 
 #### 4. CSSOM [x]
 - [x] **CSSPageRule selectorText**: Convert to getter/setter with syntax validation and serialization normalization.
-- [x] **CSSImportRule styleSheet doc**: Document `CSSImportRule.styleSheet` returning `null` in `API_BOUNDARIES.md`.
+- [x] **CSSImportRule styleSheet doc**: Document `CSSImportRule.styleSheet` returning `null` in `README.md`.
 - [x] **CSSKeyframesRule methods**: Implement `appendRule`, `deleteRule`, and `findRule`.
 - [x] **Missing rules**: Add stub classes for `CSSCounterStyleRule` and `CSSFontFeatureValuesRule`.
 #### 5. Selectors & Specificity [x]
@@ -1559,10 +1559,10 @@ Objective: Run WPT tests dynamically using a lightweight harness shim, eliminati
 Objective: Merge redundant WPT shims and DOM setups into a single, clean helper file (`tests/wpt-shim.ts`) and reuse it across both Node unit tests and the sandbox CLI script.
 
 ### Tasks
-- [x] **Consolidate shims**: Move any unique shims from `scripts/run_wpt_sandbox.ts` (such as `promise_test()`, `assert_not_equals()`, `assert_array_equals()`, `assert_class_string()`, `assert_unreached()`) into `tests/wpt-shim.ts`.
+- [x] **Consolidate shims**: Move any unique shims from `scripts/run_wpt_node.ts` (such as `promise_test()`, `assert_not_equals()`, `assert_array_equals()`, `assert_class_string()`, `assert_unreached()`) into `tests/wpt-shim.ts`.
 - [x] **Consolidate DOM setups**: Integrate the `HTMLStyleElement` `.sheet` mock patching from `the tests/wpt-sandbox-setup.ts` and the `ComputedStylePropertyMapReadOnly` class from it into `tests/wpt-shim.ts`.
 - [x] **Cleanup setup files**: Delete `the tests/wpt-global-setup.ts` and `the tests/wpt-sandbox-setup.ts` and update any imports.
-- [x] **Refactor `scripts/run_wpt_sandbox.ts`**: Make `run_wpt_sandbox.ts` use the unified shims and prototype patches from `tests/wpt-shim.ts`.
+- [x] **Refactor `scripts/run_wpt_node.ts`**: Make `run_wpt_node.ts` use the unified shims and prototype patches from `tests/wpt-shim.ts`.
 - [x] **Verify preflight**: Run `pnpm run preflight` to confirm both test suites and the CLI script compile and pass.
 
 ---
@@ -1587,7 +1587,7 @@ Objective: Eliminate the verbose 9.5k line static JSON baseline configuration fi
 
 ### Tasks
 - [x] **Dynamic WPT crawling**: Update `tests/wpt-sandbox.test.ts` to crawl the `css-typed-om` directory dynamically at runtime instead of loading a static `include` array.
-- [x] **Compact JSON Formatting**: Implement custom single-line-array serialization in `scripts/update_wpt_baseline.ts` to store each file's failures on a single line.
+- [x] **Compact JSON Formatting**: Implement custom single-line-array serialization in `scripts/run_wpt_node_crawler.ts` (`--update-baseline`) to store each file's failures on a single line.
 - [x] **Dynamic exclusion**: Identify files that fail to initialize (syntax/load errors) and automatically populate them into the `exclude` list during baseline runs.
 - [x] **Verify preflight**: Run `pnpm run preflight` to confirm all 358 WPT test files run successfully in 9 seconds with the new compact JSON format (~335 lines).
 
@@ -1662,7 +1662,7 @@ Objective: Implement missing CSS Typed OM classes (`CSSPositionValue`, `CSSTrans
 Objective: Automate conformance logging of WPT sandbox tests to track progress over time.
 
 ### Tasks
-- [x] **Progress Tracking Script**: Create `scripts/update_wpt_progress.ts` to execute WPT sandbox tests and append current statistics to `wpt-typed-om-progress.md` only when they change.
+- [x] **Progress Tracking Script**: Create `scripts/run_wpt_node_crawler.ts` (`--update-progress`) to execute WPT tests and append current statistics to `wpt-progress.md` only when they change.
 - [x] **Git Pre-commit Hook**: Implement `.git/hooks/pre-commit` to automatically run progress tracking and stage the updated log file when `src/typed-om.ts` changes.
 - [x] **Initialize Log**: Run the script and commit the initial baseline log (`5890/12150` passed, 48.48% pass rate).
 - [x] **Historical Backfill**: Backfill the progress log table with past test execution numbers from transcripts.
@@ -1759,10 +1759,10 @@ Objective: Verify our WPT shim conformance against WPT's own unit tests, then sc
   - [x] Documented remaining 3 edge-case failures at the end of the roadmap (1 in `exceptional-cases.html` on late-registered test status, 2 in `exceptional-cases-timeouts.html` on timeouts).
 - [x] **Broad Spec Conformance Crawler Expansion**:
   - [x] Expand the WPT sandbox crawler to read and execute tests under other core specification directories: `cssom/`, `css-syntax/`, `css-nesting/`, `css-variables/`, `selectors/`, `mediaqueries/`.
-  - [x] Configure includes/excludes lists for these spec folders in `tests/wpt-sandbox-config.json`.
+  - [x] Configure includes/excludes lists for these spec folders in `tests/wpt-node-config.json`.
 - [x] **Unified Multi-Spec Progress Logging**:
   - [x] Create `wpt-progress.md` logging progress across multiple specs.
-  - [x] Update progress logging script (`scripts/update_wpt_progress.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
+  - [x] Update progress logging script (`scripts/run_wpt_node_crawler.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
     ```markdown
     | Date & Time (UTC) | Commit | Typed OM (12150) | CSSOM (600) | Nesting (120) | Syntax (350) | Selectors (500) | MQ (200) | Overall | Pass Rate |
     | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -1810,12 +1810,12 @@ Objective: Resolve unbaselined failures in the expanded specifications by comple
   - [x] Mock `document.fonts` inside `createWptContext` (resolves ~2 failures).
   - [x] Implement `document.implementation.createHTMLDocument` inside `patchWindowForTypedOM` in `tests/wpt-shim.ts` using `parseHTML` (resolves ~2 failures).
 - [x] **Unified Multi-Spec Baseline Configuration**:
-  - [x] Update `tests/wpt-sandbox.test.ts` to load all specifications and exclusions dynamically from `tests/wpt-sandbox-config.json` instead of hardcoding `css-typed-om`.
+  - [x] Update `tests/wpt-sandbox.test.ts` to load all specifications and exclusions dynamically from `tests/wpt-node-config.json` instead of hardcoding `css-typed-om`.
   - [x] Baseline all remaining layout engine limitations and ES Modules syntax issues to keep standard preflight checks green.
 - [x] **Memory Leak & CPU Performance Safety**:
   - [x] Guarded globally-shared linkedom prototypes (`Element.prototype`, `CSSStyleDeclaration.prototype`) with a recursion guard to prevent stack overflow/extreme CPU locks.
   - [x] Removed global `window` closure leaks inside `Node.prototype.appendChild` and `insertBefore` mocks by resolving contexts dynamically via `ownerDocument.defaultView`.
-  - [x] Implemented automatic worker-queue throttling inside `scripts/run_wpt_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
+  - [x] Implemented automatic worker-queue throttling inside `scripts/run_wpt_node_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
   - [x] Guarded heavy crawler runner in `tests/wpt-sandbox.test.ts` with `RUN_SANDBOX_WPT=true` env flag to keep normal preflight check memory footprint minimal.
   - [x] Replaced shell `exec` with direct binary `execFile` and injected a 3.5s `unref()` self-termination fail-safe timer in workers to stop background loops.
   - [x] Injected event loop yields (5ms between assertions, 20ms between task spawns) to lower CPU and memory footprint during crawler runs.
@@ -1880,17 +1880,192 @@ Objective: Reach maximum pass rate in Chrome WPT suite by hardening Typed OM int
 
 ---
  
+## Phase 80: WPT Multi-Spec Conformance Drive (Wave 1: Nesting & Variables) [x]
+
+Objective: Resolve high-frequency failure clusters in `css-nesting` and `css-variables` identified by failure cluster diagnostics.
+
+### Tasks
+- [x] **CSSStyleSheet Lifecycle & Legacy Aliases**:
+  - Ensure `CSSStyleSheet.prototype.removeRule` and `addRule` aliases are available on all sheet instances in sandbox shims and CSSOM.
+  - Implement `CSS.supports(property, value)` and `CSS.supports(conditionText)` validation in `src/` and sandbox environment.
+- [x] **URL Token Serialization in Custom Properties**:
+  - Preserve unescaped periods, slashes, colons, and hash tokens in `url()` serialization per WPT `url-token-serialization.html`.
+- [x] **Whitespace & Fallback Serialization in CSS Variables**:
+  - Ensure whitespace preservation in custom property value tokens.
+  - Fix `var()` fallback parsing and serialization in `src/parser.ts` and `src/serializer.ts`.
+- [x] **Verification**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=css-nesting` and verify pass rate jumps.
+  - Run `node scripts/wpt_cluster_failures.ts --spec=css-variables` and verify pass rate jumps.
+  - Run `pnpm run preflight` to ensure 0 regressions.
+
+---
+ 
+## Phase 81: WPT Multi-Spec Conformance Drive (Wave 2: Selectors & Forgiving Parsing) & Documentation [x]
+
+Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing forgiving selector list parsing, complex pseudo-class arguments, and pseudo-element normalization in `src/SelectorParser.ts`, and expand public API documentation.
+
+**Spec References**:
+- Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs`
+- CSS Syntax 3: `submodules/csswg-drafts/css-syntax-3/Overview.bs`
+
+### Tasks
+- [x] **Diagnostic Failure Clustering on `selectors`**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` to identify top error patterns across the 3,103 tests.
+- [x] **Forgiving Selector List Parsing (`:is()`, `:where()`)**:
+  - Implement forgiving parsing per Selectors 4 #forgiving-selector: invalid or unsupported selectors in the argument list do not invalidate the entire selector or the pseudo-class.
+- [x] **Complex Pseudo-Class & Pseudo-Element Arguments**:
+  - Support `:nth-child(An+B of <selector-list>)` and `:nth-last-child(An+B of <selector-list>)` argument parsing and AST representation.
+  - Support relative selector parsing for `:has(> .child)` and pseudo-element argument validation.
+- [x] **Selector Serialization & Normalization**:
+  - Ensure spec-compliant stringification of complex selector lists, combinators, and pseudo-class arguments.
+- [x] **API Documentation & Architecture Consolidation**:
+  - Merge `API_BOUNDARIES.md` into `README.md` under a dedicated Architecture & Spec Boundaries section.
+  - Add comprehensive quickstarts for dual-path TS/ESM execution, CSSOM rule traversal, Typed OM math & units, and Houdini custom properties.
+  - Document `getComputedStyle` intentional non-goal and adopt `wpt:node` vs. `wpt:browser` taxonomy.
+- [x] **Verification**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and measure conformance improvement.
+  - Run `pnpm run preflight` to guarantee 0 regressions across all suites.
+
+---
+ 
+## Phase 82: WPT Multi-Spec Conformance Drive (Wave 3: CSSOM Core Conformance) [x]
+
+Objective: Drive WPT `css/cssom/` conformance (>770 tests) by hardening stylesheet insertion/deletion boundary rules, priority flag serialization, and rule hierarchy back-references in `src/CSSOM.ts` and `src/CSSStyleDeclaration.ts`.
+
+**Spec References**:
+- CSSOM Level 1: `submodules/csswg-drafts/cssom-1/Overview.bs`
+  - § 6.5.3 Insert a CSS rule (`#insert-a-css-rule`)
+  - § 6.5.4 Remove a CSS rule (`#remove-a-css-rule`)
+  - § 6.7.1 CSSStyleDeclaration API (`#the-cssstyledeclaration-interface`)
+  - § 6.4 The CSSRule Interface (`#the-cssrule-interface`)
+
+### Tasks
+- [x] **Diagnostic Failure Clustering on `cssom`**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=cssom` to identify top failure clusters across the 775 tests in `submodules/web-platform-tests/css/cssom`.
+- [x] **Rule Index Boundary & Hierarchy Validation (`insertRule` / `deleteRule`)**:
+  - In `src/CSSOM.ts`, implement strict `IndexSizeError` (when index < 0 or > rules.length) and `HierarchyRequestError` (e.g. attempting to insert `@import` after style rules or `@namespace` rules) per CSSOM 1 § 6.5.3.
+  - Ensure `CSSRule.parentStyleSheet` and `CSSRule.parentRule` back-references are updated when rules are inserted or removed.
+- [x] **Priority Flag & Serialization in `CSSStyleDeclaration`**:
+  - In `src/CSSStyleDeclaration.ts`, handle case-insensitive `"important"` priority values, whitespace handling, and normalize priority strings in `setProperty()`.
+  - Ensure canonical property name iteration order and `cssText` roundtripping.
+- [x] **Verification**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=cssom` and verify conformance improvement.
+  - Run `pnpm run preflight` to guarantee 0 regressions across all suites.
+
+---
+ 
+## Phase 83: WPT Multi-Spec Conformance Drive (Wave 3.5: CSSOM Rules, Serialization & `CSS.escape`)
+
+Objective: Push WPT `css/cssom/` conformance higher toward our practical ceiling (~68%-70%) by implementing `CSS.escape()`, `CSSStyleRule.selectorText` dynamic setter, specialized rule serializers (`@counter-style`, `@font-feature-values`, `@keyframes`), constructable stylesheet promise methods (`sheet.replace()`), and IDL test harness shims.
+
+**Spec References**:
+- CSSOM Level 1: `submodules/csswg-drafts/cssom-1/Overview.bs`
+  - § 3 Utility APIs (`#css-escape-value`)
+  - § 6.4.1 CSSStyleRule (`#dom-cssstylerule-selectortext`)
+  - § 6.4.4 CSSKeyframeRule / CSSKeyframesRule
+  - § 6.4.5 CSSNamespaceRule
+  - § 6.5.1 Constructing CSSStyleSheet Objects (`#dom-cssstylesheet-replace`)
+- CSS Counter Styles 3: `submodules/csswg-drafts/css-counter-styles-3/Overview.bs`
+- CSS Fonts 4: `submodules/csswg-drafts/css-fonts-4/Overview.bs`
+
+### Tasks
+- [x] **`CSS.escape()` Implementation**:
+  - Implement the official CSSOM § 3 string escaping algorithm in `src/CSSOM.ts` / `src/index.ts`, passing `escape.html` (9 tests).
+- [x] **`CSSStyleRule.selectorText` Dynamic Setter**:
+  - In `src/CSSStyleRule.ts` / `src/CSSOM.ts`, implement the setter for `selectorText`: validate and re-parse the incoming selector text, updating internal rule AST or throwing `SyntaxError` on invalid input per § 6.4.1.
+- [x] **Rule ASTs & `cssText` Serialization**:
+  - Implement full serialization for `CSSCounterStyleRule.cssText` (single-line format without unformatted linebreaks per CSS Counter Styles 3).
+  - Implement `CSSFontFeatureValuesRule` and `@font-feature-values` sub-rules.
+  - Implement `CSSNamespaceRule` and ensure `Object.prototype.toString.call(CSSNamespaceRule.prototype)` returns `"[object CSSNamespaceRule]"`.
+- [x] **Constructable Stylesheet `replace()` & `replaceSync()`**:
+  - In `src/CSSStyleSheet.ts`, implement `replace(text)` returning a `Promise<CSSStyleSheet>` that parses asynchronously, and `replaceSync(text)` with proper disallow-modification locks.
+- [x] **WPT IDL Test Harness Shims**:
+  - In `tests/wpt-shim.ts`, implement `assert_idl_attribute` and `document.implementation.createDocument`.
+- [x] **Verification**:
+  - Run: `node scripts/wpt_cluster_failures.ts --spec=cssom` and verify pass rate increases significantly.
+  - Run: `pnpm run preflight` to guarantee 0 regressions across all suites.
+
+---
+ 
+## Phase 84: Static Selector Matcher (`matches(element, selector)`) & Declarative Cascade Oracle (`getCascadedStyle`)
+
+Objective: Implement a pure-AST static selector matcher and declarative cascade resolver to evaluate selector rules and custom properties against DOM elements, unlocking ~2,500+ WPT tests across `selectors`, `css-variables`, `css-nesting`, and `css-syntax` using a test-sandbox cascade oracle without polluting public Node.js APIs.
+
+**Spec References**:
+- Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs`
+  - § 3 Structure of Selectors
+  - § 4 Selector Specificity
+  - § 15 Match a Selector Against an Element (`#match-against-element`)
+  - § 16 Match a Selector Against a Tree (`#match-against-tree`)
+- CSS Cascade Level 5: `submodules/csswg-drafts/css-cascade-5/Overview.bs`
+  - § 3 Cascading (`#cascading`)
+  - § 6 Cascade Sorting Order (`#cascade-sort`)
+  - § 7 Cascaded Values (`#cascaded-values`)
+- CSS Variables Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+  - § 3 Defining Custom Properties
+  - § 4 Resolving `var()` Functions
+
+### Tasks
+- [x] **Pure-AST Static Selector Matcher (`src/matcher.ts`)**:
+  - Implement `matches(element: Element, selector: string | ComplexSelector): boolean` and `querySelectorAll(root: Element | Document, selector: string): Element[]`.
+  - Support compound selectors (type, class, id, attribute `[att=val]`, null namespace `[|att]`).
+  - Support combinators (child `>`, next-sibling `+`, subsequent-sibling `~`, descendant ` `).
+  - Support pseudo-classes (`:is()`, `:where()`, `:not()`, `:has()`, `:first-child`, `:last-child`, `:only-child`, `:first-of-type`, `:last-of-type`, `:nth-child(An+B of <selector-list>)`, `:dir()`, `:heading()`, `:has-slotted()`).
+- [x] **Declarative Cascade Resolver (`src/cascade.ts`)**:
+  - Implement `getCascadedStyle(element: Element): CSSStyleDeclaration`:
+    - Collect all `CSSStyleRule`s across `element.ownerDocument.styleSheets` that match `element`.
+    - Sort matching declarations by **Origin/Importance**, **Cascade Layers (`@layer`)**, **Specificity** (`Specificity.compare()`), and **Source Order** per CSS Cascade 5 § 6.
+    - Merge with inline `element.style` declarations.
+    - Resolve custom property references (`var(--custom-prop, fallback)`).
+- [x] **WPT Test Sandbox Integration (`tests/wpt-shim.ts`)**:
+  - Bind `win.getComputedStyle = (el) => getCascadedStyle(el)` exclusively inside `tests/wpt-shim.ts` as a declarative cascade oracle to satisfy WPT assertion checks without introducing API ambiguity in public package exports.
+- [x] **Verification**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and `node scripts/wpt_cluster_failures.ts --spec=css-variables` to verify dramatic pass rate jumps.
+  - Run `pnpm run preflight` to guarantee 0 regressions across all 197+ test suites.
+
+---
+ 
+## Phase 85: Typed OM Standard Property Syntax Codegen & StylePropertyMap Validation
+
+Objective: Generate standard property syntax definitions for all 800+ CSS properties from `@webref/css` into `src/data/gen/standard-syntax.ts` to enforce spec-compliant Typed OM value validation in `StylePropertyMap.set()`, `CSSStyleValue.parse()`, and `CSSStyleValue.parseAll()`, unlocking ~5,000 WPT tests in `css-typed-om`.
+
+**Spec References**:
+- CSS Typed OM 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
+  - § 2.2 CSSStyleValue.parse() & parseAll() (`#dom-cssstylevalue-parse`)
+  - § 3.2 StylePropertyMap (`#the-stylepropertymap`)
+- CSS Properties & Values API: `submodules/css-houdini-drafts/css-properties-values-api/Overview.bs`
+  - § 3 Syntax Strings (`#syntax-strings`)
+
+### Tasks
+- [x] **Property Syntax Codegen (`scripts/codegen/generate_standard_syntax.ts`)**:
+  - Read `node_modules/@webref/css/css.json` containing all 815 standard CSS properties.
+  - Convert standard W3C syntax expressions into Houdini-compliant syntax definitions (`<color>`, `<length-percentage>`, `<length>`, `<percentage>`, `<number>`, `<time>`, `<angle>`, keyword combinations).
+  - Emit `src/data/gen/standard-syntax.ts` (810 properties) and integrate with `scripts/generate_all.ts` / `pnpm run codegen`.
+- [x] **Syntax Validation in `src/typed-om.ts` & `src/standard-syntax.ts`**:
+  - Merge `GENERATED_PROPERTIES_SYNTAX` into `STANDARD_PROPERTIES_SYNTAX`.
+  - Implemented `matchesStyleValueSyntax` and updated `StylePropertyMap.set()`, `StylePropertyMap.append()`, `CSSStyleValue.parse()`, and `CSSStyleValue.parseAll()` to validate values against syntax and throw `TypeError` on invalid combinations.
+- [x] **Unit Tests & Parity Suite (`tests/typed-om-syntax.test.ts`)**:
+  - Added unit test suite verifying invalid and valid Typed OM value assignments across standard CSS properties.
+- [x] **Mandatory Pre/Post Cluster Delta Reconciliation**:
+  - Pre-implementation baseline: 6,074 / 12,150 passed (49.99% pass rate), Cluster #1 had 5,121 failures ("Expected to throw JS exception").
+  - Post-implementation result: 10,991 / 12,150 passed (90.46% pass rate), Cluster #1 failures dropped from 5,121 down to 98 (over 5,000 WPT failures resolved).
+  - Preflight verification: `pnpm run preflight` 100% clean (0 TypeScript type errors, 0 linter warnings, all tests pass).
+
+---
+
 ## Potential roadmap items
- 
-Objective: Explore long-term ideas for WPT conformance, prototype patching options, and parser shorthand completeness.
- 
+
+Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
+
 ### Ideas
- 
-#### 1. Spec-Compliance & API Surface Refinements
+
+- [ ] **WPT Multi-Spec Conformance Drive**:
+  - [ ] **Wave 4: CSS Syntax & Tokenizer Conformance (`css/css-syntax`)**: String/ident escape sequence normalization, CDO/CDC comment tokens, bad URL recovery, and whitespace trimming rules.
+  - [ ] **Wave 5: Media Queries Conformance (`css/mediaqueries`)**: `@media` condition parsing, range syntax (`width >= 600px`), Boolean media feature validation, and media list serialization.
+  - [ ] **Wave 6: Advanced Typed OM Value Reification (`css/css-typed-om`)**: Viewport units, calculation expression trees, `anchor()` functions, and custom property value reification in `StylePropertyMap`.
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
-- [ ] **Static Selector Matching**: Implement a basic CSS selector matcher to evaluate a parsed selector against a DOM element (e.g. for use with Linkedom).
-- [ ] **Advanced Typed OM Value Parsing**: Implement complete support in `CSSStyleValue.parse()` and numeric constructors for advanced functions (e.g. `anchor()`, `calc()` math expressions, viewport units validation, and custom properties) to resolve the major Typed OM WPT conformance gap.
+
 
 
 

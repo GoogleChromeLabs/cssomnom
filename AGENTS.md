@@ -5,7 +5,7 @@ Building a spec-compliant CSSOM (CSS Object Model) parser in pure TypeScript.
 - **Execution**: Run node scripts directly: `node script.ts`. Do NOT use `npx tsx` or `ts-node`.
 
 ## Spec References
-We are building a spec-compliant implementation. Agents MUST adhere to the W3C specifications listed below, except where intentional deviations are documented in `API_BOUNDARIES.md` for pragmatism, performance, or Node.js compatibility. You are expected to actively consult these Bikeshed (`.bs`) source files to understand the normative algorithms and edge cases before implementing or auditing features.
+We are building a spec-compliant implementation. Agents MUST adhere to the W3C specifications listed below, except where intentional deviations are documented in `README.md` for pragmatism, performance, or Node.js compatibility. You are expected to actively consult these Bikeshed (`.bs`) source files to understand the normative algorithms and edge cases before implementing or auditing features.
 
 Relevant Specifications:
 - CSSOM: `submodules/csswg-drafts/cssom-1/Overview.bs`
@@ -39,7 +39,7 @@ To avoid circular dependencies between the core parser and the CSSOM/Typed OM la
 
 ### API Boundaries
 We intentionally deviate from some specifications for pragmatism, performance, or Node.js compatibility (e.g., providing synchronous versions of Houdini APIs).
-- **Rule**: Before proposing refactors to align strictly with IDL, review `API_BOUNDARIES.md` to understand documented intentional deviations.
+- **Rule**: Before proposing refactors to align strictly with IDL, review `README.md` to understand documented intentional deviations.
 
 ## Spec Evolution & Maintainability
 

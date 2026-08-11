@@ -23,31 +23,41 @@ describe('Readonly properties', () => {
   it('should make CSSImportRule properties readonly', () => {
     const rule = new CSSImportRule('http://example.com');
     
-    // @ts-expect-error - href should be readonly
-    rule.href = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - href should be readonly
+      rule.href = 'foo';
+    }, TypeError);
     
+    assert.throws(() => {
+      // @ts-expect-error - styleSheet should be readonly
+      rule.styleSheet = null;
+    }, TypeError);
     
-    // @ts-expect-error - styleSheet should be readonly
-    rule.styleSheet = null;
+    assert.throws(() => {
+      // @ts-expect-error - layerName should be readonly
+      rule.layerName = 'foo';
+    }, TypeError);
     
-    // @ts-expect-error - layerName should be readonly
-    rule.layerName = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - supportsText should be readonly
+      rule.supportsText = 'foo';
+    }, TypeError);
     
-    // @ts-expect-error - supportsText should be readonly
-    rule.supportsText = 'foo';
-    
-    // We don't assert runtime immutability as we only enforce it in types for now.
     assert.ok(true);
   });
 
   it('should make CSSNamespaceRule properties readonly', () => {
     const rule = new CSSNamespaceRule('prefix', 'http://namespace.com');
     
-    // @ts-expect-error - namespaceURI should be readonly
-    rule.namespaceURI = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - namespaceURI should be readonly
+      rule.namespaceURI = 'foo';
+    }, TypeError);
     
-    // @ts-expect-error - prefix should be readonly
-    rule.prefix = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - prefix should be readonly
+      rule.prefix = 'foo';
+    }, TypeError);
     
     assert.ok(true);
   });

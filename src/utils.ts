@@ -38,9 +38,25 @@ export function createIndexedProxy<T extends object, V, R = V>(
   });
 }
 
-export function deleteRuleFromArray(rules: Rule[], index: number): void {
+// cssom-1 § 6.5.4 #remove-a-css-rule
+export function deleteRuleFromArray(rules: Rule[], index: number): Rule {
+  // 1. Set length to the number of items in list.
+  // 2. If index is greater than or equal to length (or index < 0), throw IndexSizeError.
   if (index < 0 || index >= rules.length) {
     throw new DOMException('Index size error', 'IndexSizeError');
   }
+  // 3. Set old rule to the indexth item in list.
+  const oldRule = rules[index];
+  // 5. Remove rule old rule from list at zero-indexed position index.
   rules.splice(index, 1);
+  // 6. Set old rule's parent CSS rule and parent CSS style sheet to null.
+  if (oldRule && typeof oldRule === 'object') {
+    if ('parentRule' in oldRule) {
+      (oldRule as { parentRule: unknown }).parentRule = null;
+    }
+    if ('parentStyleSheet' in oldRule) {
+      (oldRule as { parentStyleSheet: unknown }).parentStyleSheet = null;
+    }
+  }
+  return oldRule;
 }

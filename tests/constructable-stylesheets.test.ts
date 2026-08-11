@@ -60,12 +60,13 @@ describe('Constructable CSSStyleSheet', () => {
     assert.strictEqual(sheet.cssRules[0].cssText, 'span { color: blue; }');
   });
 
-  test('sheet.replace(text) executes synchronously despite returning a promise', async () => {
+  test('sheet.replace(text) executes asynchronously and updates rules', async () => {
     const sheet = new CSSStyleSheet();
     const promise = sheet.replace('p { color: green; }');
+    assert.strictEqual(sheet.cssRules.length, 0, 'sheet should not have rules updated before promise resolution');
+    await promise;
     assert.strictEqual(sheet.cssRules.length, 1);
     assert.strictEqual(sheet.cssRules[0].cssText, 'p { color: green; }');
-    await promise;
   });
 
   test('sheet.replaceSync throws when modification is disallowed', () => {

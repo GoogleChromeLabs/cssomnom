@@ -13,9 +13,8 @@ test('window.getComputedStyle in sandbox shim', () => {
 
   assert.ok('getComputedStyle' in win, 'getComputedStyle should be in win');
   const el = win.document.getElementById('test')!;
-  assert.throws(() => {
-    win.getComputedStyle(el);
-  }, /getComputedStyle is not supported/);
+  const style = win.getComputedStyle(el);
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(255, 0, 0)');
 });
 
 test('document.styleSheets in sandbox shim', () => {

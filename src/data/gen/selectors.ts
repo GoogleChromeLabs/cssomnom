@@ -44,6 +44,7 @@ export const PSEUDO_CLASSES: Set<string> = new Set([
   'future',
   'has',
   'has-slotted',
+  'heading',
   'host',
   'host-context',
   'hover',

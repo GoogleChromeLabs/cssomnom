@@ -28,11 +28,16 @@ test('API Surface Area', () => {
     'tokenize',
     'parse',
     'getCascadedStyle',
+    'matches',
+    'querySelectorAll',
+    'querySelector',
+    'escape',
 
     // CSSOM Rules
     'CSSContainerRule',
     'CSSCounterStyleRule',
     'CSSFontFaceRule',
+    'CSSFontFeatureValuesMap',
     'CSSFontFeatureValuesRule',
     'CSSGroupingRule',
     'CSSImportRule',
@@ -140,7 +145,8 @@ test('API Surface Area', () => {
     'parseStylesheet',
     'parseStylesheetSync',
     'parseValueListSync',
-    'parseValueSync'
+    'parseValueSync',
+    'supports'
   ];
 
   const actualExports = Object.keys(CSSOM).filter(k => k !== 'default');
@@ -177,8 +183,12 @@ test('CSS methods', () => {
     }),
     // Parser
     'parseStylesheet', 'parseStylesheetSync', 'parseRuleList', 'parseRule', 'parseDeclarationList', 'parseDeclaration', 'parseValue', 'parseValueList', 'parseCommaValueList', 'parseComponentValue', 'registerProperty',
+    // Utility APIs
+    'escape',
     // Tooling Extensions
     'resolveNestedSelector',
+    // Feature Detection
+    'supports',
   ];
   
   const actualMethods = Object.keys(CSSOM.CSS).filter(k => typeof (CSSOM.CSS as unknown as Record<string, unknown>)[k] === 'function');

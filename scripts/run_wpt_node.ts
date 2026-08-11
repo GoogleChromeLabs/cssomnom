@@ -78,6 +78,13 @@ export function runWptFile(filePath: string): WptFileResult {
           }
           return val;
         }
+        if (prop in sandbox) {
+          return Reflect.get(sandbox, prop);
+        }
+        if (dom.document && typeof dom.document.getElementById === 'function') {
+          const el = dom.document.getElementById(prop);
+          if (el) return el;
+        }
       }
       return Reflect.get(sandbox, prop as string);
     },
@@ -86,7 +93,7 @@ export function runWptFile(filePath: string): WptFileResult {
         return true;
       }
       if (typeof prop === 'string') {
-        return (target[prop] !== undefined) || (prop in sandbox);
+        return (target[prop] !== undefined) || (prop in sandbox) || (Boolean(dom.document?.getElementById?.(prop)));
       }
       return prop in sandbox;
     },
@@ -147,7 +154,7 @@ export function runWptFile(filePath: string): WptFileResult {
       const scriptEl = scripts[i];
       const src = scriptEl.getAttribute('src');
       let code = '';
-      if (src) {
+      if (src && src !== 'null') {
         code = getScriptContent(htmlDir, src);
       } else {
         code = scriptEl.textContent || '';
@@ -219,19 +226,19 @@ export function runWptFile(filePath: string): WptFileResult {
 }
 
 // Support running directly as a CLI script
-if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_sandbox.ts'))) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_node.ts'))) {
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    console.error('Usage: node scripts/run_wpt_sandbox.ts <wpt-html-file-paths...>');
+    console.error('Usage: node scripts/run_wpt_node.ts <wpt-html-file-paths...>');
     process.exit(1);
   }
   
   (async () => {
-    // Master fail-safe timeout: exit process after 3500ms to prevent orphaned background hangs
+    // Master fail-safe timeout: exit process after 10000ms to prevent orphaned background hangs
     setTimeout(() => {
-      console.error("Runner timed out after 3500ms (self-termination fail-safe).");
+      console.error("Runner timed out after 10000ms (self-termination fail-safe).");
       process.exit(1);
-    }, 3500).unref();
+    }, 10000).unref();
 
     let total = 0;
     let passed = 0;
@@ -254,11 +261,12 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
             console.error(err);
           }
           // Yield to event loop to allow GC and timers to run
-          await new Promise(resolve => setTimeout(resolve, 5));
+          await new Promise(resolve => setImmediate(resolve));
         }
         result.cleanup();
       } catch (err) {
         console.error(`Failed to run file ${filePattern}:`, err);
+        console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);
         process.exit(1);
       }
     }

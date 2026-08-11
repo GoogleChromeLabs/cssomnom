@@ -28,9 +28,9 @@ If you want to run the steps individually:
 
 **1. Update Submodules:**
 ```bash
-pnpm run submodules:update
+pnpm run submodules:upgrade
 ```
-This runs `git submodule update --init --recursive --remote`.
+This runs `git submodule update --init --remote && pnpm run submodules:update` to pull remote updates and recursively initialize.
 
 **2. Generate Fixtures:**
 ```bash
@@ -42,7 +42,7 @@ This runs `node scripts/extract_external_suites.ts`.
 ```bash
 pnpm test
 ```
-Or run the full preflight check (typecheck and test):
+Or run the full preflight check (typecheck, linter, and tests):
 ```bash
 pnpm run preflight
 ```
@@ -59,7 +59,7 @@ When specifications are updated in the submodules, we need to ensure our impleme
 
 ## Spec Compliance Auditing via Subagents
 
-To maintain high compliance at scale, we use specialized AI subagents to audit the codebase against the specifications. This process should be run periodically or when significant spec updates occur.
+To maintain high compliance at scale, we use specialized AI subagents (such as `scrutineer`) to audit the codebase against the specifications. This process should be run periodically or when significant spec updates occur.
 
 ### Recommended Subagents
 
@@ -71,11 +71,11 @@ When initiating an audit, spawn the following subagents with their specific role
 - **CSS Nesting & Variables Auditor**: Reads `css-nesting-1/Overview.bs` and `css-variables-1/Overview.bs`. Focuses on interleaved declarations and custom property handling.
 - **Media Queries Auditor**: Reads `mediaqueries-4/Overview.bs`. Focuses on media query list parsing and evaluation.
 - **CSS Logical Auditor**: Reads `css-logical-1/Overview.bs`. Focuses on logical properties shorthand serialization in `cssText`.
-- **CSS Values & Typed OM Auditor**: Reads `css-values-4/Overview.bs` and `css-typed-om-1/Overview.bs`. Focuses on value representation and serialization.
+- **CSS Values & Typed OM Auditor**: Reads `css-values-4/Overview.bs` and `submodules/css-houdini-drafts/css-typed-om/Overview.bs`. Focuses on value representation and serialization.
 
 #### 2. Edge Case Researchers
 - **CSS Spec Tricky Case Researcher**: Reads specs to identify complex error recovery scenarios or easily overlooked rules (e.g., EOF handling, unclosed constructs).
-- **WPT Tricky Case Researcher**: Searches through `tests/web-platform-tests` to find specific tests that cover edge cases that might fail in naive implementations.
+- **WPT Tricky Case Researcher**: Searches through `submodules/web-platform-tests` to find specific tests that cover edge cases that might fail in naive implementations.
 
 ### General Task for Auditors
 Every auditor should:

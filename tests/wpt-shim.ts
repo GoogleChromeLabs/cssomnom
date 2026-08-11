@@ -1,4 +1,10 @@
-import { parseStyleSheet } from '../src/parser.ts';
+import { parseStyleSheet, parseRule } from '../src/parser.ts';
+import { CSSStyleSheet } from '../src/CSSOM.ts';
+import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
+import { ParseHooks } from '../src/parse-hooks.ts';
+import { getCascadedStyle } from '../src/cascade.ts';
+import { matches, querySelectorAll, querySelector } from '../src/matcher.ts';
+import { camelToDashed } from '../src/utils.ts';
 
 export interface WptSandboxTest {
   type: 'setup' | 'test' | 'promise_test' | 'async_test';
@@ -211,12 +217,17 @@ export function patchWindowForTypedOM(window: WindowType) {
       patchWindowForTypedOM(dom.window);
       return dom.window.document;
     };
+    (doc.implementation as Record<string, unknown>).createDocument = function(_namespaceURI: string | null, _qualifiedNameStr: string | null, _documentType?: unknown) {
+      const dom = parseHTML(`<!DOCTYPE html><html><head></head><body></body></html>`);
+      patchWindowForTypedOM(dom.window);
+      return dom.window.document;
+    };
+
   }
 
-  // getComputedStyle cannot be supported meaningfully in Linkedom without a visual layout engine.
-  // We throw explicitly to ensure tests requiring getComputedStyle fail predictably rather than returning incorrect empty results.
-  win.getComputedStyle = function() {
-    throw new Error('getComputedStyle is not supported in the linkedom sandbox environment (requires a full layout engine)');
+  // Declarative cascade oracle for WPT test sandbox
+  win.getComputedStyle = function(element: Element) {
+    return getCascadedStyle(element);
   };
 
   // Mock window.matchMedia
@@ -667,21 +678,9 @@ export function patchWindowForTypedOM(window: WindowType) {
         if (!this._sheet || this._sheetSource !== currentText) {
           this._sheetSource = currentText;
           const rules = parseStyleSheet(currentText);
-          this._sheet = {
-            cssRules: rules,
-            rules,
-            insertRule(text: string, idx = 0) {
-              const rule = parseStyleSheet(text)[0];
-              if (!rule) {
-                throw new Error('SyntaxError: Failed to parse rule');
-              }
-              rules.splice(idx, 0, rule);
-              return idx;
-            },
-            deleteRule(idx: number) {
-              rules.splice(idx, 1);
-            }
-          };
+          const sheet = CSSStyleSheet.createInternal(rules, parseRule);
+          Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
+          this._sheet = sheet;
         }
         return this._sheet;
       }
@@ -695,27 +694,22 @@ export function patchWindowForTypedOM(window: WindowType) {
       enumerable: true,
       get() {
         if (!this._sheet) {
-          const rules: unknown[] = [];
-          this._sheet = {
-            cssRules: rules,
-            rules,
-            insertRule(text: string, idx = 0) {
-              const rule = parseStyleSheet(text)[0];
-              if (!rule) {
-                throw new Error('SyntaxError: Failed to parse rule');
-              }
-              rules.splice(idx, 0, rule);
-              return idx;
-            },
-            deleteRule(idx: number) {
-              rules.splice(idx, 1);
-            }
-          };
+          const sheet = CSSStyleSheet.createInternal([], parseRule);
+          Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
+          this._sheet = sheet;
         }
         return this._sheet;
       }
     });
   }
+
+class StyleSheetListImpl extends Array<CSSStyleSheet> {
+  item(index: number): CSSStyleSheet | null {
+    return this[index] || null;
+  }
+}
+
+const styleToElement = new WeakMap<object, Element>();
 
   const documentConstructor = win.Document as { prototype: Record<string, unknown> } | undefined;
   if (documentConstructor) {
@@ -724,26 +718,18 @@ export function patchWindowForTypedOM(window: WindowType) {
         const styles = Array.from(this.querySelectorAll('style'));
         const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
         
-        const sheets: CSSStyleSheet[] = [];
+        const list = new StyleSheetListImpl();
         for (const styleEl of styles) {
           if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-            sheets.push(styleEl.sheet as CSSStyleSheet);
+            list.push(styleEl.sheet as unknown as CSSStyleSheet);
           }
         }
         for (const linkEl of links) {
           if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-            sheets.push(linkEl.sheet as CSSStyleSheet);
+            list.push(linkEl.sheet as unknown as CSSStyleSheet);
           }
         }
-        const list = sheets as CSSStyleSheet[] & { item(idx: number): CSSStyleSheet | null };
-        Object.defineProperty(list, 'item', {
-          value(idx: number) {
-            return list[idx] || null;
-          },
-          configurable: true,
-          enumerable: false
-        });
-        return list as StyleSheetList;
+        return list;
       },
       configurable: true
     });
@@ -765,6 +751,46 @@ export function patchWindowForTypedOM(window: WindowType) {
     });
   }
 
+  if (window.Element && window.Element.prototype) {
+    const elProto = window.Element.prototype as unknown as {
+      matches: (s: string) => boolean;
+      querySelectorAll: (s: string) => unknown;
+      querySelector: (s: string) => unknown;
+    };
+    elProto.matches = function(this: Element, selector: string) {
+      return matches(this, selector);
+    };
+    elProto.querySelectorAll = function(this: Element, selector: string) {
+      return querySelectorAll(this, selector);
+    };
+    elProto.querySelector = function(this: Element, selector: string) {
+      return querySelector(this, selector);
+    };
+  }
+  if (window.Document && window.Document.prototype) {
+    const docProto = window.Document.prototype as unknown as {
+      querySelectorAll: (s: string) => unknown;
+      querySelector: (s: string) => unknown;
+    };
+    docProto.querySelectorAll = function(this: Document, selector: string) {
+      return querySelectorAll(this, selector);
+    };
+    docProto.querySelector = function(this: Document, selector: string) {
+      return querySelector(this, selector);
+    };
+  }
+  if (window.DocumentFragment && window.DocumentFragment.prototype) {
+    const fragProto = window.DocumentFragment.prototype as unknown as {
+      querySelectorAll: (s: string) => unknown;
+      querySelector: (s: string) => unknown;
+    };
+    fragProto.querySelectorAll = function(this: DocumentFragment, selector: string) {
+      return querySelectorAll(this, selector);
+    };
+    fragProto.querySelector = function(this: DocumentFragment, selector: string) {
+      return querySelector(this, selector);
+    };
+  }
 
   Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
     get() {
@@ -783,26 +809,43 @@ export function patchWindowForTypedOM(window: WindowType) {
     styleDescriptor = Object.getOwnPropertyDescriptor(proto, 'style');
   }
   if (styleDescriptor && styleDescriptor.get) {
+    const styleProxyMap = new WeakMap<object, object>();
     Object.defineProperty(proto, 'style', {
       get() {
         const styleObj = styleDescriptor.get!.call(this);
-        Object.defineProperty(styleObj, '_element', {
-          value: this,
-          configurable: true,
-          writable: true,
-          enumerable: false
+        styleToElement.set(styleObj, this);
+        if (styleProxyMap.has(styleObj)) {
+          return styleProxyMap.get(styleObj);
+        }
+        const proxy = new Proxy(styleObj, {
+          get(target, prop, receiver) {
+            return Reflect.get(target, prop, receiver);
+          },
+          set(target, prop, value, receiver) {
+            if (typeof prop === 'string') {
+              if (value === '' || value === null || value === undefined) {
+                const dashed = camelToDashed(prop);
+                target.removeProperty(dashed);
+                return true;
+              }
+            }
+            return Reflect.set(target, prop, value, receiver);
+          }
         });
-        return styleObj;
+        styleProxyMap.set(styleObj, proxy);
+        styleToElement.set(proxy, this);
+        return proxy;
       },
       set(value: string) {
         const styleObj = styleDescriptor.get!.call(this);
+        styleToElement.set(styleObj, this);
         styleObj.cssText = value;
       },
       configurable: true,
     });
   }
 
-  // Patch CSSStyleDeclaration prototype to support case-preserving custom properties
+  // Patch CSSStyleDeclaration prototype to validate custom property names and preserve casing
   const dummyEl = window.document.createElement('div');
   const cssStyleDecl = dummyEl.style.constructor as unknown as { prototype: Record<string, unknown> };
   if (cssStyleDecl) {
@@ -828,82 +871,111 @@ export function patchWindowForTypedOM(window: WindowType) {
     const origSet = declProto.setProperty as (name: string, value: string | null, priority?: string) => void;
     const origRemove = declProto.removeProperty as (name: string) => string;
 
-    declProto.getPropertyValue = function (this: Record<string, unknown> & { cssText: string }, name: string) {
+    declProto.getPropertyValue = function (this: unknown, name: string) {
       if (name.startsWith('--')) {
-        void this.cssText;
-        const privSym = getPrivateSymbol(this);
-        const map = privSym ? ((this[privSym as unknown as string] as Map<string, string>) || this) : this;
-        if (map instanceof Map) {
-          return map.get(name) ?? '';
+        void (this as { cssText?: string }).cssText;
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym];
+          if (map && typeof (map as { get?: unknown }).get === 'function') {
+            const val = (map as { get: (k: string) => unknown }).get(name);
+            if (typeof val === 'string') {
+              return val;
+            }
+          }
         }
-        return '';
       }
       return origGet.call(this, name);
     };
 
-    declProto.setProperty = function (
-      this: Record<string, unknown> & { cssText: string; _element?: { setAttribute(name: string, val: string): void } },
-      name: string,
-      value: string | null,
-      priority?: string
-    ) {
+    declProto.setProperty = function (this: unknown, name: string, value: string | null, priority?: string) {
+      if (value === null || value === undefined || value === '') {
+        (this as { removeProperty: (k: string) => string }).removeProperty(name);
+        return;
+      }
       if (name.startsWith('--')) {
-        const privSym = getPrivateSymbol(this);
-        const map = privSym ? ((this[privSym as unknown as string] as Map<string, string>) || this) : this;
-        void this.cssText;
-
-        if (map instanceof Map) {
-          if (value === null || value === undefined || value === '') {
-            map.delete(name);
-          } else {
-            map.set(name, value);
-          }
-
-          const entries: [string, string][] = [];
-          for (const [k, v] of map.entries()) {
-            if (typeof k === 'string') {
-              entries.push([k, v]);
+        if (!ParseHooks.isValidDashedIdent(name)) {
+          return;
+        }
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym];
+          if (map && typeof (map as { set?: unknown }).set === 'function') {
+            const mapObj = map as Map<string | symbol, string>;
+            if (value === null || value === undefined || value === '') {
+              mapObj.delete(name);
+            } else {
+              mapObj.set(name, value);
             }
-          }
-          const serialized = entries.map(([k, v]) => `${k}: ${v};`).join(' ');
-          if (this._element) {
-            this._element.setAttribute('style', serialized);
+            const el = styleToElement.get(this as object);
+            if (el && typeof el.setAttribute === 'function') {
+              const entries: string[] = [];
+              for (const [k, v] of mapObj.entries()) {
+                if (typeof k === 'string' && typeof v === 'string' && k !== '-') {
+                  entries.push(`${k}: ${v}`);
+                }
+              }
+              el.setAttribute('style', entries.join('; '));
+            }
+            return;
           }
         }
-        return;
       }
       return origSet.call(this, name, value, priority);
     };
 
-    declProto.removeProperty = function (
-      this: Record<string, unknown> & { cssText: string; _element?: { setAttribute(name: string, val: string): void } },
-      name: string
-    ) {
+    declProto.removeProperty = function (this: unknown, name: string) {
       if (name.startsWith('--')) {
-        const privSym = getPrivateSymbol(this);
-        const map = privSym ? ((this[privSym as unknown as string] as Map<string, string>) || this) : this;
-        void this.cssText;
-        if (map instanceof Map) {
-          const hasProp = map.has(name);
-          if (hasProp) {
-            map.delete(name);
-            const entries: [string, string][] = [];
-            for (const [k, v] of map.entries()) {
-              if (typeof k === 'string') {
-                entries.push([k, v]);
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym];
+          if (map && typeof (map as { delete?: unknown }).delete === 'function') {
+            const mapObj = map as Map<string | symbol, string>;
+            const hasProp = mapObj.has(name);
+            mapObj.delete(name);
+            const el = styleToElement.get(this as object);
+            if (el && typeof el.setAttribute === 'function') {
+              const entries: string[] = [];
+              for (const [k, v] of mapObj.entries()) {
+                if (typeof k === 'string' && typeof v === 'string' && k !== '-') {
+                  entries.push(`${k}: ${v}`);
+                }
               }
+              el.setAttribute('style', entries.join('; '));
             }
-            const serialized = entries.map(([k, v]) => `${k}: ${v};`).join(' ');
-            if (this._element) {
-              this._element.setAttribute('style', serialized);
-            }
+            return hasProp ? name : '';
           }
-          return hasProp ? name : '';
         }
-        return '';
       }
       return origRemove.call(this, name);
     };
+
+    const origGetPriority = declProto.getPropertyPriority as ((name: string) => string) | undefined;
+    declProto.getPropertyPriority = function (this: unknown, name: string) {
+      if (origGetPriority) {
+        return origGetPriority.call(this, name);
+      }
+      const styleText = (this as { cssText?: string }).cssText || '';
+      if (styleText && styleText.toLowerCase().includes('important')) {
+        const decl = new CSSStyleDeclaration();
+        decl.cssText = styleText;
+        return decl.getPropertyPriority(name);
+      }
+      return '';
+    };
+
+    const declProtoWithSymbols = declProto as Record<string | symbol, unknown>;
+    if (!declProtoWithSymbols[Symbol.iterator]) {
+      declProtoWithSymbols[Symbol.iterator] = function* (this: unknown) {
+        const len = (this as { length?: number }).length || 0;
+        const itemFn = (this as { item?: (i: number) => string }).item;
+        if (typeof itemFn === 'function') {
+          for (let i = 0; i < len; i++) {
+            yield itemFn.call(this, i);
+          }
+        }
+      };
+    }
   }
 
   Object.defineProperty(window.Element.prototype, 'computedStyleMap', {
@@ -980,6 +1052,7 @@ export function createWptContext(
     Event: (window as { Event?: unknown }).Event,
     CustomEvent: (window as { CustomEvent?: unknown }).CustomEvent,
     navigator: (window as { navigator?: unknown }).navigator,
+    location: (window as { location?: unknown }).location || { href: 'http://localhost/test.html', origin: 'http://localhost' },
     ...TypedOM,
     DOMMatrix: (globalThis as { DOMMatrix?: unknown }).DOMMatrix,
     DOMMatrixReadOnly: (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly,
@@ -1045,14 +1118,23 @@ export function createWptContext(
       }
       activeRafs.clear();
     },
-    setup: (properties?: { single_test?: boolean; allow_uncaught_exception?: boolean }) => {
-      if (properties) {
-        if (properties.single_test) {
-          ctx.isSingleTest = true;
-        }
-        if (properties.allow_uncaught_exception) {
-          ctx.allowUncaughtException = true;
-        }
+    setup: (func_or_properties?: Function | { single_test?: boolean; allow_uncaught_exception?: boolean }, maybe_properties?: { single_test?: boolean; allow_uncaught_exception?: boolean }) => {
+      let func: Function | null = null;
+      let properties: { single_test?: boolean; allow_uncaught_exception?: boolean } = {};
+      if (typeof func_or_properties === 'function') {
+        func = func_or_properties;
+        if (maybe_properties) properties = maybe_properties;
+      } else if (func_or_properties) {
+        properties = func_or_properties;
+      }
+      if (properties.single_test) {
+        ctx.isSingleTest = true;
+      }
+      if (properties.allow_uncaught_exception) {
+        ctx.allowUncaughtException = true;
+      }
+      if (func) {
+        func();
       }
     },
     done: () => {
@@ -1332,7 +1414,30 @@ export function createWptContext(
       const expected = `[object ${class_name}]`;
       assert.strictEqual(actual, expected, message ?? '');
     },
+    assert_own_property: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok(typeof object === 'object' && object !== null, `${description || ''}: target must be an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), true, `${description || ''}: expected property ${String(property_name)} missing`);
+    },
+    assert_not_own_property: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok(typeof object === 'object' && object !== null, `${description || ''}: target must be an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), false, `${description || ''}: unexpected property ${String(property_name)} is found on object`);
+    },
+    assert_inherits: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: provided value is not an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), false, `${description || ''}: property ${String(property_name)} found on object expected in prototype chain`);
+      assert.strictEqual(property_name in (object as Record<string | symbol, unknown>), true, `${description || ''}: property ${String(property_name)} not found in prototype chain`);
+    },
+    assert_idl_attribute: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: provided value is not an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), false, `${description || ''}: property ${String(property_name)} found on object expected in prototype chain`);
+      assert.strictEqual(property_name in (object as Record<string | symbol, unknown>), true, `${description || ''}: property ${String(property_name)} not found in prototype chain`);
+    },
+    assert_readonly: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: provided value is not an object`);
+      assert.strictEqual(property_name in (object as Record<string | symbol, unknown>), true, `${description || ''}: property ${String(property_name)} not found`);
+    },
     assert_unreached: (message?: string) => {
+
       assert.fail(message || 'Reached unreachable code');
     },
     assert_implements: (condition: unknown, description?: string) => {

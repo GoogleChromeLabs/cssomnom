@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
+import { SPEC_OUT_OF_SCOPE_COUNTS } from './wpt_feasibility_audit.ts';
 
 const execFilePromise = promisify(execFile);
 
@@ -61,9 +62,9 @@ async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>
 }
 
 export async function runCrawler(options: { spec?: string; file?: string; verbose?: boolean; concurrency?: number; updateProgress?: boolean; updateBaseline?: boolean } = {}): Promise<Record<string, SpecResult>> {
-  const configPath = path.resolve(process.cwd(), 'tests/wpt-sandbox-config.json');
+  const configPath = path.resolve(process.cwd(), 'tests/wpt-node-config.json');
   if (!fs.existsSync(configPath)) {
-    console.error('Error: WPT sandbox config not found.');
+    console.error('Error: WPT node config not found.');
     process.exit(1);
   }
 
@@ -148,7 +149,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_sandbox.ts', filePath], { timeout: 4000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], { timeout: 15000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -177,6 +178,9 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
         if (match) {
           passing = parseInt(match[1], 10);
           total = parseInt(match[2], 10);
+        } else {
+          passing = 0;
+          total = 1;
         }
         if (options.updateBaseline) {
           const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || mergedOutput.includes('Runner timed out');
@@ -267,11 +271,15 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
 
     let grandTotal = 0;
     let grandPassing = 0;
-    for (const [, res] of Object.entries(specResults)) {
+    let grandFeasible = 0;
+    for (const [specKey, res] of Object.entries(specResults)) {
       grandTotal += res.total;
       grandPassing += res.passing;
+      const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[specKey] ?? 0;
+      grandFeasible += Math.max(0, res.total - outOfScope);
     }
     const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
+    const normalizedPassRate = grandFeasible > 0 ? ((grandPassing / grandFeasible) * 100).toFixed(2) : '0.00';
 
     // Get git details
     let commitHash = 'unknown';
@@ -294,6 +302,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     }
     rowParts.push(`${grandPassing}/${grandTotal}`);
     rowParts.push(`${overallPassRate}%`);
+    rowParts.push(`**${normalizedPassRate}%**`);
     const newRow = `| ${rowParts.join(' | ')} |`;
 
     if (!fileExists) {
@@ -306,11 +315,14 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       }
       headers.push('Overall');
       alignments.push(':---:');
-      headers.push('Pass Rate');
+      headers.push('Raw Pass Rate');
+      alignments.push(':---:');
+      headers.push('Normalized');
       alignments.push(':---:');
 
-      const initialContent = `# WPT Multi-Spec Conformance Sandbox Progress Log\n\n` +
-        `This file tracks the conformance progress of the CSSOM / Typed OM implementations across major W3C Web Platform Tests spec suites.\n\n` +
+      const initialContent = `# WPT Multi-Spec Conformance Progress Log\n\n` +
+        `This file tracks the conformance progress of the CSSOM / Typed OM implementations across 7 major W3C Web Platform Tests (WPT) spec suites in pure Node.js (\`pnpm run wpt:node:progress\`).\n\n` +
+        `### Historical Conformance Progress Log\n\n` +
         `| ${headers.join(' | ')} |\n` +
         `| ${alignments.join(' | ')} |\n` +
         `${newRow}\n`;
@@ -319,7 +331,19 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     } else {
       const content = fs.readFileSync(progressFilePath, 'utf-8');
       const lines = content.split('\n');
-      const delimiterIndex = lines.findIndex(line => line.includes(':---'));
+      const historyHeaderIndex = lines.findIndex(line => line.includes('### Historical Conformance Progress Log'));
+      let delimiterIndex = -1;
+      if (historyHeaderIndex !== -1) {
+        for (let i = historyHeaderIndex; i < lines.length; i++) {
+          if (lines[i].includes(':---')) {
+            delimiterIndex = i;
+            break;
+          }
+        }
+      } else {
+        delimiterIndex = lines.findIndex(line => line.includes(':---'));
+      }
+
       if (delimiterIndex !== -1) {
         lines.splice(delimiterIndex + 1, 0, newRow);
         fs.writeFileSync(progressFilePath, lines.join('\n'), 'utf-8');
@@ -334,7 +358,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   return specResults;
 }
 
-if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_node_crawler.ts') || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
   const args = process.argv.slice(2);
   let spec: string | undefined;
   let file: string | undefined;

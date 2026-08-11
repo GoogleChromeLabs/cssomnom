@@ -18,10 +18,13 @@ export { Parser, parse } from './parser.ts';
 export { tokenize } from './tokenizer.ts';
 export { serialize } from './serializer.ts';
 export { getCascadedStyle } from './cascade.ts';
+export { matches, querySelectorAll, querySelector } from './matcher.ts';
 export { StreamingTokenizer } from './streaming-tokenizer.ts';
 export type { Token, TokenType, ComponentValue, SimpleBlock, CSSFunction, ASTAtRule, Rule, Declaration } from './types.ts';
+export { escape } from './css-escape.ts';
 export * from './CSSOM.ts';
 export { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 export { CSSStyleProperties } from './data/gen/properties.ts';
 export * from './typed-om.ts';
 export * from './parser-api.ts';
+

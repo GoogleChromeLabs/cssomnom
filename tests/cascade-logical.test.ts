@@ -30,9 +30,9 @@ test('getCascadedStyle retains logical properties in output', () => {
   const element = { matches: (sel: string) => sel === '.test' };
   const style = getCascadedStyle(element, stylesheet.cssRules as unknown as Rule[]);
   
-  assert.strictEqual(style['margin-left'], '10px');
+  assert.strictEqual(style.getPropertyValue('margin-left'), '10px');
   // This is the expected behavior from Phase 57 task 2
-  assert.strictEqual(style['margin-inline-start'], '10px');
+  assert.strictEqual(style.getPropertyValue('margin-inline-start'), '10px');
 });
 
 test('getCascadedStyle resolves logical properties based on writing-mode', () => {
@@ -45,9 +45,9 @@ test('getCascadedStyle resolves logical properties based on writing-mode', () =>
   const style = getCascadedStyle(element, stylesheet.cssRules as unknown as Rule[]);
   
   // In vertical-rl, inline-start is top.
-  assert.strictEqual(style['margin-top'], '10px');
-  assert.strictEqual(style['margin-inline-start'], '10px');
-  assert.strictEqual(style['margin-left'], undefined);
+  assert.strictEqual(style.getPropertyValue('margin-top'), '10px');
+  assert.strictEqual(style.getPropertyValue('margin-inline-start'), '10px');
+  assert.strictEqual(style.getPropertyValue('margin-left'), '');
 });
 
 test('text-orientation: upright forces direction to ltr in vertical writing modes', () => {
@@ -60,8 +60,8 @@ test('text-orientation: upright forces direction to ltr in vertical writing mode
   const style = getCascadedStyle(element, stylesheet.cssRules as unknown as Rule[]);
   
   // vertical-rl + ltr (forced by text-orientation: upright) -> inline-start is top.
-  assert.strictEqual(style['margin-top'], '10px');
-  assert.strictEqual(style['margin-bottom'], undefined);
+  assert.strictEqual(style.getPropertyValue('margin-top'), '10px');
+  assert.strictEqual(style.getPropertyValue('margin-bottom'), '');
 });
 
 test('getCascadedStyle inherits writing-mode and direction from parent element', () => {
@@ -90,7 +90,7 @@ test('getCascadedStyle inherits writing-mode and direction from parent element',
   const childStyle = getCascadedStyle(childEl, rules);
   
   // child should inherit writing-mode: vertical-rl from parentEl, mapping inline-start to margin-top
-  assert.strictEqual(childStyle['margin-top'], '10px');
-  assert.strictEqual(childStyle['margin-left'], undefined);
+  assert.strictEqual(childStyle.getPropertyValue('margin-top'), '10px');
+  assert.strictEqual(childStyle.getPropertyValue('margin-left'), '');
 });
 

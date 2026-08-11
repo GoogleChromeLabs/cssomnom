@@ -39,5 +39,8 @@ export const ParseHooks = {
 
   validateCustomPropertyValue: (_values: ComponentValue[]): boolean => {
     throw new Error('validateCustomPropertyValue not injected');
+  },
+  isValidDashedIdent: (_name: string): boolean => {
+    throw new Error('isValidDashedIdent not injected');
   }
 };
