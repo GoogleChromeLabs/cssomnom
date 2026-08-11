@@ -131,21 +131,19 @@ export function querySelectorAll(root: unknown, selector: string | ComplexSelect
     }
   }
 
-  if ('documentElement' in root && isElement((root as { documentElement: unknown }).documentElement)) {
-    // Document root
-    walk((root as { documentElement: DOMElement }).documentElement);
-  } else if (isElement(root)) {
+  if (isElement(root)) {
     const children = root.children ? Array.from(root.children) : [];
     for (const child of children) {
       if (isElement(child)) {
         walk(child);
       }
     }
-  } else if ('childNodes' in root) {
-    // DocumentFragment or Node
-    const childNodes = (root as { childNodes: ArrayLike<unknown> }).childNodes || [];
-    for (let i = 0; i < childNodes.length; i++) {
-      const child = childNodes[i];
+  } else if ('children' in root || 'childNodes' in root) {
+    // Document, DocumentFragment, or Node container
+    const nodes = (root as { children?: ArrayLike<unknown>; childNodes?: ArrayLike<unknown> }).children ||
+                  (root as { childNodes?: ArrayLike<unknown> }).childNodes || [];
+    for (let i = 0; i < nodes.length; i++) {
+      const child = nodes[i];
       if (isElement(child)) {
         walk(child);
       }

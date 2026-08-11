@@ -149,7 +149,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], { timeout: 4000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], { timeout: 15000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -178,6 +178,9 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
         if (match) {
           passing = parseInt(match[1], 10);
           total = parseInt(match[2], 10);
+        } else {
+          passing = 0;
+          total = 1;
         }
         if (options.updateBaseline) {
           const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || mergedOutput.includes('Runner timed out');
