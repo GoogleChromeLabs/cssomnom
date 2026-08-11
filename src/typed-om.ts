@@ -30,7 +30,7 @@ export type { CSSUnit };
 import { formatNumber } from './utils/format.ts';
 import { DOMMatrixReadOnly, DOMMatrix, setParseTransformListHook } from './DOMMatrix.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
-import { STANDARD_PROPERTIES_SYNTAX } from './standard-syntax.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
 
 function validateProperty(property: string): void {
   if (!property.startsWith('--') && !SUPPORTED_PROPERTIES.has(property.toLowerCase())) {

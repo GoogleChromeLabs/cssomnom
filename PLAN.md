@@ -2040,10 +2040,13 @@ Objective: Generate standard property syntax definitions for all 800+ CSS proper
 - [x] **Property Syntax Codegen (`scripts/codegen/generate_standard_syntax.ts`)**:
   - Read `node_modules/@webref/css/css.json` containing all 815 standard CSS properties.
   - Convert standard W3C syntax expressions into Houdini-compliant syntax definitions (`<color>`, `<length-percentage>`, `<length>`, `<percentage>`, `<number>`, `<time>`, `<angle>`, keyword combinations).
-  - Emit `src/data/gen/standard-syntax.ts` (810 properties) and integrate with `scripts/generate_all.ts` / `pnpm run codegen`.
-- [x] **Syntax Validation in `src/typed-om.ts` & `src/standard-syntax.ts`**:
-  - Merge `GENERATED_PROPERTIES_SYNTAX` into `STANDARD_PROPERTIES_SYNTAX`.
+  - Moved all `MANUAL_OVERRIDES` and custom syntax handling directly into `scripts/codegen/generate_standard_syntax.ts` to uphold "Automation Over Hardcoding".
+  - Emit `STANDARD_PROPERTIES_SYNTAX` directly in `src/data/gen/standard-syntax.ts` (811 properties) and deleted redundant `src/standard-syntax.ts`.
+- [x] **Syntax Validation in `src/typed-om.ts` & `src/parser-api.ts`**:
+  - Point imports of `STANDARD_PROPERTIES_SYNTAX` directly to `./data/gen/standard-syntax.ts`.
   - Implemented `matchesStyleValueSyntax` and updated `StylePropertyMap.set()`, `StylePropertyMap.append()`, `CSSStyleValue.parse()`, and `CSSStyleValue.parseAll()` to validate values against syntax and throw `TypeError` on invalid combinations.
+- [x] **Native Node Snapshots in API Surface Tests (`tests/api-surface.test.ts`)**:
+  - Migrated `tests/api-surface.test.ts` from hardcoded arrays to native Node.js snapshot assertions (`t.assert.snapshot()`), generating deterministic snapshots in `tests/api-surface.test.ts.snapshot`.
 - [x] **Unit Tests & Parity Suite (`tests/typed-om-syntax.test.ts`)**:
   - Added unit test suite verifying invalid and valid Typed OM value assignments across standard CSS properties.
 - [x] **Mandatory Pre/Post Cluster Delta Reconciliation**:
