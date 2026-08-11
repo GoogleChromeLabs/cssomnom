@@ -91,6 +91,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
 
 export class CSSStyleDeclaration extends CSSStyleProperties {
   [index: number]: string;
+  [property: string]: unknown;
   private _declarations: Declaration[];
   private _declMap: Map<string, Declaration>;
   private _readonly: boolean;

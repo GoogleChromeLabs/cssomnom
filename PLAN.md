@@ -2006,20 +2006,20 @@ Objective: Implement a pure-AST static selector matcher and declarative cascade 
   - § 4 Resolving `var()` Functions
 
 ### Tasks
-- [ ] **Pure-AST Static Selector Matcher (`src/matcher.ts`)**:
+- [x] **Pure-AST Static Selector Matcher (`src/matcher.ts`)**:
   - Implement `matches(element: Element, selector: string | ComplexSelector): boolean` and `querySelectorAll(root: Element | Document, selector: string): Element[]`.
   - Support compound selectors (type, class, id, attribute `[att=val]`, null namespace `[|att]`).
   - Support combinators (child `>`, next-sibling `+`, subsequent-sibling `~`, descendant ` `).
   - Support pseudo-classes (`:is()`, `:where()`, `:not()`, `:has()`, `:first-child`, `:last-child`, `:only-child`, `:first-of-type`, `:last-of-type`, `:nth-child(An+B of <selector-list>)`, `:dir()`, `:heading()`, `:has-slotted()`).
-- [ ] **Declarative Cascade Resolver (`src/cascade.ts`)**:
+- [x] **Declarative Cascade Resolver (`src/cascade.ts`)**:
   - Implement `getCascadedStyle(element: Element): CSSStyleDeclaration`:
     - Collect all `CSSStyleRule`s across `element.ownerDocument.styleSheets` that match `element`.
     - Sort matching declarations by **Origin/Importance**, **Cascade Layers (`@layer`)**, **Specificity** (`Specificity.compare()`), and **Source Order** per CSS Cascade 5 § 6.
     - Merge with inline `element.style` declarations.
     - Resolve custom property references (`var(--custom-prop, fallback)`).
-- [ ] **WPT Test Sandbox Integration (`tests/wpt-shim.ts`)**:
+- [x] **WPT Test Sandbox Integration (`tests/wpt-shim.ts`)**:
   - Bind `win.getComputedStyle = (el) => getCascadedStyle(el)` exclusively inside `tests/wpt-shim.ts` as a declarative cascade oracle to satisfy WPT assertion checks without introducing API ambiguity in public package exports.
-- [ ] **Verification**:
+- [x] **Verification**:
   - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and `node scripts/wpt_cluster_failures.ts --spec=css-variables` to verify dramatic pass rate jumps.
   - Run `pnpm run preflight` to guarantee 0 regressions across all 197+ test suites.
 

@@ -189,5 +189,142 @@ test('Cascade: Unparented & selector resolves to :where(:scope)', () => {
   assert.strictEqual(resolved, ':where(:scope)');
 });
 
+test('Cascade: Cascade layers (@layer) normal order (later layer wins)', () => {
+  const css = `
+    @layer base, special;
+    @layer special {
+      div { color: green; }
+    }
+    @layer base {
+      div { color: red; }
+    }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div></div></body></html>');
+  const el = document.querySelector('div')!;
+
+  const style = Parser.getCascadedStyle(el, rules);
+  assert.strictEqual(style.getPropertyValue('color'), 'green');
+});
+
+test('Cascade: Cascade layers (@layer) !important reverse layer order (earlier layer wins)', () => {
+  const css = `
+    @layer base, special;
+    @layer special {
+      div { color: green !important; }
+    }
+    @layer base {
+      div { color: red !important; }
+    }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div></div></body></html>');
+  const el = document.querySelector('div')!;
+
+  const style = Parser.getCascadedStyle(el, rules);
+  assert.strictEqual(style.getPropertyValue('color'), 'red');
+});
+
+test('Cascade: Unlayered rules beat layered rules in normal cascade', () => {
+  const css = `
+    @layer special {
+      div { color: green; }
+    }
+    div { color: blue; }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div></div></body></html>');
+  const el = document.querySelector('div')!;
+
+  const style = Parser.getCascadedStyle(el, rules);
+  assert.strictEqual(style.getPropertyValue('color'), 'blue');
+});
+
+test('Cascade: Inline style overrides stylesheet rules', () => {
+  const css = `
+    #id.foo { color: blue; }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div id="id" class="foo" style="color: pink;"></div></body></html>');
+  const el = document.querySelector('div')!;
+
+  const style = Parser.getCascadedStyle(el, rules);
+  assert.strictEqual(style.getPropertyValue('color'), 'pink');
+});
+
+test('Cascade: CSS Variables inheritance and var() substitution', () => {
+  const css = `
+    :root {
+      --primary-color: orange;
+      --font-size: 20px;
+    }
+    .child {
+      color: var(--primary-color);
+      font-size: var(--font-size);
+    }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div class="parent"><span class="child"></span></div></body></html>');
+  const child = document.querySelector('.child')!;
+
+  const style = Parser.getCascadedStyle(child, rules);
+  assert.strictEqual(style.getPropertyValue('color'), 'orange');
+  assert.strictEqual(style.getPropertyValue('font-size'), '20px');
+  assert.strictEqual(style.getPropertyValue('--primary-color'), 'orange');
+});
+
+test('Cascade: CSS Variables fallback substitution', () => {
+  const css = `
+    .box {
+      color: var(--undefined-var, purple);
+      background-color: var(--undefined-1, var(--undefined-2, teal));
+    }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div class="box"></div></body></html>');
+  const el = document.querySelector('.box')!;
+
+  const style = Parser.getCascadedStyle(el, rules);
+  assert.strictEqual(style.getPropertyValue('color'), 'purple');
+  assert.strictEqual(style.getPropertyValue('background-color'), 'teal');
+});
+
+test('Cascade: CSS Variables circular reference is invalid at computed value time', () => {
+  const css = `
+    .circle {
+      --a: var(--b);
+      --b: var(--a);
+      color: var(--a);
+    }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div class="circle"></div></body></html>');
+  const el = document.querySelector('.circle')!;
+
+  const style = Parser.getCascadedStyle(el, rules);
+  assert.strictEqual(style.getPropertyValue('color'), '');
+});
+
+test('Cascade: Automatic stylesheet extraction from document.styleSheets', () => {
+  const html = `
+    <html>
+      <head>
+        <style>
+          .auto-test { color: darkblue; }
+        </style>
+      </head>
+      <body>
+        <div class="auto-test"></div>
+      </body>
+    </html>
+  `;
+  const { document } = parseHTML(html);
+  const el = document.querySelector('.auto-test')!;
+
+  const style = Parser.getCascadedStyle(el);
+  assert.strictEqual(style.getPropertyValue('color'), 'darkblue');
+});
+
+
 
 

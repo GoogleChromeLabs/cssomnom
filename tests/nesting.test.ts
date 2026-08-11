@@ -250,7 +250,8 @@ describe('CSS Nesting', () => {
         
         // Should not throw and return empty style because no match
         const style = getCascadedStyle(element, Array.from(stylesheet.cssRules) as unknown as Rule[]);
-        assert.deepStrictEqual(style, {});
+        assert.strictEqual(style.length, 0);
+        assert.strictEqual(style.color, '');
     });
 
     test('consumeQualifiedRule respects nested flag', () => {

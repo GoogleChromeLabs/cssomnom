@@ -2,6 +2,8 @@ import { parseStyleSheet, parseRule } from '../src/parser.ts';
 import { CSSStyleSheet } from '../src/CSSOM.ts';
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { ParseHooks } from '../src/parse-hooks.ts';
+import { getCascadedStyle } from '../src/cascade.ts';
+import { matches, querySelectorAll, querySelector } from '../src/matcher.ts';
 
 export interface WptSandboxTest {
   type: 'setup' | 'test' | 'promise_test' | 'async_test';
@@ -222,10 +224,9 @@ export function patchWindowForTypedOM(window: WindowType) {
 
   }
 
-  // getComputedStyle cannot be supported meaningfully in Linkedom without a visual layout engine.
-  // We throw explicitly to ensure tests requiring getComputedStyle fail predictably rather than returning incorrect empty results.
-  win.getComputedStyle = function() {
-    throw new Error('getComputedStyle is not supported in the linkedom sandbox environment (requires a full layout engine)');
+  // Declarative cascade oracle for WPT test sandbox
+  win.getComputedStyle = function(element: Element) {
+    return getCascadedStyle(element);
   };
 
   // Mock window.matchMedia
@@ -749,6 +750,46 @@ const styleToElement = new WeakMap<object, Element>();
     });
   }
 
+  if (window.Element && window.Element.prototype) {
+    const elProto = window.Element.prototype as unknown as {
+      matches: (s: string) => boolean;
+      querySelectorAll: (s: string) => unknown;
+      querySelector: (s: string) => unknown;
+    };
+    elProto.matches = function(this: Element, selector: string) {
+      return matches(this, selector);
+    };
+    elProto.querySelectorAll = function(this: Element, selector: string) {
+      return querySelectorAll(this, selector);
+    };
+    elProto.querySelector = function(this: Element, selector: string) {
+      return querySelector(this, selector);
+    };
+  }
+  if (window.Document && window.Document.prototype) {
+    const docProto = window.Document.prototype as unknown as {
+      querySelectorAll: (s: string) => unknown;
+      querySelector: (s: string) => unknown;
+    };
+    docProto.querySelectorAll = function(this: Document, selector: string) {
+      return querySelectorAll(this, selector);
+    };
+    docProto.querySelector = function(this: Document, selector: string) {
+      return querySelector(this, selector);
+    };
+  }
+  if (window.DocumentFragment && window.DocumentFragment.prototype) {
+    const fragProto = window.DocumentFragment.prototype as unknown as {
+      querySelectorAll: (s: string) => unknown;
+      querySelector: (s: string) => unknown;
+    };
+    fragProto.querySelectorAll = function(this: DocumentFragment, selector: string) {
+      return querySelectorAll(this, selector);
+    };
+    fragProto.querySelector = function(this: DocumentFragment, selector: string) {
+      return querySelector(this, selector);
+    };
+  }
 
   Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
     get() {

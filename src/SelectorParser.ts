@@ -475,13 +475,15 @@ export class SelectorParser {
     if (subCursor.hasNext) {
       const v1 = subCursor.next;
       const v2 = subCursor.peek(1);
-      if (isIdentToken(v1) && isDelimToken(v2, '|')) {
+      const v3 = subCursor.peek(2);
+      const isPipeFollowedByEquals = isDelimToken(v2, '|') && isDelimToken(v3, '=');
+      if (isIdentToken(v1) && isDelimToken(v2, '|') && !isPipeFollowedByEquals) {
         namespace = v1.value;
         subCursor.i += 2;
-      } else if (isDelimToken(v1, '*') && isDelimToken(v2, '|')) {
+      } else if (isDelimToken(v1, '*') && isDelimToken(v2, '|') && !isPipeFollowedByEquals) {
         namespace = '*';
         subCursor.i += 2;
-      } else if (isDelimToken(v1, '|')) {
+      } else if (isDelimToken(v1, '|') && !isDelimToken(v2, '=')) {
         namespace = '';
         subCursor.i += 1;
       }

@@ -1481,7 +1481,7 @@ export class Parser {
     return calculateSpecificity(selector);
   }
 
-  public static getCascadedStyle(element: unknown, rules: Rule[]): Record<string, string> {
+  public static getCascadedStyle(element: unknown, rules?: Rule[]): CSSStyleDeclaration {
     return getCascadedStyle(element, rules);
   }
 

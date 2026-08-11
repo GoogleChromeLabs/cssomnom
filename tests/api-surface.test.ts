@@ -28,6 +28,9 @@ test('API Surface Area', () => {
     'tokenize',
     'parse',
     'getCascadedStyle',
+    'matches',
+    'querySelectorAll',
+    'querySelector',
     'escape',
 
     // CSSOM Rules
