@@ -1,9 +1,9 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 import fs from 'node:fs';
-import { Parser } from '../src/parser.ts';
-import { tokenize } from '../src/tokenizer.ts';
+import { Parser } from '../../src/parser.ts';
+import { tokenize } from '../../src/tokenizer.ts';
 
-const fixturesPath = new URL('../tests/fixtures/external/lightningcss.json', import.meta.url);
+const fixturesPath = new URL('../../tests/fixtures/external/lightningcss.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
 
 const isErrorTest = (type: string) => 
@@ -50,10 +50,10 @@ for (let i = 0; i < fixtures.length; i++) {
 }
 
 // Make sure target directory exists
-fs.mkdirSync(new URL('../tests/fixtures/baselines', import.meta.url), { recursive: true });
+fs.mkdirSync(new URL('../../tests/fixtures/baselines', import.meta.url), { recursive: true });
 
 fs.writeFileSync(
-    new URL('../tests/fixtures/baselines/lightning-known-failures.json', import.meta.url),
+    new URL('../../tests/fixtures/baselines/lightning-known-failures.json', import.meta.url),
     JSON.stringify(knownFailures, null, 2) + '\n'
 );
 

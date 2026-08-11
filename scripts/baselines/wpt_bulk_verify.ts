@@ -16,8 +16,8 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { tokenize } from '../src/tokenizer.ts';
-import { Parser } from '../src/parser.ts';
+import { tokenize } from '../../src/tokenizer.ts';
+import { Parser } from '../../src/parser.ts';
 
 const wptDir = path.resolve(process.cwd(), 'submodules/web-platform-tests');
 

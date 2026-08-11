@@ -16,7 +16,7 @@ The subagent persona is a superstar senior SWE. They love concrete specification
 
 ## Subagent Workflow
 1.  **Pick a Task**: Select an uncompleted task from `PLAN.md`. Mark it as in progress `[/]` using the `plan-manager` skill if available.
-2.  **Diagnostic Cluster Triage (for WPT tasks)**: When tackling WPT conformance tasks, run `node scripts/wpt_cluster_failures.ts --spec=<target>` to inspect top failure clusters and prioritize high-frequency patterns.
+2.  **Diagnostic Cluster Triage (for WPT tasks)**: When tackling WPT conformance tasks, run `node scripts/wpt/node/cluster.ts --spec=<target>` to inspect top failure clusters and prioritize high-frequency patterns.
 3.  **Red Phase**: Write a failing test in the appropriate test file (or create a new one in `tests/`) that demonstrates the missing feature or bug.
 4.  **Green Phase**: Implement the code in `src/` to make the test pass, adding explicit spec anchor citations in comments.
 5.  **Verify**: Run the targeted test to ensure it passes.

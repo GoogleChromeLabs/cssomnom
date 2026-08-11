@@ -43,11 +43,11 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
        - **Generated Code Separation**: Verify that all machine-generated spec files reside in `src/data/gen/` (e.g. `src/data/gen/properties.ts`, `src/data/gen/units.ts`, etc.). Flag any generated files placed directly in `src/data/` or other non-gen folders.
        - **Extraction Scripts Directory**: Verify that all external test suite extraction scripts reside in `scripts/external_suites/` and use the `extract_<suite>.ts` naming pattern. Flag any extraction scripts placed directly in `scripts/` or missing the `extract_` verb prefix.
        - **Filename Case Standard**:
-         - Enforce **snake_case** for administrative/utility scripts in `scripts/` (e.g. `prune_resolved_failures.ts`, `generate_all.ts`) and codegen scripts in `scripts/codegen/`.
+         - Enforce **snake_case** for administrative/utility scripts in `scripts/` (e.g. `scripts/baselines/prune_resolved_failures.ts`, `scripts/codegen/generate_all.ts`) and codegen scripts in `scripts/codegen/`.
          - Enforce **kebab-case** for public package files, test runners in `tests/` (e.g., `external-lightning.test.ts`, `wpt-extracted.test.ts`), JSON fixtures in `tests/fixtures/`, and baseline files (which must reside in `tests/fixtures/baselines/`).
          - Flag any deviations or inconsistent mixing of case conventions within the same category.
-       - **Test Failure & Skip Taxonomy**: Audit terms used for skipping/categorizing failures (`exclude` for unexecutable HTML suites, `knownFailures` for baseline failures checked and pruned by `prune_resolved_failures.ts`, and `knownSkips` for mapped skips with explicit spec reason strings).
-       - **Script & Command Alignment**: Ensure script filenames correspond logically to npm script names in `package.json` (e.g. `codegen` $\to$ `scripts/generate_all.ts`, `external:extract` $\to$ `scripts/extract_external_suites.ts`, `baselines:prune` $\to$ `scripts/prune_resolved_failures.ts`).
+       - **Test Failure & Skip Taxonomy**: Audit terms used for skipping/categorizing failures (`exclude` for unexecutable HTML suites, `knownFailures` for baseline failures checked and pruned by `scripts/baselines/prune_resolved_failures.ts`, and `knownSkips` for mapped skips with explicit spec reason strings).
+       - **Script & Command Alignment**: Ensure script filenames correspond logically to npm script names in `package.json` (e.g. `codegen` $\to$ `scripts/codegen/generate_all.ts`, `external:extract` $\to$ `scripts/external_suites/extract_all.ts`, `baselines:prune` $\to$ `scripts/baselines/prune_resolved_failures.ts`).
 
   3. **Index & Link Integrity Verification**:
      - **Automated Link & Spec Path Validation**: Run `node .agents/skills/coherence-auditor/scripts/validate_links.ts` to automatically detect broken relative markdown links, invalid spec submodule paths, and missing script/source file references across all docs.

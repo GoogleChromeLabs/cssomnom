@@ -865,7 +865,7 @@ Objective: Organize code generation scripts into a subfolder and provide a singl
 ### Tasks
 - [x] **Create `scripts/codegen/` directory**: Created the directory.
 - [x] **Move Scripts**: Moved all `generate_*.ts` scripts from `scripts/` to `scripts/codegen/`.
-- [x] **Create Master Script**: Created `scripts/generate_all.ts` that runs all scripts in `scripts/codegen/` sequentially.
+- [x] **Create Master Script**: Created `scripts/codegen/generate_all.ts` that runs all scripts in `scripts/codegen/` sequentially.
 - [x] **Add Npm Script**: Added a `codegen` script to `package.json` that invokes the master script.
 - [x] **Verify**: Ran `pnpm run codegen` and ensured all data files are correctly generated in `src/data/`.
 
@@ -1246,7 +1246,7 @@ Objective: Centralize CSS unit definitions in a single configuration file with s
 - [x] **Define Unified Units Config**: Extracted dynamically from MDN data and specifications instead of maintaining a hardcoded local JSON file.
 - [x] **Cross-Reference Specifications**: Parsed specifications programmatically inside codegen (Values 4, Contain 3, Conditional 5).
 - [x] **Implement Units Codegen**: Created `scripts/codegen/generate_units_code.ts` to generate TypeScript types (`CSSUnit` in `src/data/gen/units.ts`) and conversion factors.
-- [x] **Integrate and Verify**: Linked codegen to the master `scripts/generate_all.ts` generator and verified with `pnpm run preflight`.
+- [x] **Integrate and Verify**: Linked codegen to the master `scripts/codegen/generate_all.ts` generator and verified with `pnpm run preflight`.
 
 ## Phase 59: Preparing for Release & OSPO Compliance [x]
 
@@ -1396,11 +1396,11 @@ Objective: Build a Node-based VM sandbox runner using `linkedom` to execute brow
 - [x] **HTMLElement attributeStyleMap**: Define `HTMLElement.prototype.attributeStyleMap` and `Element.prototype.computedStyleMap()` getters using our `StylePropertyMap` wrapper.
 
 #### 2. Sandbox VM Execution Script [x]
-- [x] **Runner script**: Create `scripts/run_wpt_node.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
+- [x] **Runner script**: Create `scripts/wpt/node/run.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
 - [x] **Sandbox configuration**: Support a config file (`tests/wpt-node-config.json`) defining allowlisted/skipped suites and baseline failures.
 
 #### 3. Integrate into Preflight [x]
-- [x] **Preflight hook**: Hook `scripts/run_wpt_node.ts` into our node test run to enforce dynamic browser WPT checks.
+- [x] **Preflight hook**: Hook `scripts/wpt/node/run.ts` into our node test run to enforce dynamic browser WPT checks.
 
 ---
 
@@ -1411,11 +1411,11 @@ Objective: Build a diagnostic utility script to detect which of our 1,300+ skipp
 ### Tasks
 
 #### 1. Implement Skip Verification Script [x]
-- [x] **Verification script**: Create a script `scripts/prune_resolved_failures.ts` that loads all test runners, bypasses their skip lists, executes the tests, and reports which ones are now passing.
+- [x] **Verification script**: Create a script `scripts/baselines/prune_resolved_failures.ts` that loads all test runners, bypasses their skip lists, executes the tests, and reports which ones are now passing.
 - [x] **Baseline pruner**: Support a write-back flag or step in the script to automatically remove passing cases from `lightning-known-failures.json` and `wpt-cssom-known-failures.json`.
 
 #### 2. Run and Prune Obsolete Skips [x]
-- [x] **Identify and Prune**: Run `node scripts/prune_resolved_failures.ts` and verify which tests are passing. Prune the passing tests from all lists.
+- [x] **Identify and Prune**: Run `node scripts/baselines/prune_resolved_failures.ts` and verify which tests are passing. Prune the passing tests from all lists.
 - [x] **Preflight check**: Confirm that our preflight still passes and the newly unskipped tests are verified correctly.
 
 
@@ -1559,10 +1559,10 @@ Objective: Run WPT tests dynamically using a lightweight harness shim, eliminati
 Objective: Merge redundant WPT shims and DOM setups into a single, clean helper file (`tests/wpt-shim.ts`) and reuse it across both Node unit tests and the sandbox CLI script.
 
 ### Tasks
-- [x] **Consolidate shims**: Move any unique shims from `scripts/run_wpt_node.ts` (such as `promise_test()`, `assert_not_equals()`, `assert_array_equals()`, `assert_class_string()`, `assert_unreached()`) into `tests/wpt-shim.ts`.
+- [x] **Consolidate shims**: Move any unique shims from `scripts/wpt/node/run.ts` (such as `promise_test()`, `assert_not_equals()`, `assert_array_equals()`, `assert_class_string()`, `assert_unreached()`) into `tests/wpt-shim.ts`.
 - [x] **Consolidate DOM setups**: Integrate the `HTMLStyleElement` `.sheet` mock patching from `the tests/wpt-sandbox-setup.ts` and the `ComputedStylePropertyMapReadOnly` class from it into `tests/wpt-shim.ts`.
 - [x] **Cleanup setup files**: Delete `the tests/wpt-global-setup.ts` and `the tests/wpt-sandbox-setup.ts` and update any imports.
-- [x] **Refactor `scripts/run_wpt_node.ts`**: Make `run_wpt_node.ts` use the unified shims and prototype patches from `tests/wpt-shim.ts`.
+- [x] **Refactor `scripts/wpt/node/run.ts`**: Make `run_wpt_node.ts` use the unified shims and prototype patches from `tests/wpt-shim.ts`.
 - [x] **Verify preflight**: Run `pnpm run preflight` to confirm both test suites and the CLI script compile and pass.
 
 ---
@@ -1587,7 +1587,7 @@ Objective: Eliminate the verbose 9.5k line static JSON baseline configuration fi
 
 ### Tasks
 - [x] **Dynamic WPT crawling**: Update `tests/wpt-sandbox.test.ts` to crawl the `css-typed-om` directory dynamically at runtime instead of loading a static `include` array.
-- [x] **Compact JSON Formatting**: Implement custom single-line-array serialization in `scripts/run_wpt_node_crawler.ts` (`--update-baseline`) to store each file's failures on a single line.
+- [x] **Compact JSON Formatting**: Implement custom single-line-array serialization in `scripts/wpt/node/crawl.ts` (`--update-baseline`) to store each file's failures on a single line.
 - [x] **Dynamic exclusion**: Identify files that fail to initialize (syntax/load errors) and automatically populate them into the `exclude` list during baseline runs.
 - [x] **Verify preflight**: Run `pnpm run preflight` to confirm all 358 WPT test files run successfully in 9 seconds with the new compact JSON format (~335 lines).
 
@@ -1600,7 +1600,7 @@ Objective: Manually expand syntax validation in `src/typed-om.ts` by adding simp
 ### Tasks
 - [x] **Identify Candidate Properties**: Analyze the WPT failures in `tests/fixtures/baselines/wpt-sandbox-known-failures.json` to find properties that fail because they allow invalid types (e.g. `writing-mode`, `direction`, `pointer-events`, `unicode-bidi`, `display`, `position`, etc.).
 - [x] **Define Houdini-Compliant Syntaxes**: Add these properties to `STANDARD_PROPERTIES_SYNTAX` inside `src/typed-om.ts`. Ensure their syntax strings use only basic types, `|` alternatives, or basic multipliers (no space separators, groupings, `||`, or `&&`).
-- [x] **Verify and Baseline**: Run `node scripts/update_wpt_baseline.ts` to execute the suite and confirm the resolved test cases are automatically removed from `tests/fixtures/baselines/wpt-sandbox-known-failures.json`.
+- [x] **Verify and Baseline**: Run `node scripts/wpt/node/crawl.ts --update-baseline` to execute the suite and confirm the resolved test cases are automatically removed from `tests/fixtures/baselines/wpt-sandbox-known-failures.json`.
 - [x] **Address Code Review Findings**:
   - [x] Remove complex/space-separated properties that cause false-positives from `STANDARD_PROPERTIES_SYNTAX` (`display`, `font-style`, `font-variant-ligatures`, `font-variant-numeric`, `font-variant-east-asian`, `grid-auto-flow`, `text-overflow`, `text-emphasis-position`, `text-underline-position`, `list-style-type`, `overflow-clip-margin`).
   - [x] Correct `transform-style` syntax by removing the invalid `auto` keyword.
@@ -1617,7 +1617,7 @@ Objective: Migrate the massive, duplicate-heavy external test baselines (`lightn
 ### Tasks
 - [x] **Define Unified Normalizer**: Extract or share the whitespace normalizer logic.
 - [x] **Refactor Test Runners**: Update `tests/external-lightning.test.ts` and `tests/wpt-cssom.test.ts` to perform checks against Sets populated with the collapsed string keys.
-- [x] **Refactor Baseline Maintenance Scripts**: Update `scripts/prune_resolved_failures.ts` and `scripts/generate_lightning_baseline.ts` to read/write collapsed string array baselines.
+- [x] **Refactor Baseline Maintenance Scripts**: Update `scripts/baselines/prune_resolved_failures.ts` and `scripts/baselines/generate_lightning_baseline.ts` to read/write collapsed string array baselines.
 - [x] **Regenerate Baselines**: Execute the baseline updates and confirm the new compact baselines are generated and all tests remain green.
 
 ---
@@ -1662,7 +1662,7 @@ Objective: Implement missing CSS Typed OM classes (`CSSPositionValue`, `CSSTrans
 Objective: Automate conformance logging of WPT sandbox tests to track progress over time.
 
 ### Tasks
-- [x] **Progress Tracking Script**: Create `scripts/run_wpt_node_crawler.ts` (`--update-progress`) to execute WPT tests and append current statistics to `wpt-progress.md` only when they change.
+- [x] **Progress Tracking Script**: Create `scripts/wpt/node/crawl.ts` (`--update-progress`) to execute WPT tests and append current statistics to `wpt-progress.md` only when they change.
 - [x] **Git Pre-commit Hook**: Implement `.git/hooks/pre-commit` to automatically run progress tracking and stage the updated log file when `src/typed-om.ts` changes.
 - [x] **Initialize Log**: Run the script and commit the initial baseline log (`5890/12150` passed, 48.48% pass rate).
 - [x] **Historical Backfill**: Backfill the progress log table with past test execution numbers from transcripts.
@@ -1762,7 +1762,7 @@ Objective: Verify our WPT shim conformance against WPT's own unit tests, then sc
   - [x] Configure includes/excludes lists for these spec folders in `tests/wpt-node-config.json`.
 - [x] **Unified Multi-Spec Progress Logging**:
   - [x] Create `wpt-progress.md` logging progress across multiple specs.
-  - [x] Update progress logging script (`scripts/run_wpt_node_crawler.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
+  - [x] Update progress logging script (`scripts/wpt/node/crawl.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
     ```markdown
     | Date & Time (UTC) | Commit | Typed OM (12150) | CSSOM (600) | Nesting (120) | Syntax (350) | Selectors (500) | MQ (200) | Overall | Pass Rate |
     | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -1815,7 +1815,7 @@ Objective: Resolve unbaselined failures in the expanded specifications by comple
 - [x] **Memory Leak & CPU Performance Safety**:
   - [x] Guarded globally-shared linkedom prototypes (`Element.prototype`, `CSSStyleDeclaration.prototype`) with a recursion guard to prevent stack overflow/extreme CPU locks.
   - [x] Removed global `window` closure leaks inside `Node.prototype.appendChild` and `insertBefore` mocks by resolving contexts dynamically via `ownerDocument.defaultView`.
-  - [x] Implemented automatic worker-queue throttling inside `scripts/run_wpt_node_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
+  - [x] Implemented automatic worker-queue throttling inside `scripts/wpt/node/crawl.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
   - [x] Guarded heavy crawler runner in `tests/wpt-sandbox.test.ts` with `RUN_SANDBOX_WPT=true` env flag to keep normal preflight check memory footprint minimal.
   - [x] Replaced shell `exec` with direct binary `execFile` and injected a 3.5s `unref()` self-termination fail-safe timer in workers to stop background loops.
   - [x] Injected event loop yields (5ms between assertions, 20ms between task spawns) to lower CPU and memory footprint during crawler runs.
@@ -1894,8 +1894,8 @@ Objective: Resolve high-frequency failure clusters in `css-nesting` and `css-var
   - Ensure whitespace preservation in custom property value tokens.
   - Fix `var()` fallback parsing and serialization in `src/parser.ts` and `src/serializer.ts`.
 - [x] **Verification**:
-  - Run `node scripts/wpt_cluster_failures.ts --spec=css-nesting` and verify pass rate jumps.
-  - Run `node scripts/wpt_cluster_failures.ts --spec=css-variables` and verify pass rate jumps.
+  - Run `node scripts/wpt/node/cluster.ts --spec=css-nesting` and verify pass rate jumps.
+  - Run `node scripts/wpt/node/cluster.ts --spec=css-variables` and verify pass rate jumps.
   - Run `pnpm run preflight` to ensure 0 regressions.
 
 ---
@@ -1910,7 +1910,7 @@ Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing for
 
 ### Tasks
 - [x] **Diagnostic Failure Clustering on `selectors`**:
-  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` to identify top error patterns across the 3,103 tests.
+  - Run `node scripts/wpt/node/cluster.ts --spec=selectors` to identify top error patterns across the 3,103 tests.
 - [x] **Forgiving Selector List Parsing (`:is()`, `:where()`)**:
   - Implement forgiving parsing per Selectors 4 #forgiving-selector: invalid or unsupported selectors in the argument list do not invalidate the entire selector or the pseudo-class.
 - [x] **Complex Pseudo-Class & Pseudo-Element Arguments**:
@@ -1923,7 +1923,7 @@ Objective: Drive WPT `selectors/` conformance (>3,100 tests) by implementing for
   - Add comprehensive quickstarts for dual-path TS/ESM execution, CSSOM rule traversal, Typed OM math & units, and Houdini custom properties.
   - Document `getComputedStyle` intentional non-goal and adopt `wpt:node` vs. `wpt:browser` taxonomy.
 - [x] **Verification**:
-  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and measure conformance improvement.
+  - Run `node scripts/wpt/node/cluster.ts --spec=selectors` and measure conformance improvement.
   - Run `pnpm run preflight` to guarantee 0 regressions across all suites.
 
 ---
@@ -1941,7 +1941,7 @@ Objective: Drive WPT `css/cssom/` conformance (>770 tests) by hardening styleshe
 
 ### Tasks
 - [x] **Diagnostic Failure Clustering on `cssom`**:
-  - Run `node scripts/wpt_cluster_failures.ts --spec=cssom` to identify top failure clusters across the 775 tests in `submodules/web-platform-tests/css/cssom`.
+  - Run `node scripts/wpt/node/cluster.ts --spec=cssom` to identify top failure clusters across the 775 tests in `submodules/web-platform-tests/css/cssom`.
 - [x] **Rule Index Boundary & Hierarchy Validation (`insertRule` / `deleteRule`)**:
   - In `src/CSSOM.ts`, implement strict `IndexSizeError` (when index < 0 or > rules.length) and `HierarchyRequestError` (e.g. attempting to insert `@import` after style rules or `@namespace` rules) per CSSOM 1 § 6.5.3.
   - Ensure `CSSRule.parentStyleSheet` and `CSSRule.parentRule` back-references are updated when rules are inserted or removed.
@@ -1949,7 +1949,7 @@ Objective: Drive WPT `css/cssom/` conformance (>770 tests) by hardening styleshe
   - In `src/CSSStyleDeclaration.ts`, handle case-insensitive `"important"` priority values, whitespace handling, and normalize priority strings in `setProperty()`.
   - Ensure canonical property name iteration order and `cssText` roundtripping.
 - [x] **Verification**:
-  - Run `node scripts/wpt_cluster_failures.ts --spec=cssom` and verify conformance improvement.
+  - Run `node scripts/wpt/node/cluster.ts --spec=cssom` and verify conformance improvement.
   - Run `pnpm run preflight` to guarantee 0 regressions across all suites.
 
 ---
@@ -1972,17 +1972,17 @@ Objective: Push WPT `css/cssom/` conformance higher toward our practical ceiling
 - [x] **`CSS.escape()` Implementation**:
   - Implement the official CSSOM § 3 string escaping algorithm in `src/CSSOM.ts` / `src/index.ts`, passing `escape.html` (9 tests).
 - [x] **`CSSStyleRule.selectorText` Dynamic Setter**:
-  - In `src/CSSStyleRule.ts` / `src/CSSOM.ts`, implement the setter for `selectorText`: validate and re-parse the incoming selector text, updating internal rule AST or throwing `SyntaxError` on invalid input per § 6.4.1.
+  - In `src/CSSOM.ts`, implement the setter for `selectorText`: validate and re-parse the incoming selector text, updating internal rule AST or throwing `SyntaxError` on invalid input per § 6.4.1.
 - [x] **Rule ASTs & `cssText` Serialization**:
   - Implement full serialization for `CSSCounterStyleRule.cssText` (single-line format without unformatted linebreaks per CSS Counter Styles 3).
   - Implement `CSSFontFeatureValuesRule` and `@font-feature-values` sub-rules.
   - Implement `CSSNamespaceRule` and ensure `Object.prototype.toString.call(CSSNamespaceRule.prototype)` returns `"[object CSSNamespaceRule]"`.
 - [x] **Constructable Stylesheet `replace()` & `replaceSync()`**:
-  - In `src/CSSStyleSheet.ts`, implement `replace(text)` returning a `Promise<CSSStyleSheet>` that parses asynchronously, and `replaceSync(text)` with proper disallow-modification locks.
+  - In `src/CSSOM.ts`, implement `replace(text)` returning a `Promise<CSSStyleSheet>` that parses asynchronously, and `replaceSync(text)` with proper disallow-modification locks.
 - [x] **WPT IDL Test Harness Shims**:
   - In `tests/wpt-shim.ts`, implement `assert_idl_attribute` and `document.implementation.createDocument`.
 - [x] **Verification**:
-  - Run: `node scripts/wpt_cluster_failures.ts --spec=cssom` and verify pass rate increases significantly.
+  - Run: `node scripts/wpt/node/cluster.ts --spec=cssom` and verify pass rate increases significantly.
   - Run: `pnpm run preflight` to guarantee 0 regressions across all suites.
 
 ---
@@ -2020,7 +2020,7 @@ Objective: Implement a pure-AST static selector matcher and declarative cascade 
 - [x] **WPT Test Sandbox Integration (`tests/wpt-shim.ts`)**:
   - Bind `win.getComputedStyle = (el) => getCascadedStyle(el)` exclusively inside `tests/wpt-shim.ts` as a declarative cascade oracle to satisfy WPT assertion checks without introducing API ambiguity in public package exports.
 - [x] **Verification**:
-  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and `node scripts/wpt_cluster_failures.ts --spec=css-variables` to verify dramatic pass rate jumps.
+  - Run `node scripts/wpt/node/cluster.ts --spec=selectors` and `node scripts/wpt/node/cluster.ts --spec=css-variables` to verify dramatic pass rate jumps.
   - Run `pnpm run preflight` to guarantee 0 regressions across all 197+ test suites.
 
 ---
@@ -2041,7 +2041,7 @@ Objective: Generate standard property syntax definitions for all 800+ CSS proper
   - Read `node_modules/@webref/css/css.json` containing all 815 standard CSS properties.
   - Convert standard W3C syntax expressions into Houdini-compliant syntax definitions (`<color>`, `<length-percentage>`, `<length>`, `<percentage>`, `<number>`, `<time>`, `<angle>`, keyword combinations).
   - Moved all `MANUAL_OVERRIDES` and custom syntax handling directly into `scripts/codegen/generate_standard_syntax.ts` to uphold "Automation Over Hardcoding".
-  - Emit `STANDARD_PROPERTIES_SYNTAX` directly in `src/data/gen/standard-syntax.ts` (811 properties) and deleted redundant `src/standard-syntax.ts`.
+  - Emit `STANDARD_PROPERTIES_SYNTAX` directly in `src/data/gen/standard-syntax.ts` (811 properties) and deleted redundant legacy standard-syntax file.
 - [x] **Syntax Validation in `src/typed-om.ts` & `src/parser-api.ts`**:
   - Point imports of `STANDARD_PROPERTIES_SYNTAX` directly to `./data/gen/standard-syntax.ts`.
   - Implemented `matchesStyleValueSyntax` and updated `StylePropertyMap.set()`, `StylePropertyMap.append()`, `CSSStyleValue.parse()`, and `CSSStyleValue.parseAll()` to validate values against syntax and throw `TypeError` on invalid combinations.
@@ -2053,6 +2053,31 @@ Objective: Generate standard property syntax definitions for all 800+ CSS proper
   - Pre-implementation baseline: 6,074 / 12,150 passed (49.99% pass rate), Cluster #1 had 5,121 failures ("Expected to throw JS exception").
   - Post-implementation result: 10,991 / 12,150 passed (90.46% pass rate), Cluster #1 failures dropped from 5,121 down to 98 (over 5,000 WPT failures resolved).
   - Preflight verification: `pnpm run preflight` 100% clean (0 TypeScript type errors, 0 linter warnings, all tests pass).
+
+---
+
+## Phase 86: Tooling & Script Architecture Reorganization (`scripts/`)
+
+Objective: Reorganize and modularize the `scripts/` directory to cleanly separate pure Node.js WPT runner and diagnostics (`scripts/wpt/node/`), real browser WPT reporting tools (`scripts/wpt/browser/`), spec codegen generators (`scripts/codegen/`), external suite extractors (`scripts/external_suites/`), and baseline maintenance tools (`scripts/baselines/`).
+
+### Tasks
+- [x] **Modular Directory Layout**:
+  - `scripts/wpt/node/`: Pure Node.js WPT runner (`run.ts`), multi-suite parallel crawler (`crawl.ts`), failure clustering diagnostic tool (`cluster.ts`), near-miss diff analyzer (`diff.ts`), and consensus feasibility study tools (`feasibility/audit.ts`, `feasibility/compare_votes.ts`, `feasibility/export_dataset.ts`, `feasibility/generate_manifest.ts`).
+  - `scripts/wpt/browser/`: Real browser WPT reporting tool (`report.ts`).
+  - `scripts/codegen/`: Spec code generators (`generate_all.ts`, `generate_properties.ts`, `generate_standard_syntax.ts`, etc.).
+  - `scripts/external_suites/`: External test suite extractors (`extract_all.ts`, `extract_csstree.ts`, `extract_nv_cssom.ts`, `extract_postcss.ts`, `extract_rrweb.ts`, `extract_wpt.ts`).
+  - `scripts/baselines/`: Test baseline maintenance utilities (`generate_lightning_baseline.ts`, `prune_resolved_failures.ts`, `rebaseline_wpt_history.ts`, `wpt_bulk_verify.ts`).
+- [x] **Script & Hook Updates**:
+  - Updated `package.json` scripts (`wpt:node`, `wpt:node:crawl`, `wpt:node:baseline`, `wpt:node:progress`, `wpt:node:cluster`, `wpt:node:diff`, `wpt:browser:*`, `fixtures:generate`, `external:extract`, `baselines:prune`, `codegen`, `maintain`).
+  - Updated `.git/hooks/pre-commit` to invoke `scripts/wpt/node/crawl.ts --update-progress`.
+- [x] **Documentation & Skill Sync**:
+  - Updated references across `MAINTENANCE.md`, `LOOP.md`, `AGENTS.md`, `.agents/skills/champ/SKILL.md`, `.agents/skills/coherence-auditor/SKILL.md`, and `PLAN.md`.
+  - Verified 100% link integrity with `node .agents/skills/coherence-auditor/scripts/validate_links.ts --all`.
+- [x] **Verification**:
+  - `pnpm run codegen`: 100% success.
+  - `pnpm run fixtures:generate`: 100% success.
+  - `pnpm run preflight`: 100% clean (0 TypeScript type errors, 0 linter warnings, all tests pass).
+  - `pnpm run wpt:node:progress`: 15,555 / 18,803 passed (82.73% overall, 92.51% normalized).
 
 ---
 

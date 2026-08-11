@@ -2,7 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SPEC_OUT_OF_SCOPE_COUNTS } from './wpt_feasibility_audit.ts';
+import { SPEC_OUT_OF_SCOPE_COUNTS } from '../wpt/node/feasibility/audit.ts';
 
 const specKeys = ['css-typed-om', 'cssom', 'css-nesting', 'css-syntax', 'css-variables', 'selectors', 'mediaqueries'];
 

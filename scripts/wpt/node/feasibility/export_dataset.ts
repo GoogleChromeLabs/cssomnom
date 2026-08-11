@@ -177,7 +177,7 @@ async function runTestFile(specName: string, filePath: string): Promise<FailureS
   const failures: FailureSample[] = [];
 
   try {
-    const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], {
+    const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], {
       timeout: 4000,
     });
     const merged = stdout + '\n' + stderr;

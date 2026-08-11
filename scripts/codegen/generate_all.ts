@@ -18,13 +18,13 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-const CODEGEN_DIR = 'scripts/codegen';
+const CODEGEN_DIR = import.meta.dirname;
 
 function main() {
     console.log('Starting full code generation...');
     
     const scripts = fs.readdirSync(CODEGEN_DIR)
-        .filter(file => file.endsWith('.ts'))
+        .filter(file => file.endsWith('.ts') && file !== 'generate_all.ts')
         .sort();
 
     for (const script of scripts) {

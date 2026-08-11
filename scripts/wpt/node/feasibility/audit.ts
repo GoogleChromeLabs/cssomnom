@@ -87,7 +87,7 @@ export function calculateFeasibility(currentResults: Record<string, { passing: n
   return { specs, overall };
 }
 
-if (process.argv[1] && process.argv[1].endsWith('wpt_feasibility_audit.ts')) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('audit.ts') || process.argv[1].endsWith('wpt_feasibility_audit.ts'))) {
   const currentResults: Record<string, { passing: number; total: number }> = {
     'css-typed-om': { passing: 5677, total: 10682 },
     'cssom': { passing: 340, total: 814 },

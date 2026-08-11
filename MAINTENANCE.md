@@ -36,7 +36,7 @@ This runs `git submodule update --init --remote && pnpm run submodules:update` t
 ```bash
 pnpm run fixtures:generate
 ```
-This runs `node scripts/extract_external_suites.ts`.
+This runs `node scripts/external_suites/extract_all.ts`.
 
 **3. Run Tests:**
 ```bash

@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { SPEC_OUT_OF_SCOPE_COUNTS } from './wpt_feasibility_audit.ts';
+import { SPEC_OUT_OF_SCOPE_COUNTS } from './feasibility/audit.ts';
 
 const execFilePromise = promisify(execFile);
 
@@ -149,7 +149,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], { timeout: 15000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -377,7 +377,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   return specResults;
 }
 
-if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_node_crawler.ts') || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('crawl.ts') || process.argv[1].endsWith('run_wpt_node_crawler.ts') || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
   const args = process.argv.slice(2);
   let spec: string | undefined;
   let file: string | undefined;

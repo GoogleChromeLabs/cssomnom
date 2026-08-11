@@ -58,7 +58,7 @@ async function analyzeSpec(specName: string, specPath: string): Promise<NearMiss
 
   await pool(concurrency, files, async (filePath) => {
     try {
-      const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/run_wpt_node.ts', filePath], { timeout: 15000 });
+      const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
       const merged = stdout + '\n' + stderr;
       const lines = merged.split('\n');
 
@@ -137,7 +137,7 @@ async function analyzeSpec(specName: string, specPath: string): Promise<NearMiss
   return nearMisses;
 }
 
-if (process.argv[1] && process.argv[1].endsWith('wpt_diff_failures.ts')) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('diff.ts') || process.argv[1].endsWith('wpt_diff_failures.ts'))) {
   const specArg = process.argv[2] || 'selectors';
   const specDirMap: Record<string, string> = {
     'selectors': 'submodules/web-platform-tests/css/selectors',

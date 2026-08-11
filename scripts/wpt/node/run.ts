@@ -1,11 +1,11 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 
 import { parseHTML } from 'linkedom';
-import { patchWindowForTypedOM, createWptContext, type WptSandboxTest } from '../tests/wpt-shim.ts';
+import { patchWindowForTypedOM, createWptContext, type WptSandboxTest } from '../../../tests/wpt-shim.ts';
 import * as vm from 'node:vm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as TypedOM from '../src/index.ts';
+import * as TypedOM from '../../../src/index.ts';
 
 export interface WptTest {
   name: string;
@@ -226,10 +226,10 @@ export function runWptFile(filePath: string): WptFileResult {
 }
 
 // Support running directly as a CLI script
-if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run_wpt_node.ts'))) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run.ts') || process.argv[1].endsWith('run_wpt_node.ts'))) {
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    console.error('Usage: node scripts/run_wpt_node.ts <wpt-html-file-paths...>');
+    console.error('Usage: node scripts/wpt/node/run.ts <wpt-html-file-paths...>');
     process.exit(1);
   }
   
