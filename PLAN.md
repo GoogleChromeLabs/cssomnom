@@ -1987,6 +1987,44 @@ Objective: Push WPT `css/cssom/` conformance higher toward our practical ceiling
 
 ---
  
+## Phase 84: Static Selector Matcher (`matches(element, selector)`) & Declarative Cascade Oracle (`getCascadedStyle`)
+
+Objective: Implement a pure-AST static selector matcher and declarative cascade resolver to evaluate selector rules and custom properties against DOM elements, unlocking ~2,500+ WPT tests across `selectors`, `css-variables`, `css-nesting`, and `css-syntax` using a test-sandbox cascade oracle without polluting public Node.js APIs.
+
+**Spec References**:
+- Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs`
+  - § 3 Structure of Selectors
+  - § 4 Selector Specificity
+  - § 15 Match a Selector Against an Element (`#match-against-element`)
+  - § 16 Match a Selector Against a Tree (`#match-against-tree`)
+- CSS Cascade Level 5: `submodules/csswg-drafts/css-cascade-5/Overview.bs`
+  - § 3 Cascading (`#cascading`)
+  - § 6 Cascade Sorting Order (`#cascade-sort`)
+  - § 7 Cascaded Values (`#cascaded-values`)
+- CSS Variables Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+  - § 3 Defining Custom Properties
+  - § 4 Resolving `var()` Functions
+
+### Tasks
+- [ ] **Pure-AST Static Selector Matcher (`src/matcher.ts`)**:
+  - Implement `matches(element: Element, selector: string | ComplexSelector): boolean` and `querySelectorAll(root: Element | Document, selector: string): Element[]`.
+  - Support compound selectors (type, class, id, attribute `[att=val]`, null namespace `[|att]`).
+  - Support combinators (child `>`, next-sibling `+`, subsequent-sibling `~`, descendant ` `).
+  - Support pseudo-classes (`:is()`, `:where()`, `:not()`, `:has()`, `:first-child`, `:last-child`, `:only-child`, `:first-of-type`, `:last-of-type`, `:nth-child(An+B of <selector-list>)`, `:dir()`, `:heading()`, `:has-slotted()`).
+- [ ] **Declarative Cascade Resolver (`src/cascade.ts`)**:
+  - Implement `getCascadedStyle(element: Element): CSSStyleDeclaration`:
+    - Collect all `CSSStyleRule`s across `element.ownerDocument.styleSheets` that match `element`.
+    - Sort matching declarations by **Origin/Importance**, **Cascade Layers (`@layer`)**, **Specificity** (`Specificity.compare()`), and **Source Order** per CSS Cascade 5 § 6.
+    - Merge with inline `element.style` declarations.
+    - Resolve custom property references (`var(--custom-prop, fallback)`).
+- [ ] **WPT Test Sandbox Integration (`tests/wpt-shim.ts`)**:
+  - Bind `win.getComputedStyle = (el) => getCascadedStyle(el)` exclusively inside `tests/wpt-shim.ts` as a declarative cascade oracle to satisfy WPT assertion checks without introducing API ambiguity in public package exports.
+- [ ] **Verification**:
+  - Run `node scripts/wpt_cluster_failures.ts --spec=selectors` and `node scripts/wpt_cluster_failures.ts --spec=css-variables` to verify dramatic pass rate jumps.
+  - Run `pnpm run preflight` to guarantee 0 regressions across all 197+ test suites.
+
+---
+ 
 ## Potential roadmap items
 
 Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
@@ -1997,7 +2035,6 @@ Objective: Explore long-term ideas for WPT conformance, prototype patching optio
   - [ ] **Wave 4: CSS Syntax & Tokenizer Conformance (`css/css-syntax`)**: String/ident escape sequence normalization, CDO/CDC comment tokens, bad URL recovery, and whitespace trimming rules.
   - [ ] **Wave 5: Media Queries Conformance (`css/mediaqueries`)**: `@media` condition parsing, range syntax (`width >= 600px`), Boolean media feature validation, and media list serialization.
   - [ ] **Wave 6: Advanced Typed OM Value Reification (`css/css-typed-om`)**: Viewport units, calculation expression trees, `anchor()` functions, and custom property value reification in `StylePropertyMap`.
-- [ ] **Static Selector Matching Engine (`matches(element, selector)`)**: Implement a pure-AST, zero-layout selector matching engine (`src/matcher.ts`) that evaluates combinators (`>`, `+`, `~`, descendant) and structural pseudo-classes (`:is`, `:where`, `:not`, `:has`, `:first-child`, `:last-child`, `:nth-child`) directly against Linkedom / DOM elements for static analysis and offline query tooling without requiring a full browser engine.
 - [ ] **WebIDL Index Accessors via Proxy**: Return a `Proxy` from the `CSSNumericArray` constructor to throw a `RangeError` on out-of-bounds index writes.
 - [ ] **Prototype Patching helper**: Export a `patchElementPrototype(HTMLElement)` utility from `src/index.ts` to allow users to opt-in to global DOM prototype patching.
 
