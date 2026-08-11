@@ -345,6 +345,25 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       }
 
       if (delimiterIndex !== -1) {
+        // Avoid inserting duplicate progress rows if scores are unchanged
+        const previousRow = lines[delimiterIndex + 1];
+        if (previousRow) {
+          const prevNumbers = previousRow
+            .split('|')
+            .slice(3)
+            .map(s => s.trim())
+            .join('|');
+          const currentNumbers = rowParts
+            .slice(2)
+            .map(s => s.trim())
+            .join('|');
+
+          if (prevNumbers === currentNumbers) {
+            console.log(`[WPT Progress] Conformance numbers unchanged (${grandPassing}/${grandTotal} passed). Skipping progress update.`);
+            return specResults;
+          }
+        }
+
         lines.splice(delimiterIndex + 1, 0, newRow);
         fs.writeFileSync(progressFilePath, lines.join('\n'), 'utf-8');
         console.log(`Inserted new progress entry into ${progressFilePath}.`);
