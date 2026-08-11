@@ -14,8 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { tokenize } from '../src/tokenizer.ts';
-import { Parser } from '../src/parser.ts';
+import { tokenize } from '../../src/tokenizer.ts';
+import { Parser } from '../../src/parser.ts';
 import { performance } from 'node:perf_hooks';
 
 const sampleCSS = `

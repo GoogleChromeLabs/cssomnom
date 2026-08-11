@@ -16,10 +16,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { tokenize } from '../../src/tokenizer.ts';
-import { Parser } from '../../src/parser.ts';
-import { CSSStyleValue } from '../../src/typed-om.ts';
-import { MediaParser } from '../../src/MediaParser.ts';
+import { tokenize } from '../src/tokenizer.ts';
+import { Parser } from '../src/parser.ts';
+import { CSSStyleValue } from '../src/typed-om.ts';
+import { MediaParser } from '../src/MediaParser.ts';
 
 function generateRandomString(length: number): string {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 {}[]():;,#.\\\'"/* \n\t';
