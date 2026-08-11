@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
+import { SPEC_OUT_OF_SCOPE_COUNTS } from './wpt_feasibility_audit.ts';
 
 const execFilePromise = promisify(execFile);
 
@@ -267,11 +268,15 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
 
     let grandTotal = 0;
     let grandPassing = 0;
-    for (const [, res] of Object.entries(specResults)) {
+    let grandFeasible = 0;
+    for (const [specKey, res] of Object.entries(specResults)) {
       grandTotal += res.total;
       grandPassing += res.passing;
+      const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[specKey] ?? 0;
+      grandFeasible += Math.max(0, res.total - outOfScope);
     }
     const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
+    const normalizedPassRate = grandFeasible > 0 ? ((grandPassing / grandFeasible) * 100).toFixed(2) : '0.00';
 
     // Get git details
     let commitHash = 'unknown';
@@ -294,6 +299,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     }
     rowParts.push(`${grandPassing}/${grandTotal}`);
     rowParts.push(`${overallPassRate}%`);
+    rowParts.push(`**${normalizedPassRate}%**`);
     const newRow = `| ${rowParts.join(' | ')} |`;
 
     if (!fileExists) {
@@ -306,11 +312,14 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       }
       headers.push('Overall');
       alignments.push(':---:');
-      headers.push('Pass Rate');
+      headers.push('Raw Pass Rate');
+      alignments.push(':---:');
+      headers.push('Normalized');
       alignments.push(':---:');
 
-      const initialContent = `# WPT Multi-Spec Conformance Sandbox Progress Log\n\n` +
-        `This file tracks the conformance progress of the CSSOM / Typed OM implementations across major W3C Web Platform Tests spec suites.\n\n` +
+      const initialContent = `# WPT Multi-Spec Conformance Progress Log\n\n` +
+        `This file tracks the conformance progress of the CSSOM / Typed OM implementations across 7 major W3C Web Platform Tests (WPT) spec suites in pure Node.js (\`pnpm run wpt:node:progress\`).\n\n` +
+        `### Historical Conformance Progress Log\n\n` +
         `| ${headers.join(' | ')} |\n` +
         `| ${alignments.join(' | ')} |\n` +
         `${newRow}\n`;
@@ -319,7 +328,19 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     } else {
       const content = fs.readFileSync(progressFilePath, 'utf-8');
       const lines = content.split('\n');
-      const delimiterIndex = lines.findIndex(line => line.includes(':---'));
+      const historyHeaderIndex = lines.findIndex(line => line.includes('### Historical Conformance Progress Log'));
+      let delimiterIndex = -1;
+      if (historyHeaderIndex !== -1) {
+        for (let i = historyHeaderIndex; i < lines.length; i++) {
+          if (lines[i].includes(':---')) {
+            delimiterIndex = i;
+            break;
+          }
+        }
+      } else {
+        delimiterIndex = lines.findIndex(line => line.includes(':---'));
+      }
+
       if (delimiterIndex !== -1) {
         lines.splice(delimiterIndex + 1, 0, newRow);
         fs.writeFileSync(progressFilePath, lines.join('\n'), 'utf-8');
