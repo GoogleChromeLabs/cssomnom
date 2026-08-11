@@ -1,5 +1,8 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 export interface SpecFeasibility {
   spec: string;
   totalTests: number;
@@ -10,13 +13,18 @@ export interface SpecFeasibility {
   normalizedPassRate: string;
 }
 
-// Infeasible failure counts derived from 3-way Delphi consensus (scrutineer, Grizz, architect)
-// Breakdown of the 2,782 browser-only tests:
-// - Viewport 2D coordinate hit-testing (caretPositionFromPoint): 22 tests
-// - Layout bounding box geometry (getClientRects): 109 tests
-// - Web Animations timeline interpolation (@keyframes): 30 tests
-// - Live interactive WebDriver events (:focus-visible heuristics): 47 tests
-// - Pure layout box metric assertions (without declarative cascade): 2,574 tests
+export interface ManifestEntry {
+  file: string;
+  category: string;
+  clusterId: string;
+  description: string;
+}
+
+const manifestPath = path.resolve(process.cwd(), 'tests/fixtures/wpt-browser-only-manifest.json');
+export const BROWSER_ONLY_MANIFEST: Record<string, ManifestEntry[]> = fs.existsSync(manifestPath)
+  ? JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
+  : {};
+
 export const SPEC_OUT_OF_SCOPE_COUNTS: Record<string, number> = {
   'css-typed-om': 4,
   'mediaqueries': 1,
@@ -26,6 +34,13 @@ export const SPEC_OUT_OF_SCOPE_COUNTS: Record<string, number> = {
   'selectors': 1990,
   'css-variables': 343,
 };
+
+export function isBrowserOnlyFile(spec: string, relativeFilePath: string): boolean {
+  const entries = BROWSER_ONLY_MANIFEST[spec];
+  if (!entries) return false;
+  const normalized = relativeFilePath.replace(/^submodules\/web-platform-tests\//, '');
+  return entries.some(e => e.file === normalized);
+}
 
 export function calculateFeasibility(currentResults: Record<string, { passing: number; total: number }>): {
   specs: SpecFeasibility[];
@@ -86,7 +101,7 @@ if (process.argv[1] && process.argv[1].endsWith('wpt_feasibility_audit.ts')) {
   const { specs, overall } = calculateFeasibility(currentResults);
 
   console.log('================================================================================');
-  console.log('📊 NORMALIZED WPT CONFORMANCE FEASIBILITY REPORT (NODE.JS VS BROWSER)');
+  console.log('📊 NORMALIZED WPT CONFORMANCE FEASIBILITY REPORT (FILE-LEVEL MANIFEST)');
   console.log('================================================================================');
   console.log('| Spec Domain     | Total Tests (N) | Browser-Only (E) | Feasible Target (M) | Passing (P) | Raw Score (P/N) | Normalized Conformance (P/M) |');
   console.log('| :-------------- | :-------------: | :--------------: | :-----------------: | :---------: | :-------------: | :--------------------------: |');
