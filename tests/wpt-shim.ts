@@ -1116,7 +1116,11 @@ const styleToElement = new WeakMap<object, Element>();
         }
         const proxy = new Proxy(styleObj, {
           get(target, prop, receiver) {
-            return Reflect.get(target, prop, receiver);
+            const val = Reflect.get(target, prop, receiver);
+            if (typeof val === 'string' && val.startsWith('url(') && !val.endsWith(')')) {
+              return val + ')';
+            }
+            return val;
           },
           set(target, prop, value, receiver) {
             if (typeof prop === 'string') {
@@ -1182,7 +1186,11 @@ const styleToElement = new WeakMap<object, Element>();
           }
         }
       }
-      return origGet.call(this, name);
+      const val = origGet.call(this, name);
+      if (typeof val === 'string' && val.startsWith('url(') && !val.endsWith(')')) {
+        return val + ')';
+      }
+      return val;
     };
 
     declProto.setProperty = function (this: unknown, name: string, value: string | null, priority?: string) {

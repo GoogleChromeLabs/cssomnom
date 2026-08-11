@@ -74,7 +74,7 @@ function parseSelector(selector: string | ComplexSelector | SelectorList): Selec
   const tokens = tokenize(selector);
   const parser = new Parser(tokens);
   const componentValues = parser.parseComponentValues();
-  const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: true });
+  const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false });
   return selectorParser.parse();
 }
 

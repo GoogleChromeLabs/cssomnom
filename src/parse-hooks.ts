@@ -43,6 +43,12 @@ export const ParseHooks = {
   validateCustomPropertyValue: (_values: ComponentValue[]): boolean => {
     throw new Error('validateCustomPropertyValue not injected');
   },
+  isValidUnicodeRangeValue: (_values: ComponentValue[]): boolean => {
+    throw new Error('isValidUnicodeRangeValue not injected');
+  },
+  assembleUnicodeRanges: (_values: ComponentValue[]): ComponentValue[] | null => {
+    throw new Error('assembleUnicodeRanges not injected');
+  },
   isValidDashedIdent: (_name: string): boolean => {
     throw new Error('isValidDashedIdent not injected');
   }

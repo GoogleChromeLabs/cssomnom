@@ -24,6 +24,29 @@ export class NeedMoreDataError extends Error {
   }
 }
 
+function safeFromCodePoints(cps: number[]): string {
+  const CHUNK_SIZE = 4096;
+  if (cps.length <= CHUNK_SIZE) {
+    return String.fromCodePoint(...cps);
+  }
+  let result = '';
+  for (let i = 0; i < cps.length; i += CHUNK_SIZE) {
+    result += String.fromCodePoint(...cps.slice(i, i + CHUNK_SIZE));
+  }
+  return result;
+}
+
+function pushCodePoints(target: number[], source: number[]): void {
+  const CHUNK_SIZE = 4096;
+  if (source.length <= CHUNK_SIZE) {
+    target.push(...source);
+    return;
+  }
+  for (let i = 0; i < source.length; i += CHUNK_SIZE) {
+    target.push(...source.slice(i, i + CHUNK_SIZE));
+  }
+}
+
 export class StreamingTokenizer extends AbstractTokenizer {
   private codePoints: number[] = [];
   private pos: number = 0;
@@ -45,7 +68,7 @@ export class StreamingTokenizer extends AbstractTokenizer {
         }
         return cp;
       });
-      this.codePoints.push(...newCodePoints);
+      pushCodePoints(this.codePoints, newCodePoints);
     }
     this.tokenizeLoop();
   }
@@ -61,7 +84,7 @@ export class StreamingTokenizer extends AbstractTokenizer {
         }
         return cp;
       });
-      this.codePoints.push(...newCodePoints);
+      pushCodePoints(this.codePoints, newCodePoints);
     }
     this.tokenizeLoop();
   }
@@ -79,6 +102,9 @@ export class StreamingTokenizer extends AbstractTokenizer {
     return result;
   }
 
+  /**
+   * Preprocess a chunk of input per CSS Syntax 3 § 3.3 #input-preprocessing.
+   */
   private preprocessChunk(chunk: string, isLast: boolean): string {
     let text = this.remnant + chunk;
     this.remnant = '';
@@ -88,12 +114,21 @@ export class StreamingTokenizer extends AbstractTokenizer {
       text = text.slice(0, -1);
     }
 
+    // Buffer high surrogate at chunk boundary if not isLast
+    // High surrogate code units: \uD800-\uDBFF
+    if (!isLast && /[\uD800-\uDBFF]$/.test(text)) {
+      this.remnant += text.slice(-1);
+      text = text.slice(0, -1);
+    }
+
     return text
       .replace(/\r\n/g, '\n')
       .replace(/\r/g, '\n')
       .replace(/\f/g, '\n')
       // oxlint-disable-next-line no-control-regex
-      .replace(/\u0000/g, '\uFFFD');
+      .replace(/\u0000/g, '\uFFFD')
+      // Replace lone surrogates per CSS Syntax 3 § 3.3 #input-preprocessing
+      .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
   }
 
   private tokenizeLoop(): void {
@@ -103,7 +138,7 @@ export class StreamingTokenizer extends AbstractTokenizer {
         const token = this.consumeToken();
         token.startIndex = startPos;
         token.endIndex = this.pos;
-        token.originalText = String.fromCodePoint(...this.codePoints.slice(startPos, token.endIndex));
+        token.originalText = safeFromCodePoints(this.codePoints.slice(startPos, token.endIndex));
         this.tokens.push(token);
         if (token.type === 'EOF') {
           break;
@@ -150,7 +185,7 @@ export class StreamingTokenizer extends AbstractTokenizer {
   }
 
   protected slice(start: number, end: number): string {
-    return String.fromCodePoint(...this.codePoints.slice(start, end));
+    return safeFromCodePoints(this.codePoints.slice(start, end));
   }
 
   protected getPosition(): number {

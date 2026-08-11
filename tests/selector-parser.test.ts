@@ -28,7 +28,7 @@ test('SelectorParser throws SyntaxError if list is unforgiving and empty', () =>
   assert.throws(() => {
     parser.parse();
   }, (err: unknown) => {
-    return err instanceof SyntaxError && err.message === 'Selector list cannot be empty';
+    return (err as { name?: string }).name === 'SyntaxError' && (err as Error).message === 'Selector list cannot be empty';
   });
 });
 
@@ -47,7 +47,7 @@ test('SelectorParser throws SyntaxError if complex selector items length is 0', 
   assert.throws(() => {
     parser.parse();
   }, (err: unknown) => {
-    return err instanceof SyntaxError && err.message === 'Complex selector cannot be empty';
+    return (err as { name?: string }).name === 'SyntaxError' && (err as Error).message === 'Complex selector cannot be empty';
   });
 });
 
@@ -58,7 +58,7 @@ test('SelectorParser propagates insideHas to :host sub-parser', () => {
   assert.throws(() => {
     parser.parse();
   }, (err: unknown) => {
-    return err instanceof SyntaxError && err.message === 'Pseudo-elements are not allowed in this context';
+    return (err as { name?: string }).name === 'SyntaxError' && (err as Error).message === 'Pseudo-elements are not allowed in this context';
   });
 });
 
@@ -69,7 +69,7 @@ test('SelectorParser throws SyntaxError if pseudo-element is used inside ::slott
   assert.throws(() => {
     parser.parse();
   }, (err: unknown) => {
-    return err instanceof SyntaxError && err.message === 'Pseudo-elements are not allowed in this context';
+    return (err as { name?: string }).name === 'SyntaxError' && (err as Error).message === 'Pseudo-elements are not allowed in this context';
   });
 });
 
@@ -89,7 +89,7 @@ test('SelectorParser rejects functional obsolete -webkit- quirks if unknown', ()
   assert.throws(() => {
     parser.parse();
   }, (err: unknown) => {
-    return err instanceof SyntaxError && err.message.includes('Unknown pseudo-element');
+    return (err as { name?: string }).name === 'SyntaxError' && (err as Error).message.includes('Unknown pseudo-element');
   });
 });
 
@@ -120,7 +120,7 @@ test('SelectorParser throws SyntaxError for invalid namespaced type selector', (
   assert.throws(() => {
     parser.parse();
   }, (err: unknown) => {
-    return err instanceof SyntaxError && err.message.includes('Expected identifier or * after namespace pipe');
+    return (err as { name?: string }).name === 'SyntaxError' && (err as Error).message.includes('Expected identifier or * after namespace pipe');
   });
 });
 
@@ -146,5 +146,5 @@ test('SelectorParser rejects relative selectors when allowRelative is false', ()
   const parser = new SelectorParser(new Parser(tokens).parseComponentValues());
   assert.throws(() => {
     parser.parse();
-  }, (err: unknown) => err instanceof SyntaxError && err.message.includes('Relative selector not allowed'));
+  }, (err: unknown) => (err as { name?: string }).name === 'SyntaxError' && (err as Error).message.includes('Relative selector not allowed'));
 });

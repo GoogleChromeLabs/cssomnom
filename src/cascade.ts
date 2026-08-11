@@ -58,6 +58,7 @@ interface MatchedDeclaration {
   layerOrder: number;
   specificity: [number, number, number];
   sourceOrder: number;
+  raw?: string;
 }
 
 /**
@@ -304,9 +305,10 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   if (styleAttrText && styleAttrText.trim()) {
     const inlineDecls = ParseHooks.parseStyleAttribute(tokenize(styleAttrText));
     for (const d of inlineDecls.declarations) {
+      const valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, d.name.startsWith('--')).trim();
       matchedDeclarations.push({
         name: d.name,
-        value: serialize(d.value, d.name.startsWith('--')).trim(),
+        value: valStr,
         important: d.important,
         isInline: true,
         layerOrder: Infinity,
@@ -390,7 +392,8 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   // Merge direct custom property winners
   for (const [prop, decl] of winningDeclarations) {
     if (prop.startsWith('--')) {
-      customProperties.set(prop, decl.value);
+      const rawVal = (decl.raw && !decl.raw.includes('var(')) ? decl.raw : (typeof decl.value === 'string' ? decl.value : serialize(decl.value, true));
+      customProperties.set(prop, rawVal);
     }
   }
 
@@ -413,6 +416,7 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         name,
         value: tokenize(resolvedVal),
         important: decl.important,
+        raw: resolvedVal,
       });
       continue;
     }
@@ -869,7 +873,7 @@ function substituteVariables(
 
   const resolved = resolveNodes(componentValues);
   if (resolved === null) return null;
-  return serialize(resolved).trim();
+  return serialize(resolved, true).trim();
 }
 
 /**

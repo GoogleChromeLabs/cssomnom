@@ -2167,28 +2167,29 @@ Objective: Drive WPT `css/css-syntax` conformance from 54.83% (227/414) to >96% 
 - Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs` (§ 15 `#parsing-selectors`)
 
 ### Tasks
-- [ ] **Consecutive Token Serialization Separator Comments (`src/serializer.ts`)**:
-  - Implement pairwise token compatibility lookup table per CSS Syntax 3 § 8.
-  - Insert `/**/` when serializing adjacent tokens that would coalesce if serialized directly (e.g. `foo` + `bar` -> `foo/**/bar`, `foo` + `url(bar)` -> `foo/**/url(bar)`, `.` + `123` -> `./**/123`, `+` + `123` -> `+/**/123`).
-  - Resolves all 18 failures across clusters #3, #4, #5, #7, #8, #9, #10 in `serialize-consecutive-tokens.html`.
-- [ ] **Unrecognized At-Rule Rejection in Declaration Lists (`src/parser.ts`)**:
-  - In `consumeAtRuleFromStream` and `consumeAtRule`, verify at-rule validity in current context per § 5.4.4.
-  - When inside style rules, `@page`, or `@font-face` declaration blocks, return `null` for unknown/unsupported at-rules (e.g. `@at {}`, `@at at;`), dropping them from child rules.
-  - Ensures primary declarations (e.g. `color: green`) correctly populate `rule.style` rather than being isolated in subsequent `CSSNestedDeclarations` rules.
-  - Resolves 104 failures in Cluster #1 across `at-rule-in-declaration-list.html`.
-- [ ] **`@charset` Directive Exclusion from CSSOM (`src/parser.ts`)**:
-  - In `isSupportedAtRule(name)` and `consumeListOfRules()`, explicitly treat `@charset` as a non-rule byte marker per § 3.2, returning `null`.
-  - Ensures `@charset "utf-8";` is ignored during stylesheet token consumption and omitted from `CSSStyleSheet.cssRules`.
-  - Resolves `charset-is-not-a-rule.html`.
-- [ ] **`StreamingTokenizer` Surrogate Code Point Sanitization (`src/streaming-tokenizer.ts`)**:
-  - In `preprocessChunk()`, add surrogate replacement (`[\uD800-\uDFFF] -> \uFFFD`) and buffer high surrogates at chunk boundaries in `this.remnant` to preserve surrogate pairs across streaming chunks.
-  - Protect `slice(start, end)` from large chunk stack overflow by chunking `String.fromCodePoint`.
-- [ ] **Selector Error DOMException Alignment (`src/SelectorParser.ts`)**:
-  - Replace JavaScript `throw new SyntaxError(...)` with `throw new DOMException(..., 'SyntaxError')` for all selector syntax violations per DOM / Selectors 4 specs.
-  - Resolves Cluster #6 in `escaped-eof.html`.
-- [ ] **Verification & Conformance Reconciliation**:
-  - Run `node scripts/wpt/node/cluster.ts --spec=css-syntax` to verify pass rate increases from 54.83% to >96%.
-  - Run `pnpm run preflight` to ensure 0 TypeScript errors, 0 lint warnings, and 100% passing tests across all test suites.
+- [x] **Consecutive Token Serialization Separator Comments (`src/serializer.ts`)**:
+  - Implemented pairwise token compatibility lookup table (`requiresTokenSeparator`) per CSS Syntax 3 § 8.
+  - Inserted `/**/` when serializing adjacent tokens that would coalesce if serialized directly (e.g. `foo` + `bar` -> `foo/**/bar`, `foo` + `url(bar)` -> `foo/**/url(bar)`, `.` + `123` -> `./**/123`, `+` + `123` -> `+/**/123`).
+  - Resolved all 18 failures across clusters #3, #4, #5, #7, #8, #9, #10 in `serialize-consecutive-tokens.html`.
+- [x] **Unrecognized At-Rule Rejection in Declaration Lists (`src/parser.ts`)**:
+  - In `consumeAtRuleFromStream` and `consumeAtRule`, verified at-rule validity in current context per § 5.4.4.
+  - When inside style rules, `@page`, or `@font-face` declaration blocks, returned `null` for unknown/unsupported at-rules (e.g. `@at {}`, `@at at;`), dropping them from child rules.
+  - Ensured primary declarations (e.g. `color: green`) correctly populate `rule.style` rather than being isolated in subsequent `CSSNestedDeclarations` rules.
+  - Resolved 104 failures in Cluster #1 across `at-rule-in-declaration-list.html`.
+- [x] **`@charset` Directive Exclusion from CSSOM (`src/parser.ts`)**:
+  - In `isSupportedAtRule(name)` and `consumeListOfRules()`, explicitly treated `@charset` as a non-rule byte marker per § 3.2, returning `null`.
+  - Ensured `@charset "utf-8";` is ignored during stylesheet token consumption and omitted from `CSSStyleSheet.cssRules`.
+  - Resolved `charset-is-not-a-rule.html`.
+- [x] **`StreamingTokenizer` Surrogate Code Point Sanitization (`src/streaming-tokenizer.ts`)**:
+  - In `preprocessChunk()`, added surrogate replacement (`[\uD800-\uDFFF] -> \uFFFD`) and buffered high surrogates at chunk boundaries in `this.remnant` to preserve surrogate pairs across streaming chunks.
+  - Protected `slice(start, end)` from large chunk stack overflow by chunking `String.fromCodePoint`.
+- [x] **Selector Error DOMException Alignment (`src/SelectorParser.ts`, `src/matcher.ts`)**:
+  - Replaced JavaScript `throw new SyntaxError(...)` with `throw new DOMException(..., 'SyntaxError')` for all selector syntax violations per DOM / Selectors 4 specs.
+  - Configured `parseSelector` in `src/matcher.ts` to use `forgiving: false` for DOM `querySelector`/`querySelectorAll` calls.
+  - Resolved Cluster #6 in `escaped-eof.html`.
+- [x] **Verification & Conformance Reconciliation**:
+  - Verified WPT `css/css-syntax` score: **227 / 414 (54.83%) -> 398 / 414 (96.14% overall, 398/398 = 100% of testable tests)**.
+  - Ran `pnpm run preflight` to confirm 0 TypeScript errors, 0 lint warnings, and 100% passing tests across all test suites.
 
 ---
 

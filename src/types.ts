@@ -184,6 +184,7 @@ export interface Declaration {
   name: string;
   value: ComponentValue[];
   important: boolean;
+  raw?: string;
 }
 
 export interface ASTAtRule {

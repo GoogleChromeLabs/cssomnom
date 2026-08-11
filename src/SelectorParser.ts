@@ -180,7 +180,7 @@ export class SelectorParser {
         if (!next || next.type === 'comma') {
           selectors.push(selector);
         } else {
-          throw new SyntaxError('Unexpected token in selector');
+          throw new DOMException('Unexpected token in selector', 'SyntaxError');
         }
       } catch (e) {
         if (this.forgiving) {
@@ -207,7 +207,7 @@ export class SelectorParser {
     }
     
     if (!this.forgiving && selectors.length === 0) {
-      throw new SyntaxError('Selector list cannot be empty');
+      throw new DOMException('Selector list cannot be empty', 'SyntaxError');
     }
     
     return { type: 'selector-list', selectors };
@@ -233,13 +233,13 @@ export class SelectorParser {
       const combinator = this.tryConsumeCombinator();
       if (combinator) {
         if (items.length === 0 && !this.allowRelative) {
-          throw new SyntaxError('Relative selector not allowed in this context');
+          throw new DOMException('Relative selector not allowed in this context', 'SyntaxError');
         }
         if (seenPseudoElement) {
-          throw new SyntaxError('Pseudo-element must be at the end of the selector');
+          throw new DOMException('Pseudo-element must be at the end of the selector', 'SyntaxError');
         }
         if (items.length > 0 && items[items.length - 1].type === 'combinator') {
-          throw new SyntaxError('Consecutive combinators are not allowed');
+          throw new DOMException('Consecutive combinators are not allowed', 'SyntaxError');
         }
         items.push(combinator);
         continue;
@@ -248,7 +248,7 @@ export class SelectorParser {
       const compound = this.consumeCompoundSelector();
       if (compound.selectors.length > 0) {
         if (seenPseudoElement) {
-          throw new SyntaxError('Pseudo-element must be at the end of the selector');
+          throw new DOMException('Pseudo-element must be at the end of the selector', 'SyntaxError');
         }
         
         const hasPseudo = compound.selectors.some(s => s.type === 'pseudo-element-selector');
@@ -268,12 +268,12 @@ export class SelectorParser {
     }
     
     if (items.length > 0 && items[items.length - 1].type === 'combinator') {
-      throw new SyntaxError('Trailing combinator is not allowed');
+      throw new DOMException('Trailing combinator is not allowed', 'SyntaxError');
     }
     
     // selectors-4 #grammar
     if (items.length === 0) {
-      throw new SyntaxError('Complex selector cannot be empty');
+      throw new DOMException('Complex selector cannot be empty', 'SyntaxError');
     }
     
     const end = this.cursor.i;
@@ -313,10 +313,10 @@ export class SelectorParser {
       if (['not', 'is', 'where', 'has'].includes(lowerName)) {
         return;
       } else if (!this.isUserActionPseudoClass(selector.name)) {
-        throw new SyntaxError('Only user-action pseudo-classes are allowed after a pseudo-element');
+        throw new DOMException('Only user-action pseudo-classes are allowed after a pseudo-element', 'SyntaxError');
       }
     } else {
-      throw new SyntaxError('Only user-action pseudo-classes are allowed after a pseudo-element');
+      throw new DOMException('Only user-action pseudo-classes are allowed after a pseudo-element', 'SyntaxError');
     }
   }
 
@@ -339,13 +339,13 @@ export class SelectorParser {
              break; // Combinator ||
           }
           // Namespace prefix |
-          if (selectors.length > 0) throw new SyntaxError('Type selector must be first in compound selector');
+          if (selectors.length > 0) throw new DOMException('Type selector must be first in compound selector', 'SyntaxError');
           selectors.push(this.consumeTypeOrUniversalSelector());
           continue;
         }
         if (val === '*') {
            if (lastPseudoElement) break;
-           if (selectors.length > 0) throw new SyntaxError('Universal selector must be first in compound selector');
+           if (selectors.length > 0) throw new DOMException('Universal selector must be first in compound selector', 'SyntaxError');
            selectors.push(this.consumeTypeOrUniversalSelector());
            continue;
         }
@@ -364,7 +364,7 @@ export class SelectorParser {
       
       if (isHashToken(token)) {
         if (token.hashType !== 'id') {
-          throw new SyntaxError("ID selector must be an identifier");
+          throw new DOMException("ID selector must be an identifier", "SyntaxError");
         }
         if (lastPseudoElement) break;
         selectors.push({ type: 'id-selector', name: token.value });
@@ -374,7 +374,7 @@ export class SelectorParser {
 
       if (isIdentToken(token)) {
         if (lastPseudoElement) break;
-        if (selectors.length > 0) throw new SyntaxError('Type selector must be first in compound selector');
+        if (selectors.length > 0) throw new DOMException('Type selector must be first in compound selector', 'SyntaxError');
         selectors.push(this.consumeTypeOrUniversalSelector());
         continue;
       }
@@ -392,14 +392,14 @@ export class SelectorParser {
           
           if (selector.type === 'pseudo-element-selector') {
             if (!isSlottedOrPart) {
-              throw new SyntaxError('Pseudo-elements cannot be nested');
+              throw new DOMException('Pseudo-elements cannot be nested', 'SyntaxError');
             }
           } else if (selector.type === 'pseudo-class-selector') {
             if (!isSlottedOrPart) {
               this.validateSimpleSelectorAfterPseudo(selector);
             }
           } else {
-             throw new SyntaxError('Unexpected selector after pseudo-element');
+             throw new DOMException('Unexpected selector after pseudo-element', 'SyntaxError');
           }
         }
         if (selector.type === 'pseudo-element-selector') {
@@ -419,7 +419,7 @@ export class SelectorParser {
     let namespace: string | undefined = undefined;
     const token = this.cursor.next;
     if (!token) {
-      throw new SyntaxError('Unexpected EOF in type selector');
+      throw new DOMException('Unexpected EOF in type selector', 'SyntaxError');
     }
 
     // Check for namespace prefix
@@ -444,7 +444,7 @@ export class SelectorParser {
       return { type: 'universal-selector', namespace };
     }
     if (!isIdentToken(next)) {
-      throw new SyntaxError('Expected identifier or * after namespace pipe');
+      throw new DOMException('Expected identifier or * after namespace pipe', 'SyntaxError');
     }
     this.validateNamespace(namespace);
     return { type: 'type-selector', name: next.value, namespace };
@@ -461,7 +461,7 @@ export class SelectorParser {
   private consumeAttributeSelector(): SimpleSelector {
     const block = this.cursor.consume();
     if (!isSimpleBlock(block, '[')) {
-      throw new SyntaxError('Expected attribute selector block');
+      throw new DOMException('Expected attribute selector block', 'SyntaxError');
     }
     
     const subCursor = new ComponentValueCursor(block.value);
@@ -521,7 +521,7 @@ export class SelectorParser {
       const lowerFlag = flagValue.toLowerCase();
 
       if (lowerFlag !== 'i' && lowerFlag !== 's') {
-        throw new SyntaxError(`Invalid attribute selector flag: ${flagValue}`);
+        throw new DOMException(`Invalid attribute selector flag: ${flagValue}`, 'SyntaxError');
       }
       flags = flagValue;
       subCursor.consume();
@@ -529,7 +529,7 @@ export class SelectorParser {
     
     subCursor.skipWhitespace();
     if (subCursor.hasNext) {
-      throw new SyntaxError('Unexpected content in attribute selector');
+      throw new DOMException('Unexpected content in attribute selector', 'SyntaxError');
     }
     
     this.validateNamespace(namespace);
@@ -557,10 +557,10 @@ export class SelectorParser {
       
       if (isPseudoElement) {
         if (this.forbidPseudo || this.insideHas) {
-          throw new SyntaxError('Pseudo-elements are not allowed in this context');
+          throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
         if (!(PSEUDO_ELEMENTS as unknown as Set<string>).has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
-          throw new SyntaxError(`Unknown pseudo-element ::${name}`);
+          throw new DOMException(`Unknown pseudo-element ::${name}`, 'SyntaxError');
         }
         return { type: 'pseudo-element-selector', name };
       }
@@ -568,13 +568,13 @@ export class SelectorParser {
       // Check for legacy pseudo-elements that use single colon
       if (['before', 'after', 'first-line', 'first-letter'].includes(effectiveLowerName)) {
         if (this.forbidPseudo || this.insideHas) {
-          throw new SyntaxError('Pseudo-elements are not allowed in this context');
+          throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
         return { type: 'pseudo-element-selector', name };
       }
       
       if (!(PSEUDO_CLASSES as unknown as Set<string>).has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
-        throw new SyntaxError(`Unknown pseudo-class :${name}`);
+        throw new DOMException(`Unknown pseudo-class :${name}`, 'SyntaxError');
       }
       return { type: 'pseudo-class-selector', name };
     } else if (isCSSFunction(token)) {
@@ -584,10 +584,10 @@ export class SelectorParser {
       
       if (isPseudoElement) {
         if (this.forbidPseudo || this.insideHas) {
-          throw new SyntaxError('Pseudo-elements are not allowed in this context');
+          throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
         if (!(PSEUDO_ELEMENTS as unknown as Set<string>).has(lowerName)) {
-          throw new SyntaxError(`Unknown pseudo-element ::${name}()`);
+          throw new DOMException(`Unknown pseudo-element ::${name}()`, 'SyntaxError');
         }
         
         if (lowerName === 'slotted') {
@@ -601,7 +601,7 @@ export class SelectorParser {
           const compound = subParser.consumeCompoundSelector();
           subParser.cursor.skipWhitespace();
           if (subParser.cursor.i !== func.value.length || compound.selectors.length === 0) {
-            throw new SyntaxError('Argument to ::slotted() must be a compound selector');
+            throw new DOMException('Argument to ::slotted() must be a compound selector', 'SyntaxError');
           }
           return { 
             type: 'pseudo-element-selector', 
@@ -617,14 +617,14 @@ export class SelectorParser {
       }
       
       if (!(PSEUDO_CLASSES as unknown as Set<string>).has(lowerName) && lowerName !== 'matches') {
-        throw new SyntaxError(`Unknown pseudo-class :${name}()`);
+        throw new DOMException(`Unknown pseudo-class :${name}()`, 'SyntaxError');
       }
       
       // For functional pseudo-classes, some take selector lists
       if (['is', 'not', 'has', 'where', 'matches'].includes(lowerName)) {
         const isHas = lowerName === 'has';
         if (isHas && this.insideHas) {
-          throw new SyntaxError(':has() cannot be nested');
+          throw new DOMException(':has() cannot be nested', 'SyntaxError');
         }
         const isForgiving = !this.strictSupports && ['is', 'where', 'matches'].includes(lowerName);
         const isLogicalPseudo = ['is', 'where', 'not', 'matches'].includes(lowerName);
@@ -649,7 +649,7 @@ export class SelectorParser {
         const compound = subParser.consumeCompoundSelector();
         subParser.cursor.skipWhitespace();
         if (subParser.cursor.i !== func.value.length || compound.selectors.length === 0) {
-          throw new SyntaxError(`Argument to :${name}() must be a compound selector`);
+          throw new DOMException(`Argument to :${name}() must be a compound selector`, 'SyntaxError');
         }
         return { 
           type: 'pseudo-class-selector', 
@@ -672,7 +672,7 @@ export class SelectorParser {
         }
         if (ofIdx !== -1) {
           if (['nth-of-type', 'nth-last-of-type'].includes(lowerName)) {
-            throw new SyntaxError(`'of' is not allowed in :${name}()`);
+            throw new DOMException(`'of' is not allowed in :${name}()`, 'SyntaxError');
           }
           const nth = func.value.slice(0, ofIdx);
           this.validateAnPlusB(nth);
@@ -705,14 +705,14 @@ export class SelectorParser {
       return { type: 'pseudo-class-selector', name, argument: func.value };
     }
     
-    throw new SyntaxError('Expected identifier or function after colon in pseudo-selector');
+    throw new DOMException('Expected identifier or function after colon in pseudo-selector', 'SyntaxError');
   }
 
   private validateAnPlusB(values: ComponentValue[]): { a: number; b: number } {
     const res = parseAnPlusB(values);
     if (!res) {
       const text = getOriginalText(values).trim();
-      throw new SyntaxError(`Invalid An+B expression: ${text}`);
+      throw new DOMException(`Invalid An+B expression: ${text}`, 'SyntaxError');
     }
     return res;
   }
@@ -724,7 +724,7 @@ export class SelectorParser {
     let end = nonComment.length - 1;
     while (end >= start && nonComment[end].type === 'whitespace') end--;
     if (start > end) {
-      throw new SyntaxError('Argument to :heading() cannot be empty');
+      throw new DOMException('Argument to :heading() cannot be empty', 'SyntaxError');
     }
     const tokens = nonComment.slice(start, end + 1);
     let expectInteger = true;
@@ -735,18 +735,18 @@ export class SelectorParser {
         if (t.type === 'number' && (t as { numberType?: string }).numberType === 'integer') {
           expectInteger = false;
         } else {
-          throw new SyntaxError('Argument to :heading() must be comma-separated integers');
+          throw new DOMException('Argument to :heading() must be comma-separated integers', 'SyntaxError');
         }
       } else {
         if (t.type === 'comma' || (t.type === 'delim' && t.value === ',')) {
           expectInteger = true;
         } else {
-          throw new SyntaxError('Expected comma in :heading() arguments');
+          throw new DOMException('Expected comma in :heading() arguments', 'SyntaxError');
         }
       }
     }
     if (expectInteger) {
-      throw new SyntaxError('Trailing comma in :heading() arguments');
+      throw new DOMException('Trailing comma in :heading() arguments', 'SyntaxError');
     }
   }
 
@@ -754,37 +754,37 @@ export class SelectorParser {
     const nonWs = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
     const firstToken = nonWs[0];
     if (nonWs.length !== 1 || !isIdentToken(firstToken)) {
-      throw new SyntaxError('Argument to :dir() must be a single identifier');
+      throw new DOMException('Argument to :dir() must be a single identifier', 'SyntaxError');
     }
     const val = firstToken.value.toLowerCase();
 
     if (val !== 'ltr' && val !== 'rtl' && val !== 'auto') {
-       throw new SyntaxError('Argument to :dir() must be ltr, rtl, or auto');
+       throw new DOMException('Argument to :dir() must be ltr, rtl, or auto', 'SyntaxError');
     }
   }
 
   private validateLang(values: ComponentValue[]): void {
     const nonWs = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
     if (nonWs.length === 0) {
-      throw new SyntaxError('Argument to :lang() cannot be empty');
+      throw new DOMException('Argument to :lang() cannot be empty', 'SyntaxError');
     }
     
     let expectItem = true;
     for (const v of nonWs) {
       if (expectItem) {
         if (!isIdentToken(v) && !isStringToken(v)) {
-          throw new SyntaxError('Argument to :lang() must be identifiers or strings');
+          throw new DOMException('Argument to :lang() must be identifiers or strings', 'SyntaxError');
         }
         expectItem = false;
       } else {
         if (v.type !== 'comma') {
-          throw new SyntaxError('Expected comma in :lang() argument');
+          throw new DOMException('Expected comma in :lang() argument', 'SyntaxError');
         }
         expectItem = true;
       }
     }
     if (expectItem) {
-      throw new SyntaxError('Trailing comma in :lang() argument');
+      throw new DOMException('Trailing comma in :lang() argument', 'SyntaxError');
     }
   }
 }

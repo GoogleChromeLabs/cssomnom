@@ -87,9 +87,15 @@ export class Parser {
     return Parser.AT_RULE_HANDLERS[name];
   }
 
-  private isSupportedAtRule(name: string): boolean {
-    if (name === 'mediaall') return false;
-    if (name.startsWith('--')) return false;
+  // css-syntax-3 § 3.2 #charset-rule & § 5.4.4 #consume-at-rule
+  private isSupportedAtRule(name: string, nested: boolean = false): boolean {
+    const lower = name.toLowerCase();
+    if (lower === 'charset') return false;
+    if (lower === 'mediaall') return false;
+    if (lower.startsWith('--')) return false;
+    if (nested) {
+      return !!this.getAtRuleHandler(lower);
+    }
     return true;
   }
 
@@ -208,7 +214,7 @@ export class Parser {
   // 5.4.5 Parse a block's contents https://drafts.csswg.org/css-syntax/#parse-block-contents
   public parseBlockContents(): Rule[] {
     const values = this.parseComponentValues();
-    return this.consumeBlockContents(new ArrayComponentValueStream(values), true);
+    return this.consumeBlockContents(new ArrayComponentValueStream(values), true, false);
   }
 
   /**
@@ -328,17 +334,16 @@ export class Parser {
       childRules: [],
     };
 
-
     while (true) {
       const next = this.nextToken;
       if (next.type === 'semicolon' || next.type === 'EOF') {
         this.discardToken();
-        if (!this.isSupportedAtRule(atRuleName)) return null;
+        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
         const handler = this.getAtRuleHandler(atRuleName);
         if (handler) {
-          return handler(this, rule);
+          return handler(this, rule, undefined, nested);
         }
-
+        if (nested) return null;
         return new CSSAtRule(rule.name, rule.prelude);
       } else if (next.type === '}') {
         if (nested) return null;
@@ -346,12 +351,14 @@ export class Parser {
         rule.prelude.push(next);
       } else if (next.type === '{') {
         const block = this.consumeBlock(this.consumeToken());
-        if (!this.isSupportedAtRule(atRuleName)) return null;
+        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
         
         const handler = this.getAtRuleHandler(atRuleName);
         if (handler) {
           return handler(this, rule, block, nested);
         }
+
+        if (nested) return null;
 
         if (this.options?.atRules?.[atRuleName]) {
           const type = this.options.atRules[atRuleName];
@@ -920,21 +927,62 @@ export class Parser {
       } else if (val.type === 'EOF' || val.type === '}') {
         break;
       } else if (val.type === 'at-keyword') {
-        const pos = stream.position;
-        const atRule = this.consumeAtRuleFromStream(stream, nested);
+        const atRule = this.consumeAtRuleFromStream(stream, isNestedStyleRule);
         if (atRule) {
           flushDecls();
           rules.push(atRule);
-        } else {
-          if (stream.position > pos) {
-            flushDecls();
-          }
         }
       } else {
         const pos = stream.position;
-        const decl = nested ? this.consumeDeclarationFromStream(stream) : null;
-        if (decl) {
-          decls.push(decl);
+        let isDecl = false;
+        if (nested) {
+          const first = stream.peek();
+          if (first.type === 'ident') {
+            if (first.value.startsWith('--') && first.value !== '--') {
+              isDecl = true;
+            } else if (first.value !== '--') {
+              const lookaheadPos = stream.position;
+              stream.next();
+              while (stream.peek().type === 'whitespace') stream.next();
+              if (stream.peek().type === 'colon') {
+                stream.next();
+                const lookaheadTokens: ComponentValue[] = [first, { type: 'colon', value: ':' } as Token];
+                let foundSemicolon = false;
+                let foundBlock = false;
+                while (true) {
+                  const next = stream.peek();
+                  if (next.type === 'EOF' || next.type === '}') {
+                    foundSemicolon = true;
+                    break;
+                  }
+                  if (next.type === 'semicolon') {
+                    foundSemicolon = true;
+                    break;
+                  }
+                  if (next.type === 'simple-block' && (next as SimpleBlock).associatedToken?.type === '{') {
+                    foundBlock = true;
+                    break;
+                  }
+                  lookaheadTokens.push(stream.next());
+                }
+                if (foundSemicolon) {
+                  isDecl = true;
+                } else if (foundBlock) {
+                  const selectorCandidate = serialize(lookaheadTokens).trim();
+                  const isValidSelector = Parser.parseSelectorAST(selectorCandidate) !== null;
+                  isDecl = !isValidSelector;
+                }
+              }
+              stream.position = lookaheadPos;
+            }
+          }
+        }
+
+        if (isDecl) {
+          const decl = this.consumeDeclarationFromStream(stream);
+          if (decl) {
+            decls.push(decl);
+          }
         } else {
           stream.position = pos;
           const rule = this.consumeNestedQualifiedRuleFromStream(stream, isNestedStyleRule, 'semicolon');
@@ -942,11 +990,7 @@ export class Parser {
             flushDecls();
             rules.push(rule);
           } else {
-            const consumedTokens = stream.slice(pos, stream.position);
-            const hasRealTokens = consumedTokens.some(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'semicolon');
-            if (hasRealTokens) {
-              flushDecls();
-            }
+            flushDecls();
           }
         }
       }
@@ -983,6 +1027,15 @@ export class Parser {
     while (true) {
       const val = stream.peek();
       if (val.type === 'EOF' || val.type === 'semicolon') {
+        break;
+      }
+      if (
+        !name.startsWith('--') &&
+        val.type === 'simple-block' &&
+        (val as SimpleBlock).associatedToken?.type === '{' &&
+        declValue.some(v => v.type !== 'whitespace')
+      ) {
+        declValue.push(stream.next());
         break;
       }
       declValue.push(stream.next());
@@ -1034,6 +1087,9 @@ export class Parser {
       const reParser = new Parser(reTokens);
       reParser.errors.push(...errors);
       const reParsed = reParser.parseComponentValues();
+      if (!isValidUnicodeRangeValue(reParsed)) {
+        return null;
+      }
       this.errors.push(...reParser.errors);
       declValue.splice(0, declValue.length, ...reParsed);
     }
@@ -1043,6 +1099,7 @@ export class Parser {
       name: name,
       value: declValue,
       important: important,
+      raw: name.startsWith('--') ? getOriginalText(declValue) : undefined,
     };
   }
   public static isValidDashedIdent(name: string): boolean {
@@ -1065,7 +1122,6 @@ export class Parser {
       firstNonWs.value.startsWith('--') &&
       secondNonWs.type === 'colon'
     );
-
   }
 
   public static validateCustomPropertyValue(values: ComponentValue[], topLevel = true): boolean {
@@ -1133,37 +1189,37 @@ export class Parser {
       const val = stream.peek();
       if (val.type === 'semicolon') {
         stream.next();
-        if (!this.isSupportedAtRule(atRuleName)) return null;
+        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
         const handler = this.getAtRuleHandler(atRuleName);
         if (handler) {
-            const handledRule = handler(this, rule);
-            if (!handledRule) return null;
-            return handledRule;
+          const handledRule = handler(this, rule, undefined, nested);
+          if (!handledRule) return null;
+          return handledRule;
         }
-
+        if (nested) return null;
         return new CSSAtRule(rule.name, rule.prelude);
       } else if (val.type === 'EOF' || val.type === '}') {
-        if (!this.isSupportedAtRule(atRuleName)) return null;
+        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
         const handler = this.getAtRuleHandler(atRuleName);
         if (handler) {
-            const handledRule = handler(this, rule);
-            if (!handledRule) return null;
-            return handledRule;
+          const handledRule = handler(this, rule, undefined, nested);
+          if (!handledRule) return null;
+          return handledRule;
         }
-
+        if (nested) return null;
         return new CSSAtRule(rule.name, rule.prelude);
       } else if (val.type === 'simple-block' && (val as SimpleBlock).associatedToken.type === '{') {
         stream.next();
         const block = val as SimpleBlock;
-        if (!this.isSupportedAtRule(atRuleName)) return null;
+        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
         
         const handler = this.getAtRuleHandler(atRuleName);
         if (handler) {
-            const handledRule = handler(this, rule, block, nested);
-            if (!handledRule) return null;
-            return handledRule;
+          const handledRule = handler(this, rule, block, nested);
+          if (!handledRule) return null;
+          return handledRule;
         }
-        
+        if (nested) return null;
         rule.childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), nested);
         const cssRules = rule.childRules.map(r => r as CSSRule);
         return new CSSAtRule(rule.name, rule.prelude, block, cssRules);
@@ -1272,7 +1328,7 @@ export class Parser {
     if (isNested) {
       selectorText = this.normalizeNestedSelector(prelude);
       if (selectorText === '') return null;
-      selectorAST = Parser.parseSelectorAST(selectorText, this.declaredNamespaces);
+      selectorAST = Parser.parseSelectorAST(selectorText, this.declaredNamespaces, true);
       if (selectorAST === null) return null;
     } else {
       if (!this.isValidSelector(prelude)) return null;
@@ -1739,6 +1795,124 @@ export function parseRuleInBlock(text: string, nested = true): Rule {
   return Parser.parseRuleInBlockText(text, nested);
 }
 
+export function assembleUnicodeRanges(values: ComponentValue[]): ComponentValue[] | null {
+  const result: ComponentValue[] = [];
+  let i = 0;
+  while (i < values.length && (values[i].type === 'whitespace' || values[i].type === 'comment')) i++;
+  if (i >= values.length) return null;
+
+  while (i < values.length) {
+    // Must start with <urange>
+    const v = values[i];
+    if (v.type === 'unicode-range') {
+      result.push(v);
+      i++;
+    } else if (v.type === 'ident' && (v.value.toLowerCase() === 'u' || v.value.toLowerCase().startsWith('u+'))) {
+      let text = '';
+      if (v.value.toLowerCase() === 'u') {
+        i++;
+        while (i < values.length && values[i].type === 'comment') i++;
+        let hasPlus = false;
+        if (i < values.length && values[i].type === 'delim' && (values[i] as Token).value === '+') {
+          hasPlus = true;
+          i++;
+          while (i < values.length && values[i].type === 'comment') i++;
+        } else if (i < values.length && (values[i].type === 'number' || values[i].type === 'dimension') && (values[i] as { sign?: string }).sign === '+') {
+          hasPlus = true;
+        }
+        if (hasPlus) {
+          let hexPart = '';
+          while (i < values.length) {
+            const t = values[i];
+            if (t.type === 'dimension') {
+              const signStr = (t as { sign?: string }).sign === '-' ? '-' : '';
+              hexPart += signStr + Math.abs((t as { value: number }).value).toString(16) + ((t as { unit?: string }).unit || '');
+              i++;
+            } else if (t.type === 'number') {
+              const signStr = (t as { sign?: string }).sign === '-' ? '-' : '';
+              hexPart += signStr + Math.abs((t as { value: number }).value).toString(16);
+              i++;
+            } else if (t.type === 'ident' || (t.type === 'delim' && ['?', '-'].includes(String((t as Token).value)))) {
+              hexPart += String((t as Token).value);
+              i++;
+            } else if (t.type === 'comment') {
+              i++;
+            } else {
+              break;
+            }
+          }
+          text = `u+${hexPart}`;
+        } else {
+          return null;
+        }
+      } else {
+        text = v.value;
+        i++;
+        while (i < values.length && (values[i].type === 'delim' && (values[i] as Token).value === '?')) {
+          text += '?';
+          i++;
+        }
+      }
+
+      const match1 = /^u\+([0-9a-f]{1,6})(-([0-9a-f]{1,6}))?$/i.exec(text);
+      if (match1) {
+        const startHex = match1[1];
+        const endHex = match1[3];
+        const startNum = parseInt(startHex, 16);
+        if (startNum > 0x10FFFF) return null;
+        if (endHex !== undefined) {
+          const endNum = parseInt(endHex, 16);
+          if (endNum > 0x10FFFF || endNum < startNum) return null;
+          result.push({
+            type: 'unicode-range',
+            value: `U+${startNum.toString(16).toUpperCase()}-${endNum.toString(16).toUpperCase()}`
+          } as Token);
+        } else {
+          result.push({
+            type: 'unicode-range',
+            value: `U+${startNum.toString(16).toUpperCase()}`
+          } as Token);
+        }
+      } else {
+        const match2 = /^u\+([0-9a-f]{0,5})(\?{1,6})$/i.exec(text);
+        if (match2 && (match2[1].length + match2[2].length <= 6)) {
+          const prefix = match2[1];
+          const q = match2[2];
+          const startHex = prefix + '0'.repeat(q.length);
+          const endHex = prefix + 'F'.repeat(q.length);
+          const startNum = parseInt(startHex, 16);
+          const endNum = parseInt(endHex, 16);
+          if (startNum > 0x10FFFF || endNum > 0x10FFFF) return null;
+          result.push({
+            type: 'unicode-range',
+            value: `U+${startNum.toString(16).toUpperCase()}-${endNum.toString(16).toUpperCase()}`
+          } as Token);
+        } else {
+          return null;
+        }
+      }
+    } else {
+      return null;
+    }
+
+    while (i < values.length && (values[i].type === 'whitespace' || values[i].type === 'comment')) i++;
+    if (i >= values.length) break;
+    if (values[i].type === 'comma' || (values[i].type === 'delim' && (values[i] as Token).value === ',')) {
+      result.push({ type: 'comma', value: ',' } as Token);
+      i++;
+      while (i < values.length && (values[i].type === 'whitespace' || values[i].type === 'comment')) i++;
+      if (i >= values.length) return null; // Trailing comma is invalid
+    } else {
+      return null;
+    }
+  }
+  return result;
+}
+
+export function isValidUnicodeRangeValue(values: ComponentValue[]): boolean {
+  return assembleUnicodeRanges(values) !== null;
+}
+
 // Inject Parser implementations into ParseHooks to break circular dependencies
 ParseHooks.parseStyleAttribute = (tokens) => new Parser(tokens).parseStyleAttribute();
 ParseHooks.consumeRule = (tokens) => new Parser(tokens).consumeRule() as unknown as Rule;
@@ -1747,6 +1921,8 @@ ParseHooks.parseComponentValues = (tokens) => new Parser(tokens).parseComponentV
 ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
 ParseHooks.parseSelectorAST = (text, declaredNamespaces, allowRelative) => Parser.parseSelectorAST(text, declaredNamespaces, allowRelative);
 ParseHooks.validateCustomPropertyValue = (values) => Parser.validateCustomPropertyValue(values);
+ParseHooks.isValidUnicodeRangeValue = (values) => isValidUnicodeRangeValue(values);
+ParseHooks.assembleUnicodeRanges = (values) => assembleUnicodeRanges(values);
 ParseHooks.isValidDashedIdent = (name) => Parser.isValidDashedIdent(name);
 
 export function parse(css: string): CSSStyleSheet {

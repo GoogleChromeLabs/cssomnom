@@ -14,18 +14,146 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, ComponentValue, Declaration, CSSFunction, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
+import type { Token, ComponentValue, Declaration, CSSFunction, SimpleBlock, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
 import { SHORTHANDS } from './shorthands.ts';
 import { formatNumber } from './utils/format.ts';
 import { parseAnPlusB } from './SelectorParser.ts';
+
+/**
+ * Determines whether two consecutive tokens require an empty comment separator
+ * between them to prevent coalescing per CSS Syntax Module Level 3 § 8.
+ * @see https://drafts.csswg.org/css-syntax-3/#serialization
+ */
+export function requiresTokenSeparator(t1: Token, t2: Token): boolean {
+  // Extract token categories
+  const isIdent1 = t1.type === 'ident';
+  const isAtKeyword1 = t1.type === 'at-keyword';
+  const isHash1 = t1.type === 'hash';
+  const isDimension1 = t1.type === 'dimension';
+  const isDelimHash1 = t1.type === 'delim' && t1.value === '#';
+  const isDelimDash1 = t1.type === 'delim' && t1.value === '-';
+  const isNumber1 = t1.type === 'number';
+  const isDelimAt1 = t1.type === 'delim' && t1.value === '@';
+  const isDelimDot1 = t1.type === 'delim' && t1.value === '.';
+  const isDelimPlus1 = t1.type === 'delim' && t1.value === '+';
+  const isDelimSlash1 = t1.type === 'delim' && t1.value === '/';
+
+  if (
+    !isIdent1 &&
+    !isAtKeyword1 &&
+    !isHash1 &&
+    !isDimension1 &&
+    !isDelimHash1 &&
+    !isDelimDash1 &&
+    !isNumber1 &&
+    !isDelimAt1 &&
+    !isDelimDot1 &&
+    !isDelimPlus1 &&
+    !isDelimSlash1
+  ) {
+    return false;
+  }
+
+  const isIdent2 = t2.type === 'ident';
+  const isFunction2 = t2.type === 'function';
+  const isUrl2 = t2.type === 'url';
+  const isBadUrl2 = t2.type === 'bad-url';
+  const isDelimDash2 = t2.type === 'delim' && t2.value === '-';
+  const isNumber2 = t2.type === 'number';
+  const isPercentage2 = t2.type === 'percentage';
+  const isDimension2 = t2.type === 'dimension';
+  const isCDC2 = t2.type === 'CDC';
+  const isOpenParen2 = t2.type === '(' || (t2.type === 'delim' && t2.value === '(');
+  const isDelimStar2 = t2.type === 'delim' && t2.value === '*';
+  const isDelimPercent2 = t2.type === 'delim' && t2.value === '%';
+
+  // Group A: matches [ident, function, url, bad url, -, number, percentage, dimension, CDC]
+  const inGroupA =
+    isIdent2 ||
+    isFunction2 ||
+    isUrl2 ||
+    isBadUrl2 ||
+    isDelimDash2 ||
+    isNumber2 ||
+    isPercentage2 ||
+    isDimension2 ||
+    isCDC2;
+
+  // Row: ident (css-syntax-3 § 8 #serialization)
+  if (isIdent1) {
+    return inGroupA || isOpenParen2;
+  }
+
+  // Rows: at-keyword, hash, dimension, #, - (css-syntax-3 § 8 #serialization)
+  if (isAtKeyword1 || isHash1 || isDimension1 || isDelimHash1 || isDelimDash1) {
+    return inGroupA;
+  }
+
+  // Row: number (css-syntax-3 § 8 #serialization)
+  if (isNumber1) {
+    return isIdent2 || isFunction2 || isUrl2 || isBadUrl2 || isNumber2 || isPercentage2 || isDimension2 || isCDC2 || isDelimPercent2;
+  }
+
+  // Row: @ (css-syntax-3 § 8 #serialization)
+  if (isDelimAt1) {
+    return isIdent2 || isFunction2 || isUrl2 || isBadUrl2 || isDelimDash2 || isCDC2;
+  }
+
+  // Rows: . and + (css-syntax-3 § 8 #serialization)
+  if (isDelimDot1 || isDelimPlus1) {
+    return isNumber2 || isPercentage2 || isDimension2;
+  }
+
+  // Row: / (css-syntax-3 § 8 #serialization)
+  if (isDelimSlash1) {
+    return isDelimStar2;
+  }
+
+  return false;
+}
+
+function getFirstToken(node: ComponentValue): Token | null {
+  if (typeof node !== 'object' || node === null) return null;
+  if (node.type === 'simple-block') {
+    return (node as SimpleBlock).associatedToken;
+  }
+  if (node.type === 'function' && 'name' in node) {
+    return { type: 'function', value: (node as CSSFunction).name } as Token;
+  }
+  const t = node as Token;
+  if (t.type === 'EOF') return null;
+  return t;
+}
+
+function getLastToken(node: ComponentValue): Token | null {
+  if (typeof node !== 'object' || node === null) return null;
+  if (node.type === 'simple-block') {
+    const start = (node as SimpleBlock).associatedToken?.value as string;
+    const end = getMirrorToken(start);
+    return { type: (end || ')') as import('./types.ts').TokenType, value: end } as Token;
+  }
+  if (node.type === 'function' && 'name' in node) {
+    return { type: ')', value: ')' } as Token;
+  }
+  const t = node as Token;
+  if (t.type === 'EOF') return null;
+  return t;
+}
 
 export function serialize(nodes: ComponentValue[], preserveCase: boolean = false, propertyName?: string): string {
   if (propertyName === 'font-family') {
     return serializeFontFamily(nodes);
   }
   let result = '';
+  let prevLastToken: Token | null = null;
+
   for (const node of nodes) {
+    const firstToken = getFirstToken(node);
+    if (prevLastToken && firstToken && requiresTokenSeparator(prevLastToken, firstToken)) {
+      result += '/**/';
+    }
     result += serializeNode(node, preserveCase);
+    prevLastToken = getLastToken(node);
   }
   return result;
 }
@@ -59,6 +187,18 @@ function serializeNode(node: ComponentValue, preserveCase: boolean): string {
         }
       }
       
+      if (funcName === 'url') {
+        let start = 0;
+        while (start < args.length && args[start].type === 'whitespace') start++;
+        let end = args.length - 1;
+        while (end >= start && args[end].type === 'whitespace') end--;
+        if (start <= end) {
+          args = args.slice(start, end + 1);
+        } else {
+          args = [];
+        }
+      }
+
       if (funcName === 'attr') {
         let hasPipe = false;
         // Remove leading '|'
@@ -86,7 +226,7 @@ function serializeNode(node: ComponentValue, preserveCase: boolean): string {
         let start = 0;
         while (start < args.length && args[start].type === 'whitespace') start++;
         let end = args.length - 1;
-        while (end >= 0 && args[end].type === 'whitespace') end--;
+        while (end >= start && args[end].type === 'whitespace') end--;
         
         if (start <= end) {
           args = args.slice(start, end + 1);
@@ -115,7 +255,7 @@ function serializeToken(token: Token, preserveCase: boolean): string {
     case 'hash':
       return '#' + token.value;
     case 'string':
-      return serializeString(token.value);
+      return (preserveCase && token.originalText && !token.originalText.endsWith('\\')) ? token.originalText : serializeString(token.value);
     case 'url':
       return preserveCase ? serializeUrlToken(token.value, token.originalText) : serializeUrl(token.value);
     case 'delim':
@@ -128,9 +268,9 @@ function serializeToken(token: Token, preserveCase: boolean): string {
       return formatNumber(token.value) + (token.unit ? serializeIdentifier(token.unit) : '');
 
     case 'whitespace':
-      return token.value;
+      return (preserveCase && token.originalText) ? token.originalText : token.value;
     case 'comment':
-      return '/**/';
+      return token.value || '/**/';
     case 'CDO':
       return '<!--';
     case 'CDC':
@@ -289,7 +429,7 @@ export function serializeUrl(val: string): string {
 }
 
 export function serializeUrlToken(val: string, originalText?: string): string {
-  if (originalText) {
+  if (originalText && !val.includes('\uFFFD') && originalText.endsWith(')')) {
     return originalText;
   }
   let result = '';

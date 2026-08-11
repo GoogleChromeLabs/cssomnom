@@ -272,6 +272,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       }
       const isCustom = winner.name.startsWith('--');
       if (isCustom) {
+        if (winner.raw !== undefined && winner.raw.includes('/*')) {
+          return winner.raw.trim();
+        }
         const serialized = serialize(winner.value, isCustom).trim();
         if (serialized === '') {
           return ' ';
@@ -465,7 +468,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       return;
     }
 
-    const tokens = tokenize(value);
+    const tokens = tokenize(value, property === 'unicode-range');
     if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
       return;
     }
@@ -496,10 +499,23 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       }
     }
 
+    const componentValues = ParseHooks.parseComponentValues(tokens);
+
+    if (property === 'unicode-range') {
+      const assembled = ParseHooks.assembleUnicodeRanges(componentValues);
+      if (!assembled) {
+        return;
+      }
+      componentValues.splice(0, componentValues.length, ...assembled);
+    }
+
     // cssom-1 § 6.7.1 #set-a-css-declaration
     if (existing) {
-      existing.value = tokens;
+      existing.value = componentValues;
       existing.important = isImportant;
+      if (property.startsWith('--')) {
+        existing.raw = value ?? undefined;
+      }
       
       const idx = this._declarations.indexOf(existing);
       if (idx !== -1) {
@@ -513,8 +529,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       const decl: Declaration = {
         type: 'declaration',
         name: property,
-        value: tokens,
+        value: componentValues,
         important: isImportant,
+        raw: property.startsWith('--') ? (value ?? undefined) : undefined,
       };
       this._declarations.push(decl);
       this._declMap.set(property, decl);

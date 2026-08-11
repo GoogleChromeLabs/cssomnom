@@ -1337,7 +1337,7 @@ export class CSSNamespaceRule extends CSSRule {
 
   get cssText() {
     if (this._prefix) {
-      return `@namespace ${this._prefix} url("${this._namespaceURI}");`;
+      return `@namespace ${serializeIdentifier(this._prefix)} url("${this._namespaceURI}");`;
     }
     return `@namespace url("${this._namespaceURI}");`;
   }
@@ -1395,11 +1395,11 @@ function parsePageSelectorList(text: string): string[] | null {
     
     let serialized = '';
     if (hasIdent) {
-      serialized += (filtered[0].value as string).toLowerCase();
+      serialized += serializeIdentifier(filtered[0].value as string);
     }
     let p = hasIdent ? 1 : 0;
     while (p < filtered.length) {
-      serialized += ':' + (filtered[p + 1].value as string).toLowerCase();
+      serialized += ':' + serializeIdentifier(filtered[p + 1].value as string);
       p += 2;
     }
     results.push(serialized);
