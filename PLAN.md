@@ -2069,7 +2069,7 @@ Objective: Reorganize and modularize the `scripts/` directory to cleanly separat
   - `scripts/baselines/`: Test baseline maintenance utilities (`generate_lightning_baseline.ts`, `prune_resolved_failures.ts`, `rebaseline_wpt_history.ts`, `wpt_bulk_verify.ts`).
 - [x] **Script & Hook Updates**:
   - Updated `package.json` scripts (`wpt:node`, `wpt:node:crawl`, `wpt:node:baseline`, `wpt:node:progress`, `wpt:node:cluster`, `wpt:node:diff`, `wpt:browser:*`, `fixtures:generate`, `external:extract`, `baselines:prune`, `codegen`, `maintain`).
-  - Updated `.git/hooks/pre-commit` to invoke `scripts/wpt/node/crawl.ts --update-progress`.
+  - Updated `.git/hooks/pre-commit` to invoke `node scripts/wpt/node/crawl.ts --update-progress`.
 - [x] **Documentation & Skill Sync**:
   - Updated references across `MAINTENANCE.md`, `LOOP.md`, `AGENTS.md`, `.agents/skills/champ/SKILL.md`, `.agents/skills/coherence-auditor/SKILL.md`, and `PLAN.md`.
   - Verified 100% link integrity with `node .agents/skills/coherence-auditor/scripts/validate_links.ts --all`.

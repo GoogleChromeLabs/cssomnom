@@ -199,7 +199,7 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **Style Rules & Nesting**: `CSSStyleRule`, `CSSNestedDeclarations`
 - **Conditional & Grouping Rules**: `CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSScopeRule`, `CSSStartingStyleRule`
 - **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSAtRule`
-- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`
+- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
 
 **Deviations & Extensions**
 - **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. We allow direct instantiation of rule classes with explicit AST and token parameters (e.g., `new CSSStyleRule(selector, decls, rules)`) for headless manipulation. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
@@ -287,6 +287,9 @@ These APIs are custom utilities for static analysis, cascading, variable resolut
     - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
     - `serialize(ast)`: Low-level serializer turning AST nodes into CSS text.
     - `getCascadedStyle(element, rules)`: Standalone cascading function.
+    - `matches(element, selector)`: Pure-AST static selector matcher.
+    - `querySelectorAll(root, selector)` / `querySelector(root, selector)`: AST-based DOM query utilities.
+    - `escape(ident)`: Top-level string identifier escaping utility (CSSOM § 3).
     - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
     - Standalone Parser API exports for tree-shaking (`parseStylesheet`, `parseStylesheetSync`, `parseRule`, `parseRuleSync`, `parseDeclaration`, `parseDeclarationSync`, `supports`, etc.).
 
