@@ -1396,11 +1396,11 @@ Objective: Build a Node-based VM sandbox runner using `linkedom` to execute brow
 - [x] **HTMLElement attributeStyleMap**: Define `HTMLElement.prototype.attributeStyleMap` and `Element.prototype.computedStyleMap()` getters using our `StylePropertyMap` wrapper.
 
 #### 2. Sandbox VM Execution Script [x]
-- [x] **Runner script**: Create `scripts/run_wpt_sandbox.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
-- [x] **Sandbox configuration**: Support a config file (`tests/wpt-sandbox-config.json`) defining allowlisted/skipped suites and baseline failures.
+- [x] **Runner script**: Create `scripts/run_wpt_node.ts` to crawl selected WPT subfolders (like `css-typed-om/` and `css-properties-values-api/`), execute their internal script tags inside a `vm` context, mock `testharness.js` functions, and collect test results.
+- [x] **Sandbox configuration**: Support a config file (`tests/wpt-node-config.json`) defining allowlisted/skipped suites and baseline failures.
 
 #### 3. Integrate into Preflight [x]
-- [x] **Preflight hook**: Hook `scripts/run_wpt_sandbox.ts` into our node test run to enforce dynamic browser WPT checks.
+- [x] **Preflight hook**: Hook `scripts/run_wpt_node.ts` into our node test run to enforce dynamic browser WPT checks.
 
 ---
 
@@ -1559,10 +1559,10 @@ Objective: Run WPT tests dynamically using a lightweight harness shim, eliminati
 Objective: Merge redundant WPT shims and DOM setups into a single, clean helper file (`tests/wpt-shim.ts`) and reuse it across both Node unit tests and the sandbox CLI script.
 
 ### Tasks
-- [x] **Consolidate shims**: Move any unique shims from `scripts/run_wpt_sandbox.ts` (such as `promise_test()`, `assert_not_equals()`, `assert_array_equals()`, `assert_class_string()`, `assert_unreached()`) into `tests/wpt-shim.ts`.
+- [x] **Consolidate shims**: Move any unique shims from `scripts/run_wpt_node.ts` (such as `promise_test()`, `assert_not_equals()`, `assert_array_equals()`, `assert_class_string()`, `assert_unreached()`) into `tests/wpt-shim.ts`.
 - [x] **Consolidate DOM setups**: Integrate the `HTMLStyleElement` `.sheet` mock patching from `the tests/wpt-sandbox-setup.ts` and the `ComputedStylePropertyMapReadOnly` class from it into `tests/wpt-shim.ts`.
 - [x] **Cleanup setup files**: Delete `the tests/wpt-global-setup.ts` and `the tests/wpt-sandbox-setup.ts` and update any imports.
-- [x] **Refactor `scripts/run_wpt_sandbox.ts`**: Make `run_wpt_sandbox.ts` use the unified shims and prototype patches from `tests/wpt-shim.ts`.
+- [x] **Refactor `scripts/run_wpt_node.ts`**: Make `run_wpt_node.ts` use the unified shims and prototype patches from `tests/wpt-shim.ts`.
 - [x] **Verify preflight**: Run `pnpm run preflight` to confirm both test suites and the CLI script compile and pass.
 
 ---
@@ -1587,7 +1587,7 @@ Objective: Eliminate the verbose 9.5k line static JSON baseline configuration fi
 
 ### Tasks
 - [x] **Dynamic WPT crawling**: Update `tests/wpt-sandbox.test.ts` to crawl the `css-typed-om` directory dynamically at runtime instead of loading a static `include` array.
-- [x] **Compact JSON Formatting**: Implement custom single-line-array serialization in `scripts/update_wpt_baseline.ts` to store each file's failures on a single line.
+- [x] **Compact JSON Formatting**: Implement custom single-line-array serialization in `scripts/run_wpt_node_crawler.ts` (`--update-baseline`) to store each file's failures on a single line.
 - [x] **Dynamic exclusion**: Identify files that fail to initialize (syntax/load errors) and automatically populate them into the `exclude` list during baseline runs.
 - [x] **Verify preflight**: Run `pnpm run preflight` to confirm all 358 WPT test files run successfully in 9 seconds with the new compact JSON format (~335 lines).
 
@@ -1662,7 +1662,7 @@ Objective: Implement missing CSS Typed OM classes (`CSSPositionValue`, `CSSTrans
 Objective: Automate conformance logging of WPT sandbox tests to track progress over time.
 
 ### Tasks
-- [x] **Progress Tracking Script**: Create `scripts/update_wpt_progress.ts` to execute WPT sandbox tests and append current statistics to `wpt-typed-om-progress.md` only when they change.
+- [x] **Progress Tracking Script**: Create `scripts/run_wpt_node_crawler.ts` (`--update-progress`) to execute WPT tests and append current statistics to `wpt-progress.md` only when they change.
 - [x] **Git Pre-commit Hook**: Implement `.git/hooks/pre-commit` to automatically run progress tracking and stage the updated log file when `src/typed-om.ts` changes.
 - [x] **Initialize Log**: Run the script and commit the initial baseline log (`5890/12150` passed, 48.48% pass rate).
 - [x] **Historical Backfill**: Backfill the progress log table with past test execution numbers from transcripts.
@@ -1759,10 +1759,10 @@ Objective: Verify our WPT shim conformance against WPT's own unit tests, then sc
   - [x] Documented remaining 3 edge-case failures at the end of the roadmap (1 in `exceptional-cases.html` on late-registered test status, 2 in `exceptional-cases-timeouts.html` on timeouts).
 - [x] **Broad Spec Conformance Crawler Expansion**:
   - [x] Expand the WPT sandbox crawler to read and execute tests under other core specification directories: `cssom/`, `css-syntax/`, `css-nesting/`, `css-variables/`, `selectors/`, `mediaqueries/`.
-  - [x] Configure includes/excludes lists for these spec folders in `tests/wpt-sandbox-config.json`.
+  - [x] Configure includes/excludes lists for these spec folders in `tests/wpt-node-config.json`.
 - [x] **Unified Multi-Spec Progress Logging**:
   - [x] Create `wpt-progress.md` logging progress across multiple specs.
-  - [x] Update progress logging script (`scripts/update_wpt_progress.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
+  - [x] Update progress logging script (`scripts/run_wpt_node_crawler.ts`) to run multiple spec folders, aggregate their test totals, and log progress using the following multi-column layout with spec totals in headers:
     ```markdown
     | Date & Time (UTC) | Commit | Typed OM (12150) | CSSOM (600) | Nesting (120) | Syntax (350) | Selectors (500) | MQ (200) | Overall | Pass Rate |
     | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -1810,12 +1810,12 @@ Objective: Resolve unbaselined failures in the expanded specifications by comple
   - [x] Mock `document.fonts` inside `createWptContext` (resolves ~2 failures).
   - [x] Implement `document.implementation.createHTMLDocument` inside `patchWindowForTypedOM` in `tests/wpt-shim.ts` using `parseHTML` (resolves ~2 failures).
 - [x] **Unified Multi-Spec Baseline Configuration**:
-  - [x] Update `tests/wpt-sandbox.test.ts` to load all specifications and exclusions dynamically from `tests/wpt-sandbox-config.json` instead of hardcoding `css-typed-om`.
+  - [x] Update `tests/wpt-sandbox.test.ts` to load all specifications and exclusions dynamically from `tests/wpt-node-config.json` instead of hardcoding `css-typed-om`.
   - [x] Baseline all remaining layout engine limitations and ES Modules syntax issues to keep standard preflight checks green.
 - [x] **Memory Leak & CPU Performance Safety**:
   - [x] Guarded globally-shared linkedom prototypes (`Element.prototype`, `CSSStyleDeclaration.prototype`) with a recursion guard to prevent stack overflow/extreme CPU locks.
   - [x] Removed global `window` closure leaks inside `Node.prototype.appendChild` and `insertBefore` mocks by resolving contexts dynamically via `ownerDocument.defaultView`.
-  - [x] Implemented automatic worker-queue throttling inside `scripts/run_wpt_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
+  - [x] Implemented automatic worker-queue throttling inside `scripts/run_wpt_node_crawler.ts` using `os.loadavg()` and `os.freemem()` monitoring to prevent vm freeze.
   - [x] Guarded heavy crawler runner in `tests/wpt-sandbox.test.ts` with `RUN_SANDBOX_WPT=true` env flag to keep normal preflight check memory footprint minimal.
   - [x] Replaced shell `exec` with direct binary `execFile` and injected a 3.5s `unref()` self-termination fail-safe timer in workers to stop background loops.
   - [x] Injected event loop yields (5ms between assertions, 20ms between task spawns) to lower CPU and memory footprint during crawler runs.

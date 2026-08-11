@@ -15,10 +15,9 @@ const CANONICAL_DOCS = [
   'README.md',
   'PLAN.md',
   'AGENTS.md',
-  'API_BOUNDARIES.md',
   'LOOP.md',
   'MAINTENANCE.md',
-  'contributing.md',
+  'CONTRIBUTING.md',
 ];
 
 function getLineNumber(content: string, index: number): number {

@@ -25,15 +25,17 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
        - `README.md`
        - `PLAN.md`
        - `AGENTS.md`
-       - `API_BOUNDARIES.md`
        - `LOOP.md`
        - `MAINTENANCE.md`
-       - `contributing.md`
+       - `CONTRIBUTING.md`
      - Verify taxonomy, workflow, and abbreviation consistency across docs:
        - **Subagent Personas & Quality Loop**: Ensure references to `champ` (Developer), `codex_reviewer_cmd` (Reviewer), `Grizz` (Gatekeeper), and `scrutineer` (Spec Auditor) in `LOOP.md`, `AGENTS.md`, and `PLAN.md` match exact names and roles.
        - **Spec Modules & Submodule References**: Validate spec names (`CSSOM Level 1`, `CSS Syntax Level 3`, `CSS Values Level 4`, `CSS Nesting Level 1`, `CSS Typed OM Level 1 & 2`, `CSS Logical Properties Level 1`, `Houdini`) and their underlying submodule paths (`submodules/csswg-drafts/`, `submodules/css-houdini-drafts/`).
-       - **Architectural Constraints**: Ensure consistent documentation of `ParseHooks` (`src/parse-hooks.ts`) for circular dependency inversion, and `API_BOUNDARIES.md` for documented spec deviations.
-       - **Execution Rules & Scripts**: Enforce that documentation consistently specifies native Node execution (`node script.ts`, NOT `npx tsx` or `ts-node`) and valid npm scripts (`pnpm run preflight`, `pnpm run codegen`, `pnpm run maintain`, `pnpm test`).
+       - **Architecture & Spec Boundaries**:
+         - Audit `README.md § Architecture & Spec Boundaries` against actual codebase exports in `src/index.ts` and `tests/api-surface.test.ts`.
+         - Ensure documented standard CSSOM / Houdini interfaces, Bridge utilities, intentional spec deviations, and non-goals (e.g. no `getComputedStyle()`) are factually accurate, up to date, and omit no methods or deviations.
+         - Ensure consistent documentation of `ParseHooks` (`src/parse-hooks.ts`) for circular dependency inversion.
+       - **Execution Rules & Scripts**: Enforce that documentation consistently specifies native Node execution (`node script.ts`, NOT `npx tsx` or `ts-node`) and valid npm scripts (`pnpm run preflight`, `pnpm run codegen`, `pnpm run maintain`, `pnpm test`, `wpt:node:*`, `wpt:browser:*`).
      - Identify any contradictory claims, outdated API signatures, or conflicting guidelines between files.
 
   2. **Codebase & Script Terminology Consistency Audit**:
