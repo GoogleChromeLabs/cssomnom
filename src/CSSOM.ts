@@ -71,6 +71,7 @@ export interface LinkStyle {
   readonly sheet: CSSStyleSheet | null;
 }
 
+// cssom-1 § 6.2 #the-medialist-interface
 export class MediaList {
   [index: number]: string;
   private _mediaQueries: MediaQuery[] = [];

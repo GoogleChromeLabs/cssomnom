@@ -223,6 +223,8 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
         walkRules(childRules, parentSelector, layerName, scopeNode);
       } else if (
+        // css-cascade-5 § 2 #filtering
+        // mediaqueries-4 § 3.2 #evaluating-mq-list
         rule instanceof CSSMediaRule ||
         ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'media')
       ) {

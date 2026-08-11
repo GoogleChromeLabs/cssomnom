@@ -29,10 +29,16 @@ import {
   FEATURE_ALLOWED_IDENTS
 } from './data/gen/media-features.ts';
 
+// mediaqueries-4 § 2 #structure
+// mediaqueries-4 § 3 #media-types
+// mediaqueries-4 § 4 #evaluating-features
+// mediaqueries-5 § 2 #syntax
 export class MediaParser {
   /**
    * Parse a media query list string into an array of normalized media queries.
    * Invalid queries are replaced with 'not all'.
+   * // mediaqueries-4 § 2.1 #mq-syntax
+   * // mediaqueries-4 § 3.2 #evaluating-mq-list
    */
   public static parse(mediaText: string): MediaQuery[] {
     if (!mediaText || mediaText.trim() === '') {
