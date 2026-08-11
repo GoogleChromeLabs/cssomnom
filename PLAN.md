@@ -1954,6 +1954,39 @@ Objective: Drive WPT `css/cssom/` conformance (>770 tests) by hardening styleshe
 
 ---
  
+## Phase 83: WPT Multi-Spec Conformance Drive (Wave 3.5: CSSOM Rules, Serialization & `CSS.escape`)
+
+Objective: Push WPT `css/cssom/` conformance higher toward our practical ceiling (~68%-70%) by implementing `CSS.escape()`, `CSSStyleRule.selectorText` dynamic setter, specialized rule serializers (`@counter-style`, `@font-feature-values`, `@keyframes`), constructable stylesheet promise methods (`sheet.replace()`), and IDL test harness shims.
+
+**Spec References**:
+- CSSOM Level 1: `submodules/csswg-drafts/cssom-1/Overview.bs`
+  - § 3 Utility APIs (`#css-escape-value`)
+  - § 6.4.1 CSSStyleRule (`#dom-cssstylerule-selectortext`)
+  - § 6.4.4 CSSKeyframeRule / CSSKeyframesRule
+  - § 6.4.5 CSSNamespaceRule
+  - § 6.5.1 Constructing CSSStyleSheet Objects (`#dom-cssstylesheet-replace`)
+- CSS Counter Styles 3: `submodules/csswg-drafts/css-counter-styles-3/Overview.bs`
+- CSS Fonts 4: `submodules/csswg-drafts/css-fonts-4/Overview.bs`
+
+### Tasks
+- [ ] **`CSS.escape()` Implementation**:
+  - Implement the official CSSOM § 3 string escaping algorithm in `src/CSSOM.ts` / `src/index.ts`, passing `escape.html` (9 tests).
+- [ ] **`CSSStyleRule.selectorText` Dynamic Setter**:
+  - In `src/CSSStyleRule.ts` / `src/CSSOM.ts`, implement the setter for `selectorText`: validate and re-parse the incoming selector text, updating internal rule AST or throwing `SyntaxError` on invalid input per § 6.4.1.
+- [ ] **Rule ASTs & `cssText` Serialization**:
+  - Implement full serialization for `CSSCounterStyleRule.cssText` (single-line format without unformatted linebreaks per CSS Counter Styles 3).
+  - Implement `CSSFontFeatureValuesRule` and `@font-feature-values` sub-rules.
+  - Implement `CSSNamespaceRule` and ensure `Object.prototype.toString.call(CSSNamespaceRule.prototype)` returns `"[object CSSNamespaceRule]"`.
+- [ ] **Constructable Stylesheet `replace()` & `replaceSync()`**:
+  - In `src/CSSStyleSheet.ts`, implement `replace(text)` returning a `Promise<CSSStyleSheet>` that parses asynchronously, and `replaceSync(text)` with proper disallow-modification locks.
+- [ ] **WPT IDL Test Harness Shims**:
+  - In `tests/wpt-shim.ts`, implement `assert_idl_attribute` and `document.implementation.createDocument`.
+- [ ] **Verification**:
+  - Run: `node scripts/wpt_cluster_failures.ts --spec=cssom` and verify pass rate increases significantly.
+  - Run: `pnpm run preflight` to guarantee 0 regressions across all suites.
+
+---
+ 
 ## Potential roadmap items
 
 Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.
