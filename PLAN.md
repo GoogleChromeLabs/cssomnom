@@ -2234,6 +2234,34 @@ Objective: Implement normative calculation tree simplification, proxy index appe
   - Enforce `TypeError` on `StylePropertyMap.append()` when existing property contains `var()`.
   - Partition iteration order in `StylePropertyMapReadOnly` (standard -> vendor-prefixed -> custom properties).
 
+---
+
+## Phase 92: DOMMatrix & Geometry Modernization, Performance Optimization & Style Refactoring (`src/DOMMatrix.ts`)
+
+Objective: Modernize `src/DOMMatrix.ts` to eliminate double-transposition cloning overhead, implement in-place 2D affine fast-paths, unroll 4x4 matrix arithmetic, deduplicate subclass accessors, fix `det === NaN` singularity handling, and align with `~/.gemini/STYLE.md`.
+
+**Spec References**:
+- W3C Geometry Interfaces Module Level 1: `https://drafts.fxtf.org/geometry/#dommatrix` (§ 3 The `DOMMatrixReadOnly` Interface, § 4 The `DOMMatrix` Interface)
+
+### Tasks
+- [ ] **Performance & Allocation Optimization (`src/DOMMatrix.ts`)**:
+  - Direct `init instanceof DOMMatrixReadOnly` cloning fast-path in constructor (eliminates 2 matrix transpositions and 2 `Float64Array` allocations per clone).
+  - In-place 2D affine fast-paths for `multiplySelf`, `rotateSelf`, `translateSelf`, `scaleSelf`, `invertSelf`, and `transformPoint` (reduces multiplications from 64 to 4–12 with 0 array allocations).
+  - Direct 3D Euler angle trigonometry in `rotateSelf` (eliminates temporary `getRz`, `getRy`, `getRx` array allocations).
+  - Fully unroll 4x4 matrix multiplication and support destination buffer writing (`multiplyInPlace`).
+- [ ] **Code Quality & Deduplication (`src/DOMMatrix.ts` & `src/utils.ts`)**:
+  - Remove 22 duplicate getter overrides in `DOMMatrix` subclass and inherit directly from `DOMMatrixReadOnly`.
+  - Deduplicate 3D component checking into `has3DComponents()` helper.
+  - Consolidate degree-to-radian constants and helpers (`DEG_TO_RAD`, `RAD_TO_DEG`, `degToRad`, `angleFromVector`) in `src/utils.ts`.
+  - Delete redundant `newDOMMatrix` wrapper in `src/typed-om.ts`.
+- [ ] **Style & Spec Conformance (`src/DOMMatrix.ts`)**:
+  - Fix singularity check in `invertMatrix` to handle `NaN` / infinite determinants (`!Number.isFinite(det) || det === 0`).
+  - Decompose `parseMatrixString` into an outline orchestrator delegating to `parseMatrix2D()`, `parseMatrix3D()`, and `parseTransformHook()`.
+  - Remove top-level `globalThis` mutation side-effects on module import.
+  - Enforce `TypeError` on conflicting `a` vs `m11` properties in `DOMMatrixInit`.
+- [ ] **Unit Tests & Parity Suite**:
+  - Expand `tests/dom-matrix.test.ts` to verify 2D affine fast-paths, non-invertible matrix handling with `NaN`, and 3D compound rotations.
+
 
 
 
