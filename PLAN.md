@@ -1940,15 +1940,15 @@ Objective: Drive WPT `css/cssom/` conformance (>770 tests) by hardening styleshe
   - § 6.4 The CSSRule Interface (`#the-cssrule-interface`)
 
 ### Tasks
-- [ ] **Diagnostic Failure Clustering on `cssom`**:
+- [x] **Diagnostic Failure Clustering on `cssom`**:
   - Run `node scripts/wpt_cluster_failures.ts --spec=cssom` to identify top failure clusters across the 775 tests in `submodules/web-platform-tests/css/cssom`.
-- [ ] **Rule Index Boundary & Hierarchy Validation (`insertRule` / `deleteRule`)**:
+- [x] **Rule Index Boundary & Hierarchy Validation (`insertRule` / `deleteRule`)**:
   - In `src/CSSOM.ts`, implement strict `IndexSizeError` (when index < 0 or > rules.length) and `HierarchyRequestError` (e.g. attempting to insert `@import` after style rules or `@namespace` rules) per CSSOM 1 § 6.5.3.
   - Ensure `CSSRule.parentStyleSheet` and `CSSRule.parentRule` back-references are updated when rules are inserted or removed.
-- [ ] **Priority Flag & Serialization in `CSSStyleDeclaration`**:
+- [x] **Priority Flag & Serialization in `CSSStyleDeclaration`**:
   - In `src/CSSStyleDeclaration.ts`, handle case-insensitive `"important"` priority values, whitespace handling, and normalize priority strings in `setProperty()`.
   - Ensure canonical property name iteration order and `cssText` roundtripping.
-- [ ] **Verification**:
+- [x] **Verification**:
   - Run `node scripts/wpt_cluster_failures.ts --spec=cssom` and verify conformance improvement.
   - Run `pnpm run preflight` to guarantee 0 regressions across all suites.
 

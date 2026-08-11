@@ -434,18 +434,27 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return (winner && winner.important) ? 'important' : '';
   }
 
+  // cssom-1 § 6.7.1 #the-cssstyledeclaration-interface
   setProperty(property: string, value: string | null, priority: string = '') {
+    // 1. If the readonly flag is set, then throw a NoModificationAllowedError exception.
     if (this._readonly) {
       throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
     }
     if (property === '--') return;
     if (!property.startsWith('--')) property = property.toLowerCase();
+    // 2. If property is not a custom property and not a supported CSS property, return.
     if (!property.startsWith('--') && !this._isPropertySupported(property)) {
       return;
     }
-    if (priority !== '' && priority.toLowerCase() !== 'important') {
+
+    // 4. If priority is not the empty string and is not an ASCII case-insensitive match for the string "important", then return.
+    const normalizedPriority = (priority ?? '').trim().toLowerCase();
+    if (normalizedPriority !== '' && normalizedPriority !== 'important') {
       return;
     }
+    const isImportant = normalizedPriority === 'important';
+
+    // 3. If value is the empty string (or null), invoke removeProperty(property) and return.
     if (value === null || value === '') {
       this.removeProperty(property);
       return;
@@ -461,7 +470,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       const expanded = shorthand.expand(ParseHooks.parseComponentValues(tokens));
       if (expanded) {
         for (const [lh, val] of Object.entries(expanded)) {
-          this.setProperty(lh, serialize(val), priority);
+          this.setProperty(lh, serialize(val), normalizedPriority);
         }
         return;
       }
@@ -482,9 +491,10 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       }
     }
 
+    // cssom-1 § 6.7.1 #set-a-css-declaration
     if (existing) {
       existing.value = tokens;
-      existing.important = priority === 'important';
+      existing.important = isImportant;
       
       const idx = this._declarations.indexOf(existing);
       if (idx !== -1) {
@@ -499,7 +509,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         type: 'declaration',
         name: property,
         value: tokens,
-        important: priority === 'important',
+        important: isImportant,
       };
       this._declarations.push(decl);
       this._declMap.set(property, decl);

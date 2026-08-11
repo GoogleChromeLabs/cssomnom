@@ -1,5 +1,6 @@
 import { parseStyleSheet, parseRule } from '../src/parser.ts';
 import { CSSStyleSheet } from '../src/CSSOM.ts';
+import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { ParseHooks } from '../src/parse-hooks.ts';
 
 export interface WptSandboxTest {
@@ -875,6 +876,33 @@ const styleToElement = new WeakMap<object, Element>();
       }
       return origRemove.call(this, name);
     };
+
+    const origGetPriority = declProto.getPropertyPriority as ((name: string) => string) | undefined;
+    declProto.getPropertyPriority = function (this: unknown, name: string) {
+      if (origGetPriority) {
+        return origGetPriority.call(this, name);
+      }
+      const styleText = (this as { cssText?: string }).cssText || '';
+      if (styleText && styleText.toLowerCase().includes('important')) {
+        const decl = new CSSStyleDeclaration();
+        decl.cssText = styleText;
+        return decl.getPropertyPriority(name);
+      }
+      return '';
+    };
+
+    const declProtoWithSymbols = declProto as Record<string | symbol, unknown>;
+    if (!declProtoWithSymbols[Symbol.iterator]) {
+      declProtoWithSymbols[Symbol.iterator] = function* (this: unknown) {
+        const len = (this as { length?: number }).length || 0;
+        const itemFn = (this as { item?: (i: number) => string }).item;
+        if (typeof itemFn === 'function') {
+          for (let i = 0; i < len; i++) {
+            yield itemFn.call(this, i);
+          }
+        }
+      };
+    }
   }
 
   Object.defineProperty(window.Element.prototype, 'computedStyleMap', {

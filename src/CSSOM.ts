@@ -273,6 +273,7 @@ export class CSSStyleSheet extends StyleSheet {
     }
   }
 
+  // cssom-1 § 6.3 #dom-cssstylesheet-replacesync
   replaceSync(text: string): void {
     if (!this._constructedFlag) {
       throw new DOMException("Not allowed on non-constructed stylesheets", "NotAllowedError");
@@ -292,17 +293,27 @@ export class CSSStyleSheet extends StyleSheet {
       return true;
     });
 
+    // Clear parent references on previously attached rules
+    for (const rule of this._rules) {
+      if (rule instanceof CSSRule) {
+        rule.parentRule = null;
+        rule.parentStyleSheet = null;
+      }
+    }
+
     this._unregisterProperties();
     this._rules = filteredRules;
     for (const rule of this._rules) {
       if (rule instanceof CSSRule) {
         rule.parentStyleSheet = this;
+        rule.parentRule = null;
       }
       this._registerRuleProperties(rule);
     }
   }
 
-
+  // cssom-1 § 6.3 #dom-cssstylesheet-insertrule
+  // cssom-1 § 6.5.3 #insert-a-css-rule
   insertRule(rule: string, index: number = 0): number {
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
@@ -310,43 +321,53 @@ export class CSSStyleSheet extends StyleSheet {
     if (!this._originCleanFlag) {
       throw new DOMException('The style sheet is not origin-clean.', 'SecurityError');
     }
-    const parsedRule = this._parseRule(rule);
-    if (!parsedRule) {
-      throw new DOMException('Syntax error', 'SyntaxError');
-    }
+
+    // cssom-1 § 6.5.3 #insert-a-css-rule step 1 & 2:
+    // 1. Set length to the number of items in list.
+    // 2. If index is greater than length (or index < 0), throw IndexSizeError.
+    // NOTE: This boundary check MUST precede parsing per CSSOM 1 § 6.5.3 step 2!
     if (index < 0 || index > this._rules.length) {
       throw new DOMException('Index size error', 'IndexSizeError');
+    }
+
+    // 3. Set new rule to the results of performing parse a CSS rule on argument rule.
+    const parsedRule = this._parseRule(rule);
+    // 5. If new rule is a syntax error, throw a SyntaxError exception.
+    if (!parsedRule) {
+      throw new DOMException('Syntax error', 'SyntaxError');
     }
 
     const isImport = isImportRule(parsedRule);
     const isNamespace = isNamespaceRule(parsedRule);
 
+    // cssom-1 § 6.3 #dom-cssstylesheet-insertrule step 5:
+    // If parsed rule is an @import rule, and the constructed flag is set, throw a SyntaxError DOMException.
     if (isImport && this._constructedFlag) {
       throw new DOMException('HierarchyRequestError: @import rules are not allowed in constructed stylesheets', 'SyntaxError');
     }
 
+    // cssom-1 § 6.5.3 #insert-a-css-rule step 6 & step 7:
     if (isImport) {
-      // Relaxed: Allow insertion of @import rules as long as they precede all other rules in the resulting list.
-      // The loop below ensures that no non-import rules precede the new import.
-      // Also, @import must precede @namespace rules
+      // 6. An @import rule must precede all other rules except @charset / @import
       for (let i = 0; i < index; i++) {
         if (!isImportRule(this._rules[i])) {
           throw new DOMException('HierarchyRequestError: @import rules must precede all other rules', 'HierarchyRequestError');
         }
       }
     } else if (isNamespace) {
-      // 4. If rule is a @namespace rule, and there are any rules in the list of css rules
-      // other than @import rules and @namespace rules, throw an InvalidStateError.
+      // 7. If new rule is an @namespace at-rule, and list contains anything other than
+      // @import at-rules and @namespace at-rules, throw an InvalidStateError exception.
       if (this._rules.some(r => isRegularRule(r))) {
         throw new DOMException('InvalidStateError: @namespace rules must precede all regular rules', 'InvalidStateError');
       }
-      // @namespace must follow all @import rules
+      // 6. @namespace must follow all @import rules. If any @import rule is at or after index, throw HierarchyRequestError.
       for (let i = index; i < this._rules.length; i++) {
         if (isImportRule(this._rules[i])) {
           throw new DOMException('HierarchyRequestError: @namespace rules must follow all @import rules', 'HierarchyRequestError');
         }
       }
     } else {
+      // 6. Regular rules must follow all @import and @namespace rules.
       for (let i = index; i < this._rules.length; i++) {
         if (isImportRule(this._rules[i]) || isNamespaceRule(this._rules[i])) {
           throw new DOMException('HierarchyRequestError: Regular rules must follow all @import and @namespace rules', 'HierarchyRequestError');
@@ -354,14 +375,19 @@ export class CSSStyleSheet extends StyleSheet {
       }
     }
 
+    // 8. Insert new rule into list at zero-indexed position index.
+    // cssom-1 § 6.4 #the-cssrule-interface: establish parentStyleSheet reference
     if (parsedRule instanceof CSSRule) {
       parsedRule.parentStyleSheet = this;
+      parsedRule.parentRule = null;
     }
     this._rules.splice(index, 0, parsedRule);
     this._registerRuleProperties(parsedRule);
     return index;
   }
 
+  // cssom-1 § 6.3 #dom-cssstylesheet-deleterule
+  // cssom-1 § 6.5.4 #remove-a-css-rule
   deleteRule(index: number): void {
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
@@ -369,8 +395,26 @@ export class CSSStyleSheet extends StyleSheet {
     if (!this._originCleanFlag) {
       throw new DOMException('The style sheet is not origin-clean.', 'SecurityError');
     }
+
+    // 1. Set length to the number of items in list.
+    // 2. If index is greater than or equal to length (or index < 0), throw IndexSizeError.
+    if (index < 0 || index >= this._rules.length) {
+      throw new DOMException('Index size error', 'IndexSizeError');
+    }
+
+    // 3. Set old rule to the indexth item in list.
     const rule = this._rules[index];
+
+    // 4. If old rule is an @namespace at-rule, and list contains anything other than
+    // @import at-rules and @namespace at-rules, throw an InvalidStateError exception.
+    if (isNamespaceRule(rule) && this._rules.some(r => isRegularRule(r))) {
+      throw new DOMException('InvalidStateError: Cannot remove @namespace rule when regular rules exist', 'InvalidStateError');
+    }
+
+    // 5. Remove rule old rule from list at zero-indexed position index.
+    // 6. Set old rule's parent CSS rule and parent CSS style sheet to null.
     deleteRuleFromArray(this._rules, index);
+
     if (rule instanceof CSSPropertyRule) {
       PropertyRegistry.unregister(rule.name, 'css');
       const idx = this._registeredProperties.indexOf(rule.name);
@@ -533,23 +577,41 @@ export class CSSGroupingRule extends CSSRule {
     }
   }
 
-  // 6.16 The CSSGroupingRule Interface
+  // cssom-1 § 6.16 #the-cssgroupingrule-interface
+  // cssom-1 § 6.5.3 #insert-a-css-rule
   insertRule(rule: string, index: number = 0): number {
-    const isNested = this instanceof CSSStyleRule || this.parentRule !== null;
-    const parsedRule = this._parseRuleInBlock(rule, isNested);
-    if (!parsedRule) {
-      throw new DOMException('Syntax error', 'SyntaxError');
-    }
+    // 1. Set length to the number of items in list.
+    // 2. If index is greater than length (or index < 0), throw IndexSizeError.
+    // NOTE: This boundary check MUST precede parsing per CSSOM 1 § 6.5.3 step 2!
     if (index < 0 || index > this._rules.length) {
       throw new DOMException('Index size error', 'IndexSizeError');
     }
+
+    const isNested = this instanceof CSSStyleRule || this.parentRule !== null;
+    const parsedRule = this._parseRuleInBlock(rule, isNested);
+    if (!parsedRule) {
+      // 5. If new rule is a syntax error, throw a SyntaxError exception.
+      throw new DOMException('Syntax error', 'SyntaxError');
+    }
+
+    // 6. If new rule cannot be inserted into list due to constraints specified by CSS, throw HierarchyRequestError.
+    // In CSS, @import and @namespace rules are forbidden inside grouping rules.
+    if (isImportRule(parsedRule) || isNamespaceRule(parsedRule)) {
+      throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
+    }
+
+    // 8. Insert new rule into list at zero-indexed position index.
+    // cssom-1 § 6.4 #the-cssrule-interface: establish parentRule reference
     if (parsedRule instanceof CSSRule) {
       parsedRule.parentRule = this;
+      parsedRule.parentStyleSheet = null;
     }
     this._rules.splice(index, 0, parsedRule);
     return index;
   }
 
+  // cssom-1 § 6.16 #the-cssgroupingrule-interface
+  // cssom-1 § 6.5.4 #remove-a-css-rule
   deleteRule(index: number): void {
     deleteRuleFromArray(this._rules, index);
   }
