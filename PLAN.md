@@ -2067,6 +2067,8 @@ Objective: Reorganize and modularize the `scripts/` directory to cleanly separat
   - `scripts/codegen/`: Spec code generators (`generate_all.ts`, `generate_properties.ts`, `generate_standard_syntax.ts`, etc.).
   - `scripts/external_suites/`: External test suite extractors (`extract_all.ts`, `extract_csstree.ts`, `extract_nv_cssom.ts`, `extract_postcss.ts`, `extract_rrweb.ts`, `extract_wpt.ts`).
   - `scripts/baselines/`: Test baseline maintenance utilities (`generate_lightning_baseline.ts`, `prune_resolved_failures.ts`, `rebaseline_wpt_history.ts`, `wpt_bulk_verify.ts`).
+  - `scripts/benchmarks/`: Performance benchmarks (`parser.bench.ts`).
+  - `tests/fuzz.test.ts`: Migrated fuzzer from `tools/fuzz/fuzz.ts` into native `node:test` suite, eliminating lonely root folders `tools/` and `benchmarks/`.
 - [x] **Script & Hook Updates**:
   - Updated `package.json` scripts (`wpt:node`, `wpt:node:crawl`, `wpt:node:baseline`, `wpt:node:progress`, `wpt:node:cluster`, `wpt:node:diff`, `wpt:browser:*`, `fixtures:generate`, `external:extract`, `baselines:prune`, `codegen`, `maintain`).
   - Updated `.git/hooks/pre-commit` to invoke `node scripts/wpt/node/crawl.ts --update-progress`.
