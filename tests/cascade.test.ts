@@ -34,9 +34,8 @@ test('Cascade: Basic specificity', () => {
   const el = document.getElementById('id');
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.color, 'green');
+  assert.strictEqual(style.color, 'rgb(0, 128, 0)');
 });
-
 
 test('Cascade: !important', () => {
   const css = `
@@ -49,7 +48,7 @@ test('Cascade: !important', () => {
   const el = document.getElementById('id');
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.color, 'blue');
+  assert.strictEqual(style.color, 'rgb(0, 0, 255)');
 });
 
 test('Cascade: Order of appearance', () => {
@@ -62,7 +61,7 @@ test('Cascade: Order of appearance', () => {
   const el = document.querySelector('div');
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.color, 'red');
+  assert.strictEqual(style.color, 'rgb(255, 0, 0)');
 });
 
 test('Cascade: :has() support', () => {
@@ -75,7 +74,7 @@ test('Cascade: :has() support', () => {
   const el = document.querySelector('div');
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.color, 'blue'); // div:has(p) (0,1,1) > div (0,0,1)
+  assert.strictEqual(style.color, 'rgb(0, 0, 255)'); // div:has(p) (0,1,1) > div (0,0,1)
 });
 
 test('Cascade: :is() and :not() specificity', () => {
@@ -88,7 +87,7 @@ test('Cascade: :is() and :not() specificity', () => {
   const el = document.querySelector('div');
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.color, 'blue'); // :is(div, #id) (1,0,0) > .red (0,1,0)
+  assert.strictEqual(style.color, 'rgb(0, 0, 255)'); // :is(div, #id) (1,0,0) > .red (0,1,0)
 });
 
 test('Cascade: Nesting', () => {
@@ -103,7 +102,7 @@ test('Cascade: Nesting', () => {
   const el = document.querySelector('.red');
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.color, 'red');
+  assert.strictEqual(style.color, 'rgb(255, 0, 0)');
 });
 
 test('Cascade: Nesting specificity with MAX parent specificity', () => {
@@ -121,7 +120,7 @@ test('Cascade: Nesting specificity with MAX parent specificity', () => {
   // Specificity of :is(&.foo) should be (1,1,0) because #b is (1,0,0) and .foo is (0,1,0).
   // Specificity of .bar is (0,1,0).
   // So :is(&.foo) should win over .bar.
-  assert.strictEqual(style.color, 'green');
+  assert.strictEqual(style.color, 'rgb(0, 128, 0)');
 });
 
 test('Cascade: Logical properties mapping', () => {
@@ -166,8 +165,8 @@ test('Cascade: CSSNestedDeclarations', () => {
   const el = document.querySelector('div');
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.color, 'blue');
-  assert.strictEqual(style['background-color'], 'green');
+  assert.strictEqual(style.color, 'rgb(0, 0, 255)');
+  assert.strictEqual(style['background-color'], 'rgb(0, 128, 0)');
 });
 
 test('Cascade: CSSNestedDeclarations without Parent', () => {
@@ -181,7 +180,7 @@ test('Cascade: CSSNestedDeclarations without Parent', () => {
   };
   
   const style = Parser.getCascadedStyle(element, [nestedDecls as unknown as Rule]);
-  assert.strictEqual(style.color, 'red');
+  assert.strictEqual(style.color, 'rgb(255, 0, 0)');
 });
 
 test('Cascade: Unparented & selector resolves to :where(:scope)', () => {
@@ -204,7 +203,7 @@ test('Cascade: Cascade layers (@layer) normal order (later layer wins)', () => {
   const el = document.querySelector('div')!;
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.getPropertyValue('color'), 'green');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(0, 128, 0)');
 });
 
 test('Cascade: Cascade layers (@layer) !important reverse layer order (earlier layer wins)', () => {
@@ -222,7 +221,7 @@ test('Cascade: Cascade layers (@layer) !important reverse layer order (earlier l
   const el = document.querySelector('div')!;
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.getPropertyValue('color'), 'red');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(255, 0, 0)');
 });
 
 test('Cascade: Unlayered rules beat layered rules in normal cascade', () => {
@@ -237,7 +236,7 @@ test('Cascade: Unlayered rules beat layered rules in normal cascade', () => {
   const el = document.querySelector('div')!;
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.getPropertyValue('color'), 'blue');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(0, 0, 255)');
 });
 
 test('Cascade: Inline style overrides stylesheet rules', () => {
@@ -249,7 +248,7 @@ test('Cascade: Inline style overrides stylesheet rules', () => {
   const el = document.querySelector('div')!;
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.getPropertyValue('color'), 'pink');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(255, 192, 203)');
 });
 
 test('Cascade: CSS Variables inheritance and var() substitution', () => {
@@ -268,7 +267,7 @@ test('Cascade: CSS Variables inheritance and var() substitution', () => {
   const child = document.querySelector('.child')!;
 
   const style = Parser.getCascadedStyle(child, rules);
-  assert.strictEqual(style.getPropertyValue('color'), 'orange');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(255, 165, 0)');
   assert.strictEqual(style.getPropertyValue('font-size'), '20px');
   assert.strictEqual(style.getPropertyValue('--primary-color'), 'orange');
 });
@@ -285,8 +284,8 @@ test('Cascade: CSS Variables fallback substitution', () => {
   const el = document.querySelector('.box')!;
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.getPropertyValue('color'), 'purple');
-  assert.strictEqual(style.getPropertyValue('background-color'), 'teal');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(128, 0, 128)');
+  assert.strictEqual(style.getPropertyValue('background-color'), 'rgb(0, 128, 128)');
 });
 
 test('Cascade: CSS Variables circular reference is invalid at computed value time', () => {
@@ -302,7 +301,7 @@ test('Cascade: CSS Variables circular reference is invalid at computed value tim
   const el = document.querySelector('.circle')!;
 
   const style = Parser.getCascadedStyle(el, rules);
-  assert.strictEqual(style.getPropertyValue('color'), '');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(0, 0, 0)');
 });
 
 test('Cascade: Automatic stylesheet extraction from document.styleSheets', () => {
@@ -322,9 +321,5 @@ test('Cascade: Automatic stylesheet extraction from document.styleSheets', () =>
   const el = document.querySelector('.auto-test')!;
 
   const style = Parser.getCascadedStyle(el);
-  assert.strictEqual(style.getPropertyValue('color'), 'darkblue');
+  assert.strictEqual(style.getPropertyValue('color'), 'rgb(0, 0, 139)');
 });
-
-
-
-

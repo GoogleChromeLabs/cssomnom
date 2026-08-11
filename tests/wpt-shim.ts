@@ -4,6 +4,7 @@ import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { ParseHooks } from '../src/parse-hooks.ts';
 import { getCascadedStyle } from '../src/cascade.ts';
 import { matches, querySelectorAll, querySelector } from '../src/matcher.ts';
+import { camelToDashed } from '../src/utils.ts';
 
 export interface WptSandboxTest {
   type: 'setup' | 'test' | 'promise_test' | 'async_test';
@@ -808,11 +809,32 @@ const styleToElement = new WeakMap<object, Element>();
     styleDescriptor = Object.getOwnPropertyDescriptor(proto, 'style');
   }
   if (styleDescriptor && styleDescriptor.get) {
+    const styleProxyMap = new WeakMap<object, object>();
     Object.defineProperty(proto, 'style', {
       get() {
         const styleObj = styleDescriptor.get!.call(this);
         styleToElement.set(styleObj, this);
-        return styleObj;
+        if (styleProxyMap.has(styleObj)) {
+          return styleProxyMap.get(styleObj);
+        }
+        const proxy = new Proxy(styleObj, {
+          get(target, prop, receiver) {
+            return Reflect.get(target, prop, receiver);
+          },
+          set(target, prop, value, receiver) {
+            if (typeof prop === 'string') {
+              if (value === '' || value === null || value === undefined) {
+                const dashed = camelToDashed(prop);
+                target.removeProperty(dashed);
+                return true;
+              }
+            }
+            return Reflect.set(target, prop, value, receiver);
+          }
+        });
+        styleProxyMap.set(styleObj, proxy);
+        styleToElement.set(proxy, this);
+        return proxy;
       },
       set(value: string) {
         const styleObj = styleDescriptor.get!.call(this);
@@ -867,6 +889,10 @@ const styleToElement = new WeakMap<object, Element>();
     };
 
     declProto.setProperty = function (this: unknown, name: string, value: string | null, priority?: string) {
+      if (value === null || value === undefined || value === '') {
+        (this as { removeProperty: (k: string) => string }).removeProperty(name);
+        return;
+      }
       if (name.startsWith('--')) {
         if (!ParseHooks.isValidDashedIdent(name)) {
           return;

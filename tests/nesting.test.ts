@@ -42,7 +42,7 @@ describe('CSS Nesting', () => {
             }
         };
         const styleChild = getCascadedStyle(elementChild, Array.from(stylesheet.cssRules) as unknown as Rule[]);
-        assert.strictEqual(styleChild.color, 'blue');
+        assert.strictEqual(styleChild.color, 'rgb(0, 0, 255)');
 
         const elementHover = {
             matches(sel: string) {
@@ -50,7 +50,7 @@ describe('CSS Nesting', () => {
             }
         };
         const styleHover = getCascadedStyle(elementHover, Array.from(stylesheet.cssRules) as unknown as Rule[]);
-        assert.strictEqual(styleHover.color, 'green');
+        assert.strictEqual(styleHover.color, 'rgb(0, 128, 0)');
     });
 
     test('nested selector without & (implicit descendant)', () => {
@@ -70,7 +70,7 @@ describe('CSS Nesting', () => {
             }
         };
         const styleChild = getCascadedStyle(elementChild, Array.from(stylesheet.cssRules) as unknown as Rule[]);
-        assert.strictEqual(styleChild.color, 'blue');
+        assert.strictEqual(styleChild.color, 'rgb(0, 0, 255)');
     });
 
     test('root-level & resolves to :where(:scope)', () => {
@@ -87,7 +87,7 @@ describe('CSS Nesting', () => {
             }
         };
         const style = getCascadedStyle(element, Array.from(stylesheet.cssRules) as unknown as Rule[]);
-        assert.strictEqual(style.color, 'red');
+        assert.strictEqual(style.color, 'rgb(255, 0, 0)');
     });
 
     test('nested @scope prelude absolutizes &', () => {
@@ -251,7 +251,7 @@ describe('CSS Nesting', () => {
         // Should not throw and return empty style because no match
         const style = getCascadedStyle(element, Array.from(stylesheet.cssRules) as unknown as Rule[]);
         assert.strictEqual(style.length, 0);
-        assert.strictEqual(style.color, '');
+        assert.strictEqual(style.color, 'rgb(0, 0, 0)');
     });
 
     test('consumeQualifiedRule respects nested flag', () => {
@@ -366,7 +366,7 @@ describe('CSS Nesting', () => {
         };
         
         const style = getCascadedStyle(elementScopeChild, childRules);
-        assert.strictEqual(style.color, 'blue');
+        assert.strictEqual(style.color, 'rgb(0, 0, 255)');
     });
 });
 

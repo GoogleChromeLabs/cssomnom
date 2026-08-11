@@ -217,7 +217,11 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           if (logical !== side) {
             const sideWin = this._getWinningDeclaration(side);
             const logWin = this._getWinningDeclaration(logical);
-            if (sideWin && logWin && sideWin !== logWin) return '';
+            if (sideWin && logWin && sideWin !== logWin) {
+              const val1 = serialize(sideWin.value).trim();
+              const val2 = serialize(logWin.value).trim();
+              if (val1 !== val2) return '';
+            }
           }
         }
 
