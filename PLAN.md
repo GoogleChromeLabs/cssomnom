@@ -1969,19 +1969,19 @@ Objective: Push WPT `css/cssom/` conformance higher toward our practical ceiling
 - CSS Fonts 4: `submodules/csswg-drafts/css-fonts-4/Overview.bs`
 
 ### Tasks
-- [ ] **`CSS.escape()` Implementation**:
+- [x] **`CSS.escape()` Implementation**:
   - Implement the official CSSOM § 3 string escaping algorithm in `src/CSSOM.ts` / `src/index.ts`, passing `escape.html` (9 tests).
-- [ ] **`CSSStyleRule.selectorText` Dynamic Setter**:
+- [x] **`CSSStyleRule.selectorText` Dynamic Setter**:
   - In `src/CSSStyleRule.ts` / `src/CSSOM.ts`, implement the setter for `selectorText`: validate and re-parse the incoming selector text, updating internal rule AST or throwing `SyntaxError` on invalid input per § 6.4.1.
-- [ ] **Rule ASTs & `cssText` Serialization**:
+- [x] **Rule ASTs & `cssText` Serialization**:
   - Implement full serialization for `CSSCounterStyleRule.cssText` (single-line format without unformatted linebreaks per CSS Counter Styles 3).
   - Implement `CSSFontFeatureValuesRule` and `@font-feature-values` sub-rules.
   - Implement `CSSNamespaceRule` and ensure `Object.prototype.toString.call(CSSNamespaceRule.prototype)` returns `"[object CSSNamespaceRule]"`.
-- [ ] **Constructable Stylesheet `replace()` & `replaceSync()`**:
+- [x] **Constructable Stylesheet `replace()` & `replaceSync()`**:
   - In `src/CSSStyleSheet.ts`, implement `replace(text)` returning a `Promise<CSSStyleSheet>` that parses asynchronously, and `replaceSync(text)` with proper disallow-modification locks.
-- [ ] **WPT IDL Test Harness Shims**:
+- [x] **WPT IDL Test Harness Shims**:
   - In `tests/wpt-shim.ts`, implement `assert_idl_attribute` and `document.implementation.createDocument`.
-- [ ] **Verification**:
+- [x] **Verification**:
   - Run: `node scripts/wpt_cluster_failures.ts --spec=cssom` and verify pass rate increases significantly.
   - Run: `pnpm run preflight` to guarantee 0 regressions across all suites.
 

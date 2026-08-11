@@ -548,9 +548,14 @@ export function supports(propertyOrCondition: string, value?: string): boolean {
   return evalSupportsConditionValues(componentValues);
 }
 
+import { escape as cssEscape } from './css-escape.ts';
+
 export const CSS = {
     // Typed OM Factories
     ...CSSFactories,
+
+    // Utility APIs (cssom-1 § 3 #the-css.escape()-method)
+    escape: cssEscape,
 
     // Tooling Extensions
     resolveNestedSelector,
@@ -571,6 +576,15 @@ export const CSS = {
     parseComponentValue,
     registerProperty: (definition: PropertyDefinition) => PropertyRegistry.register(definition),
 };
+
+// WebIDL namespace @@toStringTag definition (webidl § 3.6.3, cssom-1 § 3 #namespacedef-css)
+Object.defineProperty(CSS, Symbol.toStringTag, {
+  value: 'CSS',
+  writable: false,
+  enumerable: false,
+  configurable: true,
+});
+
 
 
 

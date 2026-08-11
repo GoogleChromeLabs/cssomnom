@@ -214,6 +214,12 @@ export function patchWindowForTypedOM(window: WindowType) {
       patchWindowForTypedOM(dom.window);
       return dom.window.document;
     };
+    (doc.implementation as Record<string, unknown>).createDocument = function(_namespaceURI: string | null, _qualifiedNameStr: string | null, _documentType?: unknown) {
+      const dom = parseHTML(`<!DOCTYPE html><html><head></head><body></body></html>`);
+      patchWindowForTypedOM(dom.window);
+      return dom.window.document;
+    };
+
   }
 
   // getComputedStyle cannot be supported meaningfully in Linkedom without a visual layout engine.
@@ -979,6 +985,7 @@ export function createWptContext(
     Event: (window as { Event?: unknown }).Event,
     CustomEvent: (window as { CustomEvent?: unknown }).CustomEvent,
     navigator: (window as { navigator?: unknown }).navigator,
+    location: (window as { location?: unknown }).location || { href: 'http://localhost/test.html', origin: 'http://localhost' },
     ...TypedOM,
     DOMMatrix: (globalThis as { DOMMatrix?: unknown }).DOMMatrix,
     DOMMatrixReadOnly: (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly,
@@ -1044,14 +1051,23 @@ export function createWptContext(
       }
       activeRafs.clear();
     },
-    setup: (properties?: { single_test?: boolean; allow_uncaught_exception?: boolean }) => {
-      if (properties) {
-        if (properties.single_test) {
-          ctx.isSingleTest = true;
-        }
-        if (properties.allow_uncaught_exception) {
-          ctx.allowUncaughtException = true;
-        }
+    setup: (func_or_properties?: Function | { single_test?: boolean; allow_uncaught_exception?: boolean }, maybe_properties?: { single_test?: boolean; allow_uncaught_exception?: boolean }) => {
+      let func: Function | null = null;
+      let properties: { single_test?: boolean; allow_uncaught_exception?: boolean } = {};
+      if (typeof func_or_properties === 'function') {
+        func = func_or_properties;
+        if (maybe_properties) properties = maybe_properties;
+      } else if (func_or_properties) {
+        properties = func_or_properties;
+      }
+      if (properties.single_test) {
+        ctx.isSingleTest = true;
+      }
+      if (properties.allow_uncaught_exception) {
+        ctx.allowUncaughtException = true;
+      }
+      if (func) {
+        func();
       }
     },
     done: () => {
@@ -1331,7 +1347,30 @@ export function createWptContext(
       const expected = `[object ${class_name}]`;
       assert.strictEqual(actual, expected, message ?? '');
     },
+    assert_own_property: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok(typeof object === 'object' && object !== null, `${description || ''}: target must be an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), true, `${description || ''}: expected property ${String(property_name)} missing`);
+    },
+    assert_not_own_property: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok(typeof object === 'object' && object !== null, `${description || ''}: target must be an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), false, `${description || ''}: unexpected property ${String(property_name)} is found on object`);
+    },
+    assert_inherits: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: provided value is not an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), false, `${description || ''}: property ${String(property_name)} found on object expected in prototype chain`);
+      assert.strictEqual(property_name in (object as Record<string | symbol, unknown>), true, `${description || ''}: property ${String(property_name)} not found in prototype chain`);
+    },
+    assert_idl_attribute: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: provided value is not an object`);
+      assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), false, `${description || ''}: property ${String(property_name)} found on object expected in prototype chain`);
+      assert.strictEqual(property_name in (object as Record<string | symbol, unknown>), true, `${description || ''}: property ${String(property_name)} not found in prototype chain`);
+    },
+    assert_readonly: (object: unknown, property_name: string | symbol, description?: string) => {
+      assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: provided value is not an object`);
+      assert.strictEqual(property_name in (object as Record<string | symbol, unknown>), true, `${description || ''}: property ${String(property_name)} not found`);
+    },
     assert_unreached: (message?: string) => {
+
       assert.fail(message || 'Reached unreachable code');
     },
     assert_implements: (condition: unknown, description?: string) => {

@@ -255,36 +255,80 @@ export class CSSStyleSheet extends StyleSheet {
     return sheet;
   }
 
-  // 6.3 The CSSStyleSheet Interface
-  // Konstruktable Stylesheets methods
-  // Spec: cssom-1 #the-cssstylesheet-interface
-  // The spec requires replace() to run steps "in parallel".
-  // In this implementation, we execute them synchronously to avoid async complexities
-  // and because we do not have a true parallel execution environment (like Web Workers) available by default.
+  // cssom-1 § 6.5.1 #dom-cssstylesheet-replace
   replace(text: string): Promise<CSSStyleSheet> {
-    if (!this._constructedFlag) {
-      return Promise.reject(new DOMException("Not allowed on non-constructed stylesheets", "NotAllowedError"));
+    // 1. Let promise be a promise.
+    // 2. If the constructed flag is not set, or the disallow modification flag is set, reject promise with a NotAllowedError DOMException and return promise.
+    if (!this._constructedFlag || this._disallowModificationFlag) {
+      return Promise.reject(new DOMException("Not allowed on non-constructed stylesheets or modification is disallowed", "NotAllowedError"));
     }
-    try {
-      this.replaceSync(text);
-      return Promise.resolve(this);
-    } catch (e) {
-      return Promise.reject(e);
-    }
+    // 3. Set the disallow modification flag.
+    this._disallowModificationFlag = true;
+
+    // 4. In parallel, do these steps:
+    return new Promise<CSSStyleSheet>((resolve, reject) => {
+      queueMicrotask(() => {
+        try {
+          // 4.1 Let rules be the result of running parse a stylesheet's contents from text.
+          const tokens = tokenize(text);
+          const rules = ParseHooks.consumeListOfRules(tokens, true);
+
+          // 4.2 If rules contains one or more @import rules, remove those rules from rules.
+          const filteredRules = rules.filter(rule => {
+            if (isImportRule(rule)) {
+              console.warn('CSS Parse Error: @import rules are not allowed in constructed stylesheets and were removed.');
+              return false;
+            }
+            return true;
+          });
+
+          // Clear parent references on previously attached rules
+          for (const rule of this._rules) {
+            if (rule instanceof CSSRule) {
+              rule.parentRule = null;
+              rule.parentStyleSheet = null;
+            }
+          }
+
+          this._unregisterProperties();
+          // 4.3 Set sheet's CSS rules to rules.
+          this._rules = filteredRules;
+          for (const rule of this._rules) {
+            if (rule instanceof CSSRule) {
+              rule.parentStyleSheet = this;
+              rule.parentRule = null;
+            }
+            this._registerRuleProperties(rule);
+          }
+
+          // 4.4 Unset sheet's disallow modification flag.
+          this._disallowModificationFlag = false;
+
+          // 4.5 Resolve promise with sheet.
+          resolve(this);
+        } catch (e) {
+          this._disallowModificationFlag = false;
+          reject(e);
+        }
+      });
+    });
   }
 
-  // cssom-1 § 6.3 #dom-cssstylesheet-replacesync
+  // cssom-1 § 6.5.1 #dom-cssstylesheet-replacesync
+  // cssom-1 § 6.5.1 #synchronously-replace-the-rules-of-a-cssstylesheet
   replaceSync(text: string): void {
+    // 1. If the constructed flag is not set, or the disallow modification flag is set, throw a NotAllowedError DOMException.
     if (!this._constructedFlag) {
       throw new DOMException("Not allowed on non-constructed stylesheets", "NotAllowedError");
     }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
     }
+    // 2. Let rules be the result of running parse a stylesheet's contents from text.
     const tokens = tokenize(text);
     const rules = ParseHooks.consumeListOfRules(tokens, true);
     
-    // 5. If rules contains one or more @import rules, remove those rules from rules
+    // 3. If rules contains one or more @import rules, remove those rules from rules.
     const filteredRules = rules.filter(rule => {
       if (isImportRule(rule)) {
         console.warn('CSS Parse Error: @import rules are not allowed in constructed stylesheets and were removed.');
@@ -302,6 +346,7 @@ export class CSSStyleSheet extends StyleSheet {
     }
 
     this._unregisterProperties();
+    // 4. Set sheet's CSS rules to rules.
     this._rules = filteredRules;
     for (const rule of this._rules) {
       if (rule instanceof CSSRule) {
@@ -478,18 +523,29 @@ function serializeGroupingRule(atKeyword: string, condition: string, rules: Rule
 }
 
 export class CSSRule {
-  parentRule: CSSRule | null = null;
+  private _parentRule: CSSRule | null = null;
   private _parentStyleSheet: CSSStyleSheet | null = null;
 
+  // cssom-1 § 6.4 #dom-cssrule-parentrule
+  get parentRule(): CSSRule | null {
+    return this._parentRule;
+  }
+
+  set parentRule(rule: CSSRule | null) {
+    this._parentRule = rule;
+  }
+
+  // cssom-1 § 6.4 #dom-cssrule-parentstylesheet
   get parentStyleSheet(): CSSStyleSheet | null {
     if (this._parentStyleSheet) return this._parentStyleSheet;
-    if (this.parentRule) return this.parentRule.parentStyleSheet;
+    if (this._parentRule) return this._parentRule.parentStyleSheet;
     return null;
   }
 
   set parentStyleSheet(sheet: CSSStyleSheet | null) {
     this._parentStyleSheet = sheet;
   }
+
   
   static readonly STYLE_RULE = 1;
   static readonly CHARSET_RULE = 2;
@@ -1147,20 +1203,26 @@ export class CSSMarginRule extends CSSRule {
 }
 
 export class CSSImportRule extends CSSRule {
-  readonly href: string;
+  private _href: string;
   private _media: MediaList;
-  readonly styleSheet: CSSStyleSheet | null = null;
-  readonly layerName: string | null = null;
-  readonly supportsText: string | null = null;
+  private _styleSheet: CSSStyleSheet | null = null;
+  private _layerName: string | null = null;
+  private _supportsText: string | null = null;
 
   constructor(href: string, mediaText: string = '', layerName: string | null = null, supportsText: string | null = null) {
     super();
-    this.href = href;
+    this._href = href;
     this._media = new MediaList(mediaText);
-    this.layerName = layerName;
-    this.supportsText = supportsText;
+    this._layerName = layerName;
+    this._supportsText = supportsText;
   }
 
+  // cssom-1 § 6.4.3 #dom-cssimportrule-href
+  get href(): string {
+    return this._href;
+  }
+
+  // cssom-1 § 6.4.3 #dom-cssimportrule-media
   get media(): MediaList {
     return this._media;
   }
@@ -1175,7 +1237,27 @@ export class CSSImportRule extends CSSRule {
     }
   }
 
+  // cssom-1 § 6.4.3 #dom-cssimportrule-stylesheet
+  get styleSheet(): CSSStyleSheet | null {
+    return this._styleSheet;
+  }
+
+  // cssom-1 § 6.4.3 #dom-cssimportrule-layername
+  get layerName(): string | null {
+    return this._layerName;
+  }
+
+  // cssom-1 § 6.4.3 #dom-cssimportrule-supportstext
+  get supportsText(): string | null {
+    return this._supportsText;
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSImportRule';
+  }
+
   get type() { return 3; } // CSSRule.IMPORT_RULE
+
 
   get cssText() {
     let text = `@import url(${serializeString(this.href)})`;
@@ -1196,22 +1278,36 @@ export class CSSImportRule extends CSSRule {
 }
 
 export class CSSNamespaceRule extends CSSRule {
-  readonly namespaceURI: string;
-  readonly prefix: string;
+  private _namespaceURI: string;
+  private _prefix: string;
 
   constructor(prefix: string, namespaceURI: string) {
     super();
-    this.prefix = prefix;
-    this.namespaceURI = namespaceURI;
+    this._prefix = prefix;
+    this._namespaceURI = namespaceURI;
+  }
+
+  // cssom-1 § 6.4.5 #dom-cssnamespacerule-namespaceuri
+  get namespaceURI(): string {
+    return this._namespaceURI;
+  }
+
+  // cssom-1 § 6.4.5 #dom-cssnamespacerule-prefix
+  get prefix(): string {
+    return this._prefix;
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSNamespaceRule';
   }
 
   get type() { return 10; } // CSSRule.NAMESPACE_RULE
 
   get cssText() {
-    if (this.prefix) {
-      return `@namespace ${this.prefix} url("${this.namespaceURI}");`;
+    if (this._prefix) {
+      return `@namespace ${this._prefix} url("${this._namespaceURI}");`;
     }
-    return `@namespace url("${this.namespaceURI}");`;
+    return `@namespace url("${this._namespaceURI}");`;
   }
 
   set cssText(_value: string) {}
@@ -1411,28 +1507,208 @@ export class CSSAtRule extends CSSRule {
   }
 }
 
+// css-counter-styles-3 § 8.1 #csscounterstylerule
 export class CSSCounterStyleRule extends CSSRule {
-  readonly name: string;
+  private _name: string;
+  private _system: string = '';
+  private _symbols: string = '';
+  private _additiveSymbols: string = '';
+  private _negative: string = '';
+  private _prefix: string = '';
+  private _suffix: string = '';
+  private _range: string = '';
+  private _pad: string = '';
+  private _speakAs: string = '';
+  private _fallback: string = '';
+  private _declarations: import('./types.ts').Declaration[] = [];
 
-  constructor(name: string) {
+  constructor(name: string, declarations: import('./types.ts').Declaration[] = []) {
     super();
-    this.name = name;
+    this._name = name;
+    this._declarations = declarations;
+    for (const d of declarations) {
+      const valStr = Array.isArray(d.value) ? serialize(d.value).trim() : (typeof d.value === 'string' ? d.value : '');
+      if (d.name === 'system') this._system = valStr;
+      else if (d.name === 'symbols') this._symbols = valStr;
+      else if (d.name === 'additive-symbols') this._additiveSymbols = valStr;
+      else if (d.name === 'negative') this._negative = valStr;
+      else if (d.name === 'prefix') this._prefix = valStr;
+      else if (d.name === 'suffix') this._suffix = valStr;
+      else if (d.name === 'range') this._range = valStr;
+      else if (d.name === 'pad') this._pad = valStr;
+      else if (d.name === 'speak-as') this._speakAs = valStr;
+      else if (d.name === 'fallback') this._fallback = valStr;
+    }
+  }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-name
+  get name(): string { return this._name; }
+  set name(value: string) { this._name = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-system
+  get system(): string { return this._system; }
+  set system(value: string) { this._system = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-symbols
+  get symbols(): string { return this._symbols; }
+  set symbols(value: string) { this._symbols = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-additivesymbols
+  get additiveSymbols(): string { return this._additiveSymbols; }
+  set additiveSymbols(value: string) { this._additiveSymbols = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-negative
+  get negative(): string { return this._negative; }
+  set negative(value: string) { this._negative = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-prefix
+  get prefix(): string { return this._prefix; }
+  set prefix(value: string) { this._prefix = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-suffix
+  get suffix(): string { return this._suffix; }
+  set suffix(value: string) { this._suffix = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-range
+  get range(): string { return this._range; }
+  set range(value: string) { this._range = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-pad
+  get pad(): string { return this._pad; }
+  set pad(value: string) { this._pad = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-speakas
+  get speakAs(): string { return this._speakAs; }
+  set speakAs(value: string) { this._speakAs = value; }
+
+  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-fallback
+  get fallback(): string { return this._fallback; }
+  set fallback(value: string) { this._fallback = value; }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSCounterStyleRule';
   }
 
   get type() { return 11; }
-  get cssText() { return `@counter-style ${this.name} {}`; }
+
+  // css-counter-styles-3 § 8.1 #csscounterstylerule
+  get cssText() {
+    const decls = this._declarations.map(d => {
+      const valStr = Array.isArray(d.value) ? serialize(d.value).trim() : (typeof d.value === 'string' ? d.value : '');
+      return `${d.name}: ${valStr};`;
+    }).join(' ');
+    if (decls.length > 0) {
+      return `@counter-style ${this._name} { ${decls} }`;
+    }
+    return `@counter-style ${this._name} {}`;
+  }
   set cssText(_value: string) {}
 }
 
+// css-fonts-4 § 8 #om-fontfeaturevalues
+export class CSSFontFeatureValuesMap {
+  private _map = new Map<string, number[]>();
+
+  get size(): number {
+    return this._map.size;
+  }
+
+  get(featureValueName: string): number[] | undefined {
+    return this._map.get(featureValueName);
+  }
+
+  set(featureValueName: string, values: number | number[]): void {
+    const arr = Array.isArray(values) ? values.map(Number) : [Number(values)];
+    this._map.set(featureValueName, arr);
+  }
+
+  has(featureValueName: string): boolean {
+    return this._map.has(featureValueName);
+  }
+
+  delete(featureValueName: string): boolean {
+    return this._map.delete(featureValueName);
+  }
+
+  clear(): void {
+    this._map.clear();
+  }
+
+  entries(): IterableIterator<[string, number[]]> {
+    return this._map.entries();
+  }
+
+  keys(): IterableIterator<string> {
+    return this._map.keys();
+  }
+
+  values(): IterableIterator<number[]> {
+    return this._map.values();
+  }
+
+  [Symbol.iterator](): IterableIterator<[string, number[]]> {
+    return this._map[Symbol.iterator]();
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSFontFeatureValuesMap';
+  }
+}
+
+// css-fonts-4 § 8 #cssfontfeaturevaluesrule-interface
 export class CSSFontFeatureValuesRule extends CSSRule {
-  readonly fontFamily: string;
+  private _fontFamily: string;
+  readonly annotation = new CSSFontFeatureValuesMap();
+  readonly ornaments = new CSSFontFeatureValuesMap();
+  readonly stylistic = new CSSFontFeatureValuesMap();
+  readonly swash = new CSSFontFeatureValuesMap();
+  readonly characterVariant = new CSSFontFeatureValuesMap();
+  readonly styleset = new CSSFontFeatureValuesMap();
+  readonly historicalForms = new CSSFontFeatureValuesMap();
 
   constructor(fontFamily: string) {
     super();
-    this.fontFamily = fontFamily;
+    this._fontFamily = fontFamily;
+  }
+
+  // css-fonts-4 § 8 #om-fontfeaturevalues
+  get fontFamily(): string {
+    return this._fontFamily;
+  }
+
+  set fontFamily(value: string) {
+    this._fontFamily = value;
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSFontFeatureValuesRule';
   }
 
   get type() { return 14; }
-  get cssText() { return `@font-feature-values ${this.fontFamily} {}`; }
+
+  get cssText(): string {
+    const blocks: string[] = [];
+    const serializeMap = (name: string, map: CSSFontFeatureValuesMap) => {
+      if (map.size === 0) return;
+      const entries: string[] = [];
+      for (const [k, v] of map.entries()) {
+        entries.push(`${k}: ${v.join(' ')};`);
+      }
+      blocks.push(`@${name} { ${entries.join(' ')} }`);
+    };
+    serializeMap('annotation', this.annotation);
+    serializeMap('ornaments', this.ornaments);
+    serializeMap('stylistic', this.stylistic);
+    serializeMap('swash', this.swash);
+    serializeMap('character-variant', this.characterVariant);
+    serializeMap('styleset', this.styleset);
+    serializeMap('historical-forms', this.historicalForms);
+
+    if (blocks.length > 0) {
+      return `@font-feature-values ${this._fontFamily} { ${blocks.join(' ')} }`;
+    }
+    return `@font-feature-values ${this._fontFamily} {}`;
+  }
   set cssText(_value: string) {}
 }
+

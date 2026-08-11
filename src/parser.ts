@@ -20,7 +20,7 @@ import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBl
 import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
 
 import { tokenize } from './tokenizer.ts';
-import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSRule, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule } from './CSSOM.ts';
+import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSRule, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule } from './CSSOM.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
 
@@ -72,6 +72,8 @@ export class Parser {
     'view-transition': (parser, rule, block) => block ? parser.handleViewTransitionRule(rule, block) : null,
     import: (parser, rule) => parser.handleImportRule(rule),
     namespace: (parser, rule) => parser.handleNamespaceRule(rule),
+    'counter-style': (parser, rule, block) => block ? parser.handleCounterStyleRule(rule, block) : null,
+    'font-feature-values': (parser, rule, block) => block ? parser.handleFontFeatureValuesRule(rule, block) : null,
   };
 
   private getAtRuleHandler(name: string): ((parser: Parser, rule: ASTAtRule, block?: SimpleBlock, nested?: boolean) => Rule | null) | undefined {
@@ -589,6 +591,67 @@ export class Parser {
   private handleMarginRule(rule: ASTAtRule, block: SimpleBlock): Rule {
     const declarations = this.consumeDeclarationsFromBlockContents(block.value);
     return new CSSMarginRule(rule.name, declarations);
+  }
+
+  // css-counter-styles-3 § 8.1 #csscounterstylerule
+  private handleCounterStyleRule(rule: ASTAtRule, block: SimpleBlock): Rule {
+    const name = serialize(rule.prelude).trim();
+    const declarations = this.consumeDeclarationsFromBlockContents(block.value);
+    return new CSSCounterStyleRule(name, declarations);
+  }
+
+  // css-fonts-4 § 8 #cssfontfeaturevaluesrule-interface
+  private handleFontFeatureValuesRule(rule: ASTAtRule, block: SimpleBlock): Rule {
+    const fontFamily = serialize(rule.prelude).trim();
+    const fontFeatureRule = new CSSFontFeatureValuesRule(fontFamily);
+
+    // Consume feature value blocks inside @font-feature-values body
+    const stream = new ArrayComponentValueStream(block.value);
+    while (stream.peek().type !== 'EOF') {
+      const token = stream.peek();
+      if (token.type === 'whitespace' || token.type === 'comment') {
+        stream.next();
+        continue;
+      }
+      if (token.type === 'at-keyword') {
+        const atToken = stream.next() as import('./types.ts').AtKeywordToken;
+        const blockName = atToken.value.toLowerCase();
+        // Skip whitespace
+        while (stream.peek().type === 'whitespace' || stream.peek().type === 'comment') {
+          stream.next();
+        }
+        const next = stream.peek();
+        if (next.type === 'simple-block' && (next as SimpleBlock).associatedToken.type === '{') {
+          const childBlock = stream.next() as SimpleBlock;
+          const decls = this.consumeDeclarationsFromBlockContents(childBlock.value);
+          for (const d of decls) {
+            const values = d.value
+              .filter(v => v.type === 'number')
+              .map(v => (v as import('./types.ts').NumberToken).value);
+
+            if (blockName === 'annotation') {
+              fontFeatureRule.annotation.set(d.name, values);
+            } else if (blockName === 'ornaments') {
+              fontFeatureRule.ornaments.set(d.name, values);
+            } else if (blockName === 'stylistic') {
+              fontFeatureRule.stylistic.set(d.name, values);
+            } else if (blockName === 'swash') {
+              fontFeatureRule.swash.set(d.name, values);
+            } else if (blockName === 'character-variant' || blockName === 'charactervariant') {
+              fontFeatureRule.characterVariant.set(d.name, values);
+            } else if (blockName === 'styleset') {
+              fontFeatureRule.styleset.set(d.name, values);
+            } else if (blockName === 'historical-forms' || blockName === 'historicalforms') {
+              fontFeatureRule.historicalForms.set(d.name, values);
+            }
+          }
+        }
+      } else {
+        stream.next();
+      }
+    }
+
+    return fontFeatureRule;
   }
 
   private handlePropertyRule(rule: ASTAtRule, block: SimpleBlock): Rule | null {

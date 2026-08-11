@@ -28,11 +28,13 @@ test('API Surface Area', () => {
     'tokenize',
     'parse',
     'getCascadedStyle',
+    'escape',
 
     // CSSOM Rules
     'CSSContainerRule',
     'CSSCounterStyleRule',
     'CSSFontFaceRule',
+    'CSSFontFeatureValuesMap',
     'CSSFontFeatureValuesRule',
     'CSSGroupingRule',
     'CSSImportRule',
@@ -178,6 +180,8 @@ test('CSS methods', () => {
     }),
     // Parser
     'parseStylesheet', 'parseStylesheetSync', 'parseRuleList', 'parseRule', 'parseDeclarationList', 'parseDeclaration', 'parseValue', 'parseValueList', 'parseCommaValueList', 'parseComponentValue', 'registerProperty',
+    // Utility APIs
+    'escape',
     // Tooling Extensions
     'resolveNestedSelector',
     // Feature Detection
