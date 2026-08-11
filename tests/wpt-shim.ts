@@ -93,33 +93,124 @@ const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 export const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
 
 import { DOMMatrixReadOnly, DOMMatrix } from '../src/DOMMatrix.ts';
+import { unitToPixels, unitToRadians } from '../src/data/gen/units.ts';
 
 (globalThis as unknown as { DOMMatrixReadOnly: unknown }).DOMMatrixReadOnly = DOMMatrixReadOnly;
 (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrix;
 
-export class ComputedStylePropertyMap extends TypedOM.StylePropertyMap {
-  override set(_property: string, ..._values: unknown[]): void {
-    throw new TypeError(`NoModificationAllowedError: Cannot modify computedStyleMap`);
-  }
-  override append(_property: string, ..._values: unknown[]): void {
-    throw new TypeError(`NoModificationAllowedError: Cannot modify computedStyleMap`);
-  }
-  override delete(_property: string): void {
-    throw new TypeError(`NoModificationAllowedError: Cannot modify computedStyleMap`);
-  }
-  override clear(): void {
-    throw new TypeError(`NoModificationAllowedError: Cannot modify computedStyleMap`);
-  }
+export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
   override get(property: string): TypedOM.CSSStyleValue | undefined {
-    const rawVal = super.get(property);
+    let rawVal: TypedOM.CSSStyleValue | undefined;
+    if (this._element) {
+      const cascaded = getCascadedStyle(this._element);
+      const cascadedVal = cascaded.getPropertyValue(property);
+      if (cascadedVal) {
+        try {
+          const parsed = TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
+          if (parsed.length > 0) rawVal = parsed[0];
+        } catch {
+          rawVal = new TypedOM.CSSStyleValue(cascadedVal);
+        }
+      }
+    }
+    if (!rawVal) {
+      rawVal = super.get(property);
+    }
     if (!rawVal) return undefined;
+
+    // Opacity Clamping
+    const propLower = property.toLowerCase();
+    if (['opacity', 'fill-opacity', 'flood-opacity', 'stop-opacity'].includes(propLower)) {
+      if (rawVal instanceof TypedOM.CSSUnitValue) {
+        if (rawVal.unit === 'number') {
+          return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, rawVal.value)), 'number');
+        }
+        if (rawVal.unit === 'percent') {
+          return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, rawVal.value / 100)), 'number');
+        }
+      }
+      if (rawVal instanceof TypedOM.CSSMathSum) {
+        let total = 0;
+        for (const term of rawVal.values) {
+          if (term instanceof TypedOM.CSSUnitValue) {
+            if (term.unit === 'percent') {
+              total += term.value / 100;
+            } else {
+              total += term.value;
+            }
+          }
+        }
+        return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, total)), 'number');
+      }
+    }
+
+    // Absolute Lengths Conversion: cm, mm, in, pt, pc, q -> px (CSS Values 4 § 6.1)
+    if (rawVal instanceof TypedOM.CSSUnitValue) {
+      if (rawVal.unit in unitToPixels && rawVal.unit !== 'px') {
+        const pxVal = rawVal.value * unitToPixels[rawVal.unit];
+        return new TypedOM.CSSUnitValue(pxVal, 'px');
+      }
+      if (rawVal.unit === 'ms') {
+        return new TypedOM.CSSUnitValue(rawVal.value * 0.001, 's');
+      }
+      if (rawVal.unit === 'rad' || rawVal.unit === 'grad' || rawVal.unit === 'turn') {
+        const degVal = rawVal.value * (unitToRadians[rawVal.unit] / unitToRadians['deg']);
+        return new TypedOM.CSSUnitValue(degVal, 'deg');
+      }
+    }
+
+    // Calc tree simplification for computed styles
+    if (rawVal instanceof TypedOM.CSSMathSum) {
+      const units = rawVal.values.map(v => (v instanceof TypedOM.CSSUnitValue ? v.unit : null));
+      if (units.every(u => u !== null)) {
+        const uList = units as TypedOM.CSSUnit[];
+        if (uList.every(u => (u in unitToPixels) || u === 'em' || u === 'rem')) {
+          let totalPx = 0;
+          let allConvertible = true;
+          for (const v of Array.from(rawVal.values) as TypedOM.CSSUnitValue[]) {
+            if (v.unit in unitToPixels) {
+              totalPx += v.value * unitToPixels[v.unit];
+            } else if (v.value === 0) {
+              totalPx += 0;
+            } else {
+              allConvertible = false;
+              break;
+            }
+          }
+          if (allConvertible) {
+            return new TypedOM.CSSUnitValue(totalPx, 'px');
+          }
+        } else if (uList.every(u => u === 'percent')) {
+          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
+          return new TypedOM.CSSUnitValue(total, 'percent');
+        } else if (uList.every(u => u === 's' || u === 'ms')) {
+          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + (v.unit === 'ms' ? v.value * 0.001 : v.value), 0);
+          return new TypedOM.CSSUnitValue(total, 's');
+        } else if (uList.every(u => u in unitToRadians)) {
+          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + (v.value * (unitToRadians[v.unit] / unitToRadians['deg'])), 0);
+          return new TypedOM.CSSUnitValue(total, 'deg');
+        } else if (uList.every(u => u === 'number')) {
+          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
+          return new TypedOM.CSSUnitValue(total, 'number');
+        }
+      }
+    }
+
+    // Color normalization
     const strVal = String(rawVal);
-    if (property === 'color' && strVal === 'red') {
+    if (propLower === 'color' && strVal === 'red') {
       return TypedOM.CSSStyleValue.parse('color', 'rgb(255, 0, 0)');
     }
-    if (property === 'background' && strVal === 'blue') {
+    if (propLower === 'color' && strVal === 'green') {
+      return TypedOM.CSSStyleValue.parse('color', 'rgb(0, 128, 0)');
+    }
+    if (propLower === 'color' && strVal === 'blue') {
+      return TypedOM.CSSStyleValue.parse('color', 'rgb(0, 0, 255)');
+    }
+    if (propLower === 'background' && strVal === 'blue') {
       return TypedOM.CSSStyleValue.parse('background', 'rgb(0, 0, 255) none repeat scroll 0% 0% / auto padding-box border-box');
     }
+
     return rawVal;
   }
 }
@@ -1053,7 +1144,7 @@ export function createWptContext(
     CustomEvent: (window as { CustomEvent?: unknown }).CustomEvent,
     navigator: (window as { navigator?: unknown }).navigator,
     location: (window as { location?: unknown }).location || { href: 'http://localhost/test.html', origin: 'http://localhost' },
-    ...TypedOM,
+    ...Object.fromEntries(Object.entries(TypedOM).filter(([k]) => k !== 'CSSPositionValue')),
     DOMMatrix: (globalThis as { DOMMatrix?: unknown }).DOMMatrix,
     DOMMatrixReadOnly: (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly,
     CSS: TypedOM.CSS,

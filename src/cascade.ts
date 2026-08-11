@@ -293,7 +293,7 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   let direction = 'ltr';
   let textOrientation = 'mixed';
 
-  const elWithParent = element as { parentElement?: DOMElement | null };
+  const elWithParent = element as { parentElement?: DOMElement | null; parentNode?: DOMElement | null };
   if (elWithParent.parentElement) {
     const parentCascaded = getCascadedStyle(elWithParent.parentElement, rules);
     const pWm = parentCascaded.getPropertyValue('writing-mode');
@@ -321,12 +321,23 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   // css-variables-1 § 4 #resolving-var-functions
   const customProperties = new Map<string, string>();
 
-  if (elWithParent.parentElement) {
-    const parentCascaded = getCascadedStyle(elWithParent.parentElement, rules);
+  const parentNode = elWithParent.parentElement || (elWithParent.parentNode && isElement(elWithParent.parentNode) ? elWithParent.parentNode : null);
+  const rootNode = (element as { ownerDocument?: { documentElement?: DOMElement | null } }).ownerDocument?.documentElement;
+
+  if (parentNode) {
+    const parentCascaded = getCascadedStyle(parentNode, rules);
     for (let i = 0; i < parentCascaded.length; i++) {
       const name = parentCascaded.item(i);
       if (name.startsWith('--')) {
         customProperties.set(name, parentCascaded.getPropertyValue(name));
+      }
+    }
+  } else if (rootNode && rootNode !== element) {
+    const rootCascaded = getCascadedStyle(rootNode, rules);
+    for (let i = 0; i < rootCascaded.length; i++) {
+      const name = rootCascaded.item(i);
+      if (name.startsWith('--')) {
+        customProperties.set(name, rootCascaded.getPropertyValue(name));
       }
     }
   }

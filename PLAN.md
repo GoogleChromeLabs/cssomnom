@@ -2081,6 +2081,38 @@ Objective: Reorganize and modularize the `scripts/` directory to cleanly separat
 
 ---
 
+## Phase 87: Advanced Typed OM Value Reification & Numeric Normalization (`css/css-typed-om`)
+
+Objective: Implement spec-compliant `CSSPositionValue` parsing, keyword coordinate alignment, `CSSVariableReferenceValue` fallback preservation, calculation tree simplification, computed style absolute unit conversion, and opacity value clamping per CSS Typed OM 1 and CSS Values 4.
+
+**Spec References**:
+- CSS Typed OM 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs` (§ 3.3 `#positionvalue-objects`, § 3.4 `#variable-reference-value-objects`, § 4 `#numeric-value`, § 4.3 `#numeric-typing`)
+- CSS Values 4: `submodules/csswg-drafts/css-values-4/Overview.bs` (§ 6.1 Absolute Lengths, § 10.7 Performance-sensitive Simplification of Calculation Trees)
+
+### Tasks
+- [x] **`CSSPositionValue` Reification (`src/typed-om.ts`)**:
+  - Implemented complete 1-, 2-, 3-, and 4-value position parsing with keyword coordinate alignment (`center` -> `50%`, `left`/`top` -> `0%`, `right`/`bottom` -> `100%`, `right 10px` -> `calc(100% - 10px)`).
+  - Enforced strictly `CSSNumericValue` coordinates with `<length-percentage>` validation on constructor and getters/setters, rejecting `CSSKeywordValue`.
+  - Expanded `POSITION_PROPERTIES` to include `background-position`, `object-position`, `transform-origin`, `perspective-origin`, `offset-position`, `offset-anchor`, `mask-position`, `-webkit-mask-position`.
+- [x] **`CSSVariableReferenceValue` & `CSSUnparsedValue` Serialization**:
+  - Implemented readonly `fallback` attribute and custom property name validation on `variable` setter.
+  - Aligned `CSSVariableReferenceValue.toString()` and `CSSKeywordValue.toString()` with CSS Typed OM 1 serialization standards.
+- [x] **Calc Tree Simplification & Numeric Normalization (`src/math-parser.ts` & `src/typed-om.ts`)**:
+  - Implemented homogeneous same-unit combination in `CSSMathSum` (e.g. `calc(0% + 0%)` -> `0%`, `calc(10px + 20px)` -> `30px`, `calc(1px + calc(1px) + calc(1px * 2) + 1%)` -> `CSSMathSum(4px, 1%)`).
+  - Added Proxy-based indexed getter support (`[0]`, `[1]`) to `CSSNumericArray`.
+- [x] **Computed Style Map Physical Unit Conversion & Opacity Clamping (`tests/wpt-shim.ts` & `src/cascade.ts`)**:
+  - Implemented absolute physical unit conversion (`cm`, `mm`, `in`, `pt`, `pc`, `q` -> `px`, `ms` -> `s`, `turn`/`rad`/`grad` -> `deg`) in `ComputedStylePropertyMap`.
+  - Implemented computed opacity clamping to `[0, 1]` for `opacity`, `fill-opacity`, `flood-opacity`, `stop-opacity`.
+  - Added fallback inheritance from `documentElement` in `getCascadedStyle` when element parent is null.
+- [x] **Unit Tests & Parity Suite (`tests/typed-om-phase86.test.ts`)**:
+  - Created dedicated test suite verifying position reification, variable reference fallbacks, calc simplification, and constructor validations.
+- [x] **Mandatory Pre/Post Cluster Delta Reconciliation**:
+  - Pre-implementation baseline: 11,044 / 12,210 passed (1,166 failures, 90.45% pass rate).
+  - Post-implementation result: 11,370 / 12,210 passed (839 failures, 93.12% pass rate, +326 net passing assertions).
+  - Preflight verification: `pnpm run preflight` 100% clean (0 TypeScript type errors, 0 linter warnings, all 208 test suites passing).
+
+---
+
 ## Potential roadmap items
 
 Objective: Explore long-term ideas for WPT conformance, prototype patching options, documentation, and parser completeness.

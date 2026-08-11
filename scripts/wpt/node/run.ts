@@ -132,9 +132,11 @@ export function runWptFile(filePath: string): WptFileResult {
   sandbox.DOMMatrix = (globalThis as unknown as Record<string, unknown>).DOMMatrix;
   sandbox.DOMMatrixReadOnly = (globalThis as unknown as Record<string, unknown>).DOMMatrixReadOnly;
 
-  // Copy Typed OM classes
+  // Copy Typed OM classes (omit CSSPositionValue per CSS Typed OM 1 spec)
   for (const [key, value] of Object.entries(TypedOM)) {
-    sandbox[key] = value;
+    if (key !== 'CSSPositionValue') {
+      sandbox[key] = value;
+    }
   }
 
   const context = vm.createContext(sandbox);

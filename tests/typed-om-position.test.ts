@@ -26,7 +26,7 @@ import {
 
 test('CSSPositionValue constructor validation', () => {
   const x = new CSSUnitValue(50, 'percent');
-  const y = new CSSKeywordValue('center');
+  const y = new CSSUnitValue(50, 'percent');
   const pos = new CSSPositionValue(x, y);
   assert.strictEqual(pos.x, x);
   assert.strictEqual(pos.y, y);
@@ -35,7 +35,7 @@ test('CSSPositionValue constructor validation', () => {
   pos.x = newX;
   assert.strictEqual(pos.x, newX);
 
-  const newY = new CSSKeywordValue('top');
+  const newY = new CSSUnitValue(0, 'percent');
   pos.y = newY;
   assert.strictEqual(pos.y, newY);
 
@@ -45,7 +45,7 @@ test('CSSPositionValue constructor validation', () => {
   }, TypeError);
 
   assert.throws(() => {
-    new CSSPositionValue(x, 'center' as unknown as CSSKeywordValue);
+    new CSSPositionValue(x, new CSSKeywordValue('center') as unknown as CSSNumericValue);
   }, TypeError);
 
   // Invalid units (not <length-percentage>) must throw TypeError
@@ -63,7 +63,7 @@ test('CSSPositionValue constructor validation', () => {
   }, TypeError);
 
   assert.throws(() => {
-    pos.y = 'center' as unknown as CSSKeywordValue;
+    pos.y = new CSSKeywordValue('center') as unknown as CSSNumericValue;
   }, TypeError);
 });
 
@@ -81,24 +81,28 @@ test('CSSPositionValue parsing and reification', () => {
   // Single value: background-position: left
   const bgPosSingle = CSSStyleValue.parse('background-position', 'left');
   assert.ok(bgPosSingle instanceof CSSPositionValue);
-  assert.ok(bgPosSingle.x instanceof CSSKeywordValue);
-  assert.strictEqual((bgPosSingle.x as CSSKeywordValue).value, 'left');
-  assert.ok(bgPosSingle.y instanceof CSSKeywordValue);
-  assert.strictEqual((bgPosSingle.y as CSSKeywordValue).value, 'center');
+  assert.ok(bgPosSingle.x instanceof CSSUnitValue);
+  assert.strictEqual((bgPosSingle.x as CSSUnitValue).value, 0);
+  assert.strictEqual((bgPosSingle.x as CSSUnitValue).unit, 'percent');
+  assert.ok(bgPosSingle.y instanceof CSSUnitValue);
+  assert.strictEqual((bgPosSingle.y as CSSUnitValue).value, 50);
+  assert.strictEqual((bgPosSingle.y as CSSUnitValue).unit, 'percent');
 
   // object-position
   const objPos = CSSStyleValue.parse('object-position', 'center top');
   assert.ok(objPos instanceof CSSPositionValue);
-  assert.ok(objPos.x instanceof CSSKeywordValue);
-  assert.strictEqual((objPos.x as CSSKeywordValue).value, 'center');
-  assert.ok(objPos.y instanceof CSSKeywordValue);
-  assert.strictEqual((objPos.y as CSSKeywordValue).value, 'top');
+  assert.ok(objPos.x instanceof CSSUnitValue);
+  assert.strictEqual((objPos.x as CSSUnitValue).value, 50);
+  assert.strictEqual((objPos.x as CSSUnitValue).unit, 'percent');
+  assert.ok(objPos.y instanceof CSSUnitValue);
+  assert.strictEqual((objPos.y as CSSUnitValue).value, 0);
+  assert.strictEqual((objPos.y as CSSUnitValue).unit, 'percent');
 });
 
 test('CSSPositionValue serialization', () => {
-  const pos = new CSSPositionValue(new CSSUnitValue(10, 'px'), new CSSKeywordValue('bottom'));
-  assert.strictEqual(pos.serialize(), '10px bottom');
-  assert.strictEqual(pos.toString(), '10px bottom');
+  const pos = new CSSPositionValue(new CSSUnitValue(10, 'px'), new CSSUnitValue(100, 'percent'));
+  assert.strictEqual(pos.serialize(), '10px 100%');
+  assert.strictEqual(pos.toString(), '10px 100%');
 });
 
 test('CSSPositionValue invalid position syntax fallback', () => {

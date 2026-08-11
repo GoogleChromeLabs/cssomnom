@@ -489,12 +489,12 @@ test('CSS.rad and CSS.turn factories do not convert to degrees', () => {
 });
 
 test('CSSNumericValue.parse preserves mathematical AST structure', () => {
-  const val = CSSNumericValue.parse('calc(1px + 2px)');
+  const val = CSSNumericValue.parse('calc(1px + 2em)');
   assert.ok(val instanceof CSSMathSum);
   const values = (val as CSSMathSum).values;
   assert.strictEqual(values.length, 2);
   assert.strictEqual(values.item(0)?.toString(), '1px');
-  assert.strictEqual(values.item(1)?.toString(), '2px');
+  assert.strictEqual(values.item(1)?.toString(), '2em');
 });
 
 test('CSSUnitValue constructor validates unit', () => {

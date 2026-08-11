@@ -273,7 +273,7 @@ describe('Typed OM Custom Serialization & Parsing', () => {
         new CSSMathProduct(CSS.number(3))
       ),
     ]);
-    assert.strictEqual(String(result), 'translate(calc(1em + 1px), 0px) rotate(calc(90deg + 1turn)) perspective(calc(1em + 1px)) skew(calc(2 * 90deg), calc(2 * 1turn)) scale3d(calc(1 * 2), calc(1 + 1), calc(3))');
+    assert.strictEqual(String(result), 'translate(calc(1em + 1px), 0px) rotate(calc(90deg + 360deg)) perspective(calc(1em + 1px)) skew(calc(2 * 90deg), calc(2 * 360deg)) scale3d(calc(1 * 2), calc(1 + 1), calc(3))');
   });
 
   it('CSSMathInvert with 0 parameter', () => {
