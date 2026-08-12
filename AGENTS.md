@@ -46,7 +46,7 @@ We intentionally deviate from some specifications for pragmatism, performance, o
 ### Automation Over Hardcoding
 As CSS specifications evolve, this codebase must evolve with them. We prioritize automation over manual maintenance for spec-derived data.
 - **Rule**: Whenever adding support for new properties, values, units, or features that are documented in external data sources (like `mdn-data` or `@webref/css`), ALWAYS prefer updating or creating a code generation script in `scripts/codegen/` rather than hardcoding lists in implementation files.
-- **Rule**: Ensure that any new generation script is added to the master script `scripts/generate_all.ts` and that the `pnpm run codegen` command functions correctly.
+- **Rule**: Ensure that any new generation script is added to the master script `scripts/codegen/generate_all.ts` and that the `pnpm run codegen` command functions correctly.
 - **Rule**: The `maintain` script in `package.json` must always include `pnpm run codegen` to ensure that updating submodules automatically updates our generated data.
 
 ## Instructions for Agents

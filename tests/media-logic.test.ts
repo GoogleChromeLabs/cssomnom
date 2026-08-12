@@ -24,30 +24,37 @@ import type { GeneralEnclosed } from '../src/types.ts';
 
 
 test('Media Queries 3-valued logic: unknown ORed with valid', () => {
-  // (unknown) or (width > 0) could be true if width > 0
+  // (unknown) or (width > 0) is syntactically valid, so canonical serialization preserves it
   const result = MediaParser.parse('(unknown-feature) or (width > 0px)');
-  // Statically it serializes to 'not all' because it contains unknown feature
-  assert.strictEqual(serializeMediaQuery(result[0]), 'not all');
+  assert.strictEqual(serializeMediaQuery(result[0]), '(unknown-feature) or (width > 0px)');
+  // Under standard environment with width = 800px > 0px: false OR true -> true
+  assert.strictEqual(MediaParser.evaluate('(unknown-feature) or (width > 0px)'), true);
 });
 
 test('Media Queries 3-valued logic: unknown ANDed with valid', () => {
   const result = MediaParser.parse('(unknown-feature) and (width > 0px)');
-  assert.strictEqual(serializeMediaQuery(result[0]), 'not all');
+  assert.strictEqual(serializeMediaQuery(result[0]), '(unknown-feature) and (width > 0px)');
+  // unknown AND true -> unknown -> false in boolean context
+  assert.strictEqual(MediaParser.evaluate('(unknown-feature) and (width > 0px)'), false);
 });
 
 test('Media Queries 3-valued logic: general-enclosed as unknown', () => {
   const result = MediaParser.parse('(future-func(val)) or (width > 0px)');
-  assert.strictEqual(serializeMediaQuery(result[0]), 'not all');
+  assert.strictEqual(serializeMediaQuery(result[0]), 'future-func(val) or (width > 0px)');
+  assert.strictEqual(MediaParser.evaluate('(future-func(val)) or (width > 0px)'), true);
 });
 
 test('Media Queries 3-valued logic: nested unknown features', () => {
   const result = MediaParser.parse('((unknown-feature)) or (width > 0px)');
-  assert.strictEqual(serializeMediaQuery(result[0]), 'not all');
+  assert.strictEqual(serializeMediaQuery(result[0]), '(unknown-feature) or (width > 0px)');
+  assert.strictEqual(MediaParser.evaluate('((unknown-feature)) or (width > 0px)'), true);
 });
 
 test('Media Queries: not modifier precedence', () => {
   const result = MediaParser.parse('not all and (unknown-feature)');
-  assert.strictEqual(serializeMediaQuery(result[0]), 'not all');
+  assert.strictEqual(serializeMediaQuery(result[0]), 'not all and (unknown-feature)');
+  // not (true AND unknown) = not (unknown) = unknown -> false
+  assert.strictEqual(MediaParser.evaluate('not all and (unknown-feature)'), false);
 });
 
 test('Media Queries: build AST for <general-enclosed> (function)', () => {
@@ -78,16 +85,16 @@ test('Media Queries: build AST for <general-enclosed> (parens)', () => {
 
 test('Media Queries: preserve unknown feature with colon', () => {
   const result = MediaParser.parse('(unknown-feature: 10px)');
-  assert.strictEqual(serializeMediaQuery(result[0]), 'not all');
+  assert.strictEqual(serializeMediaQuery(result[0]), '(unknown-feature: 10px)');
+  assert.strictEqual(MediaParser.evaluate('(unknown-feature: 10px)'), false);
 });
 
 test('Media Queries: preserve unknown feature with min- prefix in boolean context', () => {
   const result = MediaParser.parse('(min-unknown-feature)');
-  assert.strictEqual(serializeMediaQuery(result[0]), 'not all');
+  assert.strictEqual(serializeMediaQuery(result[0]), '(min-unknown-feature)');
+  assert.strictEqual(MediaParser.evaluate('(min-unknown-feature)'), false);
 });
 
-test('Media Queries: evaluate should not exist', () => {
-  const validator = new MediaQueryValidator([]);
-  // @ts-expect-error - testing removal
-  assert.strictEqual(validator.evaluate, undefined);
+test('Media Queries: evaluate static method exists on MediaParser', () => {
+  assert.strictEqual(typeof MediaParser.evaluate, 'function');
 });

@@ -1,496 +1,138 @@
 {
+  "cssom": [
+    {
+      "file": "css/cssom/getComputedStyle-insets-absolute-logical-crash.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-absolute.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-fixed.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-grid.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-nobox.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-relative.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-static.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-sticky-container-for-abspos.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-insets-sticky.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/getComputedStyle-resolved-min-size-auto.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: CSSConditionRule is not defined"
+    },
+    {
+      "file": "css/cssom/caretPositionFromPoint-in-flex-container.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "caret-screen-point-hit-testing",
+      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
+    },
+    {
+      "file": "css/cssom/caretPositionFromPoint-with-transformation.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "caret-screen-point-hit-testing",
+      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
+    },
+    {
+      "file": "css/cssom/caretRangeFromPoint-replace-document.tentative.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "caret-screen-point-hit-testing",
+      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
+    },
+    {
+      "file": "css/cssom/caretRangeFromPoint-textarea-transform.tentative.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "caret-screen-point-hit-testing",
+      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
+    },
+    {
+      "file": "css/cssom/caretRangeFromPoint.tentative.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "caret-screen-point-hit-testing",
+      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
+    },
+    {
+      "file": "css/cssom/caretPositionFromPoint-audioVideo.html",
+      "category": "DOM_SPEC_API",
+      "clusterId": "set-html-unsafe-missing",
+      "description": "container.setHTMLUnsafe HTML sanitizer helper"
+    },
+    {
+      "file": "css/cssom/caretPositionFromPoint.html",
+      "category": "DOM_SPEC_API",
+      "clusterId": "set-html-unsafe-missing",
+      "description": "container.setHTMLUnsafe HTML sanitizer helper"
+    },
+    {
+      "file": "css/cssom/HTMLLinkElement-load-event-002.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "type-error-exception",
+      "description": "Browser-dependent subresource or interaction: TypeError: iframe.contentWindow.CSSStyleSheet is not a constructor"
+    }
+  ],
   "selectors": [
     {
-      "file": "css/selectors/attribute-selectors/style-attribute-selector.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/selectors/active-observable.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: ReferenceError: EventWatcher is not defined"
     },
     {
-      "file": "css/selectors/focus-visible-010.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/focus-visible-014.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/focus-visible-017-2.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/focus-visible-017.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/focus-visible-021.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/focus-visible-023.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/focus-visible-script-focus-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/focus-within-009.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/has-specificity.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/hash-collision-cssom.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/hash-collision.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/any-link-pseudo.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/attribute.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/child-indexed-pseudo-classes-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/defined-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/defined.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/empty-pseudo-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/enabled-disabled.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/first-child-last-child.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/fullscreen-pseudo-class-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-complexity.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-css-nesting-shared.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-in-adjacent-position.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-in-ancestor-position.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-in-parent-position.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-in-sibling-position.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-invalidation-after-removing-non-first-element.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-invalidation-first-in-sibling-chain.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-pseudoclass-only.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-sibling-insertion-removal.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-sibling.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-side-effect.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-unstyled.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-with-is-child-combinator.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-with-nesting-parent-containing-complex.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/selectors/focus-visible-024.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: ReferenceError: EventWatcher is not defined"
     },
     {
       "file": "css/selectors/invalidation/has-with-nesting-parent-containing-hover.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: ReferenceError: EventWatcher is not defined"
     },
     {
-      "file": "css/selectors/invalidation/has-with-not.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/has-with-nth-child.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/heading-pseudo-class-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/host-context-pseudo-class-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/host-pseudo-class-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/insert-sibling-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/insert-sibling-002.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/insert-sibling-003.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/insert-sibling-004.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/is-pseudo-containing-sibling-relationship-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/is-where-pseudo-containing-hard-pseudo-and-never-matching.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/is-where-pseudo-containing-hard-pseudo.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/is.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/link-pseudo-class-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/link-pseudo-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/media-loading-pseudo-classes-in-has.sub.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/media-pseudo-classes-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/modal-pseudo-class-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/not-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/not-002.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/not-pseudo-containing-sibling-relationship-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/nth-child-whole-subtree.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/open-pseudo-class-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/placeholder-shown.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/quirks-mode-stylesheet-dynamic-add-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/selectorText-dynamic-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/sheet-going-away-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/sibling.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/subject-has-invalidation-with-display-none-anchor-element.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/target-pseudo-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/typed-child-indexed-pseudo-classes-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/user-action-pseudo-classes-in-has.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/user-valid-user-invalid.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/invalidation/where.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/is-nested.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/is-specificity-shadow.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/is-specificity.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/is-where-pseudo-classes.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/is-where-shadow.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/not-specificity.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/nth-last-child-invalid.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/nth-of-type-namespace.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/placeholder-shown.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/webkit-pseudo-element.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/selectors/x-pseudo-element.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/selectors/active-display-none-001.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-001.html",
@@ -596,6 +238,12 @@
     },
     {
       "file": "css/selectors/focus-visible-027.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/focus-visible-028.html",
       "category": "VIEWPORT_HIT_TESTING",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
@@ -719,762 +367,280 @@
       "category": "VIEWPORT_HIT_TESTING",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/invalidation/fullscreen-pseudo-class-in-has.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/invalidation/modal-pseudo-class-in-has.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/invalidation/user-valid-user-invalid.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/modal-pseudo-class.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/user-invalid.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/user-valid-user-invalid-multifield-inputs.tentative.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/user-valid.html",
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "dom-geometry-client-rects",
+      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+    },
+    {
+      "file": "css/selectors/active-toplayer-001.html",
+      "category": "TYPE_ERROR_EXCEPTION",
+      "clusterId": "type-error-exception",
+      "description": "TypeError: dialog.showModal is not a function"
+    },
+    {
+      "file": "css/selectors/hover-toplayer-001.html",
+      "category": "TYPE_ERROR_EXCEPTION",
+      "clusterId": "type-error-exception",
+      "description": "TypeError: dialog.showModal is not a function"
+    },
+    {
+      "file": "css/selectors/media/media-loading-state-timing.sub.html",
+      "category": "TYPE_ERROR_EXCEPTION",
+      "clusterId": "type-error-exception",
+      "description": "TypeError: dialog.showModal is not a function"
+    },
+    {
+      "file": "css/selectors/user-action-pseudo-top-layer.html",
+      "category": "TYPE_ERROR_EXCEPTION",
+      "clusterId": "type-error-exception",
+      "description": "TypeError: dialog.showModal is not a function"
+    },
+    {
+      "file": "css/selectors/user-invalid.html",
+      "category": "TYPE_ERROR_EXCEPTION",
+      "clusterId": "type-error-exception",
+      "description": "TypeError: dialog.showModal is not a function"
+    },
+    {
+      "file": "css/selectors/user-valid.html",
+      "category": "TYPE_ERROR_EXCEPTION",
+      "clusterId": "type-error-exception",
+      "description": "TypeError: dialog.showModal is not a function"
+    },
+    {
+      "file": "css/selectors/focus-visible-008.html",
+      "category": "USER_INTERACTION_STATE",
+      "clusterId": "focus-visible-heuristics",
+      "description": "Interactive :focus-visible / user focus event heuristics"
+    },
+    {
+      "file": "css/selectors/focus-visible-009.html",
+      "category": "USER_INTERACTION_STATE",
+      "clusterId": "focus-visible-heuristics",
+      "description": "Interactive :focus-visible / user focus event heuristics"
+    },
+    {
+      "file": "css/selectors/focus-visible-012.html",
+      "category": "USER_INTERACTION_STATE",
+      "clusterId": "focus-visible-heuristics",
+      "description": "Interactive :focus-visible / user focus event heuristics"
     }
   ],
   "css-variables": [
     {
-      "file": "css/css-variables/css-variable-change-style-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/css-variable-change-style-002.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/missing-closing-nested-fallback.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/revert-layer-in-fallback.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/var-ident-function.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
       "file": "css/css-variables/variable-animation-from-to.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
+    },
+    {
+      "file": "css/css-variables/variable-animation-guaranteed-invalid.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-over-transition.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-substitute-into-keyframe-shorthand.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-substitute-into-keyframe-transform.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-substitute-into-keyframe.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-substitute-within-keyframe-fallback.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-substitute-within-keyframe-multiple.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-substitute-within-keyframe.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-animation-to-only.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-created-document.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-created-element.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-css-wide-keywords.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-cycles.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-definition-cascading.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-definition-keywords.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-definition.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-exponential-blowup.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-first-letter.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-first-line.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-invalidation.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-presentation-attribute.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-pseudo-element.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-recalc-with-initial.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-reference-perspective-origin.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-substitution-background-properties.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-substitution-basic.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-substitution-filters.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-substitution-replaced-size.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-substitution-shadow-properties.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-substitution-shorthands.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variable-substitution-variable-declaration.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-transitions-transition-property-all-before-value.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     },
     {
       "file": "css/css-variables/variable-transitions-value-before-transition-property-all.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-variables/variables-substitute-guaranteed-invalid.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    }
-  ],
-  "cssom": [
-    {
-      "file": "css/cssom/CSSFontFeatureValuesRule.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable-baseURL.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable-cssRules.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable-disabled-regular-sheet-insertion.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable-disallow-import.tentative.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable-duplicate.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable-invalidation.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable-replace-on-regular-sheet.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-constructable.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/CSSStyleSheet-template-adoption.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/adoptedstylesheets-modify-array-and-sheet.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/adoptedstylesheets-observablearray.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/at-namespace.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/base-uri.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/computed-style-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/computed-style-set-property.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/css-style-attr-decl-block.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/css-style-declaration-modifications.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/css-style-reparse.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/cssstyledeclaration-csstext-all-shorthand.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/cssstyledeclaration-csstext.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/cssstyledeclaration-custom-properties.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/cssstyledeclaration-mutability.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/cssstyledeclaration-nested.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/cssstyledeclaration-registered-custom-properties.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/cssstyledeclaration-setter-form-controls.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/font-family-serialization-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-animations-replaced-into-ib-split.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-detached-subtree.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-display-none-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-display-none-002.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-display-none-003.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-insets-absolute-roundtrip.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-insets-grid.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-layout-dependent-removed-ib-sibling.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-layout-dependent-replaced-into-ib-split.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-line-height.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-logical-enumeration.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-margins-roundtrip.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-property-order.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-pseudo-checkmark.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-pseudo-picker-icon.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-pseudo-picker.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-pseudo-with-argument.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-pseudo.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-resolved-colors.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-resolved-min-max-clamping.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-resolved-min-size-auto.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-sticky-pos-percent.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/getComputedStyle-width-scroll.tentative.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/insertRule-syntax-error-01.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/preferred-stylesheet-order.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/preferred-stylesheet-reversed-order.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/resolved-border-width.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/selectorText-modification-restyle-002.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/serialize-all-longhands.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/serialize-custom-props.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/set-selector-text-attachment.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/stylesheet-title.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/cssom/caretPositionFromPoint-in-flex-container.html",
-      "category": "VIEWPORT_HIT_TESTING",
-      "clusterId": "caret-screen-point-hit-testing",
-      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
-    },
-    {
-      "file": "css/cssom/caretRangeFromPoint-replace-document.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
-      "clusterId": "caret-screen-point-hit-testing",
-      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
-    },
-    {
-      "file": "css/cssom/caretRangeFromPoint-textarea-transform.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
-      "clusterId": "caret-screen-point-hit-testing",
-      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
-    },
-    {
-      "file": "css/cssom/caretRangeFromPoint.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
-      "clusterId": "caret-screen-point-hit-testing",
-      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
-    },
-    {
-      "file": "css/cssom/caretPositionFromPoint-with-transformation.html",
-      "category": "VIEWPORT_HIT_TESTING",
-      "clusterId": "dom-geometry-client-rects",
-      "description": "element.getClientRects / getBoundingClientRect layout geometry"
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
+    },
+    {
+      "file": "css/css-variables/variables-animation-math-functions.html",
+      "category": "CONTESTED_BROWSER_ONLY",
+      "clusterId": "other-assertion-failure",
+      "description": "Browser-dependent subresource or interaction: Error: case4"
     }
   ],
   "css-syntax": [
     {
-      "file": "css/css-syntax/ident-three-code-points.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-charset-attribute-bogus.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-syntax/serialize-consecutive-tokens.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-1250-charset-attribute-windows-1253.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-syntax/unicode-range-selector.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    }
-  ],
-  "css-nesting": [
-    {
-      "file": "css/css-nesting/block-skipping.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-bogus-charset-attribute-windows-1250.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/implicit-nesting-ident-recovery.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-bogus.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/implicit-nesting-ident.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-utf16-ascii-only.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/invalidation-001.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-utf16.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/invalidation-002.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-utf16be.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/invalidation-003.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-windows-1250-in-utf16.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/invalidation-004.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-at-charset-windows-1250-in-utf16be.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/mixed-declarations-rules.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-http-bogus-at-charset-windows-1250.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/nested-declarations-matching.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-http-bogus.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/nested-error-recovery.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-http-windows-1250-at-charset-windows-1253.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/nested-rule-cssom-invalidation.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-no-decl.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/nesting-layer.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1251-css-utf8-bom.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/set-selector-text.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/charset/page-windows-1252-http-windows-1251-css-utf8-bom.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     },
     {
-      "file": "css/css-nesting/top-level-parent-pseudo-specificity.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    }
-  ],
-  "css-typed-om": [
-    {
-      "file": "css/css-typed-om/the-stylepropertymap/computed/computed.tentative.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-typed-om/the-stylepropertymap/computed/iterable.tentative.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    },
-    {
-      "file": "css/css-typed-om/the-stylepropertymap/invalidation.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
-    }
-  ],
-  "mediaqueries": [
-    {
-      "file": "css/mediaqueries/mq-dynamic-empty-children.html",
-      "category": "VISUAL_LAYOUT_CASCADE",
-      "clusterId": "getcomputedstyle-requires-layout",
-      "description": "getComputedStyle requires visual layout engine / font metrics"
+      "file": "css/css-syntax/non-ascii-codepoints.html",
+      "category": "GENERAL_ASSERTION_FAILURE",
+      "clusterId": "other-assertion-failure",
+      "description": "Error: fn is not a function"
     }
   ]
 }

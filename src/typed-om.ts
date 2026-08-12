@@ -20,6 +20,7 @@ import { matchesSyntax, PropertyRegistry } from './PropertyRegistry.ts';
 
 
 import { serialize, getMirrorToken } from './serializer.ts';
+import { escape } from './css-escape.ts';
 import { parseMathFunction, simplify } from './math-parser.ts';
 import { tokenize } from './tokenizer.ts';
 import { ParseHooks } from './parse-hooks.ts';
@@ -30,7 +31,7 @@ export type { CSSUnit };
 import { formatNumber } from './utils/format.ts';
 import { DOMMatrixReadOnly, DOMMatrix, setParseTransformListHook } from './DOMMatrix.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
-import { STANDARD_PROPERTIES_SYNTAX } from './standard-syntax.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
 
 function validateProperty(property: string): void {
   if (!property.startsWith('--') && !SUPPORTED_PROPERTIES.has(property.toLowerCase())) {
@@ -102,49 +103,175 @@ const POSITION_PROPERTIES = new Set([
   'background-position',
   'object-position',
   'transform-origin',
-  'perspective-origin'
+  'perspective-origin',
+  'offset-position',
+  'offset-anchor',
+  'mask-position',
+  '-webkit-mask-position',
 ]);
+
+// css-typed-om § 3.3 #positionvalue-objects
+// css-values-4 § 10.1 Position: the <position> type
+function toPositionCoord(val: CSSStyleValue | CSSNumericValue | CSSKeywordValue | null): CSSNumericValue | null {
+  if (!val) return null;
+  if (val instanceof CSSKeywordValue) {
+    const k = val.value.toLowerCase();
+    if (k === 'left' || k === 'top') return createUnitValue(0, 'percent');
+    if (k === 'center') return createUnitValue(50, 'percent');
+    if (k === 'right' || k === 'bottom') return createUnitValue(100, 'percent');
+    return null;
+  }
+  if (val instanceof CSSNumericValue && isLengthPercentage(val.type())) {
+    return val;
+  }
+  return null;
+}
 
 function tryParsePosition(trimmed: ComponentValue[], property?: string): CSSPositionValue | null {
   const components = trimmed.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
   if (components.length === 0) return null;
 
-  const isHKeyword = (sv: CSSStyleValue) =>
-    sv instanceof CSSKeywordValue && ['left', 'right', 'center'].includes(sv.value.toLowerCase());
-  const isVKeyword = (sv: CSSStyleValue) =>
-    sv instanceof CSSKeywordValue && ['top', 'bottom', 'center'].includes(sv.value.toLowerCase());
-  const isLengthPercent = (sv: CSSStyleValue) =>
-    sv instanceof CSSNumericValue && isLengthPercentage(sv.type());
-
+  // 1-value syntax: [ left | center | right | top | bottom | <length-percentage> ]
   if (components.length === 1) {
-    const sv = createCSSStyleValue(components[0], property || 'left');
-    if (!sv) return null;
-    if (isLengthPercent(sv) || isHKeyword(sv)) {
-      return new CSSPositionValue(sv as CSSNumericValue | CSSKeywordValue, new CSSKeywordValue('center'));
+    const c0 = components[0];
+    if (isToken(c0) && c0.type === 'ident') {
+      const k = c0.value.toLowerCase();
+      if (k === 'left') {
+        return new CSSPositionValue(createUnitValue(0, 'percent'), createUnitValue(50, 'percent'));
+      }
+      if (k === 'right') {
+        return new CSSPositionValue(createUnitValue(100, 'percent'), createUnitValue(50, 'percent'));
+      }
+      if (k === 'top') {
+        return new CSSPositionValue(createUnitValue(50, 'percent'), createUnitValue(0, 'percent'));
+      }
+      if (k === 'bottom') {
+        return new CSSPositionValue(createUnitValue(50, 'percent'), createUnitValue(100, 'percent'));
+      }
+      if (k === 'center') {
+        return new CSSPositionValue(createUnitValue(50, 'percent'), createUnitValue(50, 'percent'));
+      }
     }
-    if (isVKeyword(sv)) {
-      return new CSSPositionValue(new CSSKeywordValue('center'), sv as CSSKeywordValue);
+    const sv = createCSSStyleValue(c0, property || 'left');
+    const coord = toPositionCoord(sv);
+    if (coord) {
+      return new CSSPositionValue(coord, createUnitValue(50, 'percent'));
     }
   }
 
+  // 2-value syntax:
   if (components.length === 2) {
-    const sv1 = createCSSStyleValue(components[0], property || 'left');
-    const sv2 = createCSSStyleValue(components[1], property || 'top');
-    if (!sv1 || !sv2) return null;
+    const c0 = components[0];
+    const c1 = components[1];
 
-    // CSS Values 4 § 10.1 Position: the <position> type
-    // Option A: Horizontal component followed by Vertical component
-    const hValid1 = isHKeyword(sv1) || isLengthPercent(sv1);
-    const vValid1 = isVKeyword(sv2) || isLengthPercent(sv2);
-    if (hValid1 && vValid1) {
-      return new CSSPositionValue(sv1 as CSSNumericValue | CSSKeywordValue, sv2 as CSSNumericValue | CSSKeywordValue);
+    // Option B: Vertical keyword followed by Horizontal keyword (e.g. "top right")
+    if (isToken(c0) && c0.type === 'ident' && ['top', 'bottom'].includes(c0.value.toLowerCase()) &&
+        isToken(c1) && c1.type === 'ident' && ['left', 'right', 'center'].includes(c1.value.toLowerCase())) {
+      const yCoord = toPositionCoord(new CSSKeywordValue(c0.value));
+      const xCoord = toPositionCoord(new CSSKeywordValue(c1.value));
+      if (xCoord && yCoord) {
+        return new CSSPositionValue(xCoord, yCoord);
+      }
     }
 
-    // Option B: Vertical keyword followed by Horizontal keyword
-    const vValid2 = isVKeyword(sv1);
-    const hValid2 = isHKeyword(sv2);
-    if (vValid2 && hValid2) {
-      return new CSSPositionValue(sv2 as CSSNumericValue | CSSKeywordValue, sv1 as CSSNumericValue | CSSKeywordValue);
+    // Option A: Horizontal component followed by Vertical component
+    // Disallow vertical keyword followed by length or length followed by horizontal keyword
+    if (isToken(c0) && c0.type === 'ident' && ['top', 'bottom'].includes(c0.value.toLowerCase())) {
+      return null;
+    }
+    if (isToken(c1) && c1.type === 'ident' && ['left', 'right'].includes(c1.value.toLowerCase())) {
+      return null;
+    }
+
+    const sv1 = createCSSStyleValue(c0, property || 'left');
+    const sv2 = createCSSStyleValue(c1, property || 'top');
+    const coord1 = toPositionCoord(sv1);
+    const coord2 = toPositionCoord(sv2);
+    if (coord1 && coord2) {
+      return new CSSPositionValue(coord1, coord2);
+    }
+  }
+
+  // 3-value syntax:
+  if (components.length === 3) {
+    const c0 = components[0];
+    const c1 = components[1];
+    const c2 = components[2];
+
+    // Case 1: [ left | right ] <offset> [ top | bottom | center ]
+    if (isToken(c0) && c0.type === 'ident' && ['left', 'right'].includes(c0.value.toLowerCase())) {
+      const off = toPositionCoord(createCSSStyleValue(c1, 'left'));
+      const vert = toPositionCoord(createCSSStyleValue(c2, 'top'));
+      if (off && vert) {
+        const xCoord = c0.value.toLowerCase() === 'right'
+          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off)))
+          : off;
+        return new CSSPositionValue(xCoord, vert);
+      }
+    }
+
+    // Case 2: [ left | right | center ] [ top | bottom ] <offset>
+    if (isToken(c1) && c1.type === 'ident' && ['top', 'bottom'].includes(c1.value.toLowerCase())) {
+      const horiz = toPositionCoord(createCSSStyleValue(c0, 'left'));
+      const off = toPositionCoord(createCSSStyleValue(c2, 'top'));
+      if (horiz && off) {
+        const yCoord = c1.value.toLowerCase() === 'bottom'
+          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off)))
+          : off;
+        return new CSSPositionValue(horiz, yCoord);
+      }
+    }
+
+    // Case 3: [ top | bottom ] <offset> [ left | right | center ]
+    if (isToken(c0) && c0.type === 'ident' && ['top', 'bottom'].includes(c0.value.toLowerCase())) {
+      const off = toPositionCoord(createCSSStyleValue(c1, 'top'));
+      const horiz = toPositionCoord(createCSSStyleValue(c2, 'left'));
+      if (off && horiz) {
+        const yCoord = c0.value.toLowerCase() === 'bottom'
+          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off)))
+          : off;
+        return new CSSPositionValue(horiz, yCoord);
+      }
+    }
+  }
+
+  // 4-value syntax:
+  if (components.length === 4) {
+    const c0 = components[0];
+    const c1 = components[1];
+    const c2 = components[2];
+    const c3 = components[3];
+
+    // Case A: [ left | right ] <offset1> [ top | bottom ] <offset2>
+    if (isToken(c0) && c0.type === 'ident' && ['left', 'right'].includes(c0.value.toLowerCase()) &&
+        isToken(c2) && c2.type === 'ident' && ['top', 'bottom'].includes(c2.value.toLowerCase())) {
+      const off1 = toPositionCoord(createCSSStyleValue(c1, 'left'));
+      const off2 = toPositionCoord(createCSSStyleValue(c3, 'top'));
+      if (off1 && off2) {
+        const xCoord = c0.value.toLowerCase() === 'right'
+          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off1)))
+          : off1;
+        const yCoord = c2.value.toLowerCase() === 'bottom'
+          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off2)))
+          : off2;
+        return new CSSPositionValue(xCoord, yCoord);
+      }
+    }
+
+    // Case B: [ top | bottom ] <offset1> [ left | right ] <offset2>
+    if (isToken(c0) && c0.type === 'ident' && ['top', 'bottom'].includes(c0.value.toLowerCase()) &&
+        isToken(c2) && c2.type === 'ident' && ['left', 'right'].includes(c2.value.toLowerCase())) {
+      const off1 = toPositionCoord(createCSSStyleValue(c1, 'top'));
+      const off2 = toPositionCoord(createCSSStyleValue(c3, 'left'));
+      if (off1 && off2) {
+        const yCoord = c0.value.toLowerCase() === 'bottom'
+          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off1)))
+          : off1;
+        const xCoord = c2.value.toLowerCase() === 'right'
+          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off2)))
+          : off2;
+        return new CSSPositionValue(xCoord, yCoord);
+      }
     }
   }
 
@@ -473,7 +600,7 @@ export class CSSKeywordValue extends CSSStyleValue {
   }
 
   override toString(): string {
-    return this._value;
+    return escape(this._value);
   }
 
   serialize(): string {
@@ -1242,13 +1369,7 @@ export abstract class CSSNumericValue extends CSSStyleValue {
             throw new DOMException(`Invalid types in mathematical function: ${css}`, 'SyntaxError');
           }
           if ((v as CSSFunction).name.toLowerCase() === 'calc') {
-            if (mathNode instanceof CSSUnitValue) {
-              return new CSSMathSum(mathNode);
-            }
-            if (mathNode instanceof CSSMathSum) {
-              return mathNode;
-            }
-            return new CSSMathSum(mathNode);
+            return simplify(mathNode);
           }
           return mathNode;
         }
@@ -1454,10 +1575,20 @@ export abstract class CSSNumericValue extends CSSStyleValue {
 }
 
 export class CSSNumericArray {
+  [index: number]: CSSNumericValue;
   private _values: readonly CSSNumericValue[];
   constructor(values: CSSNumericValue[]) {
     this._values = [...values];
     Object.freeze(this._values);
+    return new Proxy(this, {
+      get(target, prop, receiver) {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = parseInt(prop, 10);
+          return target._values[index];
+        }
+        return Reflect.get(target, prop, receiver);
+      }
+    });
   }
   get length(): number { return this._values.length; }
   [Symbol.iterator]() { return this._values[Symbol.iterator](); }
@@ -2090,13 +2221,21 @@ function tokensToUnparsedSegments(values: ComponentValue[]): (string | CSSVariab
 }
 
 // CSS Typed OM: CSSVariableReferenceValue
+// css-typed-om § 3.4 #variable-reference-value-objects
 export class CSSVariableReferenceValue {
   private _variable!: string;
   private _fallback: CSSUnparsedValue | null = null;
 
   constructor(variable: string, fallback: CSSUnparsedValue | null = null) {
     this.variable = variable;
-    this.fallback = fallback;
+    if (fallback !== null && fallback !== undefined) {
+      if (!(fallback instanceof CSSUnparsedValue)) {
+        throw new TypeError("Fallback must be a CSSUnparsedValue or null.");
+      }
+      this._fallback = fallback;
+    } else {
+      this._fallback = null;
+    }
   }
 
   get variable(): string {
@@ -2114,15 +2253,8 @@ export class CSSVariableReferenceValue {
     return this._fallback;
   }
 
-  set fallback(value: CSSUnparsedValue | null) {
-    if (value !== null && !(value instanceof CSSUnparsedValue)) {
-      throw new TypeError("Fallback must be a CSSUnparsedValue or null.");
-    }
-    this._fallback = value;
-  }
-
   toString(): string {
-    if (this._fallback) {
+    if (this._fallback !== null) {
       return `var(${this._variable},${this._fallback.toString()})`;
     }
     return `var(${this._variable})`;
@@ -3063,6 +3195,30 @@ export class CSSScale extends CSSTransformComponent {
   }
 }
 
+// css-typed-om-1 § 7.3 #dom-cssrotate-angle
+// css-transforms-2 § 3 #transform-functions
+function normalizeAngleUnits(node: CSSNumericValue): CSSNumericValue {
+  if (node instanceof CSSUnitValue) {
+    if (node.unit === 'turn') return new CSSUnitValue(node.value * 360, 'deg');
+    if (node.unit === 'grad') return new CSSUnitValue(node.value * 0.9, 'deg');
+    if (node.unit === 'rad') return new CSSUnitValue(node.value * (180 / Math.PI), 'deg');
+    return node;
+  }
+  if (node instanceof CSSMathSum) {
+    return new CSSMathSum(...node.values.map(normalizeAngleUnits));
+  }
+  if (node instanceof CSSMathProduct) {
+    return new CSSMathProduct(...node.values.map(normalizeAngleUnits));
+  }
+  if (node instanceof CSSMathNegate) {
+    return new CSSMathNegate(normalizeAngleUnits(node.value));
+  }
+  if (node instanceof CSSMathInvert) {
+    return new CSSMathInvert(normalizeAngleUnits(node.value));
+  }
+  return node;
+}
+
 export class CSSRotate extends CSSTransformComponent {
   private _x!: CSSNumericValue;
   private _y!: CSSNumericValue;
@@ -3121,7 +3277,7 @@ export class CSSRotate extends CSSTransformComponent {
     if (!(numericVal instanceof CSSNumericValue) || !matchesAngle(numericVal.type())) {
       throw new TypeError('CSSRotate.angle must be an angle');
     }
-    this._angle = numericVal;
+    this._angle = normalizeAngleUnits(numericVal);
   }
 
   toString(): string {
@@ -3193,7 +3349,7 @@ export class CSSSkew extends CSSTransformComponent {
     if (!matchesAngle(numericVal.type())) {
       throw new TypeError('CSSSkew.ax must be an angle');
     }
-    this._ax = numericVal;
+    this._ax = normalizeAngleUnits(numericVal);
   }
   get ay(): CSSNumericValue { return this._ay; }
   set ay(val: number | CSSNumericValue) {
@@ -3201,7 +3357,7 @@ export class CSSSkew extends CSSTransformComponent {
     if (!matchesAngle(numericVal.type())) {
       throw new TypeError('CSSSkew.ay must be an angle');
     }
-    this._ay = numericVal;
+    this._ay = normalizeAngleUnits(numericVal);
   }
   toString(): string {
     if (this.ay instanceof CSSUnitValue && this.ay.value === 0) return `skew(${this.ax})`;
@@ -4336,22 +4492,21 @@ function isLengthPercentage(type: CSSNumericType): boolean {
   return (lengthVal + percentVal) === 1;
 }
 
-function validatePositionCoord(val: CSSNumericValue | CSSKeywordValue, paramName: string): void {
-  if (!(val instanceof CSSNumericValue) && !(val instanceof CSSKeywordValue)) {
-    throw new TypeError(`${paramName} must be a CSSNumericValue or CSSKeywordValue`);
+// css-typed-om § 3.3 #positionvalue-objects
+function validatePositionCoord(val: unknown, paramName: string): void {
+  if (!isNumericValue(val)) {
+    throw new TypeError(`${paramName} must be a CSSNumericValue`);
   }
-  if (val instanceof CSSNumericValue) {
-    if (!isLengthPercentage(val.type())) {
-      throw new TypeError(`${paramName} must be a <length-percentage>`);
-    }
+  if (!isLengthPercentage(val.type())) {
+    throw new TypeError(`${paramName} must be a <length-percentage>`);
   }
 }
 
 export class CSSPositionValue extends CSSStyleValue {
-  private _x: CSSNumericValue | CSSKeywordValue;
-  private _y: CSSNumericValue | CSSKeywordValue;
+  private _x: CSSNumericValue;
+  private _y: CSSNumericValue;
 
-  constructor(x: CSSNumericValue | CSSKeywordValue, y: CSSNumericValue | CSSKeywordValue) {
+  constructor(x: CSSNumericValue, y: CSSNumericValue) {
     super();
     validatePositionCoord(x, 'x');
     validatePositionCoord(y, 'y');
@@ -4359,20 +4514,20 @@ export class CSSPositionValue extends CSSStyleValue {
     this._y = y;
   }
 
-  get x(): CSSNumericValue | CSSKeywordValue {
+  get x(): CSSNumericValue {
     return this._x;
   }
 
-  set x(val: CSSNumericValue | CSSKeywordValue) {
+  set x(val: CSSNumericValue) {
     validatePositionCoord(val, 'x');
     this._x = val;
   }
 
-  get y(): CSSNumericValue | CSSKeywordValue {
+  get y(): CSSNumericValue {
     return this._y;
   }
 
-  set y(val: CSSNumericValue | CSSKeywordValue) {
+  set y(val: CSSNumericValue) {
     validatePositionCoord(val, 'y');
     this._y = val;
   }

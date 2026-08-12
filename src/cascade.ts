@@ -24,10 +24,12 @@ import {
   CSSLayerBlockRule,
   CSSLayerStatementRule,
   CSSStyleSheet,
+  CSSMediaRule,
 } from './CSSOM.ts';
 import { tokenize } from './tokenizer.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
 import { Parser, parseStyleSheet } from './parser.ts';
+import { MediaParser } from './MediaParser.ts';
 import { SelectorParser } from './SelectorParser.ts';
 import { serialize, serializeSelectorList } from './serializer.ts';
 import { matches, isElement } from './matcher.ts';
@@ -45,6 +47,7 @@ import type {
   ComponentValue,
   Declaration,
   ASTAtRule,
+  MediaEnvironment,
 } from './types.ts';
 
 interface MatchedDeclaration {
@@ -55,6 +58,7 @@ interface MatchedDeclaration {
   layerOrder: number;
   specificity: [number, number, number];
   sourceOrder: number;
+  raw?: string;
 }
 
 /**
@@ -219,6 +223,48 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         const layerName = currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName;
         const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
         walkRules(childRules, parentSelector, layerName, scopeNode);
+      } else if (
+        // css-cascade-5 § 2 #filtering
+        // mediaqueries-4 § 3.2 #evaluating-mq-list
+        rule instanceof CSSMediaRule ||
+        ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'media')
+      ) {
+        const mediaText = rule instanceof CSSMediaRule ? rule.media.mediaText : serialize((rule as ASTAtRule).prelude || []).trim();
+        const doc = (element as { ownerDocument?: { defaultView?: Record<string, unknown> } }).ownerDocument;
+        const win = doc?.defaultView;
+        let env: Partial<MediaEnvironment> | undefined;
+        if (win) {
+          let width = 800;
+          let height = 600;
+          if (typeof win.innerWidth === 'number' && !isNaN(win.innerWidth)) width = win.innerWidth;
+          if (typeof win.innerHeight === 'number' && !isNaN(win.innerHeight)) height = win.innerHeight;
+          const frameEl = win.frameElement as { width?: string | number; height?: string | number; style?: { width?: string; height?: string }; getAttribute?: (n: string) => string | null } | undefined;
+          if (frameEl) {
+            const styleW = frameEl.style?.width || (frameEl.width !== undefined ? String(frameEl.width) : null) || frameEl.getAttribute?.('width');
+            if (styleW) {
+              const parsed = parseFloat(styleW);
+              if (!isNaN(parsed) && parsed > 0) width = parsed;
+            }
+            const styleH = frameEl.style?.height || (frameEl.height !== undefined ? String(frameEl.height) : null) || frameEl.getAttribute?.('height');
+            if (styleH) {
+              const parsed = parseFloat(styleH);
+              if (!isNaN(parsed) && parsed > 0) height = parsed;
+            }
+          }
+          env = {
+            width,
+            height,
+            deviceWidth: width,
+            deviceHeight: height,
+            aspectRatio: [width, height],
+            deviceAspectRatio: [width, height],
+            orientation: width > height ? 'landscape' : 'portrait',
+          };
+        }
+        if (MediaParser.evaluate(mediaText, env)) {
+          const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
+          walkRules(childRules, parentSelector, currentLayer, scopeNode);
+        }
       } else if (rule instanceof CSSScopeRule) {
         const childRules = (rule as CSSGroupingRule).cssRules || [];
         walkRules(childRules, '', currentLayer, isElement(element) ? element : undefined);
@@ -259,9 +305,10 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   if (styleAttrText && styleAttrText.trim()) {
     const inlineDecls = ParseHooks.parseStyleAttribute(tokenize(styleAttrText));
     for (const d of inlineDecls.declarations) {
+      const valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, d.name.startsWith('--')).trim();
       matchedDeclarations.push({
         name: d.name,
-        value: serialize(d.value, d.name.startsWith('--')).trim(),
+        value: valStr,
         important: d.important,
         isInline: true,
         layerOrder: Infinity,
@@ -293,7 +340,7 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   let direction = 'ltr';
   let textOrientation = 'mixed';
 
-  const elWithParent = element as { parentElement?: DOMElement | null };
+  const elWithParent = element as { parentElement?: DOMElement | null; parentNode?: DOMElement | null };
   if (elWithParent.parentElement) {
     const parentCascaded = getCascadedStyle(elWithParent.parentElement, rules);
     const pWm = parentCascaded.getPropertyValue('writing-mode');
@@ -321,12 +368,23 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   // css-variables-1 § 4 #resolving-var-functions
   const customProperties = new Map<string, string>();
 
-  if (elWithParent.parentElement) {
-    const parentCascaded = getCascadedStyle(elWithParent.parentElement, rules);
+  const parentNode = elWithParent.parentElement || (elWithParent.parentNode && isElement(elWithParent.parentNode) ? elWithParent.parentNode : null);
+  const rootNode = (element as { ownerDocument?: { documentElement?: DOMElement | null } }).ownerDocument?.documentElement;
+
+  if (parentNode) {
+    const parentCascaded = getCascadedStyle(parentNode, rules);
     for (let i = 0; i < parentCascaded.length; i++) {
       const name = parentCascaded.item(i);
       if (name.startsWith('--')) {
         customProperties.set(name, parentCascaded.getPropertyValue(name));
+      }
+    }
+  } else if (rootNode && rootNode !== element) {
+    const rootCascaded = getCascadedStyle(rootNode, rules);
+    for (let i = 0; i < rootCascaded.length; i++) {
+      const name = rootCascaded.item(i);
+      if (name.startsWith('--')) {
+        customProperties.set(name, rootCascaded.getPropertyValue(name));
       }
     }
   }
@@ -334,7 +392,8 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
   // Merge direct custom property winners
   for (const [prop, decl] of winningDeclarations) {
     if (prop.startsWith('--')) {
-      customProperties.set(prop, decl.value);
+      const rawVal = (decl.raw && !decl.raw.includes('var(')) ? decl.raw : (typeof decl.value === 'string' ? decl.value : serialize(decl.value, true));
+      customProperties.set(prop, rawVal);
     }
   }
 
@@ -357,6 +416,7 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         name,
         value: tokenize(resolvedVal),
         important: decl.important,
+        raw: resolvedVal,
       });
       continue;
     }
@@ -813,7 +873,7 @@ function substituteVariables(
 
   const resolved = resolveNodes(componentValues);
   if (resolved === null) return null;
-  return serialize(resolved).trim();
+  return serialize(resolved, true).trim();
 }
 
 /**

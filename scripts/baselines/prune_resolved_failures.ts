@@ -2,11 +2,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert';
-import { Parser } from '../src/parser.ts';
-import { tokenize } from '../src/tokenizer.ts';
-import { serialize } from '../src/serializer.ts';
+import { Parser } from '../../src/parser.ts';
+import { tokenize } from '../../src/tokenizer.ts';
+import { serialize } from '../../src/serializer.ts';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '..');
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
 // --- Helper Functions ---
 

@@ -2,7 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SPEC_OUT_OF_SCOPE_COUNTS } from './wpt_feasibility_audit.ts';
+import { getBrowserOnlyFileCount } from '../wpt/node/feasibility/audit.ts';
 
 const specKeys = ['css-typed-om', 'cssom', 'css-nesting', 'css-syntax', 'css-variables', 'selectors', 'mediaqueries'];
 
@@ -45,13 +45,13 @@ for (const line of historyLines) {
         const total = parseInt(totalStr, 10);
         grandPassing += passing;
         grandTotal += total;
-        const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[key] ?? 0;
-        grandFeasible += Math.max(0, total - outOfScope);
+        const outOfScope = getBrowserOnlyFileCount(key);
+        grandFeasible += Math.max(passing, total - outOfScope);
       }
     }
 
-    const rawRate = ((grandPassing / grandTotal) * 100).toFixed(2) + '%';
-    const normRate = ((grandPassing / grandFeasible) * 100).toFixed(2) + '%';
+    const rawRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) + '%' : '0.00%';
+    const normRate = grandFeasible > 0 ? Math.min(100, (grandPassing / grandFeasible) * 100).toFixed(2) + '%' : '0.00%';
 
     const rowCols = [date, commit];
     for (let s = 0; s < 7; s++) {
@@ -66,11 +66,11 @@ for (const line of historyLines) {
     const [passStr, totalStr] = parts[2].split('/');
     const passing = parseInt(passStr, 10);
     const total = parseInt(totalStr, 10);
-    const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS['css-typed-om'] ?? 4;
-    const feasible = Math.max(0, total - outOfScope);
+    const outOfScope = getBrowserOnlyFileCount('css-typed-om');
+    const feasible = Math.max(passing, total - outOfScope);
 
-    const rawRate = ((passing / total) * 100).toFixed(2) + '%';
-    const normRate = ((passing / feasible) * 100).toFixed(2) + '%';
+    const rawRate = total > 0 ? ((passing / total) * 100).toFixed(2) + '%' : '0.00%';
+    const normRate = feasible > 0 ? Math.min(100, (passing / feasible) * 100).toFixed(2) + '%' : '0.00%';
 
     const rowCols = [date, commit, `${passing}/${total}`, '-', '-', '-', '-', '-', '-', `${passing}/${total}`, rawRate, `**${normRate}**`];
     cleanHistoryRows.push(`| ${rowCols.join(' | ')} |`);

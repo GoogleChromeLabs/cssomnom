@@ -61,6 +61,7 @@ const smartPostCSSNormalize = (s: string): string => {
 // Cases where CSSOM spec mandates dropping comments, duplicate declarations, non-standard hacks, or adding semicolons
 const postCSSSpecTransformCases = new Set([
   'atrule-decls',
+  'atrule-empty',
   'atrule-no-semicolon',
   'atrule-no-space',
   'comments',
@@ -73,6 +74,7 @@ const postCSSSpecTransformCases = new Set([
   'no-selector',
   'prop',
   'quotes',
+  'rule-at',
   'selector',
   'semicolons'
 ]);

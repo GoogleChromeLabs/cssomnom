@@ -12,7 +12,7 @@ import * as path from 'node:path';
 import { CSSStyleRule } from '../src/CSSOM.ts';
 import { StylePropertyMap, StylePropertyMapReadOnly } from '../src/typed-om.ts';
 import { patchWindowForTypedOM } from './wpt-shim.ts';
-import { runWptFile } from '../scripts/run_wpt_node.ts';
+import { runWptFile } from '../scripts/wpt/node/run.ts';
 
 interface StyleElementMock {
   textContent?: string | null;

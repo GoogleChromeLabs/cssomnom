@@ -25,15 +25,9 @@ export const BROWSER_ONLY_MANIFEST: Record<string, ManifestEntry[]> = fs.existsS
   ? JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
   : {};
 
-export const SPEC_OUT_OF_SCOPE_COUNTS: Record<string, number> = {
-  'css-typed-om': 4,
-  'mediaqueries': 1,
-  'css-syntax': 81,
-  'cssom': 243,
-  'css-nesting': 34,
-  'selectors': 1990,
-  'css-variables': 343,
-};
+export function getBrowserOnlyFileCount(spec: string): number {
+  return BROWSER_ONLY_MANIFEST[spec]?.length ?? 0;
+}
 
 export function isBrowserOnlyFile(spec: string, relativeFilePath: string): boolean {
   const entries = BROWSER_ONLY_MANIFEST[spec];
@@ -53,20 +47,20 @@ export function calculateFeasibility(currentResults: Record<string, { passing: n
   let passingAll = 0;
 
   for (const [spec, counts] of Object.entries(currentResults)) {
-    const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[spec] ?? 0;
-    const feasible = Math.max(0, counts.total - outOfScope);
-    const rawRate = ((counts.passing / counts.total) * 100).toFixed(2) + '%';
-    const normalizedRate = ((counts.passing / feasible) * 100).toFixed(2) + '%';
+    const outOfScope = getBrowserOnlyFileCount(spec);
+    const feasible = Math.max(counts.passing, counts.total - outOfScope);
+    const rawRate = counts.total > 0 ? ((counts.passing / counts.total) * 100).toFixed(2) + '%' : '0.00%';
+    const normalizedRate = feasible > 0 ? Math.min(100, (counts.passing / feasible) * 100).toFixed(2) + '%' : '0.00%';
 
     totalAll += counts.total;
-    outOfScopeAll += outOfScope;
+    outOfScopeAll += (counts.total - feasible);
     feasibleAll += feasible;
     passingAll += counts.passing;
 
     specs.push({
       spec,
       totalTests: counts.total,
-      outOfScopeTests: outOfScope,
+      outOfScopeTests: counts.total - feasible,
       feasibleTests: feasible,
       passingTests: counts.passing,
       rawPassRate: rawRate,
@@ -80,14 +74,14 @@ export function calculateFeasibility(currentResults: Record<string, { passing: n
     outOfScopeTests: outOfScopeAll,
     feasibleTests: feasibleAll,
     passingTests: passingAll,
-    rawPassRate: ((passingAll / totalAll) * 100).toFixed(2) + '%',
-    normalizedPassRate: ((passingAll / feasibleAll) * 100).toFixed(2) + '%',
+    rawPassRate: totalAll > 0 ? ((passingAll / totalAll) * 100).toFixed(2) + '%' : '0.00%',
+    normalizedPassRate: feasibleAll > 0 ? Math.min(100, (passingAll / feasibleAll) * 100).toFixed(2) + '%' : '0.00%',
   };
 
   return { specs, overall };
 }
 
-if (process.argv[1] && process.argv[1].endsWith('wpt_feasibility_audit.ts')) {
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('audit.ts') || process.argv[1].endsWith('wpt_feasibility_audit.ts'))) {
   const currentResults: Record<string, { passing: number; total: number }> = {
     'css-typed-om': { passing: 5677, total: 10682 },
     'cssom': { passing: 340, total: 814 },

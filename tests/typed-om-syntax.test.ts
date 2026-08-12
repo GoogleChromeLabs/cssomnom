@@ -26,12 +26,11 @@ import {
   StylePropertyMap,
   CSSStyleDeclaration
 } from '../src/index.ts';
-import { STANDARD_PROPERTIES_SYNTAX } from '../src/standard-syntax.ts';
-import { GENERATED_PROPERTIES_SYNTAX } from '../src/data/gen/standard-syntax.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from '../src/data/gen/standard-syntax.ts';
 
 describe('Typed OM Standard Property Syntax & Validation (Phase 85)', () => {
-  it('GENERATED_PROPERTIES_SYNTAX contains over 800 standard CSS properties', () => {
-    const keys = Object.keys(GENERATED_PROPERTIES_SYNTAX);
+  it('STANDARD_PROPERTIES_SYNTAX contains over 800 standard CSS properties', () => {
+    const keys = Object.keys(STANDARD_PROPERTIES_SYNTAX);
     assert.ok(keys.length >= 800, `Expected at least 800 properties, found ${keys.length}`);
     assert.ok(STANDARD_PROPERTIES_SYNTAX['accent-color'], 'accent-color should exist in STANDARD_PROPERTIES_SYNTAX');
     assert.ok(STANDARD_PROPERTIES_SYNTAX['animation-duration'], 'animation-duration should exist in STANDARD_PROPERTIES_SYNTAX');

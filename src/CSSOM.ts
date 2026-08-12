@@ -18,7 +18,7 @@ import { ParseHooks } from './parse-hooks.ts';
 import { serialize, serializeDeclarations, serializeString, serializeIdentifier, serializeSelectorList } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import { StylePropertyMap } from './typed-om.ts';
-import type { Declaration, Rule, ASTAtRule, ComponentValue, MediaQuery } from './types.ts';
+import type { Declaration, Rule, ASTAtRule, ComponentValue, MediaQuery, CustomMediaQuery } from './types.ts';
 import { MediaParser, serializeMediaQuery } from './MediaParser.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { createIndexedProxy, deleteRuleFromArray } from './utils.ts';
@@ -71,6 +71,7 @@ export interface LinkStyle {
   readonly sheet: CSSStyleSheet | null;
 }
 
+// cssom-1 § 6.2 #the-medialist-interface
 export class MediaList {
   [index: number]: string;
   private _mediaQueries: MediaQuery[] = [];
@@ -778,11 +779,42 @@ export class CSSMediaRule extends CSSGroupingRule {
     this.media = new MediaList(mediaText);
   }
 
+  get conditionText(): string {
+    return this.media.mediaText;
+  }
+
+  set conditionText(value: string) {
+    this.media.mediaText = value;
+  }
+
   get type() { return 4; }
 
   // 6.17 The CSSMediaRule Interface
   get cssText() {
     return serializeGroupingRule('media', this.media.mediaText, this._rules);
+  }
+
+  set cssText(_value: string) {
+    // Do nothing as per spec
+  }
+}
+
+// Media Queries 5 § 2.3 #custom-mq
+export class CSSCustomMediaRule extends CSSRule {
+  readonly name: string;
+  readonly query: CustomMediaQuery;
+
+  constructor(name: string, query: CustomMediaQuery) {
+    super();
+    this.name = name;
+    this.query = query;
+  }
+
+  get type() { return 0; }
+
+  get cssText(): string {
+    const queryStr = typeof this.query === 'boolean' ? String(this.query) : this.query.mediaText;
+    return `@custom-media ${this.name}${queryStr ? ' ' + queryStr : ''};`;
   }
 
   set cssText(_value: string) {
@@ -1305,7 +1337,7 @@ export class CSSNamespaceRule extends CSSRule {
 
   get cssText() {
     if (this._prefix) {
-      return `@namespace ${this._prefix} url("${this._namespaceURI}");`;
+      return `@namespace ${serializeIdentifier(this._prefix)} url("${this._namespaceURI}");`;
     }
     return `@namespace url("${this._namespaceURI}");`;
   }
@@ -1363,11 +1395,11 @@ function parsePageSelectorList(text: string): string[] | null {
     
     let serialized = '';
     if (hasIdent) {
-      serialized += (filtered[0].value as string).toLowerCase();
+      serialized += serializeIdentifier(filtered[0].value as string);
     }
     let p = hasIdent ? 1 : 0;
     while (p < filtered.length) {
-      serialized += ':' + (filtered[p + 1].value as string).toLowerCase();
+      serialized += ':' + serializeIdentifier(filtered[p + 1].value as string);
       p += 2;
     }
     results.push(serialized);

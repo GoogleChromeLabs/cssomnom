@@ -36,7 +36,7 @@ import { resolveNestedSelector } from './cascade.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { SHORTHANDS } from './shorthands.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
-import { STANDARD_PROPERTIES_SYNTAX } from './standard-syntax.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
 import { SelectorParser } from './SelectorParser.ts';
 
 

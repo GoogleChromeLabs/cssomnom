@@ -3,13 +3,13 @@ import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
-const FIXTURES_DIR = path.resolve(import.meta.dirname, 'external_suites');
+const FIXTURES_DIR = import.meta.dirname;
 
 function main() {
     console.log('Starting full fixture generation...');
     
     const scripts = fs.readdirSync(FIXTURES_DIR)
-        .filter(file => file.endsWith('.ts'))
+        .filter(file => file.endsWith('.ts') && file !== 'extract_all.ts')
         .sort();
 
     for (const script of scripts) {

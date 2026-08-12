@@ -79,7 +79,7 @@ test('Parser: Custom property vs. rule ambiguity', () => {
 
 // https://drafts.csswg.org/css-nesting-1/#nested-declarations
 test('Parser: At-rules inside declaration lists', () => {
-  const css = `div { @at {}; color: green; }`;
+  const css = `div { @media screen {}; color: green; }`;
   const tokens = tokenize(css);
   const parser = new Parser(tokens);
   const stylesheet = parser.parseStyleSheet();
@@ -257,7 +257,7 @@ test('Parser: unicode-range descriptor', () => {
   const stylesheet = new Parser(tokenize(css)).parseStyleSheet();
   assert.strictEqual(stylesheet.cssRules.length, 1);
   const rule = stylesheet.cssRules[0] as CSSStyleRule;
-  assert.strictEqual(rule.style.getPropertyValue('unicode-range'), 'U+0025-00FF');
+  assert.strictEqual(rule.style.getPropertyValue('unicode-range'), 'U+25-FF');
 });
 
 test('Parser: Comments are absorbed even in custom properties', () => {

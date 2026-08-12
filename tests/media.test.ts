@@ -53,7 +53,7 @@ test('MediaList behavior', () => {
 
 
 
-test('Media parsing with unknown functions replaced with "not all"', () => {
+test('Media parsing with unknown functions preserved in general-enclosed', () => {
   const css = '@media unknown-func(val), (unknown-prop: val) { body { color: red; } }';
   const tokens = tokenize(css);
   const parser = new Parser(tokens);
@@ -61,11 +61,11 @@ test('Media parsing with unknown functions replaced with "not all"', () => {
   const mediaRule = stylesheet.cssRules[0] as CSSMediaRule;
 
   assert.strictEqual(mediaRule.media.length, 2);
-  // They should serialize to 'not all' for client-visible text!
-  assert.strictEqual(mediaRule.media.item(0), 'not all');
-  assert.strictEqual(mediaRule.media.item(1), 'not all');
+  // Preserved in serialization per MQ4 § 2.4
+  assert.strictEqual(mediaRule.media.item(0), 'unknown-func(val)');
+  assert.strictEqual(mediaRule.media.item(1), '(unknown-prop: val)');
 
-  // But they should be preserved in AST!
+  // Preserved in AST
   const ast = (mediaRule.media as unknown as { mediaQueriesAST: import('../src/types.ts').MediaQuery[] }).mediaQueriesAST;
   assert.ok(ast);
   assert.strictEqual(ast.length, 2);
@@ -95,39 +95,38 @@ test('Media range parsing (width >= 600px)', () => {
   assert.strictEqual(mediaRule.media.mediaText, '(width >= 600px)');
 });
 
-test('Invalid media range parsing (width: >= 600px) replaced with "not all"', () => {
+test('Invalid media range parsing (width: >= 600px) preserved in general-enclosed', () => {
   const css = '@media (width: >= 600px) { body { color: red; } }';
   const tokens = tokenize(css);
   const parser = new Parser(tokens);
   const stylesheet = parser.parseStyleSheet();
   const mediaRule = stylesheet.cssRules[0] as CSSMediaRule;
 
-  assert.strictEqual(mediaRule.media.mediaText, 'not all');
+  assert.strictEqual(mediaRule.media.mediaText, '(width: >= 600px)');
+  assert.strictEqual(MediaParser.evaluate(mediaRule.media.mediaText), false);
 });
 
-test('Inconsistent media range operators (100px < width > 200px) replaced with "not all"', () => {
+test('Inconsistent media range operators (100px < width > 200px) preserved in general-enclosed', () => {
   const css = '@media (100px < width > 200px) { body { color: red; } }';
   const tokens = tokenize(css);
   const parser = new Parser(tokens);
   const stylesheet = parser.parseStyleSheet();
   const mediaRule = stylesheet.cssRules[0] as CSSMediaRule;
 
-  assert.strictEqual(mediaRule.media.mediaText, 'not all');
+  assert.strictEqual(mediaRule.media.mediaText, '(100px < width > 200px)');
+  assert.strictEqual(MediaParser.evaluate(mediaRule.media.mediaText), false);
 });
 
 import { MediaParser, serializeMediaQuery } from '../src/MediaParser.ts';
 
 test('Media query list error handling: invalid queries are replaced with "not all"', () => {
-  // https://drafts.csswg.org/css-mediaqueries-4/#error-handling
-  // "A media query that does not match the grammar in the previous section must be replaced by 'not all' during parsing."
-  
-  // Spec example 1:
+  // Spec example 1 (general enclosed parenthesized):
   const queries1 = MediaParser.parse('(example, all,), speech').map(serializeMediaQuery);
   assert.strictEqual(queries1.length, 2);
-  assert.strictEqual(queries1[0], 'not all');
+  assert.strictEqual(queries1[0], '(example, all,)');
   assert.strictEqual(queries1[1], 'speech');
 
-  // Spec example 2:
+  // Spec example 2 (top level invalid token):
   const queries2 = MediaParser.parse('&test, speech').map(serializeMediaQuery);
   assert.strictEqual(queries2.length, 2);
   assert.strictEqual(queries2[0], 'not all');
@@ -135,17 +134,13 @@ test('Media query list error handling: invalid queries are replaced with "not al
 });
 
 test('Media query list error handling: unclosed blocks', () => {
-  // https://drafts.csswg.org/css-mediaqueries-4/#error-handling
-  // "Because the parenthesized block is unclosed, it will contain the entire rest of the stylesheet ... and turn the entire thing into a 'not all' media query."
   const queries = MediaParser.parse('(example, speech { body { color: red; } }').map(serializeMediaQuery);
   assert.strictEqual(queries.length, 1);
-  assert.strictEqual(queries[0], 'not all');
+  assert.strictEqual(queries[0], '(example, speech {body {color: red;}})');
+  assert.strictEqual(MediaParser.evaluate(queries[0]), false);
 });
 
 test('Media query parsing: unknown media types', () => {
-  // https://drafts.csswg.org/css-mediaqueries-4/#error-handling
-  // "An unknown <media-type> must be treated as not matching. For example, the media query unknown is false, as unknown is an unknown media type. But not unknown is true, as the not negates the false media type."
-  // Note: they are NOT replaced with "not all", they are parsed as is and evaluate to false.
   const queries = MediaParser.parse('unknown, not unknown').map(serializeMediaQuery);
   assert.strictEqual(queries.length, 2);
   assert.strictEqual(queries[0], 'unknown');
@@ -153,24 +148,22 @@ test('Media query parsing: unknown media types', () => {
 });
 
 test('Media query error handling: restricted keywords', () => {
-  // https://drafts.csswg.org/css-mediaqueries-4/#error-handling
-  // "the media query 'or and (color)' is turned into 'not all' during parsing, rather than just treating the 'or' as an unknown media type."
   const queries = MediaParser.parse('or and (color)').map(serializeMediaQuery);
   assert.strictEqual(queries.length, 1);
   assert.strictEqual(queries[0], 'not all');
 });
 
-test('Media query error handling: unknown features', () => {
-  // https://drafts.csswg.org/css-mediaqueries-4/#error-handling
-  // "An unknown <mf-name> or <mf-value>, or a feature value which does not match the value syntax for that media feature, results in the value "unknown". A <media-query> whose value is "unknown" must be replaced with 'not all'."
+test('Media query error handling: unknown features preserved in serialization but evaluate to false', () => {
   const queries1 = MediaParser.parse('screen and (max-weight: 3kg) and (color), (color)').map(serializeMediaQuery);
   assert.strictEqual(queries1.length, 2);
-  assert.strictEqual(queries1[0], 'not all');
+  assert.strictEqual(queries1[0], 'screen and (max-weight: 3kg) and (color)');
   assert.strictEqual(queries1[1], '(color)');
+  assert.strictEqual(MediaParser.evaluate(queries1[0]), false);
 
   const queries2 = MediaParser.parse('(min-orientation: portrait)').map(serializeMediaQuery);
   assert.strictEqual(queries2.length, 1);
-  assert.strictEqual(queries2[0], 'not all');
+  assert.strictEqual(queries2[0], '(min-orientation: portrait)');
+  assert.strictEqual(MediaParser.evaluate(queries2[0]), false);
 });
 
 test('Media query list: empty list', () => {

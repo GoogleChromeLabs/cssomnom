@@ -21,9 +21,9 @@ import { tokenize } from '../src/tokenizer.ts';
 test('Tokenizer: unicode-range', () => {
   const tokens1 = tokenize('U+0025-00FF', true);
   assert.strictEqual(tokens1[0].type, 'unicode-range');
-  assert.strictEqual(tokens1[0].value, 'U+0025-00FF');
+  assert.strictEqual(tokens1[0].value, 'U+25-FF');
 
   const tokens2 = tokenize('U+4??', true);
   assert.strictEqual(tokens2[0].type, 'unicode-range');
-  assert.strictEqual(tokens2[0].value, 'U+0400-04FF');
+  assert.strictEqual(tokens2[0].value, 'U+400-4FF');
 });

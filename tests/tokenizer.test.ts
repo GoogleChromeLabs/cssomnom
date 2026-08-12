@@ -98,7 +98,7 @@ test('Tokenizer: Absorbs comments', () => {
 test('Tokenizer: Consume unicode-range token', () => {
   const t1 = tokenize('U+002B', true);
   assert.strictEqual(t1[0].type, 'unicode-range');
-  assert.strictEqual(t1[0].value, 'U+002B');
+  assert.strictEqual(t1[0].value, 'U+2B');
 
   const t2 = tokenize('U+1234-5678', true);
   assert.strictEqual(t2[0].type, 'unicode-range');

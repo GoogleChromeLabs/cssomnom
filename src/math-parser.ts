@@ -348,6 +348,10 @@ function toCanonical(val: CSSUnitValue): { value: number, unit: CSSUnit } {
     return { value: val.value * (unitToRadians[val.unit] / unitToRadians['deg']), unit: 'deg' };
   } else if (base === 'time' && unitToSeconds[val.unit]) {
     return { value: val.value * unitToSeconds[val.unit], unit: 's' };
+  } else if (base === 'resolution') {
+    if (val.unit === 'dpi') return { value: val.value, unit: 'dpi' };
+    if (val.unit === 'dpcm') return { value: val.value * 2.54, unit: 'dpi' };
+    if (val.unit === 'dppx' || val.unit === 'x') return { value: val.value * 96, unit: 'dpi' };
   }
   return { value: val.value, unit: val.unit };
 }
@@ -360,6 +364,10 @@ function fromCanonical(value: number, targetUnit: CSSUnit): number {
     return value / (unitToRadians[targetUnit] / unitToRadians['deg']);
   } else if (base === 'time' && unitToSeconds[targetUnit]) {
     return value / unitToSeconds[targetUnit];
+  } else if (base === 'resolution') {
+    if (targetUnit === 'dpi') return value;
+    if (targetUnit === 'dpcm') return value / 2.54;
+    if (targetUnit === 'dppx' || targetUnit === 'x') return value / 96;
   }
   return value;
 }
@@ -369,6 +377,7 @@ function isCanonicalizable(val: CSSUnitValue): boolean {
   if (base === 'length') return !!unitToPixels[val.unit];
   if (base === 'angle') return !!unitToRadians[val.unit];
   if (base === 'time') return !!unitToSeconds[val.unit];
+  if (base === 'resolution') return true;
   if (base === 'number') return true;
   return false;
 }
@@ -414,6 +423,14 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
           canonicalValue *= unitToSeconds[child.unit];
           canonicalUnit = 's';
           key = 'time';
+        } else if (base === 'resolution') {
+          if (child.unit === 'dpcm') {
+            canonicalValue *= 2.54;
+          } else if (child.unit === 'dppx' || child.unit === 'x') {
+            canonicalValue *= 96;
+          }
+          canonicalUnit = 'dpi';
+          key = 'resolution';
         } else if (base === 'number') {
           key = 'number';
         }
@@ -487,15 +504,8 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
       if (baseExponents.size === 0 || (baseExponents.size === 1 && Array.from(baseExponents.values())[0] === 1)) {
         let scalarProduct = 1;
         for (const child of numericChildren) {
-          const base = unitToBase[child.unit] || 'other';
-          let canonicalVal = child.value;
-          if (base === 'length' && unitToPixels[child.unit]) {
-            canonicalVal *= unitToPixels[child.unit];
-          } else if (base === 'angle' && unitToRadians[child.unit]) {
-            canonicalVal *= unitToRadians[child.unit] / unitToRadians['deg'];
-          } else if (base === 'time' && unitToSeconds[child.unit]) {
-            canonicalVal *= unitToSeconds[child.unit];
-          }
+          const canonicalInfo = toCanonical(new CSSUnitValue(child.value, child.unit));
+          const canonicalVal = canonicalInfo.value;
           
           if (child.inverted) {
             scalarProduct /= canonicalVal;
@@ -561,6 +571,9 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
     const simplifiedChild = simplify(node.value);
     if (simplifiedChild instanceof CSSMathNegate) {
       return simplifiedChild.value;
+    }
+    if (simplifiedChild instanceof CSSUnitValue) {
+      return new CSSUnitValue(-simplifiedChild.value, simplifiedChild.unit);
     }
     return new CSSMathNegate(simplifiedChild);
   }
