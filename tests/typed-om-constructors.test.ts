@@ -159,16 +159,27 @@ test('CSSUnparsedValue and CSSTransformValue Proxy indexes', () => {
   unparsed[0] = 'baz';
   assert.strictEqual(unparsed[0], 'baz');
 
-  // Setting index >= length throws RangeError
-  assert.throws(() => { unparsed[2] = 'qux'; }, RangeError);
+  // Setting index === length appends element per CSS Typed OM 1 § 3.4
+  unparsed[2] = 'qux';
+  assert.strictEqual(unparsed[2], 'qux');
+  assert.strictEqual(unparsed.length, 3);
+
+  // Setting index > length throws RangeError
+  assert.throws(() => { unparsed[4] = 'err'; }, RangeError);
 
   const translate = new CSSTranslate(new CSSUnitValue(10, 'px'), new CSSUnitValue(20, 'px'));
   const transform = new CSSTransformValue([translate]);
   assert.strictEqual(transform[0], translate);
   assert.strictEqual(transform.length, 1);
 
-  // Setting index >= length throws RangeError
-  assert.throws(() => { transform[1] = translate; }, RangeError);
+  // Setting index === length appends component per CSS Typed OM 1 § 7
+  const rotate = new CSSRotate(new CSSUnitValue(45, 'deg'));
+  transform[1] = rotate;
+  assert.strictEqual(transform[1], rotate);
+  assert.strictEqual(transform.length, 2);
+
+  // Setting index > length throws RangeError
+  assert.throws(() => { transform[3] = translate; }, RangeError);
 });
 
 test('CSSTransformValue.parse strict token and function validation', () => {

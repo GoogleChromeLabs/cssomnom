@@ -575,6 +575,19 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
     if (simplifiedChild instanceof CSSUnitValue) {
       return new CSSUnitValue(-simplifiedChild.value, simplifiedChild.unit);
     }
+    if (simplifiedChild instanceof CSSMathSum) {
+      // css-values-4 § 10.7 step 6.3 #calc-simplification
+      const negatedGrandchildren = simplifiedChild.values.map(grandchild => {
+        if (grandchild instanceof CSSUnitValue) {
+          return new CSSUnitValue(-grandchild.value, grandchild.unit);
+        }
+        if (grandchild instanceof CSSMathNegate) {
+          return grandchild.value;
+        }
+        return new CSSMathNegate(grandchild);
+      });
+      return new CSSMathSum(...negatedGrandchildren);
+    }
     return new CSSMathNegate(simplifiedChild);
   }
   
@@ -765,6 +778,7 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
   return node;
 }
 
+// css-values-4 § 10.7 #calc-simplification
 function simplifyMinMax(nodeName: 'min' | 'max', values: CSSNumericValue[]): CSSNumericValue {
   const isMin = nodeName === 'min';
   const flattened: CSSNumericValue[] = [];
@@ -777,9 +791,32 @@ function simplifyMinMax(nodeName: 'min' | 'max', values: CSSNumericValue[]): CSS
     }
   }
   
-  if (flattened.length === 1) {
-    return flattened[0];
+  // Combine numeric children by unit per CSS Values 4 § 10.7 step 5
+  const combined: CSSNumericValue[] = [];
+  const unitMap = new Map<string, CSSUnitValue>();
+
+  for (const child of flattened) {
+    if (child instanceof CSSUnitValue) {
+      const existing = unitMap.get(child.unit);
+      if (existing) {
+        if (isMin) {
+          existing.value = Math.min(existing.value, child.value);
+        } else {
+          existing.value = Math.max(existing.value, child.value);
+        }
+      } else {
+        const copy = new CSSUnitValue(child.value, child.unit);
+        unitMap.set(child.unit, copy);
+        combined.push(copy);
+      }
+    } else {
+      combined.push(child);
+    }
+  }
+
+  if (combined.length === 1) {
+    return combined[0];
   }
   
-  return isMin ? new CSSMathMin(...flattened) : new CSSMathMax(...flattened);
+  return isMin ? new CSSMathMin(...combined) : new CSSMathMax(...combined);
 }

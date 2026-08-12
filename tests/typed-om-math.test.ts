@@ -251,10 +251,9 @@ test('CSSNumericValue.simplify() handles unit canonicalization for min/max/clamp
   const minMixed = new CSSMathMin(new CSSUnitValue(10, 'mm'), new CSSUnitValue(1, 'em'), new CSSUnitValue(20, 'mm'));
   const simplifiedMinMixed = simplify(minMixed);
   assert.ok(simplifiedMinMixed instanceof CSSMathMin);
-  assert.strictEqual(simplifiedMinMixed.values.length, 3);
+  assert.strictEqual(simplifiedMinMixed.values.length, 2);
   assert.strictEqual(simplifiedMinMixed.values.item(0)?.toString(), '10mm');
   assert.strictEqual(simplifiedMinMixed.values.item(1)?.toString(), '1em');
-  assert.strictEqual(simplifiedMinMixed.values.item(2)?.toString(), '20mm');
 
   const max = new CSSMathMax(tenMm, oneCm);
   const simplifiedMax = simplify(max);

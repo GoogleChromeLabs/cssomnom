@@ -2228,13 +2228,13 @@ Objective: Implement normative calculation tree simplification, proxy index appe
 - CSS Typed OM 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs` (§ 3.2 `#the-stylepropertymap`, § 3.4 `#unparsedvalue-objects`, § 7 `#transformvalue-objects`)
 
 ### Tasks
-- [ ] **Same-Unit Literal Combining in `min()` / `max()` (`src/math-parser.ts`)**:
+- [x] **Same-Unit Literal Combining in `min()` / `max()` (`src/math-parser.ts`)**:
   - In `simplifyMinMax`, group numeric children by unit and combine same-unit literals (`min(10px, 20px, 100%)` -> `min(10px, 100%)`) per CSS Values 4 § 10.7 step 5.
-- [ ] **Negation Distribution over `CSSMathSum` (`src/math-parser.ts`)**:
+- [x] **Negation Distribution over `CSSMathSum` (`src/math-parser.ts`)**:
   - Distribute `CSSMathNegate` over inner `CSSMathSum` terms per CSS Values 4 § 10.7 step 6.3.
-- [ ] **Indexed Property Proxy Setters (`src/typed-om.ts`)**:
+- [x] **Indexed Property Proxy Setters (`src/typed-om.ts`)**:
   - Support appending at end of list (`array[array.length] = item`) in `CSSUnparsedValue` and `CSSTransformValue` per CSS Typed OM 1 § 3.4 & § 7.
-- [ ] **`StylePropertyMap` Custom Property Case Sensitivity & Validation (`src/typed-om.ts`)**:
+- [x] **`StylePropertyMap` Custom Property Case Sensitivity & Validation (`src/typed-om.ts`)**:
   - Preserve case for custom properties (`--fooBar`) during `_associatedProperty` validation.
   - Enforce `TypeError` on `StylePropertyMap.append()` when existing property contains `var()`.
   - Partition iteration order in `StylePropertyMapReadOnly` (standard -> vendor-prefixed -> custom properties).
