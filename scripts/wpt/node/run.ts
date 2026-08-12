@@ -75,7 +75,7 @@ export function runWptFile(filePath: string): WptFileResult {
         return sandbox.navigator;
       }
       if (prop === 'Array' || prop === 'Object' || prop === 'String' || prop === 'Number' || prop === 'Boolean' || prop === 'Symbol' || prop === 'Math' || prop === 'Date' || prop === 'RegExp' || prop === 'JSON') {
-        return (globalThis as unknown as Record<string, unknown>)[prop];
+        return Reflect.get(globalThis, prop);
       }
       if (typeof prop === 'string') {
         const val = target[prop];

@@ -1800,6 +1800,7 @@ export class Parser {
   }
 }
 
+// css-variables-1 § 3 Using Cascading Variables: The var() Notation #using-variables
 function validateVarFunction(func: CSSFunction): boolean {
   if (func.name.toLowerCase() !== 'var') return true;
   const args = func.value;
@@ -1827,6 +1828,7 @@ function validateVarFunction(func: CSSFunction): boolean {
   return true;
 }
 
+// css-syntax-3 § 5.4.5 Consume a declaration #consume-declaration
 export function validateDeclarationValue(values: ComponentValue[]): boolean {
   for (const v of values) {
     if (v.type === 'bad-string' || v.type === 'bad-url') return false;

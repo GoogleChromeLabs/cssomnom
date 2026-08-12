@@ -1525,11 +1525,11 @@ export function substituteVariables(
 
         const resolvedChildren = resolveNodes(funcNode.value);
         if (resolvedChildren === null) return null;
-        pushTokens([{ type: 'function', name: funcNode.name, value: resolvedChildren } as unknown as ComponentValue]);
+        pushTokens([{ type: 'function', name: funcNode.name, value: resolvedChildren }]);
       } else if (node.type === 'simple-block') {
         const resolvedChildren = resolveNodes(node.value);
         if (resolvedChildren === null) return null;
-        pushTokens([{ type: 'simple-block', associatedToken: (node as SimpleBlock).associatedToken, value: resolvedChildren } as unknown as ComponentValue]);
+        pushTokens([{ type: 'simple-block', associatedToken: (node as SimpleBlock).associatedToken, value: resolvedChildren }]);
       } else {
         pushTokens([node]);
       }
