@@ -18,7 +18,7 @@ import { ParseHooks } from './parse-hooks.ts';
 import { serialize, serializeDeclarations, serializeString, serializeIdentifier, serializeSelectorList } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import { StylePropertyMap } from './typed-om.ts';
-import type { Declaration, Rule, ASTAtRule, ComponentValue, MediaQuery, CustomMediaQuery } from './types.ts';
+import type { Declaration, Rule, ASTAtRule, ComponentValue, MediaQuery, CustomMediaQuery, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
 import { MediaParser, serializeMediaQuery } from './MediaParser.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { createIndexedProxy, deleteRuleFromArray } from './utils.ts';
@@ -512,15 +512,18 @@ function isRegularRule(r: Rule) {
   return !isImportRule(r) && !isNamespaceRule(r);
 }
 
+// cssom-1 § 6.4.3 #the-cssgroupingrule-interface
 function serializeGroupingRule(atKeyword: string, condition: string, rules: Rule[]): string {
   const cond = condition ? ' ' + condition : '';
   const ruleTexts = rules.map(r => (r as CSSRule).cssText).filter(p => p !== '');
   if (ruleTexts.length === 0) {
-    return `@${atKeyword}${cond} { }`;
+    if (atKeyword === 'keyframes' || atKeyword === 'scope') {
+      return `@${atKeyword}${cond} { }`;
+    }
+    return `@${atKeyword}${cond} {\n}`;
   }
-  const body = ruleTexts.join('\n');
-  const indentedBody = body.split('\n').map(line => '  ' + line).join('\n');
-  return `@${atKeyword}${cond} {\n${indentedBody}\n}`;
+  const body = ruleTexts.map(t => '  ' + t).join('\n');
+  return `@${atKeyword}${cond} {\n${body}\n}`;
 }
 
 export class CSSRule {
@@ -634,8 +637,8 @@ export class CSSGroupingRule extends CSSRule {
     }
   }
 
-  // cssom-1 § 6.16 #the-cssgroupingrule-interface
-  // cssom-1 § 6.5.3 #insert-a-css-rule
+  // cssom-1 § 6.4.3 #the-cssgroupingrule-interface
+  // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
   insertRule(rule: string, index: number = 0): number {
     // 1. Set length to the number of items in list.
     // 2. If index is greater than length (or index < 0), throw IndexSizeError.
@@ -645,6 +648,25 @@ export class CSSGroupingRule extends CSSRule {
     }
 
     const isNested = this instanceof CSSStyleRule || this.parentRule !== null;
+
+    // Check if the input rule is a top-level rule to validate hierarchy constraints
+    let topRule: Rule | null = null;
+    try {
+      topRule = ParseHooks.parseRule(rule);
+    } catch {}
+    if (topRule) {
+      if (isImportRule(topRule) || isNamespaceRule(topRule)) {
+        throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
+      }
+      if (isNested && !isImportRule(topRule) && !isNamespaceRule(topRule)) {
+        const atRuleName = (topRule as ASTAtRule).name || (topRule.constructor.name.replace(/^CSS/, '').replace(/Rule$/, '').toLowerCase());
+        const isGroupingRule = topRule instanceof CSSGroupingRule || ['media', 'supports', 'container', 'layer', 'scope', 'starting-style', 'style'].includes(atRuleName);
+        if (!isGroupingRule && !(topRule instanceof CSSStyleRule)) {
+          throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');
+        }
+      }
+    }
+
     const parsedRule = this._parseRuleInBlock(rule, isNested);
     if (!parsedRule) {
       // 5. If new rule is a syntax error, throw a SyntaxError exception.
@@ -655,6 +677,19 @@ export class CSSGroupingRule extends CSSRule {
     // In CSS, @import and @namespace rules are forbidden inside grouping rules.
     if (isImportRule(parsedRule) || isNamespaceRule(parsedRule)) {
       throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
+    }
+
+    if (parsedRule instanceof CSSNestedDeclarations) {
+      if (!isNested) {
+        throw new DOMException('Syntax error: CSSNestedDeclarations cannot be inserted into top-level grouping rule', 'SyntaxError');
+      }
+      const validDecls = parsedRule.style.declarations.filter(d => {
+        const name = d.name.toLowerCase();
+        return name.startsWith('--') || CSSStyleDeclaration.prototype._isPropertySupported(name);
+      });
+      if (validDecls.length === 0) {
+        throw new DOMException('Syntax error: CSSNestedDeclarations contains no valid declarations', 'SyntaxError');
+      }
     }
 
     // 8. Insert new rule into list at zero-indexed position index.
@@ -726,7 +761,12 @@ export class CSSStyleRule extends CSSGroupingRule {
       }
     }
     const isNested = this.parentRule !== null;
-    const selectorAST = ParseHooks.parseSelectorAST(value, declaredNamespaces, isNested);
+    let selectorAST: SelectorList | null = null;
+    try {
+      selectorAST = ParseHooks.parseSelectorAST(value, declaredNamespaces, isNested);
+    } catch {
+      return;
+    }
     if (selectorAST !== null) {
       if (isNested) {
         for (const selector of selectorAST.selectors) {
@@ -736,6 +776,19 @@ export class CSSStyleRule extends CSSGroupingRule {
                 type: 'compound-selector',
                 selectors: [{ type: 'nesting-selector' }]
               });
+            } else {
+              const hasAmp = selector.items.some((item: ComplexSelector['items'][number]) => {
+                if (item.type === 'compound-selector') {
+                  return item.selectors.some((s: SimpleSelector) => s.type === 'nesting-selector');
+                }
+                return false;
+              });
+              if (!hasAmp) {
+                selector.items.unshift(
+                  { type: 'compound-selector', selectors: [{ type: 'nesting-selector' }] },
+                  { type: 'combinator', value: ' ' }
+                );
+              }
             }
           }
         }
@@ -752,29 +805,29 @@ export class CSSStyleRule extends CSSGroupingRule {
 
   get type() { return 1; }
 
-  // 6.14 The CSSStyleRule Interface
+  // 6.14 The CSSStyleRule Interface & css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
   get cssText() {
     const declsStr = serializeDeclarations(this.style.declarations);
     
     if (this._rules.length > 0) {
       const bodyParts: string[] = [];
       if (declsStr) {
-        bodyParts.push(declsStr);
+        bodyParts.push('  ' + declsStr);
       }
       for (const r of this._rules) {
-        bodyParts.push((r as CSSRule).cssText);
+        const text = (r as CSSRule).cssText;
+        if (text !== '') {
+          bodyParts.push('  ' + text);
+        }
       }
       
-      const body = bodyParts.filter(p => p !== '').join('\n');
-      if (!body) {
-        const bodyText = declsStr.trim();
-        return `${this.selectorText} {${bodyText ? ' ' + bodyText + ' ' : ''}}`;
+      if (bodyParts.length === 0) {
+        return `${this.selectorText} { }`;
       }
-      const indentedBody = body.split('\n').map(line => '  ' + line).join('\n');
-      return `${this.selectorText} {\n${indentedBody}\n}`;
+      return `${this.selectorText} {\n${bodyParts.join('\n')}\n}`;
     } else {
       const bodyText = declsStr.trim();
-      return `${this.selectorText} {${bodyText ? ' ' + bodyText + ' ' : ''}}`;
+      return `${this.selectorText} {${bodyText ? ' ' + bodyText + ' ' : ' '}}`;
     }
   }
 
@@ -1183,7 +1236,7 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   declare fontDisplay?: string;
   declare unicodeRange?: string;
 
-  protected override _isPropertySupported(property: string): boolean {
+  override _isPropertySupported(property: string): boolean {
     return super._isPropertySupported(property) || FONT_FACE_DESCRIPTORS.has(property);
   }
 }
@@ -1233,7 +1286,7 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
   declare bleed: string;
   declare pageMarginSafety?: string;
 
-  protected override _isPropertySupported(property: string): boolean {
+  override _isPropertySupported(property: string): boolean {
     return super._isPropertySupported(property) || PAGE_DESCRIPTORS.has(property);
   }
 }

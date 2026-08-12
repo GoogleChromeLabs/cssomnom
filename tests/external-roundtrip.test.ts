@@ -71,6 +71,7 @@ const postCSSSpecTransformCases = new Set([
   'function',
   'ie-progid',
   'important',
+  'inside',
   'no-selector',
   'prop',
   'quotes',

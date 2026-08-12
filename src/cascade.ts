@@ -93,7 +93,7 @@ const INHERITED_PROPERTIES = new Set([
  * css-cascade-5 § 7 #cascaded-values
  * css-variables-1 § 4 #resolving-var-functions
  */
-export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList): CSSStyleDeclaration {
+export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList, pseudoElement?: string | null): CSSStyleDeclaration {
   if (!element || typeof element !== 'object') {
     return new CSSStyleDeclaration([], true);
   }
@@ -226,11 +226,13 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
     }
   };
 
-  const scanLayers = (list: (Rule | CSSRule)[], prefix: string = '') => {
+  const scanLayers = (list: (Rule | CSSRule)[], prefix: string = '', isInsideStyleRule: boolean = false) => {
     for (const r of list) {
       if (
-        r instanceof CSSLayerStatementRule ||
-        ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'layer' && !(r as ASTAtRule).block)
+        !isInsideStyleRule && (
+          r instanceof CSSLayerStatementRule ||
+          ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'layer' && !(r as ASTAtRule).block)
+        )
       ) {
         const names = (r as CSSLayerStatementRule).nameList || [];
         for (const n of names) {
@@ -245,10 +247,14 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         const fullName = prefix ? (rawName ? `${prefix}.${rawName}` : prefix) : rawName;
         if (fullName) registerLayer(fullName);
         if (r instanceof CSSGroupingRule && r.cssRules) {
-          scanLayers(Array.from(r.cssRules as ArrayLike<Rule | CSSRule>), fullName);
+          scanLayers(Array.from(r.cssRules as ArrayLike<Rule | CSSRule>), fullName, isInsideStyleRule);
+        }
+      } else if ('style' in r && 'selectorText' in r) {
+        if ('cssRules' in r && (r as { cssRules?: unknown }).cssRules) {
+          scanLayers(Array.from((r as { cssRules: ArrayLike<Rule | CSSRule> }).cssRules), prefix, true);
         }
       } else if (r instanceof CSSGroupingRule && r.cssRules) {
-        scanLayers(Array.from(r.cssRules as ArrayLike<Rule | CSSRule>), prefix);
+        scanLayers(Array.from(r.cssRules as ArrayLike<Rule | CSSRule>), prefix, isInsideStyleRule);
       }
     }
   };
@@ -276,8 +282,23 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         const selectorText = (rule as CSSStyleRule).selectorText || serialize((rule as { prelude?: ComponentValue[] }).prelude || []).trim();
         const resolvedSelector = resolveNestedSelector(selectorText, parentSelector);
 
-        if (matches(element, resolvedSelector, scopeNode)) {
-          const spec = getMatchingSpecificity(element, resolvedSelector);
+        const normalizedPseudo = pseudoElement ? (pseudoElement.startsWith('::') ? pseudoElement : `::${pseudoElement.replace(/^:/, '')}`) : null;
+        let isMatchingSelector = false;
+        let selectorForMatching = resolvedSelector;
+        if (normalizedPseudo) {
+          if (resolvedSelector.endsWith(normalizedPseudo) || resolvedSelector.endsWith(`:${normalizedPseudo.slice(2)}`)) {
+            selectorForMatching = resolvedSelector.replace(/::?[a-zA-Z-]+$/, '').trim() || ':scope';
+            isMatchingSelector = matches(element, selectorForMatching, scopeNode);
+          }
+        } else {
+          const hasPseudo = /::[a-zA-Z-]+$/.test(resolvedSelector) || /:(before|after|first-line|first-letter)\b/.test(resolvedSelector);
+          if (!hasPseudo) {
+            isMatchingSelector = matches(element, resolvedSelector, scopeNode);
+          }
+        }
+
+        if (isMatchingSelector) {
+          const spec = getMatchingSpecificity(element, selectorForMatching);
           const style = (rule as CSSStyleRule).style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
 
@@ -392,13 +413,46 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         }
       } else if (rule instanceof CSSScopeRule) {
         const childRules = (rule as CSSGroupingRule).cssRules || [];
-        walkRules(childRules, '', currentLayer, isElement(element) ? element : undefined);
+        let matchingScopeNode: DOMElement | undefined = undefined;
+        if (rule.startSelector) {
+          const rawStart = rule.startSelector.replace(/^\(/, '').replace(/\)$/, '').trim();
+          const scopeStart = resolveNestedSelector(rawStart, parentSelector);
+          if (isElement(element)) {
+            if (matches(element, scopeStart)) {
+              matchingScopeNode = element;
+            } else if (typeof (element as DOMElement).closest === 'function') {
+              const closest = ((element as DOMElement).closest as (s: string) => DOMElement | null).call(element, scopeStart);
+              if (closest) matchingScopeNode = closest as DOMElement;
+            }
+          }
+        } else if (isElement(element)) {
+          matchingScopeNode = element;
+        }
+        if (!rule.startSelector || matchingScopeNode) {
+          walkRules(childRules, parentSelector, currentLayer, matchingScopeNode);
+        }
       } else if (rule instanceof CSSGroupingRule) {
         walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode);
       } else if (rule instanceof CSSNestedDeclarations) {
-        const selectorToMatch = parentSelector || ':scope';
-        if (matches(element, selectorToMatch, scopeNode)) {
-          const spec = getMatchingSpecificity(element, selectorToMatch);
+        let selectorToMatch = parentSelector || ':scope';
+        let isMatchingDecl = false;
+        const normalizedPseudo = pseudoElement ? (pseudoElement.startsWith('::') ? pseudoElement : `::${pseudoElement.replace(/^:/, '')}`) : null;
+        if (normalizedPseudo) {
+          if (selectorToMatch.endsWith(normalizedPseudo) || selectorToMatch.endsWith(`:${normalizedPseudo.slice(2)}`)) {
+            selectorToMatch = selectorToMatch.replace(/::?[a-zA-Z-]+$/, '').trim() || ':scope';
+            isMatchingDecl = matches(element, selectorToMatch, scopeNode);
+          }
+        } else {
+          const hasPseudo = /::[a-zA-Z-]+$/.test(selectorToMatch) || /:(before|after|first-line|first-letter)\b/.test(selectorToMatch);
+          if (!hasPseudo) {
+            isMatchingDecl = matches(element, selectorToMatch, scopeNode);
+          }
+        }
+
+        if (isMatchingDecl) {
+          // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface:
+          // Nested @scope rules behave like :where(:scope) with specificity (0, 0, 0)
+          const spec = (scopeNode ? [0, 0, 0] : getMatchingSpecificity(element, selectorToMatch)) as [number, number, number];
           const style = rule.style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
           for (let k = 0; k < style.length; k++) {
@@ -457,7 +511,13 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
 
   for (const [prop, decls] of declarationsByProperty) {
     decls.sort(compareCascadeDeclarations);
-    winningDeclarations.set(prop, decls[decls.length - 1]);
+    let winnerIndex = decls.length - 1;
+    while (winnerIndex >= 0 && decls[winnerIndex].value.trim() === 'revert-rule') {
+      winnerIndex--;
+    }
+    if (winnerIndex >= 0) {
+      winningDeclarations.set(prop, decls[winnerIndex]);
+    }
   }
 
   // Determine writing-mode, direction, and text-orientation for logical property resolution

@@ -170,9 +170,9 @@ test('cssText serialization', () => {
   background: white; color: black;
   &.is-active { background: blue; }
   & .title {
-    font-weight: bold;
-    & .subtitle { color: blue; }
-  }
+  font-weight: bold;
+  & .subtitle { color: blue; }
+}
 }`;
   assert.strictEqual(cardRule.cssText.trim(), expectedDeep);
 });

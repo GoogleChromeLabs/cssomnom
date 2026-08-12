@@ -6,7 +6,7 @@ import { getCascadedStyle } from '../src/cascade.ts';
 import { matches, querySelectorAll, querySelector } from '../src/matcher.ts';
 import { camelToDashed } from '../src/utils.ts';
 import { MediaParser } from '../src/MediaParser.ts';
-import type { MediaEnvironment } from '../src/types.ts';
+import type { MediaEnvironment, Rule } from '../src/types.ts';
 
 export interface WptSandboxTest {
   type: 'setup' | 'test' | 'promise_test' | 'async_test';
@@ -470,35 +470,37 @@ export function patchWindowForTypedOM(window: WindowType) {
   }
 
   // Declarative cascade oracle for WPT test sandbox
-  win.getComputedStyle = function(element: Element) {
+  win.getComputedStyle = function(element: Element, pseudoElt?: string | null) {
     const liveDecl = new CSSStyleDeclaration([], true);
     return new Proxy(liveDecl, {
       get(_target, prop, _receiver) {
         if (typeof prop === 'string') {
           if (prop === 'getPropertyValue') {
-            return (p: string) => getCascadedStyle(element).getPropertyValue(p);
+            return (p: string) => getCascadedStyle(element, undefined, pseudoElt).getPropertyValue(p);
           }
           if (prop === 'getPropertyPriority') {
-            return (p: string) => getCascadedStyle(element).getPropertyPriority(p);
+            return (p: string) => getCascadedStyle(element, undefined, pseudoElt).getPropertyPriority(p);
           }
           if (prop === 'getPropertyCSSValue') {
             return (_p: string) => null;
           }
           if (prop === 'length') {
-            return getCascadedStyle(element).length;
+            return getCascadedStyle(element, undefined, pseudoElt).length;
           }
           if (prop === 'item') {
-            return (i: number) => getCascadedStyle(element).item(i);
+            return (i: number) => getCascadedStyle(element, undefined, pseudoElt).item(i);
           }
           if (prop === 'cssText') {
-            return getCascadedStyle(element).cssText;
+            return getCascadedStyle(element, undefined, pseudoElt).cssText;
           }
           if (!isNaN(Number(prop))) {
-            return getCascadedStyle(element).item(Number(prop));
+            return getCascadedStyle(element, undefined, pseudoElt).item(Number(prop));
           }
           const isCustom = prop.startsWith('--');
           const cssProp = !isCustom && prop === 'cssFloat' ? 'float' : (!isCustom ? camelToDashed(prop) : prop);
-          return getCascadedStyle(element).getPropertyValue(cssProp);
+          const val = getCascadedStyle(element, undefined, pseudoElt).getPropertyValue(cssProp);
+          if (val === '' && cssProp === 'z-index') return 'auto';
+          return val;
         }
         return Reflect.get(_target, prop, _receiver);
       }
@@ -998,8 +1000,56 @@ export function patchWindowForTypedOM(window: WindowType) {
     });
   }
 
+  // Normalize documentElement when document was parsed without an explicit <html> root
+  const winDoc = win.document as unknown as {
+    documentElement?: { tagName?: string };
+    createElement(tag: string): Element;
+    children?: Element[];
+    appendChild(el: Element): void;
+  } | undefined;
+  if (winDoc && winDoc.documentElement && winDoc.documentElement.tagName !== 'HTML') {
+    const htmlEl = winDoc.createElement('html');
+    const children = Array.from(winDoc.children || []);
+    for (const child of children) {
+      htmlEl.appendChild(child);
+    }
+    winDoc.appendChild(htmlEl);
+    Object.defineProperty(winDoc, 'documentElement', {
+      get() { return htmlEl; },
+      configurable: true
+    });
+  }
+
   const htmlStyleEl = win.HTMLStyleElement as { prototype: Record<string, unknown> } | undefined;
   if (htmlStyleEl) {
+    const winWithConstructors = win as unknown as { Node?: { prototype?: Record<string, unknown> }; Element?: { prototype?: Record<string, unknown> } };
+    const origTextContentDesc = Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'textContent') || (winWithConstructors.Node?.prototype ? Object.getOwnPropertyDescriptor(winWithConstructors.Node.prototype, 'textContent') : undefined);
+    const origInnerHTMLDesc = Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'innerHTML') || (winWithConstructors.Element?.prototype ? Object.getOwnPropertyDescriptor(winWithConstructors.Element.prototype, 'innerHTML') : undefined);
+
+    if (origTextContentDesc?.set) {
+      const origSet = origTextContentDesc.set;
+      Object.defineProperty(htmlStyleEl.prototype, 'textContent', {
+        ...origTextContentDesc,
+        set(this: { _sheet?: unknown; _sheetSource?: unknown }, val) {
+          this._sheet = null;
+          this._sheetSource = null;
+          return origSet.call(this, val);
+        }
+      });
+    }
+
+    if (origInnerHTMLDesc?.set) {
+      const origSet = origInnerHTMLDesc.set;
+      Object.defineProperty(htmlStyleEl.prototype, 'innerHTML', {
+        ...origInnerHTMLDesc,
+        set(this: { _sheet?: unknown; _sheetSource?: unknown }, val) {
+          this._sheet = null;
+          this._sheetSource = null;
+          return origSet.call(this, val);
+        }
+      });
+    }
+
     Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
       configurable: true,
       enumerable: true,
@@ -1024,7 +1074,18 @@ export function patchWindowForTypedOM(window: WindowType) {
       enumerable: true,
       get() {
         if (!this._sheet) {
-          const sheet = CSSStyleSheet.createInternal([], parseRule);
+          let rules: Rule[] = [];
+          const href = this.getAttribute ? this.getAttribute('href') : null;
+          if (href) {
+            try {
+              const htmlDir = (this.ownerDocument as unknown as { _htmlDir?: string })?._htmlDir || process.cwd();
+              const fullPath = href.startsWith('/') ? path.join(process.cwd(), 'submodules/web-platform-tests', href) : path.resolve(htmlDir, href);
+              if (fs.existsSync(fullPath)) {
+                rules = parseStyleSheet(fs.readFileSync(fullPath, 'utf-8'));
+              }
+            } catch {}
+          }
+          const sheet = CSSStyleSheet.createInternal(rules, parseRule);
           Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
           this._sheet = sheet;
         }

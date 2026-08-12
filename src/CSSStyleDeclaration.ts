@@ -122,6 +122,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     };
 
     for (const d of declarations) {
+      if (d.name === '--') continue;
       addDeclarationRecursive(d);
     }
     
@@ -563,7 +564,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     }
   }
 
-  protected _isPropertySupported(property: string): boolean {
+  _isPropertySupported(property: string): boolean {
     return SUPPORTED_PROPERTIES.has(property);
   }
 

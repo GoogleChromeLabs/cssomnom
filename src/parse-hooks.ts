@@ -27,6 +27,9 @@ export const ParseHooks = {
   consumeListOfRules: (_tokens: Token[], _topLevel: boolean): Rule[] => {
     throw new Error('consumeListOfRules not injected');
   },
+  parseRule: (_text: string): Rule | null => {
+    throw new Error('parseRule not injected');
+  },
   parseComponentValues: (_tokens: Token[]): ComponentValue[] => {
     throw new Error('parseComponentValues not injected');
   },

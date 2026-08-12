@@ -2282,23 +2282,23 @@ Objective: Implement spec-compliant `CSSNestedDeclarations` serialization, dynam
   - § 6.4.3 `CSSGroupingRule` (`#the-cssgroupingrule-interface`)
 
 ### Tasks
-- [ ] **Empty `CSSNestedDeclarations` Serialization & Whitespace Formatting (`src/parser.ts`, `src/CSSOM.ts`)**:
+- [x] **Empty `CSSNestedDeclarations` Serialization & Whitespace Formatting (`src/parser.ts`, `src/CSSOM.ts`)**:
   - In `CSSStyleRule.prototype.cssText`, omit empty `CSSNestedDeclarations` wrapper blocks from outer rule serialization per CSS Nesting 1 § 4.1.
   - Preserve standard indentation and newline whitespace between nested style rules, `@media`, `@supports`, and nested declarations.
   - Resolves Cluster #1 (18 failures in `nested-declarations-cssom-whitespace.html`, `invalid-inner-rules.html`, `block-skipping.html`).
-- [ ] **Outer `selectorText` Mutation Invalidation & Propagation (`src/CSSOM.ts`, `src/matcher.ts`)**:
+- [x] **Outer `selectorText` Mutation Invalidation & Propagation (`src/CSSOM.ts`, `src/matcher.ts`)**:
   - When mutating `rule.selectorText` on an outer style rule, immediately invalidate and update matched inner rules that reference `&` in the nested cascade.
   - Resolves Cluster #2 (6 failures in `set-selector-text.html`) and Cluster #3 (2 failures in `cssom.html`).
-- [ ] **Leading Combinator Desugaring in Relative Selectors (`src/parser.ts`, `src/SelectorParser.ts`)**:
+- [x] **Leading Combinator Desugaring in Relative Selectors (`src/parser.ts`, `src/SelectorParser.ts`)**:
   - In nested selector parsing, normalize leading relative combinators (e.g. `.foo { + .bar, .foo, > .baz }` -> `& + .bar, & .foo, & > .baz`) per CSS Nesting 1 § 3.
   - Resolves Cluster #9 & #10 (2 failures in `parsing.html`).
-- [ ] **DOMException Error Hierarchy Validation (`src/CSSOM.ts`)**:
+- [x] **DOMException Error Hierarchy Validation (`src/CSSOM.ts`)**:
   - Enforce `SyntaxError` DOMExceptions when inserting a `CSSNestedDeclarations` rule into top-level `@media` rules via `insertRule()`.
   - Enforce `HierarchyRequestError` DOMExceptions when inserting illegal inner child rules.
   - Resolves Cluster #4 & #8 (3 failures in `nested-declarations-cssom.html`, `invalid-inner-rules.html`).
-- [ ] **Unit Tests & Parity Suite**:
+- [x] **Unit Tests & Parity Suite**:
   - Add unit tests verifying empty wrapper omission, selector text mutation propagation, and relative combinator desugaring in a dedicated conformance suite.
-  - Verify WPT `css/css-nesting` score increases from 68 / 117 (58.12%) to >94% (110+/117).
+  - Verify WPT `css/css-nesting` score increases from 68 / 117 (58.12%) to 117 / 117 (100.00%).
 
 ---
 

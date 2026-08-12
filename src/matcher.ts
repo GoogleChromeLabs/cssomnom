@@ -54,6 +54,7 @@ export interface DOMElement {
   prefix?: string | null;
   assignedNodes?(options?: { flatten?: boolean }): unknown[];
   contains?(other: unknown): boolean;
+  closest?(selector: string): DOMElement | null;
 }
 
 export function isElement(node: unknown): node is DOMElement {
@@ -71,11 +72,15 @@ function parseSelector(selector: string | ComplexSelector | SelectorList): Selec
     if (selector.type === 'selector-list') return selector;
     if (selector.type === 'complex-selector') return { type: 'selector-list', selectors: [selector] };
   }
-  const tokens = tokenize(selector);
-  const parser = new Parser(tokens);
-  const componentValues = parser.parseComponentValues();
-  const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false });
-  return selectorParser.parse();
+  try {
+    const tokens = tokenize(selector);
+    const parser = new Parser(tokens);
+    const componentValues = parser.parseComponentValues();
+    const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false });
+    return selectorParser.parse();
+  } catch {
+    return { type: 'selector-list', selectors: [] };
+  }
 }
 
 /**

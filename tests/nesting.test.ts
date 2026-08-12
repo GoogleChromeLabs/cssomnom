@@ -160,7 +160,7 @@ describe('CSS Nesting', () => {
         );
         
         const cssText = mediaRule.cssText;
-        const expected = '@media screen { }';
+        const expected = '@media screen {\n}';
         assert.strictEqual(cssText, expected);
     });
 

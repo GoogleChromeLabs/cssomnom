@@ -438,7 +438,7 @@ function evaluateSupportsDeclaration(property: string, value: string): boolean {
 
   if (nonWs.length === 1 && nonWs[0].type === 'ident') {
     const valStr = String((nonWs[0] as Token).value).toLowerCase();
-    if (['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(valStr)) {
+    if (['inherit', 'initial', 'unset', 'revert', 'revert-layer', 'revert-rule'].includes(valStr)) {
       return true;
     }
   }
@@ -541,6 +541,16 @@ export function supports(propertyOrCondition: string, value?: string): boolean {
   }
   const condition = propertyOrCondition.trim();
   if (condition === '') return false;
+
+  const colonIdx = condition.indexOf(':');
+  if (!condition.startsWith('(') && colonIdx !== -1 && !/\b(and|or|not)\b/i.test(condition)) {
+    const prop = condition.slice(0, colonIdx).trim();
+    const val = condition.slice(colonIdx + 1).trim();
+    if (prop && val) {
+      const declRes = evaluateSupportsDeclaration(prop, val);
+      if (declRes) return true;
+    }
+  }
 
   const tokens = tokenize(condition);
   const parser = new Parser(tokens);

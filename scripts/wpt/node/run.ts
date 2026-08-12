@@ -143,8 +143,10 @@ export function runWptFile(filePath: string): WptFileResult {
     }
   }
 
-  const context = vm.createContext(sandbox);
   const htmlDir = path.dirname(filePath);
+  (dom.document as unknown as { _htmlDir?: string })._htmlDir = htmlDir;
+
+  const context = vm.createContext(windowProxy as Record<string, unknown>);
 
   const cleanup = () => {
     const sandboxObj = sandbox as {[key: string]: unknown};
