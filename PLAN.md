@@ -2265,6 +2265,73 @@ Objective: Modernize `src/DOMMatrix.ts` to eliminate double-transposition clonin
 - [ ] **Unit Tests & Parity Suite**:
   - Expand `tests/dom-matrix.test.ts` to verify 2D affine fast-paths, non-invertible matrix handling with `NaN`, and 3D compound rotations.
 
+---
+
+## Phase 93: CSS Nesting 1 Conformance & `CSSNestedDeclarations` Lifecycle (`css/css-nesting`)
+
+Objective: Implement spec-compliant `CSSNestedDeclarations` serialization, dynamic outer `selectorText` mutation propagation, relative combinator desugaring, and grouping rule DOMException error contracts per CSS Nesting 1.
+
+**Spec References**:
+- CSS Nesting Level 1: `submodules/csswg-drafts/css-nesting-1/Overview.bs`
+  - § 3 Nesting Selectors (`#nest-selector`)
+  - § 4 CSSOM Integration (`#cssom`)
+  - § 4.1 The `CSSNestedDeclarations` Interface (`#the-cssnesteddeclarations-interface`)
+- CSSOM Level 1: `submodules/csswg-drafts/cssom-1/Overview.bs`
+  - § 6.4.3 `CSSGroupingRule` (`#the-cssgroupingrule-interface`)
+
+### Tasks
+- [ ] **Empty `CSSNestedDeclarations` Serialization & Whitespace Formatting (`src/parser.ts`, `src/CSSOM.ts`)**:
+  - In `CSSStyleRule.prototype.cssText`, omit empty `CSSNestedDeclarations` wrapper blocks from outer rule serialization per CSS Nesting 1 § 4.1.
+  - Preserve standard indentation and newline whitespace between nested style rules, `@media`, `@supports`, and nested declarations.
+  - Resolves Cluster #1 (18 failures in `nested-declarations-cssom-whitespace.html`, `invalid-inner-rules.html`, `block-skipping.html`).
+- [ ] **Outer `selectorText` Mutation Invalidation & Propagation (`src/CSSOM.ts`, `src/matcher.ts`)**:
+  - When mutating `rule.selectorText` on an outer style rule, immediately invalidate and update matched inner rules that reference `&` in the nested cascade.
+  - Resolves Cluster #2 (6 failures in `set-selector-text.html`) and Cluster #3 (2 failures in `cssom.html`).
+- [ ] **Leading Combinator Desugaring in Relative Selectors (`src/parser.ts`, `src/SelectorParser.ts`)**:
+  - In nested selector parsing, normalize leading relative combinators (e.g. `.foo { + .bar, .foo, > .baz }` -> `& + .bar, & .foo, & > .baz`) per CSS Nesting 1 § 3.
+  - Resolves Cluster #9 & #10 (2 failures in `parsing.html`).
+- [ ] **DOMException Error Hierarchy Validation (`src/CSSOM.ts`)**:
+  - Enforce `SyntaxError` DOMExceptions when inserting a `CSSNestedDeclarations` rule into top-level `@media` rules via `insertRule()`.
+  - Enforce `HierarchyRequestError` DOMExceptions when inserting illegal inner child rules.
+  - Resolves Cluster #4 & #8 (3 failures in `nested-declarations-cssom.html`, `invalid-inner-rules.html`).
+- [ ] **Unit Tests & Parity Suite**:
+  - Add unit tests verifying empty wrapper omission, selector text mutation propagation, and relative combinator desugaring in a dedicated conformance suite.
+  - Verify WPT `css/css-nesting` score increases from 68 / 117 (58.12%) to >94% (110+/117).
+
+---
+
+## Phase 94: CSS Variables 1 Cascade, Cycle Detection & `revert`/`revert-layer` Fallbacks (`css/css-variables`)
+
+Objective: Implement spec-compliant `revert` / `revert-layer` cascade fallback rollbacks, empty custom property whitespace preservation, reference graph cycle detection, and SVG presentation attribute variable substitution per CSS Variables 1 and CSS Cascade 5.
+
+**Spec References**:
+- CSS Custom Properties for Cascading Variables Module Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+  - § 2 Defining Custom Properties (`#defining-custom-properties`)
+  - § 3 Using Cascading Variables: The `var()` Notation (`#using-variables`)
+  - § 3.1 Guaranteed-Invalid Values & Cycles (`#guaranteed-invalid`)
+- CSS Cascading and Inheritance Level 5: `submodules/csswg-drafts/css-cascade-5/Overview.bs`
+  - § 6.2 The `revert` Keyword (`#revert`)
+  - § 6.3 The `revert-layer` Keyword (`#revert-layer`)
+
+### Tasks
+- [ ] **`revert` and `revert-layer` Cascade Fallback Rollbacks (`src/cascade.ts`)**:
+  - In `getCascadedStyle` and variable substitution, when a custom property is unassigned, preserve fallback keywords `var(--unknown, revert)` and `var(--unknown, revert-layer)` and roll back to the previous cascade tier / user-agent default per CSS Cascade 5 § 6.2–6.3.
+  - Resolves Cluster #1 (191 failures in `revert-in-fallback.html`, `revert-layer-in-fallback.html`, `revert-rule-in-fallback.html`).
+- [ ] **Empty Custom Property Whitespace Token Preservation (`src/parser.ts`, `src/serializer.ts`)**:
+  - Preserve single whitespace tokens for `--foo: ;` vs empty token streams `--foo:;` per CSS Variables 1 § 2.1.
+  - Resolves Cluster #3 (25 failures in `variable-definition.html`, `variable-substitution-background-properties.html`, `variable-substitution-basic.html`).
+- [ ] **Reference Graph Dependency Cycle Detection (`src/cascade.ts`)**:
+  - Implement cycle detection across custom property references (self-cycles `--a: var(--a)`, 2-node cycles `--a: var(--b); --b: var(--a)`, and 3-node dependency chains).
+  - Evaluate cyclic properties to `guaranteed-invalid`, falling back to initial values.
+  - Resolves Cluster #5 (10 failures in `variable-cycles.html`).
+- [ ] **SVG Presentation Attribute Variable Cascade (`src/cascade.ts`)**:
+  - Wire SVG presentation attributes (`alignment-baseline`, `baseline-shift`, `flood-color`, `lighting-color`, `stop-color`, `clip-rule`) into `getCascadedStyle` variable substitution.
+  - Resolves Cluster #2 & #8 (42 failures in `variable-presentation-attribute.html`).
+- [ ] **Unit Tests & Parity Suite**:
+  - Add unit tests verifying fallback rollbacks, whitespace preservation, and cycle evaluation in a dedicated conformance suite.
+  - Verify WPT `css/css-variables` score increases from 215 / 526 (40.87%) to >87% (460+/526).
+
+
 
 
 
