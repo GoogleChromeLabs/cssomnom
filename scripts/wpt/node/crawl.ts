@@ -276,10 +276,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       grandTotal += res.total;
       grandPassing += res.passing;
       const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[specKey] ?? 0;
-      grandFeasible += Math.max(0, res.total - outOfScope);
+      const feasibleForSpec = Math.max(res.passing, res.total - outOfScope);
+      grandFeasible += feasibleForSpec;
     }
     const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
-    const normalizedPassRate = grandFeasible > 0 ? ((grandPassing / grandFeasible) * 100).toFixed(2) : '0.00';
+    const normalizedPassRate = grandFeasible > 0 ? Math.min(100, (grandPassing / grandFeasible) * 100).toFixed(2) : '0.00';
 
     // Get git details
     let commitHash = 'unknown';

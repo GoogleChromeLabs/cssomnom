@@ -27,12 +27,12 @@ export const BROWSER_ONLY_MANIFEST: Record<string, ManifestEntry[]> = fs.existsS
 
 export const SPEC_OUT_OF_SCOPE_COUNTS: Record<string, number> = {
   'css-typed-om': 4,
-  'mediaqueries': 1,
-  'css-syntax': 81,
-  'cssom': 243,
-  'css-nesting': 34,
-  'selectors': 1990,
-  'css-variables': 343,
+  'mediaqueries': 0,
+  'css-syntax': 15,
+  'cssom': 32,
+  'css-nesting': 0,
+  'selectors': 148,
+  'css-variables': 40,
 };
 
 export function isBrowserOnlyFile(spec: string, relativeFilePath: string): boolean {
@@ -54,19 +54,19 @@ export function calculateFeasibility(currentResults: Record<string, { passing: n
 
   for (const [spec, counts] of Object.entries(currentResults)) {
     const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[spec] ?? 0;
-    const feasible = Math.max(0, counts.total - outOfScope);
-    const rawRate = ((counts.passing / counts.total) * 100).toFixed(2) + '%';
-    const normalizedRate = ((counts.passing / feasible) * 100).toFixed(2) + '%';
+    const feasible = Math.max(counts.passing, counts.total - outOfScope);
+    const rawRate = counts.total > 0 ? ((counts.passing / counts.total) * 100).toFixed(2) + '%' : '0.00%';
+    const normalizedRate = feasible > 0 ? Math.min(100, (counts.passing / feasible) * 100).toFixed(2) + '%' : '0.00%';
 
     totalAll += counts.total;
-    outOfScopeAll += outOfScope;
+    outOfScopeAll += (counts.total - feasible);
     feasibleAll += feasible;
     passingAll += counts.passing;
 
     specs.push({
       spec,
       totalTests: counts.total,
-      outOfScopeTests: outOfScope,
+      outOfScopeTests: counts.total - feasible,
       feasibleTests: feasible,
       passingTests: counts.passing,
       rawPassRate: rawRate,
@@ -80,8 +80,8 @@ export function calculateFeasibility(currentResults: Record<string, { passing: n
     outOfScopeTests: outOfScopeAll,
     feasibleTests: feasibleAll,
     passingTests: passingAll,
-    rawPassRate: ((passingAll / totalAll) * 100).toFixed(2) + '%',
-    normalizedPassRate: ((passingAll / feasibleAll) * 100).toFixed(2) + '%',
+    rawPassRate: totalAll > 0 ? ((passingAll / totalAll) * 100).toFixed(2) + '%' : '0.00%',
+    normalizedPassRate: feasibleAll > 0 ? Math.min(100, (passingAll / feasibleAll) * 100).toFixed(2) + '%' : '0.00%',
   };
 
   return { specs, overall };
