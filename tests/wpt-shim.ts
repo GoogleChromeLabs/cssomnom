@@ -94,11 +94,13 @@ type DocumentType = ReturnType<typeof parseHTML>['document'];
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 export const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
 
-import { DOMMatrixReadOnly, DOMMatrix } from '../src/DOMMatrix.ts';
+import { DOMMatrixReadOnly, DOMMatrix, DOMPointReadOnly, DOMPoint } from '../src/DOMMatrix.ts';
 import { unitToPixels, unitToRadians } from '../src/data/gen/units.ts';
 
 (globalThis as unknown as { DOMMatrixReadOnly: unknown }).DOMMatrixReadOnly = DOMMatrixReadOnly;
 (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrix;
+(globalThis as unknown as { DOMPointReadOnly: unknown }).DOMPointReadOnly = DOMPointReadOnly;
+(globalThis as unknown as { DOMPoint: unknown }).DOMPoint = DOMPoint;
 
 export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
   override get(property: string): TypedOM.CSSStyleValue | undefined {

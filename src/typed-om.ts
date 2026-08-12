@@ -1612,10 +1612,6 @@ export class CSSNumericArray {
 
 export { DOMMatrixReadOnly, DOMMatrix };
 
-function newDOMMatrix(elements?: number[]): DOMMatrix {
-  return new DOMMatrix(elements);
-}
-
 
 // CSS Typed OM: CSSUnitValue
 export class CSSUnitValue extends CSSNumericValue {
@@ -3136,9 +3132,9 @@ export class CSSTranslate extends CSSTransformComponent {
     const z = this.z.to('px').value;
     
     if (this.is2D) {
-      return newDOMMatrix([1, 0, 0, 1, x, y]);
+      return new DOMMatrix([1, 0, 0, 1, x, y]);
     } else {
-      return newDOMMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
+      return new DOMMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
     }
   }
 }
@@ -3197,9 +3193,9 @@ export class CSSScale extends CSSTransformComponent {
     const z = this.z.to('number').value;
     
     if (this.is2D) {
-      return newDOMMatrix([x, 0, 0, y, 0, 0]);
+      return new DOMMatrix([x, 0, 0, y, 0, 0]);
     } else {
-      return newDOMMatrix([x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]);
+      return new DOMMatrix([x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]);
     }
   }
 }
@@ -3300,7 +3296,7 @@ export class CSSRotate extends CSSTransformComponent {
     if (this.is2D) {
       const c = Math.cos(rad);
       const s = Math.sin(rad);
-      return newDOMMatrix([c, s, -s, c, 0, 0]);
+      return new DOMMatrix([c, s, -s, c, 0, 0]);
     } else {
       let x = this.x.to('number').value;
       let y = this.y.to('number').value;
@@ -3321,7 +3317,7 @@ export class CSSRotate extends CSSTransformComponent {
       const s = Math.sin(rad);
       const t = 1 - c;
       
-      return newDOMMatrix([
+      return new DOMMatrix([
         t * x * x + c,
         t * x * y + s * z,
         t * x * z - s * y,
@@ -3375,7 +3371,7 @@ export class CSSSkew extends CSSTransformComponent {
   override toMatrix(): DOMMatrix {
     const axRad = this.ax.to('rad').value;
     const ayRad = this.ay.to('rad').value;
-    return newDOMMatrix([1, Math.tan(ayRad), Math.tan(axRad), 1, 0, 0]);
+    return new DOMMatrix([1, Math.tan(ayRad), Math.tan(axRad), 1, 0, 0]);
   }
 }
 
@@ -3399,7 +3395,7 @@ export class CSSSkewX extends CSSTransformComponent {
   }
   override toMatrix(): DOMMatrix {
     const axRad = this.ax.to('rad').value;
-    return newDOMMatrix([1, 0, Math.tan(axRad), 1, 0, 0]);
+    return new DOMMatrix([1, 0, Math.tan(axRad), 1, 0, 0]);
   }
 }
 
@@ -3423,7 +3419,7 @@ export class CSSSkewY extends CSSTransformComponent {
   }
   override toMatrix(): DOMMatrix {
     const ayRad = this.ay.to('rad').value;
-    return newDOMMatrix([1, Math.tan(ayRad), 0, 1, 0, 0]);
+    return new DOMMatrix([1, Math.tan(ayRad), 0, 1, 0, 0]);
   }
 }
 
@@ -3575,7 +3571,7 @@ export class CSSTransformValue extends CSSStyleValue {
   }
 
   toMatrix(): DOMMatrix {
-    let result = this.components[0]?.toMatrix() ?? newDOMMatrix([1, 0, 0, 1, 0, 0]);
+    let result = this.components[0]?.toMatrix() ?? new DOMMatrix([1, 0, 0, 1, 0, 0]);
     for (let i = 1; i < this.components.length; i++) {
       const next = this.components[i].toMatrix();
       result = result.multiply(next);

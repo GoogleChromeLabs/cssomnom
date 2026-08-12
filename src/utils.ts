@@ -60,3 +60,20 @@ export function deleteRuleFromArray(rules: Rule[], index: number): Rule {
   }
   return oldRule;
 }
+
+export const DEG_TO_RAD = Math.PI / 180;
+export const RAD_TO_DEG = 180 / Math.PI;
+
+export function degToRad(deg: number): number {
+  return deg * DEG_TO_RAD;
+}
+
+export function radToDeg(rad: number): number {
+  return rad * RAD_TO_DEG;
+}
+
+export function angleFromVector(x: number, y: number): number {
+  if (x === 0 && y === 0) return 0;
+  return Math.atan2(y, x) * RAD_TO_DEG;
+}
+
