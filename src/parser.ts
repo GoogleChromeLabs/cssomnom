@@ -91,8 +91,7 @@ export class Parser {
     'media', 'supports', 'container', 'layer', 'scope', 'starting-style'
   ]);
 
-  // css-nesting-1 § 659 #conditionals
-  // css-nesting-1 § 659 #conditionals
+  // css-nesting-1 § 3.3 #conditionals
   // css-syntax-3 § 3.2 #charset-rule & § 5.4.4 #consume-at-rule
   private isSupportedAtRule(name: string, nested: boolean = false): boolean {
     const lower = name.toLowerCase();

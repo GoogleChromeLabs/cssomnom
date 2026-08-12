@@ -25,7 +25,9 @@ describe("Phase 93: CSS Nesting 1 Conformance & CSSNestedDeclarations Lifecycle"
       assert.strictEqual(aRule.cssRules.length, 4);
 
       for (const childRule of aRule.cssRules) {
-        (childRule as unknown as { style: string }).style = "";
+        if ('style' in childRule && childRule.style && typeof childRule.style === 'object') {
+          (childRule as CSSStyleRule).style.cssText = "";
+        }
       }
       assert.strictEqual(aRule.cssText, ".a {\n  & { }\n  & { }\n}");
     });
@@ -49,7 +51,9 @@ describe("Phase 93: CSS Nesting 1 Conformance & CSSNestedDeclarations Lifecycle"
       assert.strictEqual(media.cssRules.length, 4);
 
       for (const childRule of media.cssRules) {
-        (childRule as unknown as { style: string }).style = "";
+        if ('style' in childRule && childRule.style && typeof childRule.style === 'object') {
+          (childRule as CSSStyleRule).style.cssText = "";
+        }
       }
       assert.strictEqual(media.cssText, "@media (width > 1px) {\n  & { }\n  & { }\n}");
     });
