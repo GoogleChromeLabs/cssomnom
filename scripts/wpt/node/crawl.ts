@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { SPEC_OUT_OF_SCOPE_COUNTS } from './feasibility/audit.ts';
+import { getBrowserOnlyFileCount } from './feasibility/audit.ts';
 
 const execFilePromise = promisify(execFile);
 
@@ -275,7 +275,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     for (const [specKey, res] of Object.entries(specResults)) {
       grandTotal += res.total;
       grandPassing += res.passing;
-      const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[specKey] ?? 0;
+      const outOfScope = getBrowserOnlyFileCount(specKey);
       const feasibleForSpec = Math.max(res.passing, res.total - outOfScope);
       grandFeasible += feasibleForSpec;
     }

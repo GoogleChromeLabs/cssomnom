@@ -2,7 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { SPEC_OUT_OF_SCOPE_COUNTS } from '../wpt/node/feasibility/audit.ts';
+import { getBrowserOnlyFileCount } from '../wpt/node/feasibility/audit.ts';
 
 const specKeys = ['css-typed-om', 'cssom', 'css-nesting', 'css-syntax', 'css-variables', 'selectors', 'mediaqueries'];
 
@@ -45,7 +45,7 @@ for (const line of historyLines) {
         const total = parseInt(totalStr, 10);
         grandPassing += passing;
         grandTotal += total;
-        const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[key] ?? 0;
+        const outOfScope = getBrowserOnlyFileCount(key);
         grandFeasible += Math.max(passing, total - outOfScope);
       }
     }
@@ -66,7 +66,7 @@ for (const line of historyLines) {
     const [passStr, totalStr] = parts[2].split('/');
     const passing = parseInt(passStr, 10);
     const total = parseInt(totalStr, 10);
-    const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS['css-typed-om'] ?? 4;
+    const outOfScope = getBrowserOnlyFileCount('css-typed-om');
     const feasible = Math.max(passing, total - outOfScope);
 
     const rawRate = total > 0 ? ((passing / total) * 100).toFixed(2) + '%' : '0.00%';

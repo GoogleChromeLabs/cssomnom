@@ -25,15 +25,9 @@ export const BROWSER_ONLY_MANIFEST: Record<string, ManifestEntry[]> = fs.existsS
   ? JSON.parse(fs.readFileSync(manifestPath, 'utf8'))
   : {};
 
-export const SPEC_OUT_OF_SCOPE_COUNTS: Record<string, number> = {
-  'css-typed-om': 4,
-  'mediaqueries': 0,
-  'css-syntax': 15,
-  'cssom': 32,
-  'css-nesting': 0,
-  'selectors': 148,
-  'css-variables': 40,
-};
+export function getBrowserOnlyFileCount(spec: string): number {
+  return BROWSER_ONLY_MANIFEST[spec]?.length ?? 0;
+}
 
 export function isBrowserOnlyFile(spec: string, relativeFilePath: string): boolean {
   const entries = BROWSER_ONLY_MANIFEST[spec];
@@ -53,7 +47,7 @@ export function calculateFeasibility(currentResults: Record<string, { passing: n
   let passingAll = 0;
 
   for (const [spec, counts] of Object.entries(currentResults)) {
-    const outOfScope = SPEC_OUT_OF_SCOPE_COUNTS[spec] ?? 0;
+    const outOfScope = getBrowserOnlyFileCount(spec);
     const feasible = Math.max(counts.passing, counts.total - outOfScope);
     const rawRate = counts.total > 0 ? ((counts.passing / counts.total) * 100).toFixed(2) + '%' : '0.00%';
     const normalizedRate = feasible > 0 ? Math.min(100, (counts.passing / feasible) * 100).toFixed(2) + '%' : '0.00%';
