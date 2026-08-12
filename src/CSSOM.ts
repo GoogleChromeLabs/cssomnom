@@ -699,17 +699,29 @@ export class CSSStyleRule extends CSSGroupingRule {
 
   get selectorText(): string {
     if (this._selectorAST) {
-      return serializeSelectorList(this._selectorAST);
+      let hasDefaultNamespace = false;
+      if (this.parentStyleSheet) {
+        for (const rule of this.parentStyleSheet.cssRules) {
+          if (rule.type === 10 && (rule as CSSNamespaceRule).prefix === '') {
+            hasDefaultNamespace = true;
+            break;
+          }
+        }
+      }
+      return serializeSelectorList(this._selectorAST, hasDefaultNamespace);
     }
     return this._selectorText;
   }
 
   set selectorText(value: string) {
     const declaredNamespaces = new Set<string>();
+    let hasDefaultNamespace = false;
     if (this.parentStyleSheet) {
       for (const rule of this.parentStyleSheet.cssRules) {
         if (rule.type === 10) {
-          declaredNamespaces.add((rule as CSSNamespaceRule).prefix);
+          const prefix = (rule as CSSNamespaceRule).prefix;
+          declaredNamespaces.add(prefix);
+          if (prefix === '') hasDefaultNamespace = true;
         }
       }
     }
@@ -729,7 +741,7 @@ export class CSSStyleRule extends CSSGroupingRule {
         }
       }
       this._selectorAST = selectorAST;
-      this._selectorText = serializeSelectorList(selectorAST);
+      this._selectorText = serializeSelectorList(selectorAST, hasDefaultNamespace);
     }
   }
 
@@ -771,7 +783,15 @@ export class CSSStyleRule extends CSSGroupingRule {
   }
 }
 
-export class CSSMediaRule extends CSSGroupingRule {
+// css-conditional-3 § 3 #the-cssconditionrule-interface
+export class CSSConditionRule extends CSSGroupingRule {
+  get conditionText(): string {
+    return '';
+  }
+}
+
+// css-conditional-3 § 4 #the-cssmediarule-interface
+export class CSSMediaRule extends CSSConditionRule {
   readonly media: MediaList;
 
   constructor(mediaText: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
@@ -779,7 +799,7 @@ export class CSSMediaRule extends CSSGroupingRule {
     this.media = new MediaList(mediaText);
   }
 
-  get conditionText(): string {
+  override get conditionText(): string {
     return this.media.mediaText;
   }
 
@@ -822,35 +842,50 @@ export class CSSCustomMediaRule extends CSSRule {
   }
 }
 
-export class CSSSupportsRule extends CSSGroupingRule {
-  readonly conditionText: string;
+// css-conditional-3 § 5 #the-csssupportsrule-interface
+export class CSSSupportsRule extends CSSConditionRule {
+  private _conditionText: string;
 
   constructor(conditionText: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
-    this.conditionText = conditionText;
+    this._conditionText = conditionText;
+  }
+
+  override get conditionText(): string {
+    return this._conditionText;
   }
 
   get type() { return 12; }
 
   get cssText() {
-    return serializeGroupingRule('supports', this.conditionText, this._rules);
+    return serializeGroupingRule('supports', this._conditionText, this._rules);
   }
 
   set cssText(_value: string) {}
 }
 
-export class CSSContainerRule extends CSSGroupingRule {
+// css-conditional-5 § 4 #the-csscontainerrule-interface
+export class CSSContainerRule extends CSSConditionRule {
+  readonly containerName: string;
   readonly containerQuery: string;
 
-  constructor(containerQuery: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(containerQuery: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule, containerName: string = '') {
     super(rules, parseRuleInBlock);
+    this.containerName = containerName;
     this.containerQuery = containerQuery;
+  }
+
+  override get conditionText(): string {
+    if (this.containerName) {
+      return `${this.containerName} ${this.containerQuery}`;
+    }
+    return this.containerQuery;
   }
 
   get type() { return 0; }
 
   get cssText() {
-    return serializeGroupingRule('container', this.containerQuery, this._rules);
+    return serializeGroupingRule('container', this.conditionText, this._rules);
   }
 
   set cssText(_value: string) {}

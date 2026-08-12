@@ -896,7 +896,15 @@ function serializeComplexSelector(complex: ComplexSelector, hasDefaultNamespace 
       if (idx === 0) return `${item.value} `;
       return ` ${item.value} `;
     }
-    return item.selectors.map(s => serializeSimpleSelector(s, hasDefaultNamespace)).join('');
+    const selectors = item.selectors.filter((s, sIdx) => {
+      if (s.type === 'universal-selector' && item.selectors.length > 1 && sIdx === 0) {
+        if (s.namespace === undefined || (s.namespace === '' && !hasDefaultNamespace)) {
+          return false;
+        }
+      }
+      return true;
+    });
+    return selectors.map(s => serializeSimpleSelector(s, hasDefaultNamespace)).join('');
   }).join('');
 }
 
@@ -947,7 +955,7 @@ function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = f
     case 'universal-selector':
       if (simple.namespace !== undefined) {
         if (simple.namespace === '*') {
-          return hasDefaultNamespace ? '*|*' : '*';
+          return '*|*';
         } else if (simple.namespace === '') {
           return '|*';
         } else {

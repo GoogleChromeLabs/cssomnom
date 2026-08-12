@@ -129,11 +129,19 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
   }
 
+  // cssom-1 § 6.4.1 #concept-declarations-specified-order
   private _addDeclaration(d: Declaration) {
     if (this._declMap.has(d.name)) {
       const existing = this._declMap.get(d.name)!;
-      existing.value = d.value;
-      existing.important = d.important;
+      if (existing.important && !d.important) {
+        return;
+      }
+      const index = this._declarations.indexOf(existing);
+      if (index !== -1) {
+        this._declarations.splice(index, 1);
+      }
+      this._declarations.push(d);
+      this._declMap.set(d.name, d);
     } else {
       this._declarations.push(d);
       this._declMap.set(d.name, d);
@@ -152,6 +160,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return this._declarations[index]?.name || '';
   }
 
+  // cssom-1 § 6.6.2 #dom-cssstyledeclaration-getpropertyvalue
   getPropertyValue(property: string): string {
     if (!property.startsWith('--')) property = property.toLowerCase();
     const shorthand = SHORTHANDS[property];
@@ -198,8 +207,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           }
           physicalToLogicalSet.set(physicalProp, lh);
         }
-
-        
 
         const physicalSides = new Set<string>();
         for (const lh of shorthand.longhands) {
@@ -256,8 +263,8 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           }
           return res || '';
         }
-
       }
+
       const directDecl = this._getWinningDeclaration(property);
       if (directDecl) {
         return serialize(directDecl.value).trim();
@@ -286,6 +293,14 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return '';
   }
 
+  /**
+   * Historical DOM Level 2 Style / CSSOM 1 member.
+   * @deprecated
+   */
+  getPropertyCSSValue(_property: string): null {
+    return null;
+  }
+
   private _getExactWinningDeclaration(property: string): Declaration | null {
     if (!property.startsWith('--')) property = property.toLowerCase();
     const isCustom = property.startsWith('--');
@@ -312,87 +327,14 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return this._getExactWinningDeclaration(property);
   }
 
-  private _resolvePhysicalLogicalWinner(ph: string, lh: string): { winner: Declaration | null, prop: string } {
-    const phWinner = this._getWinningDeclaration(ph);
-    const lhWinner = this._getWinningDeclaration(lh);
-
-    if (phWinner && lhWinner) {
-      if (phWinner.important && !lhWinner.important) {
-        return { winner: phWinner, prop: ph };
-      } else if (!phWinner.important && lhWinner.important) {
-        return { winner: lhWinner, prop: lh };
-      } else {
-        const phIdx = this._declarations.indexOf(phWinner);
-        const lhIdx = this._declarations.indexOf(lhWinner);
-        if (phIdx >= lhIdx) {
-          return { winner: phWinner, prop: ph };
-        } else {
-          return { winner: lhWinner, prop: lh };
-        }
-      }
-    } else if (phWinner) {
-      return { winner: phWinner, prop: ph };
-    } else if (lhWinner) {
-      return { winner: lhWinner, prop: lh };
-    }
-    return { winner: null, prop: '' };
-  }
-
+  // cssom-1 § 6.6.2 #dom-cssstyledeclaration-getpropertypriority
   getPropertyPriority(property: string): string {
     if (!property.startsWith('--')) property = property.toLowerCase();
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
-      let physicals: readonly string[] = [];
-      let logicals: readonly string[] = [];
-
-      if (shorthand.logicalLonghands) {
-        physicals = shorthand.longhands;
-        logicals = shorthand.logicalLonghands;
-      } else if (shorthand.physicalLonghands) {
-        physicals = shorthand.physicalLonghands;
-        logicals = shorthand.longhands;
-      }
-
-      if (physicals.length > 0 && logicals.length > 0 && physicals.length === logicals.length) {
-        const resolvedWinners: Record<string, Declaration> = {};
-        let anySet = false;
-        
-        for (let i = 0; i < physicals.length; i++) {
-          const ph = physicals[i];
-          const lh = logicals[i];
-          const { winner, prop } = this._resolvePhysicalLogicalWinner(ph, lh);
-          if (winner) {
-            anySet = true;
-            resolvedWinners[prop] = winner;
-          }
-        }
-
-        if (anySet) {
-          const keys = Object.keys(resolvedWinners);
-          const hasPhysical = keys.some(k => physicals.includes(k));
-          const hasLogical = keys.some(k => logicals.includes(k));
-          
-          if (hasPhysical && hasLogical) {
-            return '';
-          }
-
-          if (keys.length === physicals.length) {
-            const allImportant = keys.every(k => resolvedWinners[k].important);
-            if (allImportant) {
-              const values: Record<string, ComponentValue[]> = {};
-              for (const k of keys) {
-                values[k] = resolvedWinners[k].value;
-              }
-              if (shorthand.contract(values)) {
-                return 'important';
-              }
-            }
-          }
-          return '';
-        }
+      if (this.getPropertyValue(property) === '') {
         return '';
       }
-
       const checkSet = (longhands: readonly string[]) => {
         let importantCount = 0;
         const values: Record<string, ComponentValue[]> = {};
@@ -407,7 +349,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       };
 
       const primaryResult = checkSet(shorthand.longhands);
-      
       if (primaryResult.importantCount === shorthand.longhands.length && shorthand.longhands.length > 0) {
         if (shorthand.contract(primaryResult.values)) {
           return 'important';
@@ -431,6 +372,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           }
         }
       }
+
       const directDecl = this._getWinningDeclaration(property);
       if (directDecl && directDecl.important) {
         return 'important';
@@ -602,14 +544,22 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const newStyle = ParseHooks.parseStyleAttribute(tokens);
     
     for (const d of newStyle.declarations) {
-      if (this._declMap.has(d.name)) {
-        const existing = this._declMap.get(d.name)!;
-        existing.value = d.value;
-        existing.important = d.important;
-      } else {
-        this._declarations.push(d);
-        this._declMap.set(d.name, d);
+      const shorthand = SHORTHANDS[d.name];
+      if (shorthand) {
+        const expanded = shorthand.expand(d.value);
+        if (expanded) {
+          for (const [lh, val] of Object.entries(expanded)) {
+            this._addDeclaration({
+              type: 'declaration',
+              name: lh,
+              value: val,
+              important: d.important
+            });
+          }
+          continue;
+        }
       }
+      this._addDeclaration(d);
     }
   }
 

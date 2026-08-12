@@ -274,21 +274,26 @@ export interface CSSGroupingRule extends CSSRule {
   deleteRule(index: number): void;
 }
 
+export interface CSSConditionRule extends CSSGroupingRule {
+  readonly conditionText: string;
+}
+
 export interface CSSStyleRule extends CSSGroupingRule {
   selectorText: string;
   readonly style: CSSStyleDeclaration;
   readonly styleMap: StylePropertyMapReadOnly;
 }
 
-export interface CSSMediaRule extends CSSGroupingRule {
+export interface CSSMediaRule extends CSSConditionRule {
   readonly media: MediaList;
 }
 
-export interface CSSSupportsRule extends CSSGroupingRule {
+export interface CSSSupportsRule extends CSSConditionRule {
   readonly conditionText: string;
 }
 
-export interface CSSContainerRule extends CSSGroupingRule {
+export interface CSSContainerRule extends CSSConditionRule {
+  readonly containerName: string;
   readonly containerQuery: string;
 }
 

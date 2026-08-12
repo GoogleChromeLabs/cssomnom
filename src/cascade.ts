@@ -98,33 +98,117 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
     return new CSSStyleDeclaration([], true);
   }
 
+  const elObj = element as {
+    ownerDocument?: {
+      documentElement?: unknown;
+      styleSheets?: ArrayLike<CSSStyleSheet>;
+      adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
+      querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
+    };
+    nodeType?: number;
+    isConnected?: boolean;
+    parentNode?: unknown;
+    parentElement?: unknown;
+    getRootNode?: (options?: { composed?: boolean }) => unknown;
+    shadowRoot?: {
+      adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
+      styleSheets?: ArrayLike<CSSStyleSheet>;
+      querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
+    };
+  };
+
+  // If element is explicitly disconnected from DOM
+  if (elObj.isConnected === false) {
+    return new CSSStyleDeclaration([], true);
+  }
+
   let ruleList: (Rule | CSSRule)[] = [];
   if (rules) {
     ruleList = Array.from(rules as ArrayLike<Rule | CSSRule>);
   } else {
-    // Collect all stylesheets from ownerDocument
-    const elObj = element as { ownerDocument?: { styleSheets?: ArrayLike<CSSStyleSheet>; querySelectorAll?(s: string): ArrayLike<{ textContent?: string }> }; nodeType?: number };
-    const doc = elObj.ownerDocument || (elObj.nodeType === 9 ? (element as unknown as Document) : null);
-    if (doc) {
-      if ('styleSheets' in doc && doc.styleSheets && doc.styleSheets.length > 0) {
-        for (let i = 0; i < doc.styleSheets.length; i++) {
-          const sheet = doc.styleSheets[i] as unknown as CSSStyleSheet;
-          if (sheet && sheet.cssRules) {
-            for (let j = 0; j < sheet.cssRules.length; j++) {
-              const r = sheet.cssRules[j];
-              if (r) ruleList.push(r as unknown as CSSRule);
+    const root = typeof elObj.getRootNode === 'function' ? elObj.getRootNode() : (elObj.ownerDocument || (elObj.nodeType === 9 ? (element as unknown as Document) : null));
+    
+    // Helper to add rules from a CSSStyleSheet or HTMLStyleElement
+    const addSheetRules = (sheet: unknown) => {
+      if (!sheet) return;
+      const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
+      if (s.disabled) return;
+      if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
+        addSheetRules(s.sheet);
+        return;
+      }
+      if (s.cssRules && s.cssRules.length !== undefined) {
+        for (let j = 0; j < s.cssRules.length; j++) {
+          const r = s.cssRules[j];
+          if (r) ruleList.push(r as unknown as CSSRule);
+        }
+      } else if (s.textContent) {
+        const parsed = parseStyleSheet(s.textContent);
+        ruleList.push(...parsed);
+      }
+    };
+
+    if (root && typeof root === 'object') {
+      const rootObj = root as {
+        host?: { isConnected?: boolean };
+        styleSheets?: ArrayLike<CSSStyleSheet>;
+        adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
+        querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
+      };
+
+      // If root is a ShadowRoot whose host is disconnected
+      if (rootObj.host && rootObj.host.isConnected === false) {
+        return new CSSStyleDeclaration([], true);
+      }
+
+      // 1. Regular non-adopted stylesheets
+      let addedFromStyleSheets = false;
+      if ('styleSheets' in rootObj && rootObj.styleSheets && rootObj.styleSheets.length > 0) {
+        for (let i = 0; i < rootObj.styleSheets.length; i++) {
+          addSheetRules(rootObj.styleSheets[i]);
+          addedFromStyleSheets = true;
+        }
+      }
+      if (!addedFromStyleSheets && typeof rootObj.querySelectorAll === 'function') {
+        const styleTags = rootObj.querySelectorAll('style');
+        for (let i = 0; i < styleTags.length; i++) {
+          addSheetRules(styleTags[i]);
+        }
+      }
+
+      // 2. Adopted stylesheets (ordered after non-adopted stylesheets)
+      if (rootObj.adoptedStyleSheets && rootObj.adoptedStyleSheets.length > 0) {
+        for (let i = 0; i < rootObj.adoptedStyleSheets.length; i++) {
+          addSheetRules(rootObj.adoptedStyleSheets[i]);
+        }
+      }
+    }
+
+    // 3. If element is a shadow host (has shadowRoot), also include :host rules from shadowRoot
+    if (elObj.shadowRoot) {
+      const sr = elObj.shadowRoot;
+      if ('styleSheets' in sr && sr.styleSheets && sr.styleSheets.length > 0) {
+        for (let i = 0; i < sr.styleSheets.length; i++) {
+          addSheetRules(sr.styleSheets[i]);
+        }
+      } else if (typeof sr.querySelectorAll === 'function') {
+        const styleTags = sr.querySelectorAll('style');
+        for (let i = 0; i < styleTags.length; i++) {
+          const styleEl = styleTags[i];
+          if (styleEl.sheet) {
+            addSheetRules(styleEl.sheet);
+          } else {
+            const text = styleEl.textContent || '';
+            if (text) {
+              const parsed = parseStyleSheet(text);
+              ruleList.push(...parsed);
             }
           }
         }
-      } else if (typeof doc.querySelectorAll === 'function') {
-        const styleTags = doc.querySelectorAll('style');
-        for (let i = 0; i < styleTags.length; i++) {
-          const styleEl = styleTags[i];
-          const text = styleEl.textContent || '';
-          if (text) {
-            const parsed = parseStyleSheet(text);
-            ruleList.push(...parsed);
-          }
+      }
+      if (sr.adoptedStyleSheets && sr.adoptedStyleSheets.length > 0) {
+        for (let i = 0; i < sr.adoptedStyleSheets.length; i++) {
+          addSheetRules(sr.adoptedStyleSheets[i]);
         }
       }
     }
@@ -184,24 +268,64 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
     for (let i = 0; i < count; i++) {
       const rule = list[i] as Rule | CSSRule;
 
-      if ((rule as CSSRule).type === CSSRule.STYLE_RULE || (rule as { type: string }).type === 'style-rule') {
-        const styleRule = rule as CSSStyleRule;
-        const resolvedSelector = resolveNestedSelector(styleRule.selectorText, parentSelector);
+      if (
+        (rule as CSSRule).type === CSSRule.STYLE_RULE ||
+        (rule as { type: string }).type === 'style-rule' ||
+        (rule as { type: string }).type === 'qualified-rule'
+      ) {
+        const selectorText = (rule as CSSStyleRule).selectorText || serialize((rule as { prelude?: ComponentValue[] }).prelude || []).trim();
+        const resolvedSelector = resolveNestedSelector(selectorText, parentSelector);
 
         if (matches(element, resolvedSelector, scopeNode)) {
           const spec = getMatchingSpecificity(element, resolvedSelector);
-          const style = styleRule.style;
+          const style = (rule as CSSStyleRule).style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
 
           if (style) {
-            for (let k = 0; k < style.length; k++) {
-              const name = style.item(k);
-              const value = style.getPropertyValue(name);
-              const priority = style.getPropertyPriority(name);
+            if (typeof (style as { length?: number }).length === 'number' && (style as { length: number }).length >= 0) {
+              const len = (style as { length: number }).length;
+              for (let k = 0; k < len; k++) {
+                const name = typeof (style as { item?: (i: number) => string }).item === 'function'
+                  ? (style as { item: (i: number) => string }).item(k)
+                  : (style as unknown as Record<number, string>)[k];
+                if (!name) continue;
+                const value = typeof (style as { getPropertyValue?: (p: string) => string }).getPropertyValue === 'function'
+                  ? (style as { getPropertyValue: (p: string) => string }).getPropertyValue(name)
+                  : (style as unknown as Record<string, string>)[name];
+                const priority = typeof (style as { getPropertyPriority?: (p: string) => string }).getPropertyPriority === 'function'
+                  ? (style as { getPropertyPriority: (p: string) => string }).getPropertyPriority(name)
+                  : '';
+                matchedDeclarations.push({
+                  name,
+                  value: typeof value === 'string' ? value : serialize(value as unknown as ComponentValue[]),
+                  important: priority === 'important',
+                  isInline: false,
+                  layerOrder,
+                  specificity: spec,
+                  sourceOrder: sourceOrderCounter++,
+                });
+              }
+            } else if (Array.isArray((style as { declarations?: unknown[] }).declarations)) {
+              for (const d of (style as { declarations: Declaration[] }).declarations) {
+                matchedDeclarations.push({
+                  name: d.name,
+                  value: serialize(d.value),
+                  important: d.important,
+                  isInline: false,
+                  layerOrder,
+                  specificity: spec,
+                  sourceOrder: sourceOrderCounter++,
+                });
+              }
+            }
+          } else if ((rule as { block?: { value?: ComponentValue[] } }).block?.value) {
+            const blockVal = (rule as { block?: { value?: ComponentValue[] } }).block!.value || [];
+            const decls = ParseHooks.parseStyleAttribute(tokenize(serialize(blockVal)));
+            for (const d of decls.declarations) {
               matchedDeclarations.push({
-                name,
-                value,
-                important: priority === 'important',
+                name: d.name,
+                value: serialize(d.value),
+                important: d.important,
                 isInline: false,
                 layerOrder,
                 specificity: spec,
@@ -212,8 +336,9 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList)
         }
 
         // Nested rules inside CSSStyleRule
-        if (styleRule.cssRules && styleRule.cssRules.length > 0) {
-          walkRules(styleRule.cssRules, resolvedSelector, currentLayer, scopeNode);
+        const nestedRules = (rule as CSSStyleRule).cssRules || ((rule as { block?: { value?: unknown[] } }).block?.value ? (rule as { block?: { value?: unknown[] } }).block!.value!.filter((v: unknown) => v && typeof v === 'object' && ('type' in v) && ((v as { type: string }).type === 'qualified-rule' || (v as { type: string }).type === 'at-rule')) : undefined);
+        if (nestedRules && (nestedRules as ArrayLike<Rule | CSSRule>).length > 0) {
+          walkRules(nestedRules as unknown as (Rule | CSSRule)[], resolvedSelector, currentLayer, scopeNode);
         }
       } else if (
         rule instanceof CSSLayerBlockRule ||
@@ -527,6 +652,28 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         if (dashed === 'color') return 'rgb(0, 0, 0)';
         return '';
       }
+      if (dashed === 'box-shadow') {
+        const tokens = rawVal.split(/\s+/);
+        const normalizedTokens = tokens.map(t => {
+          const lower = t.toLowerCase();
+          if (lower in SYSTEM_COLORS) {
+            const [r, g, b] = SYSTEM_COLORS[lower];
+            return `rgb(${r}, ${g}, ${b})`;
+          }
+          if (lower in NAMED_COLORS) {
+            const [r, g, b, a] = NAMED_COLORS[lower];
+            if (a !== undefined && a < 1) return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
+            return `rgb(${r}, ${g}, ${b})`;
+          }
+          return t;
+        });
+        const colorToken = normalizedTokens.find(t => t.startsWith('rgb'));
+        const otherTokens = normalizedTokens.filter(t => !t.startsWith('rgb'));
+        if (colorToken) {
+          return `${colorToken} ${otherTokens.join(' ')}`;
+        }
+        return normalizedTokens.join(' ');
+      }
       return normalizeComputedColor(rawVal);
     }
 
@@ -555,6 +702,51 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
  * css-color-4 § 15 #named-colors
  * cssom-1 § 6.8 #resolved-values
  */
+const SYSTEM_COLORS: Record<string, [number, number, number]> = {
+  canvas: [255, 255, 255],
+  canvastext: [0, 0, 0],
+  linktext: [0, 0, 238],
+  visitedtext: [85, 26, 139],
+  activetext: [255, 0, 0],
+  buttonface: [240, 240, 240],
+  buttontext: [0, 0, 0],
+  buttonborder: [118, 118, 118],
+  field: [255, 255, 255],
+  fieldtext: [0, 0, 0],
+  highlight: [181, 213, 255],
+  highlighttext: [0, 0, 0],
+  selecteditem: [0, 103, 194],
+  selecteditemtext: [255, 255, 255],
+  mark: [255, 255, 0],
+  marktext: [0, 0, 0],
+  graytext: [128, 128, 128],
+  accentcolor: [0, 103, 194],
+  accentcolortext: [255, 255, 255],
+  activeborder: [240, 240, 240],
+  activecaption: [204, 204, 204],
+  appworkspace: [171, 171, 171],
+  background: [99, 99, 99],
+  buttonhighlight: [255, 255, 255],
+  buttonshadow: [160, 160, 160],
+  captiontext: [0, 0, 0],
+  inactiveborder: [244, 247, 252],
+  inactivecaption: [191, 205, 219],
+  inactivecaptiontext: [0, 0, 0],
+  infobackground: [255, 255, 225],
+  infotext: [0, 0, 0],
+  menu: [240, 240, 240],
+  menutext: [0, 0, 0],
+  scrollbar: [200, 200, 200],
+  threeddarkshadow: [113, 111, 100],
+  threedface: [240, 240, 240],
+  threedhighlight: [255, 255, 255],
+  threedlightshadow: [227, 227, 227],
+  threedshadow: [160, 160, 160],
+  window: [255, 255, 255],
+  windowframe: [100, 100, 100],
+  windowtext: [0, 0, 0]
+};
+
 export function normalizeComputedColor(val: string): string {
   if (!val || typeof val !== 'string') return '';
   const trimmed = val.trim();
@@ -568,6 +760,12 @@ export function normalizeComputedColor(val: string): string {
     if (a !== undefined && a < 1) {
       return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
     }
+    return `rgb(${r}, ${g}, ${b})`;
+  }
+
+  // 1.1 System colors (css-color-4 § 6 #system-colors)
+  if (lower in SYSTEM_COLORS) {
+    const [r, g, b] = SYSTEM_COLORS[lower];
     return `rgb(${r}, ${g}, ${b})`;
   }
 

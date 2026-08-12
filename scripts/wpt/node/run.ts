@@ -2,6 +2,7 @@
 
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM, createWptContext, type WptSandboxTest } from '../../../tests/wpt-shim.ts';
+import assert from 'node:assert/strict';
 import * as vm from 'node:vm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -213,6 +214,11 @@ export function runWptFile(filePath: string): WptFileResult {
       step(fn: Function) {
         return fn();
       },
+      unreached_func(desc?: string) {
+        return () => {
+          assert.fail(`Unreached function called: ${desc || 'unreached'}`);
+        };
+      },
       done() {}
     };
     const wrappedFn = async () => {
@@ -262,9 +268,31 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
     let passed = 0;
     let failed = 0;
     
+    const filesToRun: string[] = [];
+    const collectFiles = (dir: string) => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          collectFiles(full);
+        } else if (entry.isFile() && (entry.name.endsWith('.html') || entry.name.endsWith('.htm'))) {
+          filesToRun.push(full);
+        }
+      }
+    };
+
     for (const filePattern of args) {
       const fullPath = path.resolve(process.cwd(), filePattern);
-      console.log(`Running WPT file: ${filePattern}`);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+        collectFiles(fullPath);
+      } else {
+        filesToRun.push(fullPath);
+      }
+    }
+
+    for (const fullPath of filesToRun) {
+      const relPath = path.relative(process.cwd(), fullPath);
+      console.log(`Running WPT file: ${relPath}`);
       try {
         const result = runWptFile(fullPath);
         for (const testItem of result.tests) {
@@ -285,7 +313,7 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
         // Yield 10ms between files
         await new Promise(resolve => setTimeout(resolve, 10));
       } catch (err) {
-        console.error(`Failed to run file ${filePattern}:`, err);
+        console.error(`Failed to run file ${relPath}:`, err);
         console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);
         process.exit(1);
       }
