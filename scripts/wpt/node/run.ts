@@ -278,10 +278,12 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
             console.error(`  ✖ ${testItem.name.replace(/\n/g, '\\n')}`);
             console.error(err);
           }
-          // Yield to event loop to allow GC and timers to run
-          await new Promise(resolve => setImmediate(resolve));
+          // Yield to event loop for 10ms to allow GC, OS scheduling, and prevent system freeze
+          await new Promise(resolve => setTimeout(resolve, 10));
         }
         result.cleanup();
+        // Yield 10ms between files
+        await new Promise(resolve => setTimeout(resolve, 10));
       } catch (err) {
         console.error(`Failed to run file ${filePattern}:`, err);
         console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);
