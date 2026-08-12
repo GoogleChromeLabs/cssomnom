@@ -45,6 +45,8 @@ import type {
   SelectorList,
   PseudoClassSelector,
   ComponentValue,
+  SimpleBlock,
+  Token,
   Declaration,
   ASTAtRule,
   MediaEnvironment,
@@ -85,6 +87,170 @@ const INHERITED_PROPERTIES = new Set([
   'direction',
   'writing-mode',
 ]);
+
+/**
+ * Standard SVG presentation attributes that map to CSS properties in the cascade.
+ * svg-2 § 6.2 #presentation-attributes
+ * css-cascade-5 § 3 #cascade-origins
+ */
+const SVG_PRESENTATION_ATTRIBUTES = new Set([
+  'alignment-baseline',
+  'baseline-shift',
+  'clip',
+  'clip-path',
+  'clip-rule',
+  'color',
+  'color-interpolation',
+  'color-interpolation-filters',
+  'color-rendering',
+  'cursor',
+  'direction',
+  'display',
+  'dominant-baseline',
+  'fill',
+  'fill-opacity',
+  'fill-rule',
+  'filter',
+  'flood-color',
+  'flood-opacity',
+  'font-family',
+  'font-size',
+  'font-size-adjust',
+  'font-stretch',
+  'font-style',
+  'font-variant',
+  'font-weight',
+  'glyph-orientation-vertical',
+  'image-rendering',
+  'letter-spacing',
+  'lighting-color',
+  'marker-end',
+  'marker-mid',
+  'marker-start',
+  'mask',
+  'mask-type',
+  'opacity',
+  'overflow',
+  'paint-order',
+  'pointer-events',
+  'shape-rendering',
+  'stop-color',
+  'stop-opacity',
+  'stroke',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-opacity',
+  'stroke-width',
+  'text-anchor',
+  'text-decoration',
+  'text-decoration-line',
+  'text-decoration-style',
+  'text-rendering',
+  'transform',
+  'vector-effect',
+  'visibility',
+  'word-spacing',
+  'writing-mode',
+]);
+
+/**
+ * Standard CSS color properties that normalize computed color format.
+ * css-color-4 § 4 #resolving-color-values
+ */
+const COLOR_PROPERTIES = new Set([
+  'color',
+  'background-color',
+  'border-color',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'outline-color',
+  'text-decoration-color',
+  'column-rule-color',
+  'caret-color',
+]);
+
+/**
+ * Default initial property values for standard CSS and SVG presentation attributes.
+ * css-cascade-5 § 7.1 #initial-values
+ * svg-2 § 6.2 #presentation-attributes
+ */
+const DEFAULT_PROPERTY_VALUES: Record<string, string> = {
+  'alignment-baseline': 'baseline',
+  'baseline-shift': 'baseline',
+  'clip-rule': 'nonzero',
+  'color': 'rgb(0, 0, 0)',
+  'color-interpolation-filters': '',
+  'cursor': 'auto',
+  'direction': 'ltr',
+  'display': 'inline',
+  'dominant-baseline': 'auto',
+  'fill': 'black',
+  'fill-opacity': '1',
+  'fill-rule': 'nonzero',
+  'filter': 'none',
+  'flood-color': '',
+  'flood-opacity': '1',
+  'font-family': 'Times New Roman',
+  'font-size': '16px',
+  'font-size-adjust': 'none',
+  'font-stretch': '100%',
+  'font-style': 'normal',
+  'font-weight': '400',
+  'glyph-orientation-vertical': 'auto',
+  'kerning': 'auto',
+  'letter-spacing': 'normal',
+  'lighting-color': '',
+  'opacity': '1',
+  'overflow': 'visible',
+  'pointer-events': 'visiblePainted',
+  'stop-color': '',
+  'stop-opacity': '1',
+  'stroke': '',
+  'stroke-dasharray': 'none',
+  'stroke-dashoffset': '0px',
+  'stroke-linecap': 'butt',
+  'stroke-linejoin': 'miter',
+  'stroke-miterlimit': '4',
+  'stroke-opacity': '1',
+  'stroke-width': '1px',
+  'text-anchor': 'start',
+  'text-decoration-line': 'none',
+  'text-decoration-style': 'solid',
+  'visibility': 'visible',
+  'word-spacing': '0px',
+  'writing-mode': 'lr-tb',
+  'background-color': 'rgba(0, 0, 0, 0)',
+  'border-spacing': '0px',
+  'text-indent': '0px',
+};
+
+const BLOCK_TAGS = new Set([
+  'HTML', 'BODY', 'DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'UL', 'OL', 'LI', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'NAV',
+  'BLOCKQUOTE', 'PRE', 'FIGURE', 'FIGCAPTION', 'FORM', 'FIELDSET', 'TABLE', 'HR'
+]);
+
+function getUaDefault(prop: string, element: unknown): string {
+  const el = element as { tagName?: string; nodeName?: string };
+  const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
+
+  if (prop === 'margin' || prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-left' || prop === 'margin-right') {
+    return tag === 'BODY' ? '8px' : '0px';
+  }
+  if (prop === 'display') {
+    return BLOCK_TAGS.has(tag) ? 'block' : 'inline';
+  }
+  return DEFAULT_PROPERTY_VALUES[prop] ?? '';
+}
+
+function getInitialValue(prop: string, _element: unknown): string {
+  return DEFAULT_PROPERTY_VALUES[prop] ?? '';
+}
 
 /**
  * Resolves the cascaded style statically for a DOM element according to CSS Cascade 5 and CSS Variables 1.
@@ -133,6 +299,11 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
       if (!sheet) return;
       const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
       if (s.disabled) return;
+      if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
+        const parsed = parseStyleSheet(s.textContent);
+        ruleList.push(...parsed);
+        return;
+      }
       if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
         addSheetRules(s.sheet);
         return;
@@ -142,9 +313,6 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
           const r = s.cssRules[j];
           if (r) ruleList.push(r as unknown as CSSRule);
         }
-      } else if (s.textContent) {
-        const parsed = parseStyleSheet(s.textContent);
-        ruleList.push(...parsed);
       }
     };
 
@@ -244,8 +412,15 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
         ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'layer' && (r as ASTAtRule).block)
       ) {
         const rawName = (r as CSSLayerBlockRule).name || serialize((r as ASTAtRule).prelude || []).trim();
-        const fullName = prefix ? (rawName ? `${prefix}.${rawName}` : prefix) : rawName;
-        if (fullName) registerLayer(fullName);
+        let fullName: string;
+        if (!rawName) {
+          fullName = prefix ? `${prefix}.__anon_${nextLayerIndex}` : `__anon_${nextLayerIndex}`;
+          registerLayer(fullName);
+        } else {
+          fullName = prefix ? `${prefix}.${rawName}` : rawName;
+          registerLayer(fullName);
+        }
+        (r as unknown as { _assignedLayerName?: string })._assignedLayerName = fullName;
         if (r instanceof CSSGroupingRule && r.cssRules) {
           scanLayers(Array.from(r.cssRules as ArrayLike<Rule | CSSRule>), fullName, isInsideStyleRule);
         }
@@ -365,8 +540,9 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
         rule instanceof CSSLayerBlockRule ||
         ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'layer' && (rule as ASTAtRule).block)
       ) {
+        const assigned = (rule as unknown as { _assignedLayerName?: string })._assignedLayerName;
         const rawName = (rule as CSSLayerBlockRule).name || serialize((rule as ASTAtRule).prelude || []).trim();
-        const layerName = currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName;
+        const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
         const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
         walkRules(childRules, parentSelector, layerName, scopeNode);
       } else if (
@@ -476,15 +652,36 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
 
   walkRules(ruleList);
 
-  // Overlay inline style attribute
-  // css-cascade-5 § 6.2 #cascade-sort
+  // SVG presentation attributes: svg-2 § 6.2 #presentation-attributes, css-cascade-5 § 3 #cascade-origins
   const domEl = element as { getAttribute?(n: string): string | null; style?: { cssText?: string } };
-  const styleAttrText = domEl.getAttribute?.('style') || (typeof domEl.style === 'string' ? domEl.style : domEl.style?.cssText);
+  if (domEl && typeof domEl.getAttribute === 'function') {
+    for (const attr of SVG_PRESENTATION_ATTRIBUTES) {
+      const attrVal = domEl.getAttribute(attr);
+      if (attrVal !== null && attrVal !== '') {
+        matchedDeclarations.push({
+          name: attr,
+          value: attrVal,
+          important: false,
+          isInline: false,
+          layerOrder: 0,
+          specificity: [0, 0, 0],
+          sourceOrder: -1000 + matchedDeclarations.length,
+        });
+      }
+    }
+  }
+
+  // Overlay inline style attribute: css-cascade-5 § 6.2 #cascade-sort
+  const styleAttrText = domEl?.getAttribute?.('style') || (typeof domEl?.style === 'string' ? domEl.style : domEl?.style?.cssText);
 
   if (styleAttrText && styleAttrText.trim()) {
     const inlineDecls = ParseHooks.parseStyleAttribute(tokenize(styleAttrText));
     for (const d of inlineDecls.declarations) {
-      const valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, d.name.startsWith('--')).trim();
+      const isCustom = d.name.startsWith('--');
+      let valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, isCustom).trim();
+      if (isCustom && !valStr) {
+        valStr = ' ';
+      }
       matchedDeclarations.push({
         name: d.name,
         value: valStr,
@@ -507,27 +704,17 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
     declarationsByProperty.get(key)!.push(decl);
   }
 
-  const winningDeclarations = new Map<string, MatchedDeclaration>();
-
-  for (const [prop, decls] of declarationsByProperty) {
-    decls.sort(compareCascadeDeclarations);
-    let winnerIndex = decls.length - 1;
-    while (winnerIndex >= 0 && decls[winnerIndex].value.trim() === 'revert-rule') {
-      winnerIndex--;
-    }
-    if (winnerIndex >= 0) {
-      winningDeclarations.set(prop, decls[winnerIndex]);
-    }
-  }
-
   // Determine writing-mode, direction, and text-orientation for logical property resolution
   let writingMode = 'horizontal-tb';
   let direction = 'ltr';
   let textOrientation = 'mixed';
 
   const elWithParent = element as { parentElement?: DOMElement | null; parentNode?: DOMElement | null };
-  if (elWithParent.parentElement) {
-    const parentCascaded = getCascadedStyle(elWithParent.parentElement, rules);
+  const parentNode = elWithParent.parentElement || (elWithParent.parentNode && isElement(elWithParent.parentNode) ? elWithParent.parentNode : null);
+  const rootNode = (element as { ownerDocument?: { documentElement?: DOMElement | null } }).ownerDocument?.documentElement;
+  const parentCascaded = parentNode ? getCascadedStyle(parentNode, rules) : null;
+
+  if (parentCascaded) {
     const pWm = parentCascaded.getPropertyValue('writing-mode');
     if (pWm) writingMode = pWm;
     const pDir = parentCascaded.getPropertyValue('direction');
@@ -536,32 +723,28 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
     if (pTo) textOrientation = pTo;
   }
 
-  const wmWinner = winningDeclarations.get('writing-mode');
+  const wmWinner = declarationsByProperty.get('writing-mode')?.at(-1);
   if (wmWinner) writingMode = wmWinner.value;
 
-  const dirWinner = winningDeclarations.get('direction');
+  const dirWinner = declarationsByProperty.get('direction')?.at(-1);
   if (dirWinner) direction = dirWinner.value;
 
-  const toWinner = winningDeclarations.get('text-orientation');
+  const toWinner = declarationsByProperty.get('text-orientation')?.at(-1);
   if (toWinner) textOrientation = toWinner.value;
 
   if (textOrientation === 'upright' && (writingMode === 'vertical-rl' || writingMode === 'vertical-lr')) {
     direction = 'ltr';
   }
 
-  // Resolve custom properties with inheritance down the tree
+  // 1. Collect inherited and direct custom property raw declarations
   // css-variables-1 § 4 #resolving-var-functions
-  const customProperties = new Map<string, string>();
+  const rawCustomProps = new Map<string, string>();
 
-  const parentNode = elWithParent.parentElement || (elWithParent.parentNode && isElement(elWithParent.parentNode) ? elWithParent.parentNode : null);
-  const rootNode = (element as { ownerDocument?: { documentElement?: DOMElement | null } }).ownerDocument?.documentElement;
-
-  if (parentNode) {
-    const parentCascaded = getCascadedStyle(parentNode, rules);
+  if (parentCascaded) {
     for (let i = 0; i < parentCascaded.length; i++) {
       const name = parentCascaded.item(i);
       if (name.startsWith('--')) {
-        customProperties.set(name, parentCascaded.getPropertyValue(name));
+        rawCustomProps.set(name, parentCascaded.getPropertyValue(name));
       }
     }
   } else if (rootNode && rootNode !== element) {
@@ -569,88 +752,246 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
     for (let i = 0; i < rootCascaded.length; i++) {
       const name = rootCascaded.item(i);
       if (name.startsWith('--')) {
-        customProperties.set(name, rootCascaded.getPropertyValue(name));
+        rawCustomProps.set(name, rootCascaded.getPropertyValue(name));
       }
     }
   }
 
-  // Merge direct custom property winners
-  for (const [prop, decl] of winningDeclarations) {
+  for (const [prop, decls] of declarationsByProperty) {
+    if (prop.startsWith('--') && decls.length > 0) {
+      const lastDecl = decls[decls.length - 1];
+      const rawVal = (lastDecl.raw && !lastDecl.raw.includes('var(')) ? lastDecl.raw : (typeof lastDecl.value === 'string' ? lastDecl.value : serialize(lastDecl.value, true));
+      rawCustomProps.set(prop, rawVal);
+    }
+  }
+
+  // 2. Resolve custom properties with dependency cycle detection and cascade rollback
+  // css-variables-1 § 3.1 #guaranteed-invalid
+  // css-variables-1 § 4.4 #cycles
+  // css-cascade-5 § 6.2 #default, § 6.3 #revert-layer, § 6.3.3 #revert-rule-keyword
+  const resolvedCustomProps = new Map<string, string>();
+  const cyclicProps = new Set<string>();
+
+  function resolveCustomProp(name: string, callStack: Set<string>): string | null {
+    if (cyclicProps.has(name)) return null;
+    if (resolvedCustomProps.has(name)) return resolvedCustomProps.get(name)!;
+    if (callStack.has(name)) {
+      const stackArr = Array.from(callStack);
+      const idx = stackArr.indexOf(name);
+      if (idx !== -1) {
+        for (let j = idx; j < stackArr.length; j++) {
+          cyclicProps.add(stackArr[j]);
+        }
+      }
+      cyclicProps.add(name);
+      return null;
+    }
+
+    const nextStack = new Set(callStack);
+    nextStack.add(name);
+
+    const decls = declarationsByProperty.get(name);
+    if (decls && decls.length > 0) {
+      decls.sort(compareCascadeDeclarations);
+      for (let i = decls.length - 1; i >= 0; i--) {
+        const decl = decls[i];
+        const rawVal = (decl.raw && !decl.raw.includes('var(')) ? decl.raw : (typeof decl.value === 'string' ? decl.value : serialize(decl.value, true));
+        
+        let subVal: string | null = rawVal;
+        if (rawVal.includes('var(')) {
+          subVal = substituteVariables(rawVal, rawCustomProps, nextStack, cyclicProps);
+        }
+
+        if (subVal === null || cyclicProps.has(name)) {
+          if (cyclicProps.has(name)) return null;
+          continue;
+        }
+
+        const trimmed = subVal.trim();
+        if (trimmed === 'revert-rule') {
+          continue;
+        }
+        if (trimmed === 'revert-layer') {
+          let prevIdx = i - 1;
+          while (prevIdx >= 0 && decls[prevIdx].layerOrder >= decl.layerOrder) {
+            prevIdx--;
+          }
+          if (prevIdx >= 0) {
+            i = prevIdx + 1;
+            continue;
+          } else {
+            const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
+            resolvedCustomProps.set(name, parentVal);
+            return parentVal || null;
+          }
+        }
+        if (trimmed === 'revert') {
+          const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
+          resolvedCustomProps.set(name, parentVal);
+          return parentVal || null;
+        }
+        if (trimmed === 'initial') {
+          return null;
+        }
+        if (trimmed === 'inherit' || trimmed === 'unset') {
+          const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
+          resolvedCustomProps.set(name, parentVal);
+          return parentVal || null;
+        }
+
+        const finalSubVal = subVal === '' ? ' ' : subVal;
+        resolvedCustomProps.set(name, finalSubVal);
+        return finalSubVal;
+      }
+    }
+
+    // No local declaration: inherit from parent
+    const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
+    if (parentVal) {
+      resolvedCustomProps.set(name, parentVal);
+      return parentVal;
+    }
+
+    return null;
+  }
+
+  // Populate all custom properties that are declared or inherited
+  const allCustomPropertyNames = new Set<string>();
+  for (const [prop] of rawCustomProps) {
+    allCustomPropertyNames.add(prop);
+  }
+  for (const [prop] of declarationsByProperty) {
     if (prop.startsWith('--')) {
-      const rawVal = (decl.raw && !decl.raw.includes('var(')) ? decl.raw : (typeof decl.value === 'string' ? decl.value : serialize(decl.value, true));
-      customProperties.set(prop, rawVal);
+      allCustomPropertyNames.add(prop);
     }
   }
 
-  // Resolve var() references within custom properties
-  for (const [prop, rawVal] of customProperties) {
-    const resolved = substituteVariables(rawVal, customProperties, new Set([prop]));
-    if (resolved !== null) {
-      customProperties.set(prop, resolved);
+  for (const prop of allCustomPropertyNames) {
+    const res = resolveCustomProp(prop, new Set());
+    if (res !== null && !cyclicProps.has(prop)) {
+      resolvedCustomProps.set(prop, res);
+    } else {
+      resolvedCustomProps.set(prop, '');
     }
   }
 
-  // Map declarations into result with logical resolution & variable substitution
+  // 3. Resolve standard properties with cascade rollbacks
+  // css-cascade-5 § 6.2 #default, § 6.3 #revert-layer, § 6.3.3 #revert-rule-keyword
+  const winningDeclarations = new Map<string, MatchedDeclaration>();
+
+  for (const [prop, decls] of declarationsByProperty) {
+    if (prop.startsWith('--')) continue;
+    decls.sort(compareCascadeDeclarations);
+
+    for (let i = decls.length - 1; i >= 0; i--) {
+      const decl = decls[i];
+      const subVal = substituteVariables(decl.value, resolvedCustomProps, new Set(), cyclicProps);
+      if (subVal === null) {
+        // css-variables-1 § 3.1: Invalid at computed-value time
+        continue;
+      }
+
+      if (/^\s*-?\d+(?:\.\d+)?\s+(?:px|em|rem|%|vh|vw|ch|pt|cm|mm|in|pc|ex|cap|ic|lh|cqw|cqh)\s*$/i.test(subVal)) {
+        continue;
+      }
+
+      const trimmedVal = subVal.trim();
+      if (trimmedVal === 'revert-rule') {
+        continue;
+      }
+      if (trimmedVal === 'revert-layer') {
+        let prevIdx = i - 1;
+        while (prevIdx >= 0 && decls[prevIdx].layerOrder >= decl.layerOrder) {
+          prevIdx--;
+        }
+        if (prevIdx >= 0) {
+          i = prevIdx + 1;
+          continue;
+        } else {
+          const val = (parentCascaded && INHERITED_PROPERTIES.has(prop))
+            ? parentCascaded.getPropertyValue(prop)
+            : getUaDefault(prop, element);
+          winningDeclarations.set(prop, { ...decl, value: val });
+          break;
+        }
+      }
+      if (trimmedVal === 'revert') {
+        const val = (parentCascaded && INHERITED_PROPERTIES.has(prop))
+          ? parentCascaded.getPropertyValue(prop)
+          : getUaDefault(prop, element);
+        winningDeclarations.set(prop, { ...decl, value: val });
+        break;
+      }
+      if (trimmedVal === 'initial') {
+        const val = getInitialValue(prop, element);
+        winningDeclarations.set(prop, { ...decl, value: val });
+        break;
+      }
+      if (trimmedVal === 'inherit') {
+        const val = parentCascaded ? parentCascaded.getPropertyValue(prop) : getInitialValue(prop, element);
+        winningDeclarations.set(prop, { ...decl, value: val });
+        break;
+      }
+      if (trimmedVal === 'unset') {
+        const val = (INHERITED_PROPERTIES.has(prop) && parentCascaded)
+          ? parentCascaded.getPropertyValue(prop)
+          : getInitialValue(prop, element);
+        winningDeclarations.set(prop, { ...decl, value: val });
+        break;
+      }
+
+      winningDeclarations.set(prop, { ...decl, value: subVal });
+      break;
+    }
+  }
+
+  // 4. Map declarations into final declarations list
   const finalDeclarations: Declaration[] = [];
 
   for (const [name, decl] of winningDeclarations) {
-    if (name.startsWith('--')) {
-      const resolvedVal = customProperties.get(name) ?? decl.value;
+    const mappedName = resolveLogicalProperty(name, writingMode, direction);
+    const finalValue = COLOR_PROPERTIES.has(mappedName) ? normalizeComputedColor(decl.value) : decl.value;
+
+    finalDeclarations.push({
+      type: 'declaration',
+      name: mappedName,
+      value: tokenize(finalValue),
+      important: decl.important,
+    });
+
+    if (mappedName !== name) {
       finalDeclarations.push({
         type: 'declaration',
         name,
-        value: tokenize(resolvedVal),
-        important: decl.important,
-        raw: resolvedVal,
-      });
-      continue;
-    }
-
-    const mappedName = resolveLogicalProperty(name, writingMode, direction);
-    const resolvedValue = substituteVariables(decl.value, customProperties, new Set());
-
-    if (resolvedValue !== null) {
-      const normalizedValue = normalizeComputedColor(resolvedValue);
-      finalDeclarations.push({
-        type: 'declaration',
-        name: mappedName,
-        value: tokenize(normalizedValue),
+        value: tokenize(finalValue),
         important: decl.important,
       });
-
-      // Retain logical property names
-      if (mappedName !== name) {
-        finalDeclarations.push({
-          type: 'declaration',
-          name,
-          value: tokenize(normalizedValue),
-          important: decl.important,
-        });
-      }
     }
   }
 
-  // Ensure inherited custom properties from parent are present
-  for (const [customProp, customVal] of customProperties) {
-    if (!finalDeclarations.some(d => d.name === customProp)) {
+  // Ensure resolved non-empty custom properties are present in finalDeclarations
+  for (const [customProp, customVal] of resolvedCustomProps) {
+    if (customVal !== '') {
       finalDeclarations.push({
         type: 'declaration',
         name: customProp,
         value: tokenize(customVal),
         important: false,
+        raw: customVal,
       });
     }
   }
 
-  const parentCascaded = elWithParent.parentElement ? getCascadedStyle(elWithParent.parentElement, rules) : null;
-  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, false, parentCascaded);
+  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, false, parentCascaded, element);
 
   // Sync logical properties
-  for (const logical in LOGICAL_MAPPING) {
-    const mapped = resolveLogicalProperty(logical, writingMode, direction);
-    const existingVal = resultStyle.getPropertyValue(mapped);
-    if (existingVal && !resultStyle.getPropertyValue(logical)) {
-      resultStyle.setProperty(logical, existingVal);
+  if (finalDeclarations.length > 0) {
+    for (const logical in LOGICAL_MAPPING) {
+      const mapped = resolveLogicalProperty(logical, writingMode, direction);
+      const decl = finalDeclarations.find(d => d.name === mapped);
+      if (decl && !resultStyle.getPropertyValue(logical)) {
+        resultStyle.setProperty(logical, decl.value.length ? serialize(decl.value) : decl.raw || '');
+      }
     }
   }
 
@@ -666,20 +1007,28 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
  */
 export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
   private _parentStyle: CSSStyleDeclaration | null;
+  private _element: unknown;
 
-  constructor(declarations: Declaration[] = [], readonlyFlag: boolean = false, parentStyle: CSSStyleDeclaration | null = null) {
+  constructor(declarations: Declaration[] = [], readonlyFlag: boolean = false, parentStyle: CSSStyleDeclaration | null = null, element: unknown = null) {
     super(declarations, readonlyFlag);
     this._parentStyle = parentStyle;
+    this._element = element;
   }
 
   override getPropertyValue(property: string): string {
     const isCustom = property.startsWith('--');
-    const dashed = isCustom ? property : camelToDashed(property).toLowerCase();
-    const rawVal = super.getPropertyValue(dashed);
-
     if (isCustom) {
-      return rawVal;
+      const decl = this._declarations.find(d => d.name === property);
+      if (!decl) return '';
+      if (decl.raw !== undefined) {
+        const trimmed = decl.raw.trim();
+        return trimmed === '' ? ' ' : trimmed;
+      }
+      const ser = serialize(decl.value, true).trim();
+      return ser === '' ? ' ' : ser;
     }
+    const dashed = camelToDashed(property).toLowerCase();
+    const rawVal = super.getPropertyValue(dashed);
 
     if (rawVal) {
       const lowerRaw = rawVal.trim().toLowerCase();
@@ -689,28 +1038,27 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
           if (parentVal) return parentVal;
         }
-        if (dashed === 'background-color') return 'rgba(0, 0, 0, 0)';
-        if (dashed === 'color') return 'rgb(0, 0, 0)';
-        return '';
+        return getInitialValue(dashed, this._element);
       }
       // css-cascade-5 § 7.3.1 #initial
       if (lowerRaw === 'initial') {
-        if (dashed === 'background-color') return 'rgba(0, 0, 0, 0)';
-        if (dashed === 'color') return 'rgb(0, 0, 0)';
-        return '';
+        return getInitialValue(dashed, this._element);
       }
       // css-cascade-5 § 7.3.3 #unset
       if (lowerRaw === 'unset') {
-        if (INHERITED_PROPERTIES.has(dashed)) {
-          if (this._parentStyle) {
-            const parentVal = this._parentStyle.getPropertyValue(dashed);
-            if (parentVal) return parentVal;
-          }
-          if (dashed === 'color') return 'rgb(0, 0, 0)';
+        if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
+          const parentVal = this._parentStyle.getPropertyValue(dashed);
+          if (parentVal) return parentVal;
         }
-        if (dashed === 'background-color') return 'rgba(0, 0, 0, 0)';
-        if (dashed === 'color') return 'rgb(0, 0, 0)';
-        return '';
+        return getInitialValue(dashed, this._element);
+      }
+      // css-cascade-5 § 6.2 #default
+      if (lowerRaw === 'revert' || lowerRaw === 'revert-layer' || lowerRaw === 'revert-rule') {
+        if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
+          const parentVal = this._parentStyle.getPropertyValue(dashed);
+          if (parentVal) return parentVal;
+        }
+        return getUaDefault(dashed, this._element);
       }
       if (dashed === 'box-shadow') {
         const tokens = rawVal.split(/\s+/);
@@ -734,7 +1082,10 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return normalizedTokens.join(' ');
       }
-      return normalizeComputedColor(rawVal);
+      if (COLOR_PROPERTIES.has(dashed)) {
+        return normalizeComputedColor(rawVal);
+      }
+      return rawVal;
     }
 
     if (this._parentStyle && INHERITED_PROPERTIES.has(dashed)) {
@@ -744,12 +1095,10 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
     }
 
-    if (dashed === 'background-color') {
-      return 'rgba(0, 0, 0, 0)';
-    }
-
-    if (dashed === 'color') {
-      return 'rgb(0, 0, 0)';
+    if (dashed === 'color') return 'rgb(0, 0, 0)';
+    if (dashed === 'background-color') return 'rgba(0, 0, 0, 0)';
+    if (SVG_PRESENTATION_ATTRIBUTES.has(dashed)) {
+      return DEFAULT_PROPERTY_VALUES[dashed] ?? '';
     }
 
     return '';
@@ -1048,10 +1397,16 @@ function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDeclaration
  * Recursively resolves var() references with fallback substitution and circular reference detection.
  * css-variables-1 § 4 #resolving-var-functions
  */
-function substituteVariables(
+/**
+ * Recursively resolves var() references with fallback substitution and circular reference detection.
+ * css-variables-1 § 4 #resolving-var-functions
+ * css-variables-1 § 4.4 #cycles
+ */
+export function substituteVariables(
   valueText: string,
   customProps: Map<string, string>,
-  resolvingStack: Set<string>
+  resolvingStack: Set<string> = new Set(),
+  cyclicProps: Set<string> = new Set()
 ): string | null {
   if (!valueText || !valueText.includes('var(')) {
     return valueText;
@@ -1059,56 +1414,109 @@ function substituteVariables(
 
   const tokens = tokenize(valueText);
   const componentValues = new Parser(tokens).parseComponentValues();
-
   const resolveNodes = (nodes: ComponentValue[]): ComponentValue[] | null => {
     const result: ComponentValue[] = [];
+    const pushTokens = (tokens: ComponentValue[]) => {
+      for (const tok of tokens) {
+        if (result.length > 0) {
+          const last = result[result.length - 1];
+          if (last && last.type !== 'whitespace' && tok.type !== 'whitespace') {
+            result.push({ type: 'whitespace', value: ' ' } as ComponentValue);
+          }
+        }
+        result.push(tok);
+      }
+    };
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       if (node.type === 'function' && 'name' in node && Array.isArray(node.value)) {
         const funcNode = node as unknown as { name: string; value: ComponentValue[] };
         if (funcNode.name.toLowerCase() === 'var') {
           const args = funcNode.value;
-          const varNameToken = args.find(
-            t => typeof t === 'object' && t !== null && 'type' in t && t.type === 'ident' && 'value' in t && typeof t.value === 'string' && t.value.startsWith('--')
-          ) as { type: string; value: string } | undefined;
-          if (!varNameToken) {
-            return null;
-          }
-          const varName = varNameToken.value;
-
-          // Circular reference detection: css-variables-1 § 4.4 #cycles
-          if (resolvingStack.has(varName)) {
-            return null;
-          }
-
           const commaIndex = args.findIndex(t => typeof t === 'object' && t !== null && 'type' in t && t.type === 'comma');
+          const nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
           const fallbackTokens = commaIndex !== -1 ? args.slice(commaIndex + 1) : null;
+
+          const nonWsNameTokens = nameTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+          let varName: string | undefined;
+
+          if (nonWsNameTokens.length === 1 && nonWsNameTokens[0].type === 'simple-block' && (nonWsNameTokens[0] as SimpleBlock).associatedToken?.type === '{') {
+            const innerTokens = (nonWsNameTokens[0] as SimpleBlock).value.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+            const ident = innerTokens.find(t => t.type === 'ident' && typeof (t as Token).value === 'string' && ((t as Token).value as string).startsWith('--'));
+            if (ident && typeof (ident as Token).value === 'string') varName = (ident as Token).value as string;
+          } else {
+            const ident = nonWsNameTokens.find(t => t.type === 'ident' && typeof (t as Token).value === 'string' && ((t as Token).value as string).startsWith('--'));
+            if (ident && typeof (ident as Token).value === 'string') varName = (ident as Token).value as string;
+          }
+
+          if (!varName) {
+            if (fallbackTokens) {
+              const resolvedFallback = resolveNodes(fallbackTokens);
+              if (resolvedFallback === null) return null;
+              pushTokens(resolvedFallback);
+              continue;
+            }
+            return null;
+          }
+
+          if (resolvingStack.has(varName)) {
+            const stackArr = Array.from(resolvingStack);
+            const idx = stackArr.indexOf(varName);
+            if (idx !== -1) {
+              for (let j = idx; j < stackArr.length; j++) {
+                cyclicProps.add(stackArr[j]);
+              }
+            }
+            cyclicProps.add(varName);
+            return null;
+          }
+
+          if (cyclicProps.has(varName)) {
+            if (fallbackTokens) {
+              const resolvedFallback = resolveNodes(fallbackTokens);
+              if (resolvedFallback === null) return null;
+              pushTokens(resolvedFallback);
+              continue;
+            }
+            return null;
+          }
 
           if (customProps.has(varName)) {
             const rawCustomVal = customProps.get(varName)!;
+            if (rawCustomVal === '') {
+              if (fallbackTokens) {
+                const resolvedFallback = resolveNodes(fallbackTokens);
+                if (resolvedFallback === null) return null;
+                pushTokens(resolvedFallback);
+                continue;
+              }
+              return null;
+            }
+
             if (rawCustomVal.includes('var(')) {
               const nextStack = new Set(resolvingStack);
               nextStack.add(varName);
-              const resolvedCustom = substituteVariables(rawCustomVal, customProps, nextStack);
-              if (resolvedCustom === null) {
+              const resolvedCustom = substituteVariables(rawCustomVal, customProps, nextStack, cyclicProps);
+              if (resolvedCustom === null || cyclicProps.has(varName)) {
+                cyclicProps.add(varName);
                 if (fallbackTokens) {
                   const resolvedFallback = resolveNodes(fallbackTokens);
                   if (resolvedFallback === null) return null;
-                  result.push(...resolvedFallback);
+                  pushTokens(resolvedFallback);
                   continue;
                 }
                 return null;
               }
-              const substitutedTokens = new Parser(tokenize(resolvedCustom)).parseComponentValues();
-              result.push(...substitutedTokens);
+              const substitutedTokens = tokenize(resolvedCustom);
+              pushTokens(substitutedTokens);
             } else {
-              const substitutedTokens = new Parser(tokenize(rawCustomVal)).parseComponentValues();
-              result.push(...substitutedTokens);
+              const substitutedTokens = tokenize(rawCustomVal);
+              pushTokens(substitutedTokens);
             }
           } else if (fallbackTokens) {
             const resolvedFallback = resolveNodes(fallbackTokens);
             if (resolvedFallback === null) return null;
-            result.push(...resolvedFallback);
+            pushTokens(resolvedFallback);
           } else {
             return null;
           }
@@ -1117,13 +1525,13 @@ function substituteVariables(
 
         const resolvedChildren = resolveNodes(funcNode.value);
         if (resolvedChildren === null) return null;
-        result.push({ type: 'function', name: funcNode.name, value: resolvedChildren });
+        pushTokens([{ type: 'function', name: funcNode.name, value: resolvedChildren } as unknown as ComponentValue]);
       } else if (node.type === 'simple-block') {
         const resolvedChildren = resolveNodes(node.value);
         if (resolvedChildren === null) return null;
-        result.push({ type: 'simple-block', associatedToken: node.associatedToken, value: resolvedChildren });
+        pushTokens([{ type: 'simple-block', associatedToken: (node as SimpleBlock).associatedToken, value: resolvedChildren } as unknown as ComponentValue]);
       } else {
-        result.push(node);
+        pushTokens([node]);
       }
     }
     return result;

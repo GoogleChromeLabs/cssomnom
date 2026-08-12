@@ -46,6 +46,9 @@ export const ParseHooks = {
   validateCustomPropertyValue: (_values: ComponentValue[]): boolean => {
     throw new Error('validateCustomPropertyValue not injected');
   },
+  validateDeclarationValue: (_values: ComponentValue[]): boolean => {
+    throw new Error('validateDeclarationValue not injected');
+  },
   isValidUnicodeRangeValue: (_values: ComponentValue[]): boolean => {
     throw new Error('isValidUnicodeRangeValue not injected');
   },

@@ -74,6 +74,9 @@ export function runWptFile(filePath: string): WptFileResult {
       if (prop === 'navigator') {
         return sandbox.navigator;
       }
+      if (prop === 'Array' || prop === 'Object' || prop === 'String' || prop === 'Number' || prop === 'Boolean' || prop === 'Symbol' || prop === 'Math' || prop === 'Date' || prop === 'RegExp' || prop === 'JSON') {
+        return (globalThis as unknown as Record<string, unknown>)[prop];
+      }
       if (typeof prop === 'string') {
         const val = target[prop];
         if (val !== undefined) {
@@ -109,11 +112,32 @@ export function runWptFile(filePath: string): WptFileResult {
     }
   });
 
-  // Ensure standard aliases are present
+  // Ensure standard aliases and JS primitives are present
   sandbox.window = windowProxy;
   sandbox.document = dom.document;
   sandbox.globalThis = windowProxy;
   sandbox.self = windowProxy;
+  sandbox.Array = globalThis.Array;
+  sandbox.Object = globalThis.Object;
+  sandbox.String = globalThis.String;
+  sandbox.Number = globalThis.Number;
+  sandbox.Boolean = globalThis.Boolean;
+  sandbox.Symbol = globalThis.Symbol;
+  sandbox.Math = globalThis.Math;
+  sandbox.Date = globalThis.Date;
+  sandbox.RegExp = globalThis.RegExp;
+  sandbox.JSON = globalThis.JSON;
+
+  winObj.Array = globalThis.Array;
+  winObj.Object = globalThis.Object;
+  winObj.String = globalThis.String;
+  winObj.Number = globalThis.Number;
+  winObj.Boolean = globalThis.Boolean;
+  winObj.Symbol = globalThis.Symbol;
+  winObj.Math = globalThis.Math;
+  winObj.Date = globalThis.Date;
+  winObj.RegExp = globalThis.RegExp;
+  winObj.JSON = globalThis.JSON;
 
   // Copy common globals explicitly if they are on window
   const commonGlobals = [

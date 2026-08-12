@@ -6,6 +6,7 @@ import { getCascadedStyle } from '../src/cascade.ts';
 import { matches, querySelectorAll, querySelector } from '../src/matcher.ts';
 import { camelToDashed } from '../src/utils.ts';
 import { MediaParser } from '../src/MediaParser.ts';
+import { tokenize } from '../src/tokenizer.ts';
 import type { MediaEnvironment, Rule } from '../src/types.ts';
 
 export interface WptSandboxTest {
@@ -1345,22 +1346,50 @@ const styleToElement = new WeakMap<object, Element>();
 
     Object.defineProperty(declProto, 'cssText', {
       get(this: unknown) {
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym] as Map<string | symbol, string>;
+          if (map && typeof (map as { entries?: unknown }).entries === 'function') {
+            const entries: string[] = [];
+            for (const [k, v] of map.entries()) {
+              if (typeof k === 'string' && typeof v === 'string') {
+                entries.push(`${k}: ${v}`);
+              }
+            }
+            if (entries.length > 0) {
+              return entries.join('; ') + ';';
+            }
+          }
+        }
         const raw = origCssTextDesc?.get ? origCssTextDesc.get.call(this) : '';
-        if (!raw) return '';
-        const d = new CSSStyleDeclaration();
-        d.cssText = raw;
-        return d.cssText;
+        return raw;
       },
       set(this: unknown, val: string) {
-        const d = new CSSStyleDeclaration();
-        d.cssText = val;
         if (origCssTextDesc?.set) {
-          origCssTextDesc.set.call(this, d.cssText);
+          origCssTextDesc.set.call(this, val);
+        }
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym] as Map<string | symbol, string>;
+          if (map && typeof map.clear === 'function') {
+            map.clear();
+            const d = new CSSStyleDeclaration();
+            d.cssText = val;
+            const seen = new Set<string>();
+            for (let i = 0; i < d.length; i++) {
+              const name = d.item(i);
+              if (seen.has(name)) continue;
+              seen.add(name);
+              const v = d.getPropertyValue(name);
+              const p = d.getPropertyPriority(name);
+              map.set(name, p === 'important' ? `${v} !important` : v);
+            }
+          }
         }
         const el = styleToElement.get(this as object);
         if (el && typeof el.setAttribute === 'function') {
-          if (d.cssText) {
-            el.setAttribute('style', d.cssText);
+          if (val) {
+            el.setAttribute('style', val);
           } else {
             el.removeAttribute('style');
           }
@@ -1372,17 +1401,32 @@ const styleToElement = new WeakMap<object, Element>();
 
     declProto.getPropertyValue = function (this: unknown, name: string) {
       if (name.startsWith('--')) {
+        if (!ParseHooks.isValidDashedIdent(name)) {
+          return '';
+        }
         void (this as { cssText?: string }).cssText;
         const sym = getPrivateSymbol(this);
         if (sym && sym in (this as Record<symbol, unknown>)) {
           const map = (this as Record<symbol, unknown>)[sym];
           if (map && typeof (map as { get?: unknown }).get === 'function') {
-            const val = (map as { get: (k: string) => unknown }).get(name);
-            if (typeof val === 'string') {
-              return val;
+            const hasProp = typeof (map as { has?: unknown }).has === 'function' ? (map as { has: (k: string) => boolean }).has(name) : false;
+            if (hasProp) {
+              const rawVal = (map as { get: (k: string) => unknown }).get(name);
+              if (typeof rawVal === 'string') {
+                const cleaned = rawVal.replace(/\s*!important\s*$/i, '').trim();
+                if (cleaned === '') {
+                  return ' ';
+                }
+                return cleaned;
+              }
+              return ' ';
             }
           }
         }
+        return '';
+      }
+      if (name.startsWith('-')) {
+        return '';
       }
       const val = origGet.call(this, name);
       if (typeof val === 'string' && val.startsWith('url(') && !val.endsWith(')')) {
@@ -1395,6 +1439,13 @@ const styleToElement = new WeakMap<object, Element>();
       if (value === null || value === undefined || value === '') {
         (this as { removeProperty: (k: string) => string }).removeProperty(name);
         return;
+      }
+      if (typeof value === 'string' && value.includes('var(')) {
+        const tokens = tokenize(value);
+        const comp = ParseHooks.parseComponentValues(tokens);
+        if (!ParseHooks.validateDeclarationValue(comp)) {
+          return;
+        }
       }
       if (name.startsWith('--')) {
         if (!ParseHooks.isValidDashedIdent(name)) {

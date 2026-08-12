@@ -92,7 +92,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
 export class CSSStyleDeclaration extends CSSStyleProperties {
   [index: number]: string;
   [property: string]: unknown;
-  private _declarations: Declaration[];
+  protected _declarations: Declaration[];
   private _declMap: Map<string, Declaration>;
   private _readonly: boolean;
   public parentRule: CSSRule | null = null;
@@ -545,6 +545,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const newStyle = ParseHooks.parseStyleAttribute(tokens);
     
     for (const d of newStyle.declarations) {
+      if (d.name === '--') continue;
       const shorthand = SHORTHANDS[d.name];
       if (shorthand) {
         const expanded = shorthand.expand(d.value);

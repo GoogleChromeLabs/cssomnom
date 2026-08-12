@@ -1101,10 +1101,15 @@ export class Parser {
       }
     }
     if (name.startsWith('--')) {
-      if (!Parser.validateCustomPropertyValue(declValue)) {
+      if (!Parser.isValidDashedIdent(name) || !Parser.validateCustomPropertyValue(declValue)) {
         return null;
       }
-    } else if (name.toLowerCase() === 'unicode-range') {
+    } else {
+      if (!validateDeclarationValue(declValue)) {
+        return null;
+      }
+    }
+    if (name.toLowerCase() === 'unicode-range') {
       const text = getOriginalText(declValue);
       const errors: ParseError[] = [];
       const reTokens = tokenize(text, true, errors);
@@ -1160,8 +1165,6 @@ export class Parser {
       } else if (v.type === 'function') {
         const func = v as CSSFunction;
         if (!Parser.validateCustomPropertyValue(func.value, false)) return false;
-        
-
       }
     }
     return true;
@@ -1797,6 +1800,47 @@ export class Parser {
   }
 }
 
+function validateVarFunction(func: CSSFunction): boolean {
+  if (func.name.toLowerCase() !== 'var') return true;
+  const args = func.value;
+  const commaIndex = args.findIndex(t => t.type === 'comma');
+  const nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
+  const nonWsNameTokens = nameTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+
+  if (nonWsNameTokens.length === 0) {
+    return false;
+  }
+
+  if (nonWsNameTokens.length === 1 && nonWsNameTokens[0].type === 'simple-block' && (nonWsNameTokens[0] as SimpleBlock).associatedToken?.type === '{') {
+    const innerTokens = (nonWsNameTokens[0] as SimpleBlock).value.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+    if (innerTokens.length === 0) {
+      return false;
+    }
+    return true;
+  }
+
+  const hasSimpleCurlyBlock = nonWsNameTokens.some(t => t.type === 'simple-block' && (t as SimpleBlock).associatedToken?.type === '{');
+  if (hasSimpleCurlyBlock) {
+    return false;
+  }
+
+  return true;
+}
+
+export function validateDeclarationValue(values: ComponentValue[]): boolean {
+  for (const v of values) {
+    if (v.type === 'bad-string' || v.type === 'bad-url') return false;
+    if (v.type === 'simple-block') {
+      if (!validateDeclarationValue((v as SimpleBlock).value)) return false;
+    } else if (v.type === 'function') {
+      const func = v as CSSFunction;
+      if (!validateVarFunction(func)) return false;
+      if (!validateDeclarationValue(func.value)) return false;
+    }
+  }
+  return true;
+}
+
 
 /**
  * Parses a single rule from a string.
@@ -1949,6 +1993,7 @@ ParseHooks.parseComponentValues = (tokens) => new Parser(tokens).parseComponentV
 ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
 ParseHooks.parseSelectorAST = (text, declaredNamespaces, allowRelative) => Parser.parseSelectorAST(text, declaredNamespaces, allowRelative);
 ParseHooks.validateCustomPropertyValue = (values) => Parser.validateCustomPropertyValue(values);
+ParseHooks.validateDeclarationValue = (values) => validateDeclarationValue(values);
 ParseHooks.isValidUnicodeRangeValue = (values) => isValidUnicodeRangeValue(values);
 ParseHooks.assembleUnicodeRanges = (values) => assembleUnicodeRanges(values);
 ParseHooks.isValidDashedIdent = (name) => Parser.isValidDashedIdent(name);
