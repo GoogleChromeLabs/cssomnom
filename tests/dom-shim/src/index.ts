@@ -5,6 +5,7 @@ import type { WindowType } from './testharness-bridge.ts';
 
 export * from './wpt-assertions.ts';
 export * from './dom-stubs.ts';
+export * from './virtual-clock.ts';
 export * from './testharness-bridge.ts';
 export * from './iframe-runner.ts';
 

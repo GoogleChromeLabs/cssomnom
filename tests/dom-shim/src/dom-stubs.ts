@@ -1286,8 +1286,17 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     }
   };
 
+  if (!('performance' in win)) {
+    win.performance = {
+      now: () => ((win.__virtualClock as { currentTime: number } | undefined)?.currentTime ?? performance.now())
+    };
+  }
+
   if (!('requestAnimationFrame' in win)) {
     win.requestAnimationFrame = function (cb: (time: number) => void) {
+      if (win.__virtualClock) {
+        return (win.__virtualClock as { requestAnimationFrame: (cb: (t: number) => void) => number }).requestAnimationFrame(cb);
+      }
       return setTimeout(() => {
         checkAutofocus();
         (win as unknown as { __triggerRenderUpdate?: () => void }).__triggerRenderUpdate?.();
@@ -1296,13 +1305,17 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
           const cw = (ifr as unknown as { contentWindow?: { __triggerRenderUpdate?: () => void } }).contentWindow;
           cw?.__triggerRenderUpdate?.();
         }
-        cb(performance.now());
+        cb((win.performance as { now: () => number })?.now?.() ?? performance.now());
       }, 16);
     };
   }
   if (!('cancelAnimationFrame' in win)) {
     win.cancelAnimationFrame = function (id: unknown) {
-      clearTimeout(id as NodeJS.Timeout);
+      if (win.__virtualClock) {
+        (win.__virtualClock as { cancelAnimationFrame: (id: unknown) => void }).cancelAnimationFrame(id);
+      } else {
+        clearTimeout(id as NodeJS.Timeout);
+      }
     };
   }
 

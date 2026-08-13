@@ -2514,6 +2514,55 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - `pnpm run preflight`: 0 TypeScript errors, 0 oxlint warnings, safe-exec check pass, 100% unit tests passing.
   - `pnpm run wpt:verify`: 0 regressions across 1,687 test files with +28 newly passing tests (16,797 passing tests).
 
+---
+
+## Phase 102: Cross-Browser Differential Parity Oracle (Node.js vs Headless Chrome)
+**Goal**: Build an automated Differential Parity Oracle that executes WPT tests in Headless Chrome (`wpt run chrome`), compares the live browser results against Node.js `.wpt-cache/last-run.json`, and categorizes results into verified passes, feasibility boundaries, and potential over-mocking false positives.
+
+### Tasks
+- [ ] **Headless Chrome Execution Integration**:
+  - Enhance `scripts/wpt/browser/run.ts` to export structured WPT JSON report artifacts (`dist/report-chrome.json`).
+- [ ] **Differential Parity Engine (`scripts/wpt/browser/parity.ts`)**:
+  - Build parity comparator matching test subtest assertions between `last-run.json` (Node) and `report-chrome.json` (Blink).
+  - Output classified Parity Matrix:
+    1. *Verified Conformance*: Pass in Node + Pass in Chrome.
+    2. *Verified Specification Gaps*: Fail in Node + Pass in Chrome.
+    3. *Feasibility Boundaries*: Fail in Node + Fail in Chrome (confirms browser-only / unsupported / contested WPT tests).
+    4. *Over-Mocking False Positives*: Pass in Node + Fail in Chrome (flags overly lenient shims).
+- [ ] **CLI Wiring**:
+  - Add `wpt parity` subcommand and `pnpm run wpt:parity` in `package.json`.
+- [ ] **Verification**:
+  - Run `pnpm run wpt:parity` across `css-typed-om` and `selectors` suites.
+
+---
+
+## Phase 103: Typed OM Failure Cluster #1: `CSSUnparsedValue` Roundtrip & Transform `is2D` Immutability
+**Goal**: Eliminate the largest remaining failure cluster (~1,036 failures across 211 files) by implementing strict `is2D` immutability in CSSTransformComponent subclasses and fixing `CSSUnparsedValue` token serialization roundtripping.
+
+### Tasks
+- [ ] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
+  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSRotate`, `CSSTranslate`, `CSSScale` is a no-op or correctly updates 2D/3D state without throwing unexpected exceptions.
+- [ ] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
+  - In `src/typed-om/values/CSSUnparsedValue.ts`: Fix `toString()` and token list iteration to accurately serialize mixed strings and `CSSVariableReferenceValue` instances.
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
+  - Run `pnpm run wpt:verify` to confirm 0 regressions and record newly passing assertions.
+
+---
+
+## Phase 104: Deterministic Virtual Clock & Microtask Flusher in `tests/dom-shim/`
+**Goal**: Implement a deterministic virtual macro-tick and micro-tick flusher in `tests/dom-shim/src/testharness-bridge.ts` and `dom-stubs.ts` so async WPT tests (`step_timeout`, `requestAnimationFrame`) execute synchronously without wall-clock delays.
+
+### Tasks
+- [x] **Investigate Virtual Clock Architectures**:
+  - Researched HappyDOM, JSDOM, and WPT `testharness.js` discrete event models.
+- [x] **Implement Deterministic Virtual Timer Queue**:
+  - Built `VirtualClock` in `tests/dom-shim/src/virtual-clock.ts` with discrete event scheduling, microtask flushing, and rAF frame boundaries.
+  - Integrated into `tests/dom-shim/src/testharness-bridge.ts`, `dom-stubs.ts`, `iframe-runner.ts`, and `scripts/wpt/node/run.ts`.
+- [x] **Unit Testing & Performance Benchmark**:
+  - Added comprehensive unit tests in `tests/dom-shim/tests/virtual-clock.test.ts`.
+  - Verified 0 regressions across 1,687 WPT test files (16,797 passing assertions).
+
 
 
 

@@ -196,14 +196,21 @@ export function runWptFile(filePath: string): WptFileResult {
   }
 
   const testQueue: WptTest[] = [];
+  const clock = (sandbox as { clock?: { pumpUntil: (fn: () => boolean, opts?: { maxTicks?: number; maxVirtualDuration?: number }) => Promise<boolean>; setTimeout: (fn: Function, delay?: number) => number } }).clock;
   for (const t of tests) {
     if (t.executed) {
       const wrappedFn = async () => {
+        if (t.type === 'async_test' && t.promise) {
+          if (clock) {
+            void clock.pumpUntil(() => (t as unknown as { completed?: boolean }).completed === true, { maxTicks: 5000, maxVirtualDuration: 30000 });
+          }
+          await t.promise;
+        }
         if ((t.status ?? 0) !== 0) {
           throw new Error(t.message || `Test failed with status ${t.status}`);
         }
       };
-      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
+      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: t.type === 'async_test' });
       continue;
     }
 
@@ -213,6 +220,9 @@ export function runWptFile(filePath: string): WptFileResult {
         cleanups.push(fn);
       },
       step_timeout(fn: Function, delay: number) {
+        if (clock) {
+          return clock.setTimeout(fn, delay);
+        }
         return setTimeout(fn, delay);
       },
       step_func(fn: Function) {
@@ -234,7 +244,23 @@ export function runWptFile(filePath: string): WptFileResult {
     const wrappedFn = async () => {
       try {
         if (t.fn) {
-          await t.fn.call(testHarnessParam, testHarnessParam);
+          const res = t.fn.call(testHarnessParam, testHarnessParam);
+          if (
+            res &&
+            typeof res === 'object' &&
+            'then' in res &&
+            typeof (res as Record<string, unknown>).then === 'function'
+          ) {
+            let promiseDone = false;
+            const wrappedPromise = (res as Promise<unknown>).then(
+              (v) => { promiseDone = true; return v; },
+              (err) => { promiseDone = true; throw err; }
+            );
+            if (clock) {
+              void clock.pumpUntil(() => promiseDone, { maxTicks: 5000, maxVirtualDuration: 30000 });
+            }
+            await wrappedPromise;
+          }
         }
       } finally {
         for (const cleanup of cleanups) {
@@ -246,7 +272,7 @@ export function runWptFile(filePath: string): WptFileResult {
         }
       }
     };
-    testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
+    testQueue.push({ name: t.name, fn: wrappedFn, isAsync: t.type === 'promise_test' || t.type === 'async_test' });
   }
   return {
     tests: testQueue,

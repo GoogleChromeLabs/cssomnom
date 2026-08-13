@@ -19,6 +19,7 @@ import {
   createNavigatorPreferences,
   getMediaEnvForWindow
 } from './dom-stubs.ts';
+import { VirtualClock } from './virtual-clock.ts';
 
 (globalThis as unknown as { DOMMatrixReadOnly: unknown }).DOMMatrixReadOnly = DOMMatrixReadOnly;
 (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrix;
@@ -76,14 +77,12 @@ export const TYPED_OM_EXPORTS = Object.fromEntries(
 export function createWptContext(
   window: WindowType,
   document: Partial<DocumentType>,
-  tests: WptSandboxTest[]
+  tests: WptSandboxTest[],
+  clock?: VirtualClock
 ): Record<string, unknown> {
-  let nextRafId = 1;
-  const activeRafs = new Map<number, NodeJS.Timeout>();
-  const activeTimeouts = new Set<NodeJS.Timeout>();
-  const activeIntervals = new Set<NodeJS.Timeout>();
-
   const win = window as unknown as Record<string, unknown>;
+  const virtualClock = clock ?? (win.__virtualClock as VirtualClock | undefined) ?? new VirtualClock();
+  win.__virtualClock = virtualClock;
 
   const checkAutofocus = () => {
     const docObj = document as (Document & { activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
@@ -95,6 +94,75 @@ export function createWptContext(
     }
   };
   checkAutofocus();
+
+  virtualClock.onRafFrame = (_currentTime: number) => {
+    checkAutofocus();
+    (win as unknown as { __triggerRenderUpdate?: () => void }).__triggerRenderUpdate?.();
+    const checkWindow = (w: Record<string, unknown>) => {
+      const env = getMediaEnvForWindow(w);
+      const prevW = w.__lastWidth as number | undefined;
+      const prevH = w.__lastHeight as number | undefined;
+      if (prevW !== undefined && prevH !== undefined && (prevW !== env.width || prevH !== env.height)) {
+        w.__lastWidth = env.width;
+        w.__lastHeight = env.height;
+        const resizeEv = new ((w.Event as { new(t: string): Event }) || Event)('resize');
+        if (typeof (w.dispatchEvent as (e: Event) => boolean) === 'function') {
+          (w.dispatchEvent as (e: Event) => boolean).call(w, resizeEv);
+        }
+        if (w.__resizeListeners instanceof Set) {
+          for (const l of w.__resizeListeners) {
+            try {
+              l.call(w, resizeEv);
+            } catch {}
+          }
+        }
+        if (typeof (w as { onresize?: (e: Event) => void }).onresize === 'function') {
+          try {
+            (w as { onresize: (e: Event) => void }).onresize(resizeEv);
+          } catch {}
+        }
+      } else {
+        w.__lastWidth = env.width;
+        w.__lastHeight = env.height;
+      }
+      if (w.__activeMqls instanceof Set) {
+        for (const m of w.__activeMqls) {
+          if (typeof (m as { _checkChange?: () => void })._checkChange === 'function') {
+            (m as { _checkChange: () => void })._checkChange();
+          }
+        }
+      }
+    };
+
+    checkWindow(window as unknown as Record<string, unknown>);
+    const iframes = (window.document?.querySelectorAll ? Array.from(window.document.querySelectorAll('iframe')) : []) as unknown as Array<{ contentWindow?: unknown }>;
+    for (const ifr of iframes) {
+      if (ifr && ifr.contentWindow) {
+        checkWindow(ifr.contentWindow as Record<string, unknown>);
+        const cw = ifr.contentWindow as { __triggerRenderUpdate?: () => void };
+        cw.__triggerRenderUpdate?.();
+      }
+    }
+  };
+
+  const perfObj = {
+    now: () => virtualClock.currentTime
+  };
+  win.performance = perfObj;
+
+  const setTimeoutFn = (cb: Function, delay?: number, ...args: unknown[]) => virtualClock.setTimeout(cb, delay, ...args);
+  const clearTimeoutFn = (id: unknown) => virtualClock.clearTimeout(id);
+  const setIntervalFn = (cb: Function, delay?: number, ...args: unknown[]) => virtualClock.setInterval(cb, delay, ...args);
+  const clearIntervalFn = (id: unknown) => virtualClock.clearInterval(id);
+  const requestAnimationFrameFn = (cb: (time: number) => void) => virtualClock.requestAnimationFrame(cb);
+  const cancelAnimationFrameFn = (id: unknown) => virtualClock.cancelAnimationFrame(id);
+
+  win.setTimeout = setTimeoutFn;
+  win.clearTimeout = clearTimeoutFn;
+  win.setInterval = setIntervalFn;
+  win.clearInterval = clearIntervalFn;
+  win.requestAnimationFrame = requestAnimationFrameFn;
+  win.cancelAnimationFrame = cancelAnimationFrameFn;
 
   const ctx: Record<string, unknown> = {
     // Expose elements with IDs as globals (must precede harness functions so IDs like id="test" don't clobber harness functions)
@@ -132,110 +200,18 @@ export function createWptContext(
     AssertionError: AssertionErrorProxy,
     OptionalFeatureUnsupportedError,
 
-    // Timers
-    setTimeout: (cb: Function, delay?: number, ...args: unknown[]) => {
-      const timer = setTimeout(() => {
-        activeTimeouts.delete(timer);
-        try {
-          cb(...args);
-        } catch {}
-      }, delay);
-      activeTimeouts.add(timer);
-      return timer;
-    },
-    clearTimeout: (timer: unknown) => {
-      clearTimeout(timer as NodeJS.Timeout);
-      activeTimeouts.delete(timer as NodeJS.Timeout);
-    },
-    setInterval: (cb: Function, delay?: number, ...args: unknown[]) => {
-      const timer = setInterval(() => {
-        try {
-          cb(...args);
-        } catch {}
-      }, delay);
-      activeIntervals.add(timer);
-      return timer;
-    },
-    clearInterval: (timer: unknown) => {
-      clearInterval(timer as NodeJS.Timeout);
-      activeIntervals.delete(timer as NodeJS.Timeout);
-    },
-    requestAnimationFrame: (cb: (time: number) => void) => {
-      const id = nextRafId++;
-      const timer = setTimeout(() => {
-        activeRafs.delete(id);
-        try {
-          checkAutofocus();
-          const checkWindow = (w: Record<string, unknown>) => {
-            const env = getMediaEnvForWindow(w);
-            const prevW = w.__lastWidth as number | undefined;
-            const prevH = w.__lastHeight as number | undefined;
-            if (prevW !== undefined && prevH !== undefined && (prevW !== env.width || prevH !== env.height)) {
-              w.__lastWidth = env.width;
-              w.__lastHeight = env.height;
-              const resizeEv = new ((w.Event as { new(t: string): Event }) || Event)('resize');
-              if (typeof (w.dispatchEvent as (e: Event) => boolean) === 'function') {
-                (w.dispatchEvent as (e: Event) => boolean).call(w, resizeEv);
-              }
-              if (w.__resizeListeners instanceof Set) {
-                for (const l of w.__resizeListeners) {
-                  try {
-                    l.call(w, resizeEv);
-                  } catch {}
-                }
-              }
-              if (typeof (w as { onresize?: (e: Event) => void }).onresize === 'function') {
-                try {
-                  (w as { onresize: (e: Event) => void }).onresize(resizeEv);
-                } catch {}
-              }
-            } else {
-              w.__lastWidth = env.width;
-              w.__lastHeight = env.height;
-            }
-            if (w.__activeMqls instanceof Set) {
-              for (const m of w.__activeMqls) {
-                if (typeof (m as { _checkChange?: () => void })._checkChange === 'function') {
-                  (m as { _checkChange: () => void })._checkChange();
-                }
-              }
-            }
-          };
-
-          checkWindow(window as unknown as Record<string, unknown>);
-          const iframes = (window.document?.querySelectorAll ? Array.from(window.document.querySelectorAll('iframe')) : []) as unknown as Array<{ contentWindow?: unknown }>;
-          for (const ifr of iframes) {
-            if (ifr && ifr.contentWindow) {
-              checkWindow(ifr.contentWindow as Record<string, unknown>);
-            }
-          }
-
-          cb(performance.now());
-        } catch {}
-      }, 16);
-      activeRafs.set(id, timer);
-      return id;
-    },
-    cancelAnimationFrame: (id: number) => {
-      const timer = activeRafs.get(id);
-      if (timer) {
-        clearTimeout(timer);
-        activeRafs.delete(id);
-      }
-    },
+    // Virtual Clock & Timers
+    clock: virtualClock,
+    virtualClock,
+    performance: perfObj,
+    setTimeout: setTimeoutFn,
+    clearTimeout: clearTimeoutFn,
+    setInterval: setIntervalFn,
+    clearInterval: clearIntervalFn,
+    requestAnimationFrame: requestAnimationFrameFn,
+    cancelAnimationFrame: cancelAnimationFrameFn,
     __cleanup: () => {
-      for (const timer of activeTimeouts) {
-        clearTimeout(timer);
-      }
-      activeTimeouts.clear();
-      for (const timer of activeIntervals) {
-        clearInterval(timer);
-      }
-      activeIntervals.clear();
-      for (const timer of activeRafs.values()) {
-        clearTimeout(timer);
-      }
-      activeRafs.clear();
+      virtualClock.reset();
     },
 
     // Test lifecycle harness
@@ -330,7 +306,7 @@ export function createWptContext(
         },
         step: (stepFn: Function) => stepFn(),
         step_timeout: (cb: Function, delay: number) => {
-          return setTimeout(() => {
+          return virtualClock.setTimeout(() => {
             try {
               cb();
             } catch (e) {
@@ -515,7 +491,7 @@ export function createWptContext(
           };
         },
         step_timeout: (stepFn: Function, delay: number) => {
-          return setTimeout(tObj.step_func(stepFn), delay);
+          return virtualClock.setTimeout(tObj.step_func(stepFn), delay);
         },
         add_cleanup: (cleanFn: Function) => {
           if (!testObj.cleanups) {
