@@ -31,6 +31,8 @@ import {
 } from './color-rectify.ts';
 import { createCSSStyleValue } from '../values/style-value-factory.ts';
 
+import { matchesAngle } from '../utils/type-guards.ts';
+
 // Spec: CSS Typed OM Level 2 § 2.1 #cssrgb
 export class CSSRGB extends CSSColorValue {
   private _r!: CSSNumericValue | CSSKeywordValue;
@@ -44,6 +46,9 @@ export class CSSRGB extends CSSColorValue {
     b: number | string | CSSNumericValue | CSSKeywordValue,
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSRGB': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.r = r;
     this.g = g;
@@ -92,6 +97,9 @@ export class CSSHSL extends CSSColorValue {
     l: number | string | CSSNumericValue | CSSKeywordValue,
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSHSL': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.h = h;
     this.s = s;
@@ -127,11 +135,14 @@ export class CSSHWB extends CSSColorValue {
   private _alpha!: CSSNumericValue | CSSKeywordValue;
 
   constructor(
-    h: number | string | CSSNumericValue,
+    h: CSSNumericValue,
     w: number | string | CSSNumericValue | CSSKeywordValue,
     b: number | string | CSSNumericValue | CSSKeywordValue,
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSHWB': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.h = h;
     this.w = w;
@@ -140,13 +151,15 @@ export class CSSHWB extends CSSColorValue {
   }
 
   get h(): CSSNumericValue { checkBrand(this, CSSHWB); return this._h; }
-  set h(val: number | string | CSSNumericValue) {
+  set h(val: CSSNumericValue) {
     checkBrand(this, CSSHWB);
-    const rectified = rectifyColorAngle(val);
-    if (!(rectified instanceof CSSNumericValue)) {
+    if (!(val instanceof CSSNumericValue) || typeof val === 'number') {
       throw new TypeError(`CSSHWB.h must be a CSSNumericValue`);
     }
-    this._h = rectified;
+    if (!matchesAngle(val.type())) {
+      throw new DOMException(`CSSHWB.h must have angle type`, 'SyntaxError');
+    }
+    this._h = val;
   }
 
   get w(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._w; }
@@ -179,6 +192,9 @@ export class CSSLab extends CSSColorValue {
     b: number | string | CSSNumericValue | CSSKeywordValue,
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSLab': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.l = l;
     this.a = a;
@@ -219,6 +235,9 @@ export class CSSLCH extends CSSColorValue {
     h: number | string | CSSNumericValue | CSSKeywordValue,
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSLCH': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.l = l;
     this.c = c;
@@ -259,6 +278,9 @@ export class CSSOKLab extends CSSColorValue {
     b: number | string | CSSNumericValue | CSSKeywordValue,
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSOKLab': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.l = l;
     this.a = a;
@@ -299,6 +321,9 @@ export class CSSOKLCH extends CSSColorValue {
     h: number | string | CSSNumericValue | CSSKeywordValue,
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSOKLCH': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.l = l;
     this.c = c;
@@ -337,6 +362,15 @@ export class CSSColor extends CSSColorValue {
     channels: (number | string | CSSNumericValue | CSSKeywordValue)[],
     alpha: number | string | CSSNumericValue | CSSKeywordValue = 1
   ) {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to construct 'CSSColor': 2 arguments required, but only " + arguments.length + " present.");
+    }
+    if (typeof colorSpace !== 'string' && !(colorSpace instanceof CSSKeywordValue)) {
+      throw new TypeError("CSSColor colorSpace must be a string or CSSKeywordValue");
+    }
+    if (!Array.isArray(channels)) {
+      throw new TypeError("CSSColor channels must be an array");
+    }
     super();
     this.colorSpace = colorSpace;
     this._channels = channels.map(c => rectifyColorNumberOrPercent(c));

@@ -2495,7 +2495,24 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Updated `package.json` with `wpt`, `wpt:run`, `wpt:crawl`, `wpt:progress`, `wpt:baseline`, `wpt:verify`, `wpt:cluster`, `wpt:diff`.
   - Added unit test suite `tests/wpt-cli.test.ts`.
 - [x] **Preflight & Verification**:
-  - `pnpm run preflight` 100% passing (0 typecheck errors, 0 linter warnings, safe-exec check pass, 100% unit tests passing).
+## Phase 101: Typed OM Strict Constructor Validation & Browser Geometry Classification
+**Goal**: Implement strict WebIDL constructor type checks for CSS Typed OM color and transform subclasses, enforce error handling in `CSSStyleValue.parseAll()`, support fallback reification in `StylePropertyMap`, and classify layout geometry tests in the browser exclusion manifest.
+
+### Tasks
+- [x] **Typed OM Strict Constructor TypeErrors & Validation**:
+  - `src/typed-om/color/color-spaces.ts`: Added argument count checks ($\ge 3$ arguments for `CSSRGB`, `CSSHSL`, `CSSHWB`, `CSSLab`, `CSSLCH`, `CSSOKLab`, `CSSOKLCH`; $\ge 2$ arguments for `CSSColor`). Enforced strict `CSSNumericValue` instance check with `<angle>` type check on `CSSHWB.h`.
+  - `src/typed-om/transform/transform-components.ts`: Enforced strict argument counts and numeric type checking with dimension validation for `CSSTranslate`, `CSSScale`, `CSSRotate`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSPerspective`, and `CSSMatrixComponent`.
+- [x] **`CSSStyleValue.parseAll()` & Custom Property Validation**:
+  - `src/typed-om/values/style-value-parser.ts`: Throws `TypeError` on empty property names, empty css values, `'--'`, and invalid custom property math expressions (e.g., `calc(1 +)`).
+  - Keyword and color property handling: Supports valid syntax keywords (`currentcolor`, `auto`, `invert`, `none`) and reifies valid colors via `CSSColorValue.parse`.
+- [x] **`StylePropertyMap` Unsupported Property Fallbacks**:
+  - Supports reifying unsupported and unparsed property declarations (`will-change`, `filter`, `cursor`) as base `CSSStyleValue` instances with roundtrip preservation.
+- [x] **Classify Layout Geometry Tests in Browser Manifest**:
+  - `tests/fixtures/wpt-browser-only-manifest.json`: Updated 47 layout geometry tests matching `clusterId: "dom-geometry-client-rects"` to category `DOM_VIEWPORT_GEOMETRY`.
+- [x] **Unit Testing & Zero-Regression Verification**:
+  - Created `tests/typed-om-constructors.test.ts` verifying all constructor rules, error dispatches, and fallbacks.
+  - `pnpm run preflight`: 0 TypeScript errors, 0 oxlint warnings, safe-exec check pass, 100% unit tests passing.
+  - `pnpm run wpt:verify`: 0 regressions across 1,687 test files with +28 newly passing tests (16,797 passing tests).
 
 
 

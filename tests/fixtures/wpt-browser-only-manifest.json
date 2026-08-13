@@ -130,283 +130,283 @@
     },
     {
       "file": "css/selectors/active-display-none-001.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-001.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-002.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-003.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-004.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-005.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-006.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-007.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-011.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-013.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-015.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-016.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-018-2.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-018.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-019.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-022.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-025.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-026.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-027.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-028.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-002.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-003.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-004.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-005.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-006.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-007.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-008-b.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-008.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-009.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-010.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-011.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-012.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-013.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-014.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-015.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-016.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-017.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-018.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-019.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/focus-visible-script-focus-020.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/invalidation/fullscreen-pseudo-class-in-has.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/invalidation/modal-pseudo-class-in-has.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/invalidation/user-valid-user-invalid.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/modal-pseudo-class.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/user-invalid.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/user-valid-user-invalid-multifield-inputs.tentative.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },
     {
       "file": "css/selectors/user-valid.html",
-      "category": "VIEWPORT_HIT_TESTING",
+      "category": "DOM_VIEWPORT_GEOMETRY",
       "clusterId": "dom-geometry-client-rects",
       "description": "element.getClientRects / getBoundingClientRect layout geometry"
     },

@@ -24,7 +24,7 @@ import { SHORTHANDS } from '../../shorthands.ts';
 import { SHORTHANDS_DATA } from '../../data/gen/shorthands.ts';
 import { SUPPORTED_PROPERTIES } from '../../data/gen/property-list.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from '../../data/gen/standard-syntax.ts';
-import { privateToken, hasVarFunction } from '../utils/validation.ts';
+import { privateToken, hasVarFunction, isCSSFunction } from '../utils/validation.ts';
 import { CSSStyleValue } from './CSSStyleValue.ts';
 import { CSSKeywordValue } from './CSSKeywordValue.ts';
 import { CSSUnparsedValue, tokensToUnparsedSegments } from './CSSUnparsedValue.ts';
@@ -34,6 +34,9 @@ import { CSSTransformValue } from '../transform/CSSTransformValue.ts';
 import { parseTranslate, parseRotate, parseScale } from '../transform/transform-parser.ts';
 import { CSSColorValue } from '../color/CSSColorValue.ts';
 import { POSITION_PROPERTIES, COLOR_PROPERTIES, LIST_PROPERTIES } from '../style-map/style-validation.ts';
+import { NAMED_COLORS } from '../../data/gen/colors.ts';
+
+import { parseMathFunction } from '../../math-parser.ts';
 
 function shouldFallbackToCSSStyleValue(property: string, css: string): boolean {
   const propLower = property.toLowerCase();
@@ -51,6 +54,28 @@ function shouldFallbackToCSSStyleValue(property: string, css: string): boolean {
     return valueLower.includes('url(');
   }
   return false;
+}
+
+function validateMathFunctions(tokens: ComponentValue[]): boolean {
+  for (const t of tokens) {
+    if (isCSSFunction(t)) {
+      const nameLower = t.name.toLowerCase();
+      if (['calc', 'min', 'max', 'clamp'].includes(nameLower)) {
+        if (!hasVarFunction(t.value)) {
+          try {
+            const parsed = parseMathFunction(t.name, t.value);
+            if (!parsed) return false;
+          } catch {
+            return false;
+          }
+        }
+      }
+      if (!validateMathFunctions(t.value)) return false;
+    } else if (t.type === 'simple-block' && Array.isArray(t.value)) {
+      if (!validateMathFunctions(t.value)) return false;
+    }
+  }
+  return true;
 }
 
 function createValueFromTokens(values: ComponentValue[], property?: string): CSSStyleValue {
@@ -93,29 +118,46 @@ export function parseAllStyleValues(property: string, css: string): CSSStyleValu
   if (arguments.length < 2) {
     throw new TypeError("Failed to execute 'parseAll' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
   }
-  if (property === '--') {
-    throw new TypeError("Invalid property name: '--'");
+  if (typeof property !== 'string' || property === '') {
+    throw new TypeError("Invalid property name: property must be a non-empty string");
+  }
+  if (property === '--' || (property.startsWith('--') && property.length < 3)) {
+    throw new TypeError(`Invalid property name: '${property}'`);
   }
   if (!property.startsWith('--') && !SUPPORTED_PROPERTIES.has(property.toLowerCase())) {
     throw new TypeError(`Invalid or unsupported property name: '${property}'`);
   }
   const results = _parseAll(property, css);
+  if (results.length === 0) {
+    throw new TypeError(`Invalid value for property '${property}': '${css}'`);
+  }
+  const propKey = property.startsWith('--') ? property : property.toLowerCase();
   for (const val of results) {
-    val._associatedProperty = property;
+    val._associatedProperty = propKey;
   }
   return results;
 }
 
 function _parseAll(property: string, css: string): CSSStyleValue[] {
-  if (property === '--') {
-    throw new TypeError("Invalid property name: '--'");
+  if (property === '--' || (property.startsWith('--') && property.length < 3)) {
+    throw new TypeError(`Invalid property name: '${property}'`);
+  }
+  if (typeof css !== 'string' || css.trim() === '') {
+    throw new TypeError(`Invalid empty value for property '${property}'`);
   }
   const tokens = tokenize(css);
+  if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
+    throw new TypeError(`Invalid CSS token in '${css}'`);
+  }
   const componentValues = ParseHooks.parseComponentValues(tokens);
   const trimmed = componentValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
 
   if (trimmed.length === 0) {
-    return [];
+    throw new TypeError(`Invalid empty value for property '${property}'`);
+  }
+
+  if (!validateMathFunctions(componentValues)) {
+    throw new TypeError(`Invalid math function in value: ${css}`);
   }
 
   const isCSSWideKeyword = trimmed.length === 1 && trimmed[0].type === 'ident' &&
@@ -239,15 +281,25 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
   }
 
   if (COLOR_PROPERTIES.has(propLower)) {
-    // For specified color properties, keyword/ident colors (like "red", "transparent", "currentcolor")
-    // must remain CSSKeywordValue so they serialize back to their keyword.
     if (trimmed.length === 1 && trimmed[0].type === 'ident') {
-      return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
+      const kw = (trimmed[0] as IdentToken).value.toLowerCase();
+      const syntax = STANDARD_PROPERTIES_SYNTAX[propLower];
+      if (
+        kw in NAMED_COLORS ||
+        kw === 'currentcolor' ||
+        kw === 'transparent' ||
+        kw === 'auto' ||
+        kw === 'invert' ||
+        kw === 'none' ||
+        (syntax && syntax.split('|').map(s => s.trim().toLowerCase()).includes(kw))
+      ) {
+        return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
+      }
     }
     try {
       return [CSSColorValue.parse(css)];
-    } catch (e) {
-      throw new TypeError(`Failed to parse color property ${property}: ${css}`);
+    } catch {
+      throw new TypeError(`Invalid value for color property ${property}: ${css}`);
     }
   }
   if (trimmed.length === 1) {

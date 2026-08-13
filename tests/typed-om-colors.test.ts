@@ -197,9 +197,9 @@ test('Alpha is omitted when unity in modern colors serialization', () => {
   const hsl2 = new CSSHSL(120, 1, 0.5, 0.5);
   assert.strictEqual(hsl2.toString(), 'hsl(120deg 100% 50% / 50%)');
 
-  const hwb1 = new CSSHWB(120, 0.1, 0.2, 1);
+  const hwb1 = new CSSHWB(new CSSUnitValue(120, 'deg'), 0.1, 0.2, 1);
   assert.strictEqual(hwb1.toString(), 'hwb(120deg 10% 20%)');
-  const hwb2 = new CSSHWB(120, 0.1, 0.2, 0.8);
+  const hwb2 = new CSSHWB(new CSSUnitValue(120, 'deg'), 0.1, 0.2, 0.8);
   assert.strictEqual(hwb2.toString(), 'hwb(120deg 10% 20% / 80%)');
 
   const lab1 = new CSSLab(0.5, 10, 20, 1);

@@ -21,7 +21,16 @@ import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
 import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { DOMMatrix, DOMMatrixReadOnly } from '../../DOMMatrix.ts';
 import { matchesLength, matchesLengthPercentage, matchesNumber, matchesAngle } from '../utils/type-guards.ts';
-import { ensureNumeric } from '../utils/formatting.ts';
+
+function validateNumberish(val: unknown, name: string): CSSNumericValue {
+  if (typeof val === 'number') {
+    return new CSSUnitValue(val, 'number');
+  }
+  if (val instanceof CSSNumericValue && matchesNumber(val.type())) {
+    return val;
+  }
+  throw new TypeError(`${name} must be a unitless number`);
+}
 
 // Spec: CSS Typed OM Level 1 § 5.2 #csstranslate
 export class CSSTranslate extends CSSTransformComponent {
@@ -29,12 +38,15 @@ export class CSSTranslate extends CSSTransformComponent {
   private _y!: CSSNumericValue;
   private _z!: CSSNumericValue;
 
-  constructor(x: number | CSSNumericValue, y: number | CSSNumericValue, z?: number | CSSNumericValue) {
+  constructor(x: CSSNumericValue, y: CSSNumericValue, z?: CSSNumericValue) {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to construct 'CSSTranslate': 2 arguments required, but only " + arguments.length + " present.");
+    }
     super();
-    this.x = ensureNumeric(x);
-    this.y = ensureNumeric(y);
+    this.x = x;
+    this.y = y;
     if (z !== undefined) {
-      this.z = ensureNumeric(z);
+      this.z = z;
       this._is2D = false;
     } else {
       this._z = new CSSUnitValue(0, 'px');
@@ -45,34 +57,31 @@ export class CSSTranslate extends CSSTransformComponent {
   get x(): CSSNumericValue {
     return this._x;
   }
-  set x(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!(numericVal instanceof CSSNumericValue) || !matchesLengthPercentage(numericVal.type())) {
+  set x(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesLengthPercentage(val.type())) {
       throw new TypeError('CSSTranslate.x must be a length or percentage');
     }
-    this._x = numericVal;
+    this._x = val;
   }
 
   get y(): CSSNumericValue {
     return this._y;
   }
-  set y(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!(numericVal instanceof CSSNumericValue) || !matchesLengthPercentage(numericVal.type())) {
+  set y(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesLengthPercentage(val.type())) {
       throw new TypeError('CSSTranslate.y must be a length or percentage');
     }
-    this._y = numericVal;
+    this._y = val;
   }
 
   get z(): CSSNumericValue {
     return this._z;
   }
-  set z(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!(numericVal instanceof CSSNumericValue) || !matchesLength(numericVal.type())) {
+  set z(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesLength(val.type())) {
       throw new TypeError('CSSTranslate.z must be a length');
     }
-    this._z = numericVal;
+    this._z = val;
   }
 
   override get is2D(): boolean {
@@ -109,38 +118,34 @@ export class CSSScale extends CSSTransformComponent {
   private _y!: CSSNumericValue;
   private _z!: CSSNumericValue;
   constructor(x: number | CSSNumericValue, y: number | CSSNumericValue, z?: number | CSSNumericValue) {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to construct 'CSSScale': 2 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.x = x;
     this.y = y;
-    this.z = z !== undefined ? z : new CSSUnitValue(1, 'number');
-    this.is2D = z === undefined;
+    if (z !== undefined) {
+      this.z = z;
+      this.is2D = false;
+    } else {
+      this.z = new CSSUnitValue(1, 'number');
+      this.is2D = true;
+    }
   }
 
   get x(): CSSNumericValue { return this._x; }
   set x(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!matchesNumber(numericVal.type())) {
-      throw new TypeError('CSSScale.x must be a unitless number');
-    }
-    this._x = numericVal;
+    this._x = validateNumberish(val, 'CSSScale.x');
   }
 
   get y(): CSSNumericValue { return this._y; }
   set y(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!matchesNumber(numericVal.type())) {
-      throw new TypeError('CSSScale.y must be a unitless number');
-    }
-    this._y = numericVal;
+    this._y = validateNumberish(val, 'CSSScale.y');
   }
 
   get z(): CSSNumericValue { return this._z; }
   set z(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!matchesNumber(numericVal.type())) {
-      throw new TypeError('CSSScale.z must be a unitless number');
-    }
-    this._z = numericVal;
+    this._z = validateNumberish(val, 'CSSScale.z');
   }
   toString(): string {
     if (this.is2D) {
@@ -172,59 +177,48 @@ export class CSSRotate extends CSSTransformComponent {
   private _z!: CSSNumericValue;
   private _angle!: CSSNumericValue;
 
-  constructor(angle: number | CSSNumericValue);
-  constructor(x: number | CSSNumericValue, y: number | CSSNumericValue, z: number | CSSNumericValue, angle: number | CSSNumericValue);
+  constructor(angle: CSSNumericValue);
+  constructor(x: number | CSSNumericValue, y: number | CSSNumericValue, z: number | CSSNumericValue, angle: CSSNumericValue);
   constructor(xOrAngle: number | CSSNumericValue, y?: number | CSSNumericValue, z?: number | CSSNumericValue, angle?: number | CSSNumericValue) {
     super();
-    if (y === undefined) {
-      this.angle = ensureNumeric(xOrAngle);
+    if (arguments.length === 1) {
+      this.angle = xOrAngle as CSSNumericValue;
       this._x = new CSSUnitValue(0, 'number');
       this._y = new CSSUnitValue(0, 'number');
       this._z = new CSSUnitValue(1, 'number');
       this.is2D = true;
-    } else {
-      this.x = ensureNumeric(xOrAngle);
-      this.y = ensureNumeric(y);
-      this.z = ensureNumeric(z!);
-      this.angle = ensureNumeric(angle!);
+    } else if (arguments.length === 4) {
+      this.x = xOrAngle;
+      this.y = y!;
+      this.z = z!;
+      this.angle = angle as CSSNumericValue;
       this.is2D = false;
+    } else {
+      throw new TypeError("Failed to construct 'CSSRotate': 1 or 4 arguments required, but " + arguments.length + " present.");
     }
   }
 
   get x(): CSSNumericValue { return this._x; }
   set x(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!(numericVal instanceof CSSNumericValue) || !matchesNumber(numericVal.type())) {
-      throw new TypeError('CSSRotate.x must be a unitless number');
-    }
-    this._x = numericVal;
+    this._x = validateNumberish(val, 'CSSRotate.x');
   }
 
   get y(): CSSNumericValue { return this._y; }
   set y(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!(numericVal instanceof CSSNumericValue) || !matchesNumber(numericVal.type())) {
-      throw new TypeError('CSSRotate.y must be a unitless number');
-    }
-    this._y = numericVal;
+    this._y = validateNumberish(val, 'CSSRotate.y');
   }
 
   get z(): CSSNumericValue { return this._z; }
   set z(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!(numericVal instanceof CSSNumericValue) || !matchesNumber(numericVal.type())) {
-      throw new TypeError('CSSRotate.z must be a unitless number');
-    }
-    this._z = numericVal;
+    this._z = validateNumberish(val, 'CSSRotate.z');
   }
 
   get angle(): CSSNumericValue { return this._angle; }
-  set angle(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!(numericVal instanceof CSSNumericValue) || !matchesAngle(numericVal.type())) {
+  set angle(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSRotate.angle must be an angle');
     }
-    this._angle = normalizeAngleUnits(numericVal);
+    this._angle = normalizeAngleUnits(val);
   }
 
   toString(): string {
@@ -285,27 +279,28 @@ export class CSSRotate extends CSSTransformComponent {
 export class CSSSkew extends CSSTransformComponent {
   private _ax!: CSSNumericValue;
   private _ay!: CSSNumericValue;
-  constructor(ax: number | CSSNumericValue, ay: number | CSSNumericValue) {
+  constructor(ax: CSSNumericValue, ay: CSSNumericValue) {
+    if (arguments.length < 2) {
+      throw new TypeError("Failed to construct 'CSSSkew': 2 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     this.ax = ax;
     this.ay = ay;
     this.is2D = true;
   }
   get ax(): CSSNumericValue { return this._ax; }
-  set ax(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!matchesAngle(numericVal.type())) {
+  set ax(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSSkew.ax must be an angle');
     }
-    this._ax = normalizeAngleUnits(numericVal);
+    this._ax = normalizeAngleUnits(val);
   }
   get ay(): CSSNumericValue { return this._ay; }
-  set ay(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!matchesAngle(numericVal.type())) {
+  set ay(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSSkew.ay must be an angle');
     }
-    this._ay = normalizeAngleUnits(numericVal);
+    this._ay = normalizeAngleUnits(val);
   }
   toString(): string {
     if (this.ay instanceof CSSUnitValue && this.ay.value === 0) return `skew(${this.ax})`;
@@ -321,18 +316,20 @@ export class CSSSkew extends CSSTransformComponent {
 // Spec: CSS Typed OM Level 1 § 5.5 #cssskewx
 export class CSSSkewX extends CSSTransformComponent {
   private _ax!: CSSNumericValue;
-  constructor(ax: number | CSSNumericValue) {
+  constructor(ax: CSSNumericValue) {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to construct 'CSSSkewX': 1 argument required, but only 0 present.");
+    }
     super();
     this.ax = ax;
     this.is2D = true;
   }
   get ax(): CSSNumericValue { return this._ax; }
-  set ax(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!matchesAngle(numericVal.type())) {
+  set ax(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSSkewX.ax must be an angle');
     }
-    this._ax = numericVal;
+    this._ax = val;
   }
   toString(): string {
     return `skewX(${this.ax})`;
@@ -346,18 +343,20 @@ export class CSSSkewX extends CSSTransformComponent {
 // Spec: CSS Typed OM Level 1 § 5.5 #cssskewy
 export class CSSSkewY extends CSSTransformComponent {
   private _ay!: CSSNumericValue;
-  constructor(ay: number | CSSNumericValue) {
+  constructor(ay: CSSNumericValue) {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to construct 'CSSSkewY': 1 argument required, but only 0 present.");
+    }
     super();
     this.ay = ay;
     this.is2D = true;
   }
   get ay(): CSSNumericValue { return this._ay; }
-  set ay(val: number | CSSNumericValue) {
-    const numericVal = ensureNumeric(val);
-    if (!matchesAngle(numericVal.type())) {
+  set ay(val: CSSNumericValue) {
+    if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSSkewY.ay must be an angle');
     }
-    this._ay = numericVal;
+    this._ay = val;
   }
   toString(): string {
     return `skewY(${this.ay})`;
@@ -371,36 +370,35 @@ export class CSSSkewY extends CSSTransformComponent {
 // Spec: CSS Typed OM Level 1 § 5.6 #cssperspective
 export class CSSPerspective extends CSSTransformComponent {
   private _length!: CSSNumericValue | CSSKeywordValue;
-  constructor(length: number | string | CSSNumericValue | CSSKeywordValue) {
+  constructor(length: CSSNumericValue | CSSKeywordValue | string) {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to construct 'CSSPerspective': 1 argument required, but only 0 present.");
+    }
     super();
     this.length = length;
     this.is2D = false;
   }
   get length(): CSSNumericValue | CSSKeywordValue { return this._length; }
-  set length(val: number | string | CSSNumericValue | CSSKeywordValue) {
+  set length(val: CSSNumericValue | CSSKeywordValue | string) {
     let resolved: CSSNumericValue | CSSKeywordValue;
     if (typeof val === 'string') {
-      try {
-        resolved = CSSNumericValue.parse(val);
-      } catch {
-        resolved = new CSSKeywordValue(val);
+      if (val.toLowerCase() === 'none') {
+        resolved = new CSSKeywordValue('none');
+      } else {
+        throw new TypeError('CSSPerspective.length keyword string must be "none"');
       }
-    } else if (typeof val === 'number') {
-      resolved = ensureNumeric(val);
-    } else {
-      resolved = val;
-    }
-
-    if (resolved instanceof CSSNumericValue) {
-      if (!matchesLength(resolved.type())) {
-        throw new TypeError('CSSPerspective.length must be a length');
-      }
-    } else if (resolved instanceof CSSKeywordValue) {
-      if (resolved.value.toLowerCase() !== 'none') {
+    } else if (val instanceof CSSKeywordValue) {
+      if (val.value.toLowerCase() !== 'none') {
         throw new TypeError('CSSPerspective.length keyword must be none');
       }
+      resolved = val;
+    } else if (val instanceof CSSNumericValue) {
+      if (!matchesLength(val.type())) {
+        throw new TypeError('CSSPerspective.length must be a length');
+      }
+      resolved = val;
     } else {
-      throw new TypeError('CSSPerspective.length must be a length or none keyword');
+      throw new TypeError('CSSPerspective.length must be a length CSSNumericValue or "none"');
     }
     this._length = resolved;
   }
@@ -436,6 +434,12 @@ export interface CSSMatrixComponentOptions {
 export class CSSMatrixComponent extends CSSTransformComponent {
   public matrix: DOMMatrix;
   constructor(matrix: DOMMatrixReadOnly, options?: CSSMatrixComponentOptions) {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to construct 'CSSMatrixComponent': 1 argument required, but only 0 present.");
+    }
+    if (!matrix || typeof matrix !== 'object' || !('a' in matrix && 'm11' in matrix)) {
+      throw new TypeError("Failed to construct 'CSSMatrixComponent': parameter 1 is not of type 'DOMMatrixReadOnly'.");
+    }
     super();
     this.matrix = new DOMMatrix(matrix);
     if (options && options.is2D !== undefined) {
