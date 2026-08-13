@@ -58,7 +58,7 @@ async function analyzeSpec(specName: string, specPath: string): Promise<NearMiss
 
   await pool(concurrency, files, async (filePath) => {
     try {
-      const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
+      const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=512', 'scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
       const merged = stdout + '\n' + stderr;
       const lines = merged.split('\n');
 

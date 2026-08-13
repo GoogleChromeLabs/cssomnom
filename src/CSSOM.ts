@@ -760,7 +760,15 @@ export class CSSStyleRule extends CSSGroupingRule {
         }
       }
     }
-    const isNested = this.parentRule !== null;
+    let isNested = false;
+    let currParent: CSSRule | null = this.parentRule;
+    while (currParent !== null) {
+      if (currParent.type === 1 || currParent.constructor.name === 'CSSStyleRule') {
+        isNested = true;
+        break;
+      }
+      currParent = currParent.parentRule;
+    }
     let selectorAST: SelectorList | null = null;
     try {
       selectorAST = ParseHooks.parseSelectorAST(value, declaredNamespaces, isNested);
