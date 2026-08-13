@@ -596,6 +596,23 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
           sheet = CSSStyleSheet.createInternal(rules, parseRule);
           Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
           styleSheetMap.set(this, sheet);
+
+          const linkEl = this as unknown as {
+            dispatchEvent?: (e: Event) => boolean;
+            onload?: ((e: Event) => void) | null;
+          };
+          if (typeof linkEl.dispatchEvent === 'function') {
+            const dispatch = linkEl.dispatchEvent;
+            queueMicrotask(() => {
+              try {
+                const loadEv = new ((win.Event as { new(t: string): Event }) || Event)('load');
+                dispatch.call(linkEl, loadEv);
+                if (typeof linkEl.onload === 'function') {
+                  linkEl.onload(loadEv);
+                }
+              } catch {}
+            });
+          }
         }
         return sheet;
       }

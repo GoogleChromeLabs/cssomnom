@@ -202,15 +202,18 @@ export function runWptFile(filePath: string): WptFileResult {
       const wrappedFn = async () => {
         if (t.type === 'async_test' && t.promise) {
           if (clock) {
-            let isDone = false;
-            const pumpPromise = clock.pumpUntil(() => isDone, { maxTicks: 5000, maxVirtualDuration: 30000 });
-            const testPromise = t.promise.finally(() => {
-              isDone = true;
-            });
-            await Promise.all([pumpPromise, testPromise]);
-          } else {
-            await t.promise;
+            await clock.pumpUntil(
+              () => (t as unknown as { completed?: boolean }).completed === true || (t.status !== undefined && t.status !== 0),
+              { maxTicks: 5000, maxVirtualDuration: 30000 }
+            );
           }
+          await Promise.race([
+            t.promise,
+            new Promise<never>((_, reject) => {
+              const timer = setTimeout(() => reject(new Error('Async test timeout')), 5000);
+              if (typeof timer.unref === 'function') timer.unref();
+            })
+          ]);
         }
         if ((t.status ?? 0) !== 0) {
           throw new Error(t.message || `Test failed with status ${t.status}`);
@@ -251,8 +254,7 @@ export function runWptFile(filePath: string): WptFileResult {
       try {
         if (t.fn) {
           const fn = t.fn;
-          let isDone = false;
-          const pumpPromise = clock ? clock.pumpUntil(() => isDone, { maxTicks: 5000, maxVirtualDuration: 30000 }) : Promise.resolve();
+          let testPromiseSettled = false;
           const testPromise = (async () => {
             try {
               const res = fn.call(testHarnessParam, testHarnessParam);
@@ -265,10 +267,24 @@ export function runWptFile(filePath: string): WptFileResult {
                 await res;
               }
             } finally {
-              isDone = true;
+              testPromiseSettled = true;
             }
           })();
-          await Promise.all([pumpPromise, testPromise]);
+
+          if (clock) {
+            await clock.pumpUntil(
+              () => testPromiseSettled || (t as unknown as { completed?: boolean }).completed === true || (t.status !== undefined && t.status !== 0),
+              { maxTicks: 5000, maxVirtualDuration: 30000 }
+            );
+          }
+
+          await Promise.race([
+            testPromise,
+            new Promise<never>((_, reject) => {
+              const timer = setTimeout(() => reject(new Error('Promise test timeout')), 5000);
+              if (typeof timer.unref === 'function') timer.unref();
+            })
+          ]);
         }
       } finally {
         for (const cleanup of cleanups) {
