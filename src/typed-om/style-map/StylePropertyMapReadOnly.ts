@@ -147,10 +147,17 @@ export class StylePropertyMapReadOnly {
 
   has(property: string): boolean {
     validateProperty(property);
+    const shorthand = SHORTHANDS[property];
     const declarations = this._getDeclarations();
     if (declarations.length > 0) {
+      if (shorthand) {
+        return shorthand.longhands.every(lh => declarations.some(d => d.name === lh));
+      }
       return declarations.some((d: Declaration) => d.name === property);
     } else {
+      if (shorthand) {
+        return shorthand.longhands.every(lh => this._style.getPropertyValue(lh) !== '');
+      }
       return this._style.getPropertyValue(property) !== '';
     }
   }
