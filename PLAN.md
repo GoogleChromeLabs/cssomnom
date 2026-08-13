@@ -2354,6 +2354,9 @@ Objective: Harden the WPT crawler against unconstrained memory growth and uninte
   - Created `scripts/codegen/generate_cascade_data.ts` consuming `@webref/css` and `mdn-data` to generate `src/data/gen/cascade-data.ts`.
   - Updated `src/cascade.ts` to import `SVG_PRESENTATION_ATTRIBUTES`, `COLOR_PROPERTIES`, `DEFAULT_PROPERTY_VALUES`, and `BLOCK_TAGS` from generated data.
   - Added `generate_cascade_data.ts` to `scripts/codegen/generate_all.ts`.
+- [x] **Feasibility Denominator Baseline & Conformance Table (`wpt-progress.md`, `MAINTENANCE.md`)**:
+  - Re-anchored all historical progress logs to the 16,842 feasible target denominator across all 7 WPT suites.
+  - Documented the WPT submodule upgrade and Delphi feasibility manifest revision workflow in `MAINTENANCE.md` linking to `scripts/wpt/node/feasibility/README.md`.
 - [x] **Verification & Preflight**:
   - Ran `pnpm run codegen` and `pnpm run preflight`.
   - All unit tests pass with 0 type errors and 0 linter warnings.
