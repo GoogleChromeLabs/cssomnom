@@ -77,11 +77,11 @@ export function runWptFile(filePath: string): WptFileResult {
         return sandbox.navigator;
       }
       if (typeof prop === 'string') {
-        if (prop in globalThis) {
-          return Reflect.get(globalThis, prop);
-        }
         if (prop in sandbox) {
           return Reflect.get(sandbox, prop);
+        }
+        if (prop in globalThis) {
+          return Reflect.get(globalThis, prop);
         }
         const val = target[prop];
         if (val !== undefined) {
