@@ -96,7 +96,7 @@ export class VirtualClock {
 
   requestAnimationFrame(cb: (time: number) => void): number {
     const id = this._nextId++;
-    if (this._nextRafTime === null) {
+    if (this._nextRafTime === null || this._nextRafTime < this._currentTime) {
       this._nextRafTime = this._currentTime + 16.666;
     }
     const targetFrameTime = this._nextRafTime;
@@ -117,6 +117,9 @@ export class VirtualClock {
     if (rafEntry) {
       rafEntry.cancelled = true;
       this._rafCallbacks.delete(numId);
+    }
+    if (this._rafCallbacks.size === 0) {
+      this._nextRafTime = null;
     }
   }
 
@@ -229,6 +232,7 @@ export class VirtualClock {
     }
 
     let ticks = 0;
+    let emptyStreak = 0;
     while (ticks < maxTicks && (this._currentTime - startTime) <= maxVirtualDuration) {
       if (isDone()) {
         return true;
@@ -239,8 +243,18 @@ export class VirtualClock {
         return true;
       }
       if (!hasMore) {
+        emptyStreak++;
         await this.drainMicrotasks();
-        return isDone();
+        if (isDone()) return true;
+        // Yield to Node event loop so subresource loads and file/network I/O progress
+        await new Promise(resolve => setTimeout(resolve, 5));
+        await this.drainMicrotasks();
+        if (isDone()) return true;
+        if (emptyStreak > 10 && this.pendingTasksCount === 0 && this._rafCallbacks.size === 0) {
+          return isDone();
+        }
+      } else {
+        emptyStreak = 0;
       }
     }
 

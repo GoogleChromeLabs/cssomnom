@@ -1287,9 +1287,19 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
   };
 
   if (!('performance' in win)) {
-    win.performance = {
-      now: () => ((win.__virtualClock as { currentTime: number } | undefined)?.currentTime ?? performance.now())
-    };
+    try {
+      Object.defineProperty(win, 'performance', {
+        value: {
+          now: () => ((win.__virtualClock as { currentTime: number } | undefined)?.currentTime ?? performance.now())
+        },
+        configurable: true,
+        writable: true
+      });
+    } catch {
+      (win as Record<string, unknown>).performance = {
+        now: () => ((win.__virtualClock as { currentTime: number } | undefined)?.currentTime ?? performance.now())
+      };
+    }
   }
 
   if (!('requestAnimationFrame' in win)) {

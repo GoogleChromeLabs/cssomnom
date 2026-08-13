@@ -148,7 +148,15 @@ export function createWptContext(
   const perfObj = {
     now: () => virtualClock.currentTime
   };
-  win.performance = perfObj;
+  try {
+    Object.defineProperty(win, 'performance', {
+      value: perfObj,
+      configurable: true,
+      writable: true
+    });
+  } catch {
+    (win as Record<string, unknown>).performance = perfObj;
+  }
 
   const setTimeoutFn = (cb: Function, delay?: number, ...args: unknown[]) => virtualClock.setTimeout(cb, delay, ...args);
   const clearTimeoutFn = (id: unknown) => virtualClock.clearTimeout(id);
