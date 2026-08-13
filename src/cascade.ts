@@ -29,6 +29,7 @@ import {
 import { tokenize } from './tokenizer.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
 import { Parser, parseStyleSheet } from './parser.ts';
+import { SHORTHANDS } from './shorthands.ts';
 import { MediaParser } from './MediaParser.ts';
 import { SelectorParser } from './SelectorParser.ts';
 import { serialize, serializeSelectorList } from './serializer.ts';
@@ -736,9 +737,96 @@ export function getCascadedStyle(element: unknown, rules?: Rule[] | CSSRuleList,
 
   // 3. Resolve standard properties with cascade rollbacks
   // css-cascade-5 § 6.2 #default, § 6.3 #revert-layer, § 6.3.3 #revert-rule-keyword
+  // css-variables-1 § 3 #variables-in-shorthands
+  function expandShorthandWithVariables(
+    decl: MatchedDeclaration
+  ): MatchedDeclaration[] {
+    const shorthand = SHORTHANDS[decl.name.toLowerCase()];
+    if (!shorthand) {
+      return [decl];
+    }
+
+    let subVal = decl.value;
+    if (subVal.includes('var(') || subVal.includes('env(')) {
+      const res = substituteVariables(subVal, resolvedCustomProps, new Set(), cyclicProps);
+      if (res === null) {
+        // css-variables-1 § 3.1: Invalid at computed-value time
+        return [];
+      }
+      subVal = res;
+    }
+
+    const trimmed = subVal.trim().toLowerCase();
+    const isCSSWide = ['revert', 'revert-layer', 'revert-rule', 'initial', 'inherit', 'unset'].includes(trimmed);
+
+    if (isCSSWide) {
+      const results: MatchedDeclaration[] = [];
+      for (const lh of shorthand.longhands) {
+        const subShorthand = SHORTHANDS[lh];
+        if (subShorthand) {
+          results.push(...expandShorthandWithVariables({
+            ...decl,
+            name: lh,
+            value: subVal,
+          }));
+        } else {
+          results.push({
+            ...decl,
+            name: lh,
+            value: subVal,
+          });
+        }
+      }
+      return results;
+    }
+
+    const tokens = tokenize(subVal);
+    const compValues = ParseHooks.parseComponentValues(tokens);
+    const expanded = shorthand.expand(compValues);
+    if (expanded) {
+      const results: MatchedDeclaration[] = [];
+      for (const [lh, val] of Object.entries(expanded)) {
+        const subShorthand = SHORTHANDS[lh];
+        const valStr = serialize(val).trim();
+        if (subShorthand) {
+          results.push(...expandShorthandWithVariables({
+            ...decl,
+            name: lh,
+            value: valStr,
+          }));
+        } else {
+          results.push({
+            ...decl,
+            name: lh,
+            value: valStr,
+          });
+        }
+      }
+      return results;
+    }
+
+    return [{
+      ...decl,
+      value: subVal,
+    }];
+  }
+
+  const standardDeclarationsByProperty = new Map<string, MatchedDeclaration[]>();
+  for (const decl of matchedDeclarations) {
+    if (decl.name.startsWith('--')) continue;
+    const expandedList = expandShorthandWithVariables(decl);
+    for (const expDecl of expandedList) {
+      const key = expDecl.name.toLowerCase();
+      if (!standardDeclarationsByProperty.has(key)) {
+        standardDeclarationsByProperty.set(key, []);
+      }
+      standardDeclarationsByProperty.get(key)!.push(expDecl);
+    }
+  }
+
   const winningDeclarations = new Map<string, MatchedDeclaration>();
 
-  for (const [prop, decls] of declarationsByProperty) {
+  for (const [prop, decls] of standardDeclarationsByProperty) {
     if (prop.startsWith('--')) continue;
     decls.sort(compareCascadeDeclarations);
 
@@ -1267,7 +1355,7 @@ export function substituteVariables(
   resolvingStack: Set<string> = new Set(),
   cyclicProps: Set<string> = new Set()
 ): string | null {
-  if (!valueText || !valueText.includes('var(')) {
+  if (!valueText || (!valueText.includes('var(') && !valueText.includes('env('))) {
     return valueText;
   }
 
@@ -1290,7 +1378,53 @@ export function substituteVariables(
       const node = nodes[i];
       if (node.type === 'function' && 'name' in node && Array.isArray(node.value)) {
         const funcNode = node as unknown as { name: string; value: ComponentValue[] };
-        if (funcNode.name.toLowerCase() === 'var') {
+        const funcNameLower = funcNode.name.toLowerCase();
+
+        if (funcNameLower === 'env') {
+          // css-env-1 § 3.1 Syntax of env()
+          const args = funcNode.value;
+          const commaIndex = args.findIndex(t => typeof t === 'object' && t !== null && 'type' in t && t.type === 'comma');
+          const nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
+          const fallbackTokens = commaIndex !== -1 ? args.slice(commaIndex + 1) : null;
+
+          const nonWsNameTokens = nameTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+          const envIdent = nonWsNameTokens.find(t => t.type === 'ident' && typeof (t as Token).value === 'string');
+          const envName = envIdent ? ((envIdent as Token).value as string).toLowerCase() : '';
+
+          const STANDARD_ENV_VARS: Record<string, string> = {
+            'safe-area-inset-top': '0px',
+            'safe-area-inset-right': '0px',
+            'safe-area-inset-bottom': '0px',
+            'safe-area-inset-left': '0px',
+            'titlebar-area-x': '0px',
+            'titlebar-area-y': '0px',
+            'titlebar-area-width': '0px',
+            'titlebar-area-height': '0px',
+            'keyboard-inset-top': '0px',
+            'keyboard-inset-right': '0px',
+            'keyboard-inset-bottom': '0px',
+            'keyboard-inset-left': '0px',
+            'keyboard-inset-width': '0px',
+            'keyboard-inset-height': '0px',
+          };
+
+          if (envName && envName in STANDARD_ENV_VARS) {
+            const envVal = STANDARD_ENV_VARS[envName];
+            pushTokens(tokenize(envVal));
+            continue;
+          }
+
+          if (fallbackTokens) {
+            const resolvedFallback = resolveNodes(fallbackTokens);
+            if (resolvedFallback === null) return null;
+            pushTokens(resolvedFallback);
+            continue;
+          }
+
+          return null;
+        }
+
+        if (funcNameLower === 'var') {
           const args = funcNode.value;
           const commaIndex = args.findIndex(t => typeof t === 'object' && t !== null && 'type' in t && t.type === 'comma');
           const nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
@@ -1352,7 +1486,7 @@ export function substituteVariables(
               return null;
             }
 
-            if (rawCustomVal.includes('var(')) {
+            if (rawCustomVal.includes('var(') || rawCustomVal.includes('env(')) {
               const nextStack = new Set(resolvingStack);
               nextStack.add(varName);
               const resolvedCustom = substituteVariables(rawCustomVal, customProps, nextStack, cyclicProps);

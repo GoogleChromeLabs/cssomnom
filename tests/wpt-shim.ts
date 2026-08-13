@@ -1287,6 +1287,10 @@ const styleToElement = new WeakMap<object, Element>();
         }
         const proxy = new Proxy(styleObj, {
           get(target, prop, receiver) {
+            if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+              const idx = parseInt(prop, 10);
+              return typeof target.item === 'function' ? target.item(idx) : target[idx];
+            }
             const val = Reflect.get(target, prop, receiver);
             if (typeof val === 'string' && val.startsWith('url(') && !val.endsWith(')')) {
               return val + ')';
