@@ -261,6 +261,11 @@ export function runWptFile(filePath: string): WptFileResult {
 
 // Support running directly as a CLI script
 if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run.ts') || process.argv[1].endsWith('run_wpt_node.ts'))) {
+  if (!process.execArgv.some(arg => arg.startsWith('--max-old-space-size'))) {
+    console.error('\x1b[31m[Fatal Error] scripts/wpt/node/run.ts MUST be executed with `--max-old-space-size=512` (e.g. `node --max-old-space-size=512 scripts/wpt/node/run.ts <file>`). Aborting to prevent unconstrained memory growth.\x1b[0m');
+    process.exit(1);
+  }
+
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error('Usage: node scripts/wpt/node/run.ts <wpt-html-file-paths...>');

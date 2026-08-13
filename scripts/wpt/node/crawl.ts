@@ -5,7 +5,16 @@ import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFile, execSync } from 'node:child_process';
 import { getBrowserOnlyFileCount } from './feasibility/audit.ts';
-import { runWptFile } from './run.ts';
+
+function countDeclaredTests(filePath: string): number {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const matches = content.match(/\b(test|async_test|promise_test)\s*\(/g);
+    return matches ? Math.max(1, matches.length) : 1;
+  } catch {
+    return 1;
+  }
+}
 
 function execFilePromise(
   file: string,
@@ -38,8 +47,8 @@ function execFilePromise(
             const rssPages = parseInt(fields[21], 10);
             const rssMB = (rssPages * 4096) / (1024 * 1024);
 
-            if (rssMB > 1024) {
-              console.warn(`[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > 1024MB). Terminating with SIGKILL.`);
+            if (rssMB > 1536) {
+              console.warn(`[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > 1536MB). Terminating with SIGKILL.`);
               child.kill('SIGKILL');
               clearInterval(watchdogTimer);
               return;
@@ -129,7 +138,15 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   const allKnownFailures: Record<string, string[]> = {};
   const allSyntaxErrors: Record<string, string> = {};
 
-  const concurrency = options.concurrency ?? Math.min(24, Math.max(1, Math.floor((os.freemem() / (1024 * 1024 * 1024)) / 1.5)));
+  const _masterWatchdog = setInterval(() => {
+    const masterRssMB = process.memoryUsage().rss / (1024 * 1024);
+    if (masterRssMB > 2560) {
+      console.error(`\x1b[31m[Fatal Memory Error] Master crawler process exceeded 2.5GB RSS (${masterRssMB.toFixed(0)}MB). Aborting to prevent system memory exhaustion.\x1b[0m`);
+      process.exit(1);
+    }
+  }, 500).unref();
+
+  const concurrency = options.concurrency ?? Math.min(8, Math.max(1, Math.floor((os.freemem() / (1024 * 1024 * 1024)) / 1.5)));
   if (options.verbose) {
     console.log(`Using parallel concurrency limit: ${concurrency}`);
   }
@@ -204,7 +221,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=512', 'scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=1024', 'scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -235,16 +252,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
           total = parseInt(match[2], 10);
         } else {
           passing = 0;
-          if (errorObj.killed || errorObj.signal) {
-            total = 1;
-          } else {
-            try {
-              const extracted = runWptFile(filePath);
-              total = Math.max(1, extracted.tests.length);
-            } catch {
-              total = 1;
-            }
-          }
+          total = countDeclaredTests(filePath);
         }
         if (options.updateBaseline) {
           const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || errorObj.signal === 'SIGKILL' || mergedOutput.includes('Runner timed out');
@@ -449,6 +457,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
 }
 
 if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('crawl.ts') || process.argv[1].endsWith('run_wpt_node_crawler.ts') || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
+  if (!process.execArgv.some(arg => arg.startsWith('--max-old-space-size'))) {
+    console.error('\x1b[31m[Fatal Error] scripts/wpt/node/crawl.ts MUST be executed with `--max-old-space-size=1024` (e.g. `node --max-old-space-size=1024 scripts/wpt/node/crawl.ts`). Aborting to prevent unconstrained memory growth.\x1b[0m');
+    process.exit(1);
+  }
+
   const args = process.argv.slice(2);
   let spec: string | undefined;
   let file: string | undefined;

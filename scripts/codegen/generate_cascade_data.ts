@@ -42,6 +42,7 @@ interface MdnProperty {
 // Standard cross-spec CSS styling properties that SVG 2 § 6.2 explicitly lists as presentation attributes
 const SVG2_CROSS_SPEC_PRESENTATION_PROPERTIES = new Set([
   'color',
+  'color-rendering',
   'cursor',
   'direction',
   'display',
@@ -52,7 +53,10 @@ const SVG2_CROSS_SPEC_PRESENTATION_PROPERTIES = new Set([
   'font-style',
   'font-variant',
   'font-weight',
+  'glyph-orientation-horizontal',
+  'glyph-orientation-vertical',
   'image-rendering',
+  'kerning',
   'letter-spacing',
   'opacity',
   'overflow',
