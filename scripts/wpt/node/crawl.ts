@@ -377,9 +377,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     const rowParts = [dateStr, `\`${commitStr}\``];
     for (const key of specOrder) {
       const res = specResults[key] || { passing: 0, total: 0 };
-      rowParts.push(`${res.passing}/${res.total}`);
+      const outOfScope = getBrowserOnlyFileCount(key);
+      const feasibleForSpec = Math.max(res.passing, res.total - outOfScope);
+      rowParts.push(`${res.passing}/${feasibleForSpec}`);
     }
-    rowParts.push(`${grandPassing}/${grandTotal}`);
+    rowParts.push(`${grandPassing}/${grandFeasible}`);
     rowParts.push(`${overallPassRate}%`);
     rowParts.push(`**${normalizedPassRate}%**`);
     const newRow = `| ${rowParts.join(' | ')} |`;
