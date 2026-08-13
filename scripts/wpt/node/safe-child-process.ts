@@ -47,11 +47,18 @@ export interface SafeExecOptions {
   maxOldSpaceSize?: number;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  pollIntervalMs?: number;
+  onSample?: (sample: { timestamp: number; elapsedMs: number; rssMB: number; state: string }) => void;
 }
 
 export interface ExecResult {
   stdout: string;
   stderr: string;
+  durationMs: number;
+  peakRssMb: number;
+  exitCode: number | null;
+  signal: string | null;
+  status: 'OK' | 'TIMEOUT' | 'WATCHDOG_KILLED' | 'ERROR';
 }
 
 export function safeExecTestFile(
@@ -64,6 +71,7 @@ export function safeExecTestFile(
   const maxRssMB = options.maxRssMb ?? 6144;
   const runnerPath = options.runnerPath ?? path.resolve(import.meta.dirname, 'run.ts');
   const extraArgs = options.args ?? [];
+  const pollIntervalMs = options.pollIntervalMs ?? 50;
 
   const args = [
     `--max-old-space-size=${maxOldSpaceSize}`,
@@ -74,6 +82,9 @@ export function safeExecTestFile(
 
   return new Promise((resolve, reject) => {
     let watchdogTimer: NodeJS.Timeout | null = null;
+    const startTime = Date.now();
+    let peakRssMb = 0;
+    let isWatchdogKilled = false;
 
     const child = execFile(
       process.execPath,
@@ -91,10 +102,38 @@ export function safeExecTestFile(
         }
         activeChildren.delete(child);
 
-        if (err) {
-          return reject(Object.assign(err, { stdout, stderr }));
+        const durationMs = Date.now() - startTime;
+        let status: 'OK' | 'TIMEOUT' | 'WATCHDOG_KILLED' | 'ERROR' = 'OK';
+
+        if (isWatchdogKilled) {
+          status = 'WATCHDOG_KILLED';
+        } else if (err) {
+          const isTimeout =
+            (err as { killed?: boolean }).killed ||
+            (err as { signal?: string }).signal === 'SIGTERM' ||
+            (typeof stdout === 'string' && stdout.includes('Runner timed out')) ||
+            (typeof stderr === 'string' && stderr.includes('Runner timed out'));
+          if (isTimeout) {
+            status = 'TIMEOUT';
+          } else {
+            status = 'ERROR';
+          }
         }
-        resolve({ stdout, stderr });
+
+        const result: ExecResult = {
+          stdout,
+          stderr,
+          durationMs,
+          peakRssMb,
+          exitCode: child.exitCode,
+          signal: child.signalCode,
+          status,
+        };
+
+        if (err) {
+          return reject(Object.assign(err, result));
+        }
+        resolve(result);
       }
     );
 
@@ -121,7 +160,21 @@ export function safeExecTestFile(
             const rssPages = parseInt(fields[21], 10);
             const rssMB = (rssPages * 4096) / (1024 * 1024);
 
+            if (rssMB > peakRssMb) {
+              peakRssMb = rssMB;
+            }
+
+            if (options.onSample) {
+              options.onSample({
+                timestamp: Date.now(),
+                elapsedMs: Date.now() - startTime,
+                rssMB,
+                state,
+              });
+            }
+
             if (rssMB > maxRssMB) {
+              isWatchdogKilled = true;
               console.warn(
                 `[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > ${maxRssMB}MB). Terminating with SIGKILL.`
               );
@@ -140,6 +193,7 @@ export function safeExecTestFile(
             if (state === 'D') {
               dStateCount++;
               if (dStateCount >= 2) {
+                isWatchdogKilled = true;
                 console.warn(
                   `[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 2 consecutive checks. Terminating with SIGKILL.`
                 );
@@ -162,7 +216,7 @@ export function safeExecTestFile(
       } catch {
         // Child process may have exited during check
       }
-    }, 250);
+    }, pollIntervalMs);
   });
 }
 
