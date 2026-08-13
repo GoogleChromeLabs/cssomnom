@@ -341,18 +341,25 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     };
     const specOrder = ['css-typed-om', 'cssom', 'css-nesting', 'css-syntax', 'css-variables', 'selectors', 'mediaqueries'];
 
+    const CANONICAL_FEASIBLE_TARGETS: Record<string, number> = {
+      'css-typed-om': 12219,
+      'cssom': 923,
+      'css-syntax': 398,
+      'css-nesting': 117,
+      'css-variables': 548,
+      'selectors': 4147,
+      'mediaqueries': 417,
+    };
+    const CANONICAL_FEASIBLE_TOTAL = 18769;
+
     let grandTotal = 0;
     let grandPassing = 0;
-    let grandFeasible = 0;
-    for (const [specKey, res] of Object.entries(specResults)) {
+    for (const res of Object.values(specResults)) {
       grandTotal += res.total;
       grandPassing += res.passing;
-      const outOfScope = getBrowserOnlyFileCount(specKey);
-      const feasibleForSpec = Math.max(res.passing, res.total - outOfScope);
-      grandFeasible += feasibleForSpec;
     }
     const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
-    const normalizedPassRate = grandFeasible > 0 ? Math.min(100, (grandPassing / grandFeasible) * 100).toFixed(2) : '0.00';
+    const normalizedPassRate = CANONICAL_FEASIBLE_TOTAL > 0 ? Math.min(100, (grandPassing / CANONICAL_FEASIBLE_TOTAL) * 100).toFixed(2) : '0.00';
 
     const EXPECTED_MINIMUM_TESTS = 16000;
     if (grandTotal < EXPECTED_MINIMUM_TESTS) {
@@ -377,11 +384,10 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     const rowParts = [dateStr, `\`${commitStr}\``];
     for (const key of specOrder) {
       const res = specResults[key] || { passing: 0, total: 0 };
-      const outOfScope = getBrowserOnlyFileCount(key);
-      const feasibleForSpec = Math.max(res.passing, res.total - outOfScope);
-      rowParts.push(`${res.passing}/${feasibleForSpec}`);
+      const feasibleTarget = CANONICAL_FEASIBLE_TARGETS[key] || res.total;
+      rowParts.push(`${res.passing}/${feasibleTarget}`);
     }
-    rowParts.push(`${grandPassing}/${grandFeasible}`);
+    rowParts.push(`${grandPassing}/${CANONICAL_FEASIBLE_TOTAL}`);
     rowParts.push(`${overallPassRate}%`);
     rowParts.push(`**${normalizedPassRate}%**`);
     const newRow = `| ${rowParts.join(' | ')} |`;
