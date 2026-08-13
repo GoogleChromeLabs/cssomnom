@@ -115,7 +115,6 @@ test('requestAnimationFrame and cancelAnimationFrame mock in sandbox context', a
   const win = dom.window;
   patchWindowForTypedOM(win);
   const ctx = createWptContext(win, win.document, []);
-  const clock = ctx.clock as { step: () => Promise<boolean> };
 
   const rAF = ctx.requestAnimationFrame as Function;
   const cAF = ctx.cancelAnimationFrame as Function;
@@ -130,7 +129,7 @@ test('requestAnimationFrame and cancelAnimationFrame mock in sandbox context', a
   assert.strictEqual(typeof id, 'number');
   assert.strictEqual(called, false, 'should run asynchronously');
 
-  await clock.step();
+  await new Promise(resolve => setTimeout(resolve, 20));
   assert.strictEqual(called, true, 'should execute callback');
 
   let cancelled = false;
@@ -138,7 +137,7 @@ test('requestAnimationFrame and cancelAnimationFrame mock in sandbox context', a
     cancelled = true;
   });
   cAF(cancelId);
-  await clock.step();
+  await new Promise(resolve => setTimeout(resolve, 20));
   assert.strictEqual(cancelled, false, 'should cancel callback');
 });
 

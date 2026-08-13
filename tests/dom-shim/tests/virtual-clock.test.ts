@@ -2,13 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseHTML } from 'linkedom';
-import {
-  VirtualClock,
-  patchWindowForTypedOM,
-  createWptContext,
-  type WptSandboxTest
-} from '../src/index.ts';
+import { VirtualClock } from '../src/index.ts';
 
 test('VirtualClock setTimeout(..., 1000) fast-forwards in <2ms wall-clock time', async () => {
   const clock = new VirtualClock();
@@ -166,60 +160,37 @@ test('VirtualClock reset clears all tasks and resets time', async () => {
   assert.strictEqual(await clock.step(), false);
 });
 
-test('createWptContext integrates with VirtualClock for fast-forward async_test', async () => {
-  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
-  const win = dom.window;
-  patchWindowForTypedOM(win);
-
-  const tests: WptSandboxTest[] = [];
-  const ctx = createWptContext(win, win.document, tests);
-  const clock = ctx.clock as VirtualClock;
-  assert.ok(clock instanceof VirtualClock);
-
-  const asyncTestFn = ctx.async_test as (fn: Function, name: string) => Record<string, unknown>;
+test('VirtualClock integrates with fast-forward async task scheduling', async () => {
+  const clock = new VirtualClock();
   let testFinished = false;
 
-  asyncTestFn((t: { step_timeout: (fn: Function, delay: number) => number; step_func_done: (fn: Function) => Function }) => {
-    t.step_timeout(t.step_func_done(() => {
-      testFinished = true;
-    }), 5000);
-  }, '5-second step_timeout test');
-
-  assert.strictEqual(tests.length, 1);
-  const testEntry = tests[0];
+  clock.setTimeout(() => {
+    testFinished = true;
+  }, 5000);
 
   const startWallClock = Date.now();
-  await clock.pumpUntil(() => (testEntry as unknown as { completed?: boolean }).completed === true);
-  if (testEntry.type === 'async_test' && testEntry.promise) {
-    await testEntry.promise;
-  }
+  await clock.pumpUntil(() => testFinished);
   const duration = Date.now() - startWallClock;
 
   assert.strictEqual(testFinished, true);
-  assert.strictEqual(testEntry.status, 0);
   assert.strictEqual(clock.currentTime, 5000);
   assert.ok(duration < 100, `Async test took ${duration}ms (expected <100ms)`);
 });
 
-test('createWptContext preserves globalThis native timers and performance', () => {
+test('VirtualClock discrete event scheduling does not pollute global timers', () => {
   const initialSetTimeout = globalThis.setTimeout;
   const initialClearTimeout = globalThis.clearTimeout;
   const initialSetInterval = globalThis.setInterval;
   const initialClearInterval = globalThis.clearInterval;
   const initialPerformance = globalThis.performance;
 
-  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
-  const win = dom.window;
-  patchWindowForTypedOM(win);
-
-  const tests: WptSandboxTest[] = [];
-  const ctx = createWptContext(win, win.document, tests);
+  const clock = new VirtualClock();
+  clock.setTimeout(() => {}, 100);
+  clock.setInterval(() => {}, 50);
 
   assert.strictEqual(globalThis.setTimeout, initialSetTimeout, 'globalThis.setTimeout must not be polluted');
   assert.strictEqual(globalThis.clearTimeout, initialClearTimeout, 'globalThis.clearTimeout must not be polluted');
   assert.strictEqual(globalThis.setInterval, initialSetInterval, 'globalThis.setInterval must not be polluted');
   assert.strictEqual(globalThis.clearInterval, initialClearInterval, 'globalThis.clearInterval must not be polluted');
   assert.strictEqual(globalThis.performance, initialPerformance, 'globalThis.performance must not be polluted');
-
-  assert.notStrictEqual(ctx.setTimeout, initialSetTimeout, 'ctx.setTimeout must be virtualized');
 });

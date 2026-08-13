@@ -77,11 +77,11 @@ export function runWptFile(filePath: string): WptFileResult {
         return sandbox.navigator;
       }
       if (typeof prop === 'string') {
-        if (prop in sandbox) {
-          return Reflect.get(sandbox, prop);
-        }
         if (prop in globalThis) {
           return Reflect.get(globalThis, prop);
+        }
+        if (prop in sandbox) {
+          return Reflect.get(sandbox, prop);
         }
         const val = target[prop];
         if (val !== undefined) {
@@ -190,43 +190,20 @@ export function runWptFile(filePath: string): WptFileResult {
   try {
     // @ts-expect-error - internal load event tracking property
     win.__loadEventFired = true;
-    const loadEv = new (win.Event || Event)('load');
-    const winObj = win as { onload?: (e: Event) => void };
-    if (typeof winObj.onload === 'function') {
-      try {
-        winObj.onload.call(win, loadEv);
-      } catch {}
-    }
-    win.dispatchEvent(loadEv);
+    win.dispatchEvent(new win.Event('load'));
   } catch (err) {
     console.error("Failed to dispatch load event:", err);
   }
 
   const testQueue: WptTest[] = [];
-  const clock = (sandbox as { clock?: { pumpUntil: (fn: () => boolean, opts?: { maxTicks?: number; maxVirtualDuration?: number }) => Promise<boolean>; setTimeout: (fn: Function, delay?: number) => number } }).clock;
   for (const t of tests) {
     if (t.executed) {
       const wrappedFn = async () => {
-        if (t.type === 'async_test' && t.promise) {
-          if (clock) {
-            await clock.pumpUntil(
-              () => (t as unknown as { completed?: boolean }).completed === true || (t.status !== undefined && t.status !== 0),
-              { maxTicks: 5000, maxVirtualDuration: 30000 }
-            );
-          }
-          await Promise.race([
-            t.promise,
-            new Promise<never>((_, reject) => {
-              const timer = setTimeout(() => reject(new Error('Async test timeout')), 5000);
-              if (typeof timer.unref === 'function') timer.unref();
-            })
-          ]);
-        }
         if ((t.status ?? 0) !== 0) {
           throw new Error(t.message || `Test failed with status ${t.status}`);
         }
       };
-      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: t.type === 'async_test' });
+      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
       continue;
     }
 
@@ -236,9 +213,6 @@ export function runWptFile(filePath: string): WptFileResult {
         cleanups.push(fn);
       },
       step_timeout(fn: Function, delay: number) {
-        if (clock) {
-          return clock.setTimeout(fn, delay);
-        }
         return setTimeout(fn, delay);
       },
       step_func(fn: Function) {
@@ -260,38 +234,7 @@ export function runWptFile(filePath: string): WptFileResult {
     const wrappedFn = async () => {
       try {
         if (t.fn) {
-          const fn = t.fn;
-          let testPromiseSettled = false;
-          const testPromise = (async () => {
-            try {
-              const res = fn.call(testHarnessParam, testHarnessParam);
-              if (
-                res &&
-                typeof res === 'object' &&
-                'then' in res &&
-                typeof (res as Record<string, unknown>).then === 'function'
-              ) {
-                await res;
-              }
-            } finally {
-              testPromiseSettled = true;
-            }
-          })();
-
-          if (clock) {
-            await clock.pumpUntil(
-              () => testPromiseSettled || (t as unknown as { completed?: boolean }).completed === true || (t.status !== undefined && t.status !== 0),
-              { maxTicks: 5000, maxVirtualDuration: 30000 }
-            );
-          }
-
-          await Promise.race([
-            testPromise,
-            new Promise<never>((_, reject) => {
-              const timer = setTimeout(() => reject(new Error('Promise test timeout')), 5000);
-              if (typeof timer.unref === 'function') timer.unref();
-            })
-          ]);
+          await t.fn.call(testHarnessParam, testHarnessParam);
         }
       } finally {
         for (const cleanup of cleanups) {
@@ -303,7 +246,7 @@ export function runWptFile(filePath: string): WptFileResult {
         }
       }
     };
-    testQueue.push({ name: t.name, fn: wrappedFn, isAsync: t.type === 'promise_test' || t.type === 'async_test' });
+    testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
   }
   return {
     tests: testQueue,

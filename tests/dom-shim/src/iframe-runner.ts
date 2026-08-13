@@ -6,7 +6,6 @@ import * as vm from 'node:vm';
 import { parseHTML } from 'linkedom';
 import { HarnessError, messageOf } from './wpt-assertions.ts';
 import { createWptContext, type WindowType, type DocumentType, type WptSandboxTest } from './testharness-bridge.ts';
-import type { VirtualClock } from './virtual-clock.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 export const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
@@ -93,8 +92,7 @@ export function runIframeDocumentWrite(
     iframeDocument.title = titleMatch[1];
   }
 
-  const rootClock = (parentWindow as unknown as { __virtualClock?: VirtualClock }).__virtualClock;
-  const iframeSandbox = createWptContext(iframeWindow, iframeDocument, iframeTests, rootClock) as IframeSandboxContext;
+  const iframeSandbox = createWptContext(iframeWindow, iframeDocument, iframeTests) as IframeSandboxContext;
   iframeSandbox.parent = parentWindow;
   iframeSandbox.top = parentWindow;
   iframeSandbox.window = iframeWindow;
@@ -275,20 +273,7 @@ export function runIframeDocumentWrite(
         } else if (t.type === 'async_test') {
           try {
             if (t.promise) {
-              const clock = (iframeWindow as unknown as { __virtualClock?: VirtualClock }).__virtualClock;
-              if (clock) {
-                await clock.pumpUntil(
-                  () => (t as unknown as { completed?: boolean }).completed === true || (t.status !== undefined && t.status !== 0),
-                  { maxTicks: 5000, maxVirtualDuration: 30000 }
-                );
-              }
-              await Promise.race([
-                t.promise,
-                new Promise<never>((_, reject) => {
-                  const timer = setTimeout(() => reject(new Error('Async test timeout')), 2000);
-                  if (typeof timer.unref === 'function') timer.unref();
-                })
-              ]);
+              await timeoutPromise(t.promise, 1000);
             }
             statusCode = t.status ?? 0;
             message = t.message ?? null;
@@ -320,39 +305,17 @@ export function runIframeDocumentWrite(
           };
           try {
             if (t.fn) {
-              const fn = t.fn;
-              const clock = (iframeWindow as unknown as { __virtualClock?: VirtualClock }).__virtualClock;
-              let promiseSettled = false;
-              const testPromise = (async () => {
-                try {
-                  const valOrPromise = fn(tObj);
-                  if (
-                    valOrPromise &&
-                    typeof valOrPromise === 'object' &&
-                    'then' in valOrPromise &&
-                    typeof (valOrPromise as Record<string, unknown>).then === 'function'
-                  ) {
-                    await valOrPromise;
-                  }
-                } finally {
-                  promiseSettled = true;
-                }
-              })();
-
-              if (clock) {
-                await clock.pumpUntil(
-                  () => promiseSettled || (t as unknown as { completed?: boolean }).completed === true || (t.status !== undefined && t.status !== 0),
-                  { maxTicks: 5000, maxVirtualDuration: 30000 }
-                );
+              const valOrPromise = t.fn(tObj);
+              if (
+                valOrPromise &&
+                typeof valOrPromise === 'object' &&
+                'then' in valOrPromise &&
+                typeof (valOrPromise as Record<string, unknown>).then === 'function'
+              ) {
+                await timeoutPromise(valOrPromise as Promise<unknown>, 1000);
+              } else {
+                await valOrPromise;
               }
-
-              await Promise.race([
-                testPromise,
-                new Promise<never>((_, reject) => {
-                  const timer = setTimeout(() => reject(new Error('Promise test timeout')), 2000);
-                  if (typeof timer.unref === 'function') timer.unref();
-                })
-              ]);
             }
           } catch (err: unknown) {
             const isTimeout = err && typeof err === 'object' && (err as Record<string, unknown>).isTimeout === true;
@@ -419,7 +382,6 @@ export function setupIframePrototype(
     get(this: object) {
       let doc = iframeContentDocumentMap.get(this);
       if (!doc) {
-        const iframeEl = this as { ownerDocument?: Document };
         const iframeDom = parseHTML('<!DOCTYPE html><html><head></head><body></body></html>');
         const iframeWindow = iframeDom.window;
         (iframeWindow as unknown as Record<string, unknown>).frameElement = this;
@@ -427,22 +389,17 @@ export function setupIframePrototype(
         (iframeWindow as unknown as Record<string, unknown>).__lastHeight = 100;
         patchWindow(iframeWindow);
 
-        const parentDoc = iframeEl.ownerDocument;
-        const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
-        const parentClock = (parentWin as unknown as { __virtualClock?: VirtualClock }).__virtualClock;
-        if (parentClock) {
-          (iframeWindow as unknown as Record<string, unknown>).__virtualClock = parentClock;
-        }
+        const iframeEl = this as { ownerDocument?: Document };
 
         // Route postMessage to parent window (main window)
         iframeWindow.postMessage = function (this: typeof iframeWindow, data: unknown) {
-          const targetDoc = iframeEl.ownerDocument;
-          const targetWin = (targetDoc?.defaultView as WindowType | undefined) || mainWindow;
-          const EventConstructor = (targetWin.CustomEvent || targetWin.Event || CustomEvent || Event) as { new (t: string): CustomEvent };
+          const parentDoc = iframeEl.ownerDocument;
+          const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
+          const EventConstructor = (parentWin.CustomEvent || parentWin.Event || CustomEvent || Event) as { new (t: string): CustomEvent };
           const event = new EventConstructor('message');
           Object.defineProperty(event, 'data', { value: data, enumerable: true });
           Object.defineProperty(event, 'source', { value: this, enumerable: true });
-          targetWin.dispatchEvent(event);
+          parentWin.dispatchEvent(event);
         };
 
         const iframeDocument = iframeDom.document;
