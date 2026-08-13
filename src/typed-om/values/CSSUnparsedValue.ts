@@ -21,7 +21,6 @@ import { CSSVariableReferenceValue } from './CSSVariableReferenceValue.ts';
 import { serialize, getMirrorToken } from '../../serializer.ts';
 import { isCSSFunction, hasVarFunction } from '../utils/validation.ts';
 import type { CSSNumericType } from '../numeric/CSSNumericType.ts';
-import type { CSSNumericValue } from '../numeric/CSSNumericValue.ts';
 
 // Spec: CSS Typed OM Level 1 § 3.4 #unparsedvalue-objects
 export class CSSUnparsedValue extends CSSStyleValue {
@@ -62,8 +61,10 @@ export class CSSUnparsedValue extends CSSStyleValue {
   entries(): IterableIterator<[number, string | CSSVariableReferenceValue]> { return this._values.entries(); }
   keys(): IterableIterator<number> { return this._values.keys(); }
   values(): IterableIterator<string | CSSVariableReferenceValue> { return this._values.values(); }
-  forEach(callback: (value: string | CSSVariableReferenceValue, index: number) => void, thisArg?: unknown): void {
-    this._values.forEach(callback, thisArg);
+  forEach(callback: (value: string | CSSVariableReferenceValue, index: number, parent: CSSUnparsedValue) => void, thisArg?: unknown): void {
+    for (let i = 0; i < this._values.length; i++) {
+      callback.call(thisArg, this._values[i], i, this);
+    }
   }
   item(index: number): string | CSSVariableReferenceValue | undefined { return this._values[index]; }
 
@@ -97,10 +98,7 @@ export class CSSUnparsedValue extends CSSStyleValue {
   }
 
   type(): CSSNumericType {
-    if (this._values.length === 0) return {};
-    const first = this._values[0];
-    if (typeof first === 'string') return {};
-    return (first as unknown as CSSNumericValue).type();
+    return {};
   }
 }
 

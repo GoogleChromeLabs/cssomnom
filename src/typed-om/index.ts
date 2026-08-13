@@ -19,20 +19,8 @@
 export type { CSSUnit } from '../data/gen/units.ts';
 export type { CSSNumericType } from './numeric/CSSNumericType.ts';
 
-// Side-effect registrations: arithmetic methods & style value parsers
-import './numeric/numeric-methods.ts';
-import './values/style-value-parser.ts';
-import './color/color-reify.ts';
-
-// Values
+// 1. Root Values & Numeric Base Classes
 export { CSSStyleValue } from './values/CSSStyleValue.ts';
-export { CSSKeywordValue } from './values/CSSKeywordValue.ts';
-export { CSSImageValue } from './values/CSSImageValue.ts';
-export { CSSVariableReferenceValue } from './values/CSSVariableReferenceValue.ts';
-export { CSSUnparsedValue } from './values/CSSUnparsedValue.ts';
-export { createCSSStyleValue } from './values/style-value-factory.ts';
-
-// Numeric
 export { CSSNumericValue } from './numeric/CSSNumericValue.ts';
 export { CSSUnitValue } from './numeric/CSSUnitValue.ts';
 export { CSSNumericArray } from './numeric/CSSNumericArray.ts';
@@ -49,7 +37,14 @@ export {
   CSSMathFunction
 } from './numeric/math/CSSMathOperations.ts';
 
-// Colors
+// 2. Concrete Value Subclasses
+export { CSSKeywordValue } from './values/CSSKeywordValue.ts';
+export { CSSImageValue } from './values/CSSImageValue.ts';
+export { CSSVariableReferenceValue } from './values/CSSVariableReferenceValue.ts';
+export { CSSUnparsedValue } from './values/CSSUnparsedValue.ts';
+export { createCSSStyleValue } from './values/style-value-factory.ts';
+
+// 3. Colors
 export { CSSColorValue } from './color/CSSColorValue.ts';
 export {
   CSSRGB,
@@ -62,7 +57,7 @@ export {
   CSSColor
 } from './color/color-spaces.ts';
 
-// Transforms
+// 4. Transforms
 export { CSSTransformComponent } from './transform/CSSTransformComponent.ts';
 export {
   CSSTranslate,
@@ -77,18 +72,21 @@ export {
 } from './transform/transform-components.ts';
 export { CSSTransformValue } from './transform/CSSTransformValue.ts';
 
-// Position
+// 5. Position
 export { CSSPositionValue } from './position/CSSPositionValue.ts';
 
-// Style Property Maps
+// 6. Style Property Maps
 export { type StyleReadOnlyLike, StylePropertyMapReadOnly } from './style-map/StylePropertyMapReadOnly.ts';
 export { type StyleLike, StylePropertyMap } from './style-map/StylePropertyMap.ts';
 
-// Geometry & Parser API
+// 7. Geometry & Parser API
 export { DOMMatrixReadOnly, DOMMatrix } from '../DOMMatrix.ts';
 export { CSS } from '../parser-api.ts';
 
-// Register transform parsing hook on DOMMatrix
+// 8. Module Initializations & Hooks
+import './values/style-value-parser.ts';
+import './numeric/numeric-methods.ts';
+import './color/color-reify.ts';
 import { CSSTransformValue } from './transform/CSSTransformValue.ts';
 import { setParseTransformListHook } from '../DOMMatrix.ts';
 

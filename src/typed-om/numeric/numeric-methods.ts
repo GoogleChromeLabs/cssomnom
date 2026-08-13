@@ -210,35 +210,34 @@ function isStandardCSSNumericValue(node: CSSNumericValue): boolean {
   return false;
 }
 
-// Attach prototype methods to CSSNumericValue
-CSSNumericValue.prototype.to = function(unit: string): CSSUnitValue {
-  if (arguments.length < 1) {
+export function numericTo(self: CSSNumericValue, unit: string): CSSUnitValue {
+  if (arguments.length < 2) {
     throw new TypeError("Failed to execute 'to' on 'CSSNumericValue': 1 argument required, but only 0 present.");
   }
   if (!unitToBase[unit]) {
     throw new DOMException(`Invalid unit: ${unit}`, 'SyntaxError');
   }
-  const sum = createSumValue(this);
+  const sum = createSumValue(self);
   if (!sum || sum.length > 1) {
-    throw new TypeError(`Cannot convert ${this.serialize()} to ${unit}`);
+    throw new TypeError(`Cannot convert ${self.serialize()} to ${unit}`);
   }
   const item = createCSSUnitValueFromSumValueItem(sum[0]);
-  if (!item) throw new TypeError(`Cannot convert ${this.serialize()} to ${unit}`);
+  if (!item) throw new TypeError(`Cannot convert ${self.serialize()} to ${unit}`);
   return item.to(unit);
-};
+}
 
-CSSNumericValue.prototype.toSum = function(...units: string[]): CSSMathSum {
+export function numericToSum(self: CSSNumericValue, ...units: string[]): CSSMathSum {
   for (const unit of units) {
     if (!unitToBase[unit]) throw new DOMException(`Invalid unit: ${unit}`, 'SyntaxError');
   }
 
-  const sum = createSumValue(this);
+  const sum = createSumValue(self);
   if (!sum) {
-    throw new TypeError(`Cannot create sum value from ${this.serialize()}`);
+    throw new TypeError(`Cannot create sum value from ${self.serialize()}`);
   }
 
   const values = sum.map(item => createCSSUnitValueFromSumValueItem(item));
-  if (values.some(v => v === null)) throw new TypeError(`Cannot create sum value from ${this.serialize()}`);
+  if (values.some(v => v === null)) throw new TypeError(`Cannot create sum value from ${self.serialize()}`);
 
   let unitValues = values as CSSUnitValue[];
 
@@ -269,9 +268,9 @@ CSSNumericValue.prototype.toSum = function(...units: string[]): CSSMathSum {
   }
 
   return new CSSMathSum(...result);
-};
+}
 
-CSSNumericValue.parse = function(css: string): CSSNumericValue {
+export function parseNumericValue(css: string): CSSNumericValue {
   if (arguments.length < 1) {
     throw new TypeError("Failed to execute 'parse' on 'CSSNumericValue': 1 argument required, but only 0 present.");
   }
@@ -322,15 +321,15 @@ CSSNumericValue.parse = function(css: string): CSSNumericValue {
     }
     throw new DOMException(`Invalid numeric value: ${css}. Details: ${e instanceof Error ? e.message : e}`, 'SyntaxError');
   }
-};
+}
 
-CSSNumericValue.prototype.add = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+export function numericAdd(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): CSSNumericValue {
   const rectifiedValues = values.map(v => ensureNumeric(v));
   let allValues: CSSNumericValue[] = [];
-  if (this instanceof CSSMathSum) {
-    allValues.push(...this.values);
+  if (self instanceof CSSMathSum) {
+    allValues.push(...self.values);
   } else {
-    allValues.push(this);
+    allValues.push(self);
   }
   allValues.push(...rectifiedValues);
 
@@ -346,9 +345,9 @@ CSSNumericValue.prototype.add = function(...values: (number | CSSNumericValue)[]
   const sumNode = new CSSMathSum(...allValues);
   sumNode.type();
   return sumNode;
-};
+}
 
-CSSNumericValue.prototype.sub = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+export function numericSub(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): CSSNumericValue {
   const negatedValues = values.map(v => {
     const num = ensureNumeric(v);
     if (num instanceof CSSMathNegate) {
@@ -359,16 +358,16 @@ CSSNumericValue.prototype.sub = function(...values: (number | CSSNumericValue)[]
     }
     return new CSSMathNegate(num);
   });
-  return this.add(...negatedValues);
-};
+  return self.add(...negatedValues);
+}
 
-CSSNumericValue.prototype.mul = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+export function numericMul(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): CSSNumericValue {
   const rectifiedValues = values.map(v => ensureNumeric(v));
   let allValues: CSSNumericValue[] = [];
-  if (this instanceof CSSMathProduct) {
-    allValues.push(...this.values);
+  if (self instanceof CSSMathProduct) {
+    allValues.push(...self.values);
   } else {
-    allValues.push(this);
+    allValues.push(self);
   }
   allValues.push(...rectifiedValues);
 
@@ -388,9 +387,9 @@ CSSNumericValue.prototype.mul = function(...values: (number | CSSNumericValue)[]
   }
 
   return new CSSMathProduct(...allValues);
-};
+}
 
-CSSNumericValue.prototype.div = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+export function numericDiv(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): CSSNumericValue {
   const invertedValues = values.map(v => {
     const num = ensureNumeric(v);
     if (num instanceof CSSMathInvert) {
@@ -404,16 +403,16 @@ CSSNumericValue.prototype.div = function(...values: (number | CSSNumericValue)[]
     }
     return new CSSMathInvert(num);
   });
-  return this.mul(...invertedValues);
-};
+  return self.mul(...invertedValues);
+}
 
-CSSNumericValue.prototype.min = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+export function numericMin(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): CSSNumericValue {
   const rectifiedValues = values.map(v => ensureNumeric(v));
   let allValues: CSSNumericValue[] = [];
-  if (this instanceof CSSMathMin) {
-    allValues.push(...this.values);
+  if (self instanceof CSSMathMin) {
+    allValues.push(...self.values);
   } else {
-    allValues.push(this);
+    allValues.push(self);
   }
   allValues.push(...rectifiedValues);
 
@@ -427,15 +426,15 @@ CSSNumericValue.prototype.min = function(...values: (number | CSSNumericValue)[]
   }
 
   return new CSSMathMin(...allValues);
-};
+}
 
-CSSNumericValue.prototype.max = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+export function numericMax(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): CSSNumericValue {
   const rectifiedValues = values.map(v => ensureNumeric(v));
   let allValues: CSSNumericValue[] = [];
-  if (this instanceof CSSMathMax) {
-    allValues.push(...this.values);
+  if (self instanceof CSSMathMax) {
+    allValues.push(...self.values);
   } else {
-    allValues.push(this);
+    allValues.push(self);
   }
   allValues.push(...rectifiedValues);
 
@@ -449,7 +448,7 @@ CSSNumericValue.prototype.max = function(...values: (number | CSSNumericValue)[]
   }
 
   return new CSSMathMax(...allValues);
-};
+}
 
 function equalsInternal(a: CSSNumericValue, other: number | CSSNumericValue): boolean {
   if (typeof other === 'number') {
@@ -509,10 +508,49 @@ function equalsInternal(a: CSSNumericValue, other: number | CSSNumericValue): bo
   return false;
 }
 
-CSSNumericValue.prototype.equals = function(...values: (number | CSSNumericValue)[]): boolean {
+export function numericEquals(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): boolean {
   if (values.length === 0) return true;
   for (const v of values) {
-    if (!equalsInternal(this, v)) return false;
+    if (!equalsInternal(self, v)) return false;
   }
   return true;
+}
+
+// Spec: CSS Typed OM Level 1 § 4.1 #numericvalue-objects
+CSSNumericValue.prototype.to = function(unit: string): CSSUnitValue {
+  return numericTo(this, unit);
 };
+
+CSSNumericValue.prototype.toSum = function(...units: string[]): CSSMathSum {
+  return numericToSum(this, ...units);
+};
+
+CSSNumericValue.prototype.add = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+  return numericAdd(this, ...values);
+};
+
+CSSNumericValue.prototype.sub = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+  return numericSub(this, ...values);
+};
+
+CSSNumericValue.prototype.mul = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+  return numericMul(this, ...values);
+};
+
+CSSNumericValue.prototype.div = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+  return numericDiv(this, ...values);
+};
+
+CSSNumericValue.prototype.min = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+  return numericMin(this, ...values);
+};
+
+CSSNumericValue.prototype.max = function(...values: (number | CSSNumericValue)[]): CSSNumericValue {
+  return numericMax(this, ...values);
+};
+
+CSSNumericValue.prototype.equals = function(...values: (number | CSSNumericValue)[]): boolean {
+  return numericEquals(this, ...values);
+};
+
+CSSNumericValue.parse = parseNumericValue;

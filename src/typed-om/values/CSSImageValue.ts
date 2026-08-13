@@ -19,3 +19,33 @@ import { CSSStyleValue } from './CSSStyleValue.ts';
 
 // Spec: CSS Typed OM Level 1 § 3.5 #imagevalue-objects
 export abstract class CSSImageValue extends CSSStyleValue {}
+
+export class CSSURLImageValue extends CSSImageValue {
+  private _url: string;
+
+  constructor(url: string) {
+    super();
+    this._url = url;
+  }
+
+  get url(): string {
+    return this._url;
+  }
+
+  override toString(): string {
+    return this._url.startsWith('url(') ? this._url : `url("${this._url}")`;
+  }
+}
+
+export class CSSGradientImageValue extends CSSImageValue {
+  private _gradientText: string;
+
+  constructor(gradientText: string) {
+    super();
+    this._gradientText = gradientText;
+  }
+
+  override toString(): string {
+    return this._gradientText;
+  }
+}

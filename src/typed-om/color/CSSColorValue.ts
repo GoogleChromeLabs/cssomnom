@@ -18,12 +18,6 @@
 import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 import type { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 
-let parseColorImpl: ((css: string) => CSSColorValue | CSSKeywordValue) | null = null;
-
-export function registerColorParser(impl: (css: string) => CSSColorValue | CSSKeywordValue): void {
-  parseColorImpl = impl;
-}
-
 // Spec: CSS Typed OM Level 2 § 2 #colorvalue-objects
 export abstract class CSSColorValue extends CSSStyleValue {
   constructor() {
@@ -33,13 +27,10 @@ export abstract class CSSColorValue extends CSSStyleValue {
     }
   }
 
-  static override parse(css: string): CSSColorValue | CSSKeywordValue {
+  static override parse(_css: string): CSSColorValue | CSSKeywordValue {
     if (arguments.length < 1) {
       throw new TypeError("Failed to execute 'parse' on 'CSSColorValue': 1 argument required, but only 0 present.");
     }
-    if (!parseColorImpl) {
-      throw new Error("Color parser not initialized");
-    }
-    return parseColorImpl(css);
+    throw new Error("CSSColorValue.parse not initialized");
   }
 }

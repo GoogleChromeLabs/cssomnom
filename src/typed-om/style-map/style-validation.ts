@@ -83,8 +83,12 @@ export const POSITION_PROPERTIES = new Set([
 ]);
 
 export const COLOR_PROPERTIES = new Set([
-  'color', 'background-color', 'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-  'outline-color', 'text-decoration-color', 'column-rule-color', 'caret-color', 'fill', 'stroke'
+  'color', 'background-color',
+  'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+  'border-inline-color', 'border-inline-start-color', 'border-inline-end-color',
+  'border-block-color', 'border-block-start-color', 'border-block-end-color',
+  'outline-color', 'text-decoration-color', 'text-emphasis-color', 'column-rule-color', 'caret-color', 'accent-color',
+  'flood-color', 'lighting-color', 'stop-color', 'fill', 'stroke'
 ]);
 
 export function getPropertyValueSafe(style: unknown, property: string): string {

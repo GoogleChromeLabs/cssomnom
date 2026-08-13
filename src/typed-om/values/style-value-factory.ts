@@ -23,7 +23,7 @@ import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
 import { CSSMathSum } from '../numeric/math/CSSMathOperations.ts';
 import { CSSUnparsedValue, tokensToUnparsedSegments } from './CSSUnparsedValue.ts';
 import { CSSVariableReferenceValue } from './CSSVariableReferenceValue.ts';
-import { CSSImageValue } from './CSSImageValue.ts';
+import { CSSURLImageValue, CSSGradientImageValue } from './CSSImageValue.ts';
 import { serialize } from '../../serializer.ts';
 import { parseMathFunction, simplify } from '../../math-parser.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from '../../data/gen/standard-syntax.ts';
@@ -90,15 +90,10 @@ export function createCSSStyleValue(v: ComponentValue, property?: string): CSSSt
       return new CSSUnparsedValue([new CSSVariableReferenceValue(varName, fallback)]);
     }
     if (nameLower === 'url') {
-      // CSSImageValue for url()
-      return new (class extends CSSImageValue {
-        override toString() { return `url(${serialize(fn.value).trim()})`; }
-      })();
+      return new CSSURLImageValue(`url(${serialize(fn.value).trim()})`);
     }
     if (nameLower.endsWith('gradient')) {
-      return new (class extends CSSImageValue {
-        override toString() { return serialize([v]).trim(); }
-      })();
+      return new CSSGradientImageValue(serialize([v]).trim());
     }
   }
   if (isToken(v)) {
@@ -123,10 +118,7 @@ export function createCSSStyleValue(v: ComponentValue, property?: string): CSSSt
         return new CSSUnitValue(v.value, (v.unit || '') as CSSUnit);
 
       case 'url':
-        // CSSImageValue for url()
-        return new (class extends CSSImageValue {
-          override toString() { return `url("${v.value}")`; }
-        })();
+        return new CSSURLImageValue(v.value);
       default:
         return null;
     }

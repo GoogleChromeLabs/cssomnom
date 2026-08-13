@@ -17,17 +17,6 @@
 
 import { privateToken } from '../utils/validation.ts';
 
-let parseAllImpl: ((property: string, css: string) => CSSStyleValue[]) | null = null;
-let parseImpl: ((property: string, css: string) => CSSStyleValue) | null = null;
-
-export function registerStyleValueParsers(
-  parseAll: (property: string, css: string) => CSSStyleValue[],
-  parse: (property: string, css: string) => CSSStyleValue
-): void {
-  parseAllImpl = parseAll;
-  parseImpl = parse;
-}
-
 // Spec: CSS Typed OM Level 1 § 3 #stylevalue-objects
 export class CSSStyleValue {
   get [Symbol.toStringTag]() {
@@ -47,23 +36,17 @@ export class CSSStyleValue {
     return this._cssText || '';
   }
 
-  static parseAll(property: string, css: string): CSSStyleValue[] {
+  static parseAll(_property: string, _css: string): CSSStyleValue[] {
     if (arguments.length < 2) {
       throw new TypeError("Failed to execute 'parseAll' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
     }
-    if (!parseAllImpl) {
-      throw new Error("StyleValue parser not initialized");
-    }
-    return parseAllImpl(property, css);
+    throw new Error("CSSStyleValue.parseAll not initialized");
   }
 
-  static parse(property: string, css: string): CSSStyleValue {
+  static parse(_property: string, _css: string): CSSStyleValue {
     if (arguments.length < 2) {
       throw new TypeError("Failed to execute 'parse' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
     }
-    if (!parseImpl) {
-      throw new Error("StyleValue parser not initialized");
-    }
-    return parseImpl(property, css);
+    throw new Error("CSSStyleValue.parse not initialized");
   }
 }

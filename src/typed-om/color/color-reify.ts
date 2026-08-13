@@ -16,7 +16,7 @@
  */
 
 import type { ComponentValue, HashToken, IdentToken, CSSFunction } from '../../types.ts';
-import { CSSColorValue, registerColorParser } from './CSSColorValue.ts';
+import { CSSColorValue } from './CSSColorValue.ts';
 import type { CSSNumericValue } from '../numeric/CSSNumericValue.ts';
 import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
@@ -136,5 +136,4 @@ export function parseColor(css: string): CSSColorValue | CSSKeywordValue {
   throw new DOMException(`Invalid color value: ${css}`, 'SyntaxError');
 }
 
-// Register parse implementation on CSSColorValue
-registerColorParser(parseColor);
+CSSColorValue.parse = parseColor;

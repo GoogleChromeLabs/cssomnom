@@ -32,42 +32,42 @@ export abstract class CSSNumericValue extends CSSStyleValue {
   abstract type(): CSSNumericType;
 
   to(_unit: string): CSSUnitValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.to not initialized");
   }
 
   toSum(..._units: string[]): CSSMathSum {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.toSum not initialized");
   }
 
   static parse(_css: string): CSSNumericValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.parse not initialized");
   }
 
   add(..._values: (number | CSSNumericValue)[]): CSSNumericValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.add not initialized");
   }
 
   sub(..._values: (number | CSSNumericValue)[]): CSSNumericValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.sub not initialized");
   }
 
   mul(..._values: (number | CSSNumericValue)[]): CSSNumericValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.mul not initialized");
   }
 
   div(..._values: (number | CSSNumericValue)[]): CSSNumericValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.div not initialized");
   }
 
   min(..._values: (number | CSSNumericValue)[]): CSSNumericValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.min not initialized");
   }
 
   max(..._values: (number | CSSNumericValue)[]): CSSNumericValue {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.max not initialized");
   }
 
   equals(..._values: (number | CSSNumericValue)[]): boolean {
-    throw new Error("Numeric methods not initialized");
+    throw new Error("CSSNumericValue.equals not initialized");
   }
 }

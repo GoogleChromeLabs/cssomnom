@@ -15,9 +15,11 @@
  * limitations under the License.
  */
 
-import type { Declaration } from '../../types.ts';
+import type { Declaration, ComponentValue } from '../../types.ts';
 import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 import { CSSUnparsedValue, tokensToUnparsedSegments } from '../values/CSSUnparsedValue.ts';
+import { SHORTHANDS } from '../../shorthands.ts';
+import { SUPPORTED_PROPERTIES } from '../../data/gen/property-list.ts';
 import { serialize } from '../../serializer.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { ParseHooks } from '../../parse-hooks.ts';
@@ -41,7 +43,7 @@ export class StylePropertyMapReadOnly {
       this._style = {
         length: styleOrDecls.length,
         getPropertyValue: (prop: string) => {
-          const decl = styleOrDecls.find(d => d.name === prop);
+          const decl = styleOrDecls.find(d => (d.name.startsWith('--') ? d.name : d.name.toLowerCase()) === (prop.startsWith('--') ? prop : prop.toLowerCase()));
           return decl ? serialize(decl.value).trim() : '';
         },
         item: (index: number) => styleOrDecls[index]?.name || '',
@@ -147,18 +149,22 @@ export class StylePropertyMapReadOnly {
 
   has(property: string): boolean {
     validateProperty(property);
-    const shorthand = SHORTHANDS[property];
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
+    if (this._element !== undefined && !propKey.startsWith('--')) {
+      return SUPPORTED_PROPERTIES.has(propKey);
+    }
+    const shorthand = SHORTHANDS[propKey];
     const declarations = this._getDeclarations();
     if (declarations.length > 0) {
       if (shorthand) {
-        return shorthand.longhands.every(lh => declarations.some(d => d.name === lh));
+        return shorthand.longhands.every(lh => declarations.some(d => (d.name.startsWith('--') ? d.name : d.name.toLowerCase()) === lh));
       }
-      return declarations.some((d: Declaration) => d.name === property);
+      return declarations.some((d: Declaration) => (d.name.startsWith('--') ? d.name : d.name.toLowerCase()) === propKey);
     } else {
       if (shorthand) {
-        return shorthand.longhands.every(lh => this._style.getPropertyValue(lh) !== '');
+        return shorthand.longhands.every(lh => this._style.getPropertyValue(lh) !== '') || this._style.getPropertyValue(propKey) !== '';
       }
-      return this._style.getPropertyValue(property) !== '';
+      return this._style.getPropertyValue(propKey) !== '';
     }
   }
 
@@ -173,29 +179,51 @@ export class StylePropertyMapReadOnly {
   }
 
   protected _getAllRaw(property: string): CSSStyleValue[] {
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     const declarations = this._getDeclarations();
     if (declarations.length > 0) {
-      const decl = declarations.find((d: Declaration) => d.name === property);
-      if (!decl) return [];
-      if (property.startsWith('--')) {
+      const decl = declarations.find((d: Declaration) => (d.name.startsWith('--') ? d.name : d.name.toLowerCase()) === propKey);
+      if (!decl) {
+        const shorthand = SHORTHANDS[propKey];
+        if (shorthand) {
+          const longhandValues: Record<string, ComponentValue[]> = {};
+          let allSet = true;
+          for (const lh of shorthand.longhands) {
+            const d = declarations.find(decl => (decl.name.startsWith('--') ? decl.name : decl.name.toLowerCase()) === lh);
+            if (!d) {
+              allSet = false;
+              break;
+            }
+            longhandValues[lh] = d.value;
+          }
+          if (allSet) {
+            const contracted = shorthand.contract(longhandValues);
+            if (contracted !== null) {
+              return [new CSSStyleValue(contracted, privateToken)];
+            }
+          }
+        }
+        return [];
+      }
+      if (propKey.startsWith('--')) {
         return [new CSSUnparsedValue(tokensToUnparsedSegments(decl.value))];
       }
       const serialized = serialize(decl.value).trim();
       try {
-        return CSSStyleValue.parseAll(property, serialized);
+        return CSSStyleValue.parseAll(propKey, serialized);
       } catch (e) {
         return [new CSSStyleValue(serialized, privateToken)];
       }
     } else {
-      const val = this._style.getPropertyValue(property);
+      const val = this._style.getPropertyValue(propKey);
       if (val === '') return [];
-      if (property.startsWith('--')) {
+      if (propKey.startsWith('--')) {
         const tokens = tokenize(val);
         const componentValues = ParseHooks.parseComponentValues(tokens);
         return [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
       }
       try {
-        return CSSStyleValue.parseAll(property, val);
+        return CSSStyleValue.parseAll(propKey, val);
       } catch (e) {
         return [new CSSStyleValue(val, privateToken)];
       }

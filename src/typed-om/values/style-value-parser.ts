@@ -25,7 +25,7 @@ import { SHORTHANDS_DATA } from '../../data/gen/shorthands.ts';
 import { SUPPORTED_PROPERTIES } from '../../data/gen/property-list.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from '../../data/gen/standard-syntax.ts';
 import { privateToken, hasVarFunction } from '../utils/validation.ts';
-import { CSSStyleValue, registerStyleValueParsers } from './CSSStyleValue.ts';
+import { CSSStyleValue } from './CSSStyleValue.ts';
 import { CSSKeywordValue } from './CSSKeywordValue.ts';
 import { CSSUnparsedValue, tokensToUnparsedSegments } from './CSSUnparsedValue.ts';
 import { createCSSStyleValue } from './style-value-factory.ts';
@@ -305,5 +305,5 @@ export function parseStyleValue(property: string, css: string): CSSStyleValue {
   return all[0];
 }
 
-// Register parsers on CSSStyleValue
-registerStyleValueParsers(parseAllStyleValues, parseStyleValue);
+CSSStyleValue.parseAll = parseAllStyleValues;
+CSSStyleValue.parse = parseStyleValue;
