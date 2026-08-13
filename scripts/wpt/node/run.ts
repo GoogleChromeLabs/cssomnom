@@ -190,7 +190,25 @@ export function runWptFile(filePath: string): WptFileResult {
   try {
     // @ts-expect-error - internal load event tracking property
     win.__loadEventFired = true;
-    win.dispatchEvent(new win.Event('load'));
+    const loadEv = new (win.Event || Event)('load');
+    const winObj = win as { onload?: (e: Event) => void; self?: { onload?: (e: Event) => void } };
+    if (typeof winObj.onload === 'function') {
+      try {
+        winObj.onload.call(win, loadEv);
+      } catch {}
+    }
+    if (typeof winObj.self?.onload === 'function' && winObj.self.onload !== winObj.onload) {
+      try {
+        winObj.self.onload.call(win, loadEv);
+      } catch {}
+    }
+    const sandboxObj = sandbox as { onload?: (e: Event) => void };
+    if (typeof sandboxObj.onload === 'function' && sandboxObj.onload !== winObj.onload) {
+      try {
+        sandboxObj.onload.call(win, loadEv);
+      } catch {}
+    }
+    win.dispatchEvent(loadEv);
   } catch (err) {
     console.error("Failed to dispatch load event:", err);
   }
