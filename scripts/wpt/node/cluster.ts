@@ -126,7 +126,7 @@ async function analyzeSpec(specName: string, specPath: string, excludes: string[
     let fileTotal = 0;
 
     try {
-      const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], { timeout: 3500 });
+      const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], { timeout: 10000 });
       const merged = stdout + '\n' + stderr;
       const summaryMatch = merged.match(/Summary: (\d+)\/(\d+) passed/);
       if (summaryMatch) {

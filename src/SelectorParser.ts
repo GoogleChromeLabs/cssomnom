@@ -532,6 +532,10 @@ export class SelectorParser {
       throw new DOMException('Unexpected content in attribute selector', 'SyntaxError');
     }
     
+    if (!name) {
+      throw new DOMException('Expected attribute name in attribute selector', 'SyntaxError');
+    }
+
     this.validateNamespace(namespace);
     return { type: 'attribute-selector', name, namespace, operator, value, flags };
 

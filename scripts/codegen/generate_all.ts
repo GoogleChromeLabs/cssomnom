@@ -33,7 +33,7 @@ function main() {
         
         const result = spawnSync('node', [scriptPath], {
             stdio: 'inherit',
-            shell: true
+            shell: false
         });
 
         if (result.status !== 0) {

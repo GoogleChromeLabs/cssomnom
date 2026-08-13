@@ -4,10 +4,75 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFile, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
 import { getBrowserOnlyFileCount } from './feasibility/audit.ts';
 
-const execFilePromise = promisify(execFile);
+function countDeclaredTests(filePath: string): number {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const matches = content.match(/\b(test|async_test|promise_test)\s*\(/g);
+    return matches ? Math.max(1, matches.length) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function execFilePromise(
+  file: string,
+  args: string[],
+  options: { timeout?: number }
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(file, args, { timeout: options.timeout }, (err, stdout, stderr) => {
+      if (watchdogTimer) clearInterval(watchdogTimer);
+      if (err) {
+        return reject(Object.assign(err, { stdout, stderr }));
+      }
+      resolve({ stdout, stderr });
+    });
+
+    let dStateCount = 0;
+    const watchdogTimer = setInterval(() => {
+      if (!child.pid || child.killed) {
+        clearInterval(watchdogTimer);
+        return;
+      }
+      try {
+        const statPath = `/proc/${child.pid}/stat`;
+        if (fs.existsSync(statPath)) {
+          const statContent = fs.readFileSync(statPath, 'utf-8');
+          const lastParen = statContent.lastIndexOf(')');
+          if (lastParen !== -1) {
+            const fields = statContent.slice(lastParen + 2).trim().split(/\s+/);
+            const state = fields[0];
+            const rssPages = parseInt(fields[21], 10);
+            const rssMB = (rssPages * 4096) / (1024 * 1024);
+
+            if (rssMB > 1536) {
+              console.warn(`[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > 1536MB). Terminating with SIGKILL.`);
+              child.kill('SIGKILL');
+              clearInterval(watchdogTimer);
+              return;
+            }
+
+            if (state === 'D') {
+              dStateCount++;
+              if (dStateCount >= 2) {
+                console.warn(`[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 2 consecutive checks. Terminating with SIGKILL.`);
+                child.kill('SIGKILL');
+                clearInterval(watchdogTimer);
+                return;
+              }
+            } else {
+              dStateCount = 0;
+            }
+          }
+        }
+      } catch {
+        // Child process may have exited during check
+      }
+    }, 250);
+  });
+}
 
 interface SpecConfig {
   path: string;
@@ -73,9 +138,22 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   const allKnownFailures: Record<string, string[]> = {};
   const allSyntaxErrors: Record<string, string> = {};
 
-  const concurrency = options.concurrency ?? Math.min(16, Math.max(1, os.availableParallelism() - 1));
+  const _masterWatchdog = setInterval(() => {
+    const masterRssMB = process.memoryUsage().rss / (1024 * 1024);
+    if (masterRssMB > 2560) {
+      console.error(`\x1b[31m[Fatal Memory Error] Master crawler process exceeded 2.5GB RSS (${masterRssMB.toFixed(0)}MB). Aborting to prevent system memory exhaustion.\x1b[0m`);
+      process.exit(1);
+    }
+  }, 500).unref();
+
+  const concurrency = options.concurrency ?? Math.min(24, Math.max(1, Math.floor((os.freemem() / (1024 * 1024 * 1024)) / 1.5)));
   if (options.verbose) {
     console.log(`Using parallel concurrency limit: ${concurrency}`);
+  }
+
+  if (options.updateProgress && (options.spec || options.file)) {
+    console.error('Error: --update-progress cannot be run on a partial spec or single file.');
+    process.exit(1);
   }
 
   let specsToRun = Object.entries(config.specs);
@@ -130,17 +208,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     let specPassing = 0;
 
     const results = await pool(concurrency, filteredFiles, async (filePath) => {
-      // Monitor system health and throttle if load is too high or free memory is low
-      const cpuCount = os.cpus().length;
-      let load = os.loadavg()[0];
-      let freeMem = os.freemem() / (1024 * 1024 * 1024); // GB
-      
-      if (load > cpuCount * 0.95 || freeMem < 1.5) {
-        console.warn(`[System Health Guard] High Load: ${load.toFixed(1)} (cores: ${cpuCount}), Free Mem: ${freeMem.toFixed(2)}GB. Pausing worker for 1000ms...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        // Refresh load stats after sleep
-        load = os.loadavg()[0];
-        freeMem = os.freemem() / (1024 * 1024 * 1024);
+      // Monitor memory health and pause if memory is dangerously low (< 500MB)
+      const freeMem = os.freemem() / (1024 * 1024 * 1024); // GB
+      if (freeMem < 0.5) {
+        console.warn(`[System Health Guard] Free Mem critically low: ${freeMem.toFixed(2)}GB. Pausing worker for 500ms...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       let passing = 0;
@@ -149,7 +221,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=1024', 'scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -180,10 +252,10 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
           total = parseInt(match[2], 10);
         } else {
           passing = 0;
-          total = 1;
+          total = countDeclaredTests(filePath);
         }
         if (options.updateBaseline) {
-          const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || mergedOutput.includes('Runner timed out');
+          const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || errorObj.signal === 'SIGKILL' || mergedOutput.includes('Runner timed out');
           const hasSummary = mergedOutput.includes('Summary:');
           if (isTimeout) {
             loadError = 'Runner timed out (execution took longer than 3.5s)';
@@ -282,6 +354,12 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
     const normalizedPassRate = grandFeasible > 0 ? Math.min(100, (grandPassing / grandFeasible) * 100).toFixed(2) : '0.00';
 
+    const EXPECTED_MINIMUM_TESTS = 16000;
+    if (grandTotal < EXPECTED_MINIMUM_TESTS) {
+      console.error(`Error: Overall total tests (${grandTotal}) is below minimum sanity threshold (${EXPECTED_MINIMUM_TESTS}). Aborting progress update to prevent log corruption.`);
+      process.exit(1);
+    }
+
     // Get git details
     let commitHash = 'unknown';
     let isDirty = false;
@@ -299,9 +377,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     const rowParts = [dateStr, `\`${commitStr}\``];
     for (const key of specOrder) {
       const res = specResults[key] || { passing: 0, total: 0 };
-      rowParts.push(`${res.passing}/${res.total}`);
+      const outOfScope = getBrowserOnlyFileCount(key);
+      const feasibleForSpec = Math.max(res.passing, res.total - outOfScope);
+      rowParts.push(`${res.passing}/${feasibleForSpec}`);
     }
-    rowParts.push(`${grandPassing}/${grandTotal}`);
+    rowParts.push(`${grandPassing}/${grandFeasible}`);
     rowParts.push(`${overallPassRate}%`);
     rowParts.push(`**${normalizedPassRate}%**`);
     const newRow = `| ${rowParts.join(' | ')} |`;
@@ -379,6 +459,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
 }
 
 if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('crawl.ts') || process.argv[1].endsWith('run_wpt_node_crawler.ts') || process.argv[1].endsWith('run_wpt_crawler.ts'))) {
+  if (!process.execArgv.some(arg => arg.startsWith('--max-old-space-size'))) {
+    console.error('\x1b[31m[Fatal Error] scripts/wpt/node/crawl.ts MUST be executed with `--max-old-space-size=1024` (e.g. `node --max-old-space-size=1024 scripts/wpt/node/crawl.ts`). Aborting to prevent unconstrained memory growth.\x1b[0m');
+    process.exit(1);
+  }
+
   const args = process.argv.slice(2);
   let spec: string | undefined;
   let file: string | undefined;

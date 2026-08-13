@@ -1,7 +1,10 @@
+/** MANDATORY INVOCATION FLAG: Always run this file with `node --max-old-space-size=512 scripts/wpt/node/run.ts <file>` to enforce a 512MB heap limit and prevent unconstrained memory growth. */
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
+
 
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM, createWptContext, type WptSandboxTest } from '../../../tests/wpt-shim.ts';
+import assert from 'node:assert/strict';
 import * as vm from 'node:vm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -74,15 +77,21 @@ export function runWptFile(filePath: string): WptFileResult {
         return sandbox.navigator;
       }
       if (typeof prop === 'string') {
-        const val = target[prop];
-        if (val !== undefined) {
-          if (typeof val === 'function') {
-            return val.bind(target);
-          }
-          return val;
+        if (prop in globalThis) {
+          return Reflect.get(globalThis, prop);
         }
         if (prop in sandbox) {
           return Reflect.get(sandbox, prop);
+        }
+        const val = target[prop];
+        if (val !== undefined) {
+          if (typeof val === 'function') {
+            if (val.prototype && val.prototype.constructor === val) {
+              return val;
+            }
+            return val.bind(target);
+          }
+          return val;
         }
         if (dom.document && typeof dom.document.getElementById === 'function') {
           const el = dom.document.getElementById(prop);
@@ -96,7 +105,7 @@ export function runWptFile(filePath: string): WptFileResult {
         return true;
       }
       if (typeof prop === 'string') {
-        return (target[prop] !== undefined) || (prop in sandbox) || (Boolean(dom.document?.getElementById?.(prop)));
+        return (target[prop] !== undefined) || (prop in sandbox) || (prop in globalThis) || (Boolean(dom.document?.getElementById?.(prop)));
       }
       return prop in sandbox;
     },
@@ -108,7 +117,7 @@ export function runWptFile(filePath: string): WptFileResult {
     }
   });
 
-  // Ensure standard aliases are present
+  // Ensure standard aliases and JS primitives are present
   sandbox.window = windowProxy;
   sandbox.document = dom.document;
   sandbox.globalThis = windowProxy;
@@ -142,8 +151,10 @@ export function runWptFile(filePath: string): WptFileResult {
     }
   }
 
-  const context = vm.createContext(sandbox);
   const htmlDir = path.dirname(filePath);
+  (dom.document as unknown as { _htmlDir?: string })._htmlDir = htmlDir;
+
+  const context = vm.createContext(windowProxy as Record<string, unknown>);
 
   const cleanup = () => {
     const sandboxObj = sandbox as {[key: string]: unknown};
@@ -213,6 +224,11 @@ export function runWptFile(filePath: string): WptFileResult {
       step(fn: Function) {
         return fn();
       },
+      unreached_func(desc?: string) {
+        return () => {
+          assert.fail(`Unreached function called: ${desc || 'unreached'}`);
+        };
+      },
       done() {}
     };
     const wrappedFn = async () => {
@@ -245,6 +261,11 @@ export function runWptFile(filePath: string): WptFileResult {
 
 // Support running directly as a CLI script
 if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run.ts') || process.argv[1].endsWith('run_wpt_node.ts'))) {
+  if (!process.execArgv.some(arg => arg.startsWith('--max-old-space-size'))) {
+    console.error('\x1b[31m[Fatal Error] scripts/wpt/node/run.ts MUST be executed with `--max-old-space-size=512` (e.g. `node --max-old-space-size=512 scripts/wpt/node/run.ts <file>`). Aborting to prevent unconstrained memory growth.\x1b[0m');
+    process.exit(1);
+  }
+
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error('Usage: node scripts/wpt/node/run.ts <wpt-html-file-paths...>');
@@ -262,9 +283,31 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
     let passed = 0;
     let failed = 0;
     
+    const filesToRun: string[] = [];
+    const collectFiles = (dir: string) => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          collectFiles(full);
+        } else if (entry.isFile() && (entry.name.endsWith('.html') || entry.name.endsWith('.htm'))) {
+          filesToRun.push(full);
+        }
+      }
+    };
+
     for (const filePattern of args) {
       const fullPath = path.resolve(process.cwd(), filePattern);
-      console.log(`Running WPT file: ${filePattern}`);
+      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+        collectFiles(fullPath);
+      } else {
+        filesToRun.push(fullPath);
+      }
+    }
+
+    for (const fullPath of filesToRun) {
+      const relPath = path.relative(process.cwd(), fullPath);
+      console.log(`Running WPT file: ${relPath}`);
       try {
         const result = runWptFile(fullPath);
         for (const testItem of result.tests) {
@@ -278,14 +321,10 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
             console.error(`  ✖ ${testItem.name.replace(/\n/g, '\\n')}`);
             console.error(err);
           }
-          // Yield to event loop for 10ms to allow GC, OS scheduling, and prevent system freeze
-          await new Promise(resolve => setTimeout(resolve, 10));
         }
         result.cleanup();
-        // Yield 10ms between files
-        await new Promise(resolve => setTimeout(resolve, 10));
       } catch (err) {
-        console.error(`Failed to run file ${filePattern}:`, err);
+        console.error(`Failed to run file ${relPath}:`, err);
         console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);
         process.exit(1);
       }

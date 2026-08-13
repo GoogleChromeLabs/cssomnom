@@ -20,14 +20,14 @@ import { CSSStyleSheet, CSSMediaRule, CSSNestedDeclarations, CSSStyleRule } from
 
 test('CSSGroupingRule: insertRule fallback to declaration', () => {
   const sheet = new CSSStyleSheet();
-  sheet.replaceSync('@media (width > 0px) {}');
-  const mediaRule = sheet.cssRules[0] as CSSMediaRule;
+  sheet.replaceSync('.container { @media (width > 0px) {} }');
+  const mediaRule = (sheet.cssRules[0] as CSSStyleRule).cssRules[0] as CSSMediaRule;
   
   // Traditional rule: works
   mediaRule.insertRule('div { color: blue; }', 0);
   assert.strictEqual(mediaRule.cssRules.length, 1);
   
-  // Declaration: should work (fallback to CSSNestedDeclarations)
+  // Declaration: should work (fallback to CSSNestedDeclarations in nested grouping rule)
   mediaRule.insertRule('color: red;', 1);
   assert.strictEqual(mediaRule.cssRules.length, 2);
   assert.ok(mediaRule.cssRules[1] instanceof CSSNestedDeclarations, 'Should be instance of CSSNestedDeclarations');

@@ -54,6 +54,7 @@ export interface DOMElement {
   prefix?: string | null;
   assignedNodes?(options?: { flatten?: boolean }): unknown[];
   contains?(other: unknown): boolean;
+  closest?(selector: string): DOMElement | null;
 }
 
 export function isElement(node: unknown): node is DOMElement {
@@ -71,11 +72,15 @@ function parseSelector(selector: string | ComplexSelector | SelectorList): Selec
     if (selector.type === 'selector-list') return selector;
     if (selector.type === 'complex-selector') return { type: 'selector-list', selectors: [selector] };
   }
-  const tokens = tokenize(selector);
-  const parser = new Parser(tokens);
-  const componentValues = parser.parseComponentValues();
-  const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false });
-  return selectorParser.parse();
+  try {
+    const tokens = tokenize(selector);
+    const parser = new Parser(tokens);
+    const componentValues = parser.parseComponentValues();
+    const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false });
+    return selectorParser.parse();
+  } catch {
+    return { type: 'selector-list', selectors: [] };
+  }
 }
 
 /**
@@ -283,8 +288,12 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       const selName = simple.name.toLowerCase();
       if (selName !== '*' && elLocal !== selName) return false;
       if (simple.namespace !== undefined && simple.namespace !== '*') {
+        const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
         if (simple.namespace === '') {
           if (element.namespaceURI && element.namespaceURI !== 'http://www.w3.org/1999/xhtml') return false;
+          if (isSvg) return false;
+        } else if (simple.namespace === 'svg') {
+          if (!isSvg && element.prefix !== 'svg' && element.namespaceURI !== 'http://www.w3.org/2000/svg') return false;
         } else {
           if (element.prefix !== simple.namespace && element.namespaceURI !== simple.namespace) return false;
         }
@@ -294,9 +303,14 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
 
     // selectors-4 § 5.2 #universal-selector
     case 'universal-selector': {
+      const elLocal = (element.localName || element.tagName || '').toLowerCase();
       if (simple.namespace !== undefined && simple.namespace !== '*') {
+        const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
         if (simple.namespace === '') {
           if (element.namespaceURI && element.namespaceURI !== 'http://www.w3.org/1999/xhtml') return false;
+          if (isSvg) return false;
+        } else if (simple.namespace === 'svg') {
+          if (!isSvg && element.prefix !== 'svg' && element.namespaceURI !== 'http://www.w3.org/2000/svg') return false;
         } else {
           if (element.prefix !== simple.namespace && element.namespaceURI !== simple.namespace) return false;
         }
@@ -336,7 +350,7 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
     }
 
     case 'pseudo-element-selector': {
-      return true;
+      return false;
     }
 
     default:
@@ -424,6 +438,11 @@ function isHTMLCaseInsensitiveAttribute(element: DOMElement, attrName: string): 
  */
 function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelector, scope?: DOMElement): boolean {
   const name = pseudo.name.toLowerCase();
+
+  // selectors-4 § 3.7 #legacy-pseudo-element-aliases
+  if (name === 'after' || name === 'before' || name === 'first-letter' || name === 'first-line') {
+    return false;
+  }
 
   // selectors-4 § 4.1 #forgiving-selector
   if (name === 'is' || name === 'where' || name === 'matches') {

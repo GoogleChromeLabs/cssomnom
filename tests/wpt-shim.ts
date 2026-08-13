@@ -6,7 +6,8 @@ import { getCascadedStyle } from '../src/cascade.ts';
 import { matches, querySelectorAll, querySelector } from '../src/matcher.ts';
 import { camelToDashed } from '../src/utils.ts';
 import { MediaParser } from '../src/MediaParser.ts';
-import type { MediaEnvironment } from '../src/types.ts';
+import { tokenize } from '../src/tokenizer.ts';
+import type { MediaEnvironment, Rule } from '../src/types.ts';
 
 export interface WptSandboxTest {
   type: 'setup' | 'test' | 'promise_test' | 'async_test';
@@ -94,11 +95,13 @@ type DocumentType = ReturnType<typeof parseHTML>['document'];
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 export const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
 
-import { DOMMatrixReadOnly, DOMMatrix } from '../src/DOMMatrix.ts';
+import { DOMMatrixReadOnly, DOMMatrix, DOMPointReadOnly, DOMPoint } from '../src/DOMMatrix.ts';
 import { unitToPixels, unitToRadians } from '../src/data/gen/units.ts';
 
 (globalThis as unknown as { DOMMatrixReadOnly: unknown }).DOMMatrixReadOnly = DOMMatrixReadOnly;
 (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrix;
+(globalThis as unknown as { DOMPointReadOnly: unknown }).DOMPointReadOnly = DOMPointReadOnly;
+(globalThis as unknown as { DOMPoint: unknown }).DOMPoint = DOMPoint;
 
 export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
   override get(property: string): TypedOM.CSSStyleValue | undefined {
@@ -468,8 +471,41 @@ export function patchWindowForTypedOM(window: WindowType) {
   }
 
   // Declarative cascade oracle for WPT test sandbox
-  win.getComputedStyle = function(element: Element) {
-    return getCascadedStyle(element);
+  win.getComputedStyle = function(element: Element, pseudoElt?: string | null) {
+    const liveDecl = new CSSStyleDeclaration([], true);
+    return new Proxy(liveDecl, {
+      get(_target, prop, _receiver) {
+        if (typeof prop === 'string') {
+          if (prop === 'getPropertyValue') {
+            return (p: string) => getCascadedStyle(element, undefined, pseudoElt).getPropertyValue(p);
+          }
+          if (prop === 'getPropertyPriority') {
+            return (p: string) => getCascadedStyle(element, undefined, pseudoElt).getPropertyPriority(p);
+          }
+          if (prop === 'getPropertyCSSValue') {
+            return (_p: string) => null;
+          }
+          if (prop === 'length') {
+            return getCascadedStyle(element, undefined, pseudoElt).length;
+          }
+          if (prop === 'item') {
+            return (i: number) => getCascadedStyle(element, undefined, pseudoElt).item(i);
+          }
+          if (prop === 'cssText') {
+            return getCascadedStyle(element, undefined, pseudoElt).cssText;
+          }
+          if (!isNaN(Number(prop))) {
+            return getCascadedStyle(element, undefined, pseudoElt).item(Number(prop));
+          }
+          const isCustom = prop.startsWith('--');
+          const cssProp = !isCustom && prop === 'cssFloat' ? 'float' : (!isCustom ? camelToDashed(prop) : prop);
+          const val = getCascadedStyle(element, undefined, pseudoElt).getPropertyValue(cssProp);
+          if (val === '' && cssProp === 'z-index') return 'auto';
+          return val;
+        }
+        return Reflect.get(_target, prop, _receiver);
+      }
+    });
   };
 
   // Mock window.matchMedia
@@ -965,8 +1001,56 @@ export function patchWindowForTypedOM(window: WindowType) {
     });
   }
 
+  // Normalize documentElement when document was parsed without an explicit <html> root
+  const winDoc = win.document as unknown as {
+    documentElement?: { tagName?: string };
+    createElement(tag: string): Element;
+    children?: Element[];
+    appendChild(el: Element): void;
+  } | undefined;
+  if (winDoc && winDoc.documentElement && winDoc.documentElement.tagName !== 'HTML') {
+    const htmlEl = winDoc.createElement('html');
+    const children = Array.from(winDoc.children || []);
+    for (const child of children) {
+      htmlEl.appendChild(child);
+    }
+    winDoc.appendChild(htmlEl);
+    Object.defineProperty(winDoc, 'documentElement', {
+      get() { return htmlEl; },
+      configurable: true
+    });
+  }
+
   const htmlStyleEl = win.HTMLStyleElement as { prototype: Record<string, unknown> } | undefined;
   if (htmlStyleEl) {
+    const winWithConstructors = win as unknown as { Node?: { prototype?: Record<string, unknown> }; Element?: { prototype?: Record<string, unknown> } };
+    const origTextContentDesc = Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'textContent') || (winWithConstructors.Node?.prototype ? Object.getOwnPropertyDescriptor(winWithConstructors.Node.prototype, 'textContent') : undefined);
+    const origInnerHTMLDesc = Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'innerHTML') || (winWithConstructors.Element?.prototype ? Object.getOwnPropertyDescriptor(winWithConstructors.Element.prototype, 'innerHTML') : undefined);
+
+    if (origTextContentDesc?.set) {
+      const origSet = origTextContentDesc.set;
+      Object.defineProperty(htmlStyleEl.prototype, 'textContent', {
+        ...origTextContentDesc,
+        set(this: { _sheet?: unknown; _sheetSource?: unknown }, val) {
+          this._sheet = null;
+          this._sheetSource = null;
+          return origSet.call(this, val);
+        }
+      });
+    }
+
+    if (origInnerHTMLDesc?.set) {
+      const origSet = origInnerHTMLDesc.set;
+      Object.defineProperty(htmlStyleEl.prototype, 'innerHTML', {
+        ...origInnerHTMLDesc,
+        set(this: { _sheet?: unknown; _sheetSource?: unknown }, val) {
+          this._sheet = null;
+          this._sheetSource = null;
+          return origSet.call(this, val);
+        }
+      });
+    }
+
     Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
       configurable: true,
       enumerable: true,
@@ -991,7 +1075,18 @@ export function patchWindowForTypedOM(window: WindowType) {
       enumerable: true,
       get() {
         if (!this._sheet) {
-          const sheet = CSSStyleSheet.createInternal([], parseRule);
+          let rules: Rule[] = [];
+          const href = this.getAttribute ? this.getAttribute('href') : null;
+          if (href) {
+            try {
+              const htmlDir = (this.ownerDocument as unknown as { _htmlDir?: string })?._htmlDir || process.cwd();
+              const fullPath = href.startsWith('/') ? path.join(process.cwd(), 'submodules/web-platform-tests', href) : path.resolve(htmlDir, href);
+              if (fs.existsSync(fullPath)) {
+                rules = parseStyleSheet(fs.readFileSync(fullPath, 'utf-8'));
+              }
+            } catch {}
+          }
+          const sheet = CSSStyleSheet.createInternal(rules, parseRule);
           Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
           this._sheet = sheet;
         }
@@ -1008,8 +1103,42 @@ class StyleSheetListImpl extends Array<CSSStyleSheet> {
 
 const styleToElement = new WeakMap<object, Element>();
 
+  const createAdoptedStyleSheetsAccessor = () => ({
+    get(this: { _adoptedStyleSheets?: CSSStyleSheet[] }) {
+      if (!this._adoptedStyleSheets) {
+        this._adoptedStyleSheets = [];
+      }
+      return this._adoptedStyleSheets;
+    },
+    set(this: { _adoptedStyleSheets?: CSSStyleSheet[], ownerDocument?: Document }, sheets: CSSStyleSheet[]) {
+      if (!sheets || typeof (sheets as unknown as Iterable<unknown>)[Symbol.iterator] !== 'function') {
+        throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
+      }
+      const arr = Array.from(sheets);
+      for (const s of arr) {
+        const sObj = s as unknown as { constructor?: { name?: string }; cssRules?: unknown; _isConstructed?: boolean; isConstructed?: boolean; ownerNode?: unknown; ownerRule?: unknown; _constructorDocument?: Document };
+        const isSheet = s instanceof CSSStyleSheet || (sObj && typeof sObj === 'object' && (sObj.constructor?.name === 'CSSStyleSheet' || 'cssRules' in sObj));
+        if (!isSheet) {
+          throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
+        }
+        if (!sObj._isConstructed && !sObj.isConstructed && (sObj.ownerNode || sObj.ownerRule)) {
+          throw new DOMException('Failed to set adoptedStyleSheets: member of list is not a constructed stylesheet', 'NotAllowedError');
+        }
+        const sheetDoc = sObj._constructorDocument;
+        const targetDoc = (this instanceof (win.Document as unknown as { new(): Document }) ? this : this.ownerDocument) as Document | undefined;
+        if ((sheetDoc && targetDoc && sheetDoc !== targetDoc) || (win.CSSStyleSheet && sObj.constructor !== win.CSSStyleSheet && sObj.constructor?.name === 'CSSStyleSheet')) {
+          throw new DOMException('Failed to set adoptedStyleSheets: stylesheet was constructed in a different document', 'NotAllowedError');
+        }
+      }
+      this._adoptedStyleSheets = arr;
+    },
+    configurable: true,
+    enumerable: true
+  });
+
   const documentConstructor = win.Document as { prototype: Record<string, unknown> } | undefined;
   if (documentConstructor) {
+    Object.defineProperty(documentConstructor.prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
     Object.defineProperty(documentConstructor.prototype, 'styleSheets', {
       get(this: Document) {
         const styles = Array.from(this.querySelectorAll('style'));
@@ -1046,6 +1175,42 @@ const styleToElement = new WeakMap<object, Element>();
       },
       configurable: true
     });
+
+    if (!('caretRangeFromPoint' in documentConstructor.prototype)) {
+      documentConstructor.prototype.caretRangeFromPoint = function(_x: number, _y: number) {
+        return null;
+      };
+    }
+    if (!('caretPositionFromPoint' in documentConstructor.prototype)) {
+      documentConstructor.prototype.caretPositionFromPoint = function(_x: number, _y: number) {
+        return null;
+      };
+    }
+  }
+
+  const shadowRootConstructor = (win.ShadowRoot || win.DocumentFragment) as { prototype: Record<string, unknown> } | undefined;
+  if (shadowRootConstructor) {
+    Object.defineProperty(shadowRootConstructor.prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
+    Object.defineProperty(shadowRootConstructor.prototype, 'styleSheets', {
+      get(this: DocumentFragment) {
+        const styles = Array.from(this.querySelectorAll('style'));
+        const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
+        
+        const list = new StyleSheetListImpl();
+        for (const styleEl of styles) {
+          if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
+            list.push(styleEl.sheet as unknown as CSSStyleSheet);
+          }
+        }
+        for (const linkEl of links) {
+          if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
+            list.push(linkEl.sheet as unknown as CSSStyleSheet);
+          }
+        }
+        return list;
+      },
+      configurable: true
+    });
   }
 
   if (window.Element && window.Element.prototype) {
@@ -1053,6 +1218,7 @@ const styleToElement = new WeakMap<object, Element>();
       matches: (s: string) => boolean;
       querySelectorAll: (s: string) => unknown;
       querySelector: (s: string) => unknown;
+      setHTMLUnsafe?: (html: string) => void;
     };
     elProto.matches = function(this: Element, selector: string) {
       return matches(this, selector);
@@ -1063,6 +1229,11 @@ const styleToElement = new WeakMap<object, Element>();
     elProto.querySelector = function(this: Element, selector: string) {
       return querySelector(this, selector);
     };
+    if (!elProto.setHTMLUnsafe) {
+      elProto.setHTMLUnsafe = function(this: Element, html: string) {
+        this.innerHTML = html;
+      };
+    }
   }
   if (window.Document && window.Document.prototype) {
     const docProto = window.Document.prototype as unknown as {
@@ -1171,20 +1342,91 @@ const styleToElement = new WeakMap<object, Element>();
     const origGet = declProto.getPropertyValue as (name: string) => string;
     const origSet = declProto.setProperty as (name: string, value: string | null, priority?: string) => void;
     const origRemove = declProto.removeProperty as (name: string) => string;
+    const origCssTextDesc = Object.getOwnPropertyDescriptor(declProto, 'cssText');
+
+    Object.defineProperty(declProto, 'cssText', {
+      get(this: unknown) {
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym] as Map<string | symbol, string>;
+          if (map && typeof (map as { entries?: unknown }).entries === 'function') {
+            const entries: string[] = [];
+            for (const [k, v] of map.entries()) {
+              if (typeof k === 'string' && typeof v === 'string') {
+                entries.push(`${k}: ${v}`);
+              }
+            }
+            if (entries.length > 0) {
+              return entries.join('; ') + ';';
+            }
+          }
+        }
+        const raw = origCssTextDesc?.get ? origCssTextDesc.get.call(this) : '';
+        return raw;
+      },
+      set(this: unknown, val: string) {
+        if (origCssTextDesc?.set) {
+          origCssTextDesc.set.call(this, val);
+        }
+        const sym = getPrivateSymbol(this);
+        if (sym && sym in (this as Record<symbol, unknown>)) {
+          const map = (this as Record<symbol, unknown>)[sym] as Map<string | symbol, string>;
+          if (map && typeof map.clear === 'function') {
+            map.clear();
+            const d = new CSSStyleDeclaration();
+            d.cssText = val;
+            const seen = new Set<string>();
+            for (let i = 0; i < d.length; i++) {
+              const name = d.item(i);
+              if (seen.has(name)) continue;
+              seen.add(name);
+              const v = d.getPropertyValue(name);
+              const p = d.getPropertyPriority(name);
+              map.set(name, p === 'important' ? `${v} !important` : v);
+            }
+          }
+        }
+        const el = styleToElement.get(this as object);
+        if (el && typeof el.setAttribute === 'function') {
+          if (val) {
+            el.setAttribute('style', val);
+          } else {
+            el.removeAttribute('style');
+          }
+        }
+      },
+      configurable: true,
+      enumerable: true
+    });
 
     declProto.getPropertyValue = function (this: unknown, name: string) {
       if (name.startsWith('--')) {
+        if (!ParseHooks.isValidDashedIdent(name)) {
+          return '';
+        }
         void (this as { cssText?: string }).cssText;
         const sym = getPrivateSymbol(this);
         if (sym && sym in (this as Record<symbol, unknown>)) {
           const map = (this as Record<symbol, unknown>)[sym];
           if (map && typeof (map as { get?: unknown }).get === 'function') {
-            const val = (map as { get: (k: string) => unknown }).get(name);
-            if (typeof val === 'string') {
-              return val;
+            const hasProp = typeof (map as { has?: unknown }).has === 'function' ? (map as { has: (k: string) => boolean }).has(name) : false;
+            if (hasProp) {
+              const rawVal = (map as { get: (k: string) => unknown }).get(name);
+              if (typeof rawVal === 'string') {
+                const cleaned = rawVal.replace(/\s*!important\s*$/i, '').trim();
+                if (cleaned === '') {
+                  return ' ';
+                }
+                return cleaned;
+              }
+              return ' ';
             }
           }
         }
+        return '';
+      }
+      if (name.startsWith('-')) {
+        return '';
       }
       const val = origGet.call(this, name);
       if (typeof val === 'string' && val.startsWith('url(') && !val.endsWith(')')) {
@@ -1197,6 +1439,13 @@ const styleToElement = new WeakMap<object, Element>();
       if (value === null || value === undefined || value === '') {
         (this as { removeProperty: (k: string) => string }).removeProperty(name);
         return;
+      }
+      if (typeof value === 'string' && value.includes('var(')) {
+        const tokens = tokenize(value);
+        const comp = ParseHooks.parseComponentValues(tokens);
+        if (!ParseHooks.validateDeclarationValue(comp)) {
+          return;
+        }
       }
       if (name.startsWith('--')) {
         if (!ParseHooks.isValidDashedIdent(name)) {
@@ -1226,7 +1475,14 @@ const styleToElement = new WeakMap<object, Element>();
           }
         }
       }
-      return origSet.call(this, name, value, priority);
+      origSet.call(this, name, value, priority);
+      const el = styleToElement.get(this as object);
+      if (el && typeof el.setAttribute === 'function') {
+        const text = (this as { cssText?: string }).cssText;
+        if (text) {
+          el.setAttribute('style', text);
+        }
+      }
     };
 
     declProto.removeProperty = function (this: unknown, name: string) {
@@ -1252,7 +1508,13 @@ const styleToElement = new WeakMap<object, Element>();
           }
         }
       }
-      return origRemove.call(this, name);
+      const res = origRemove.call(this, name);
+      const el = styleToElement.get(this as object);
+      if (el && typeof el.setAttribute === 'function') {
+        const text = (this as { cssText?: string }).cssText;
+        el.setAttribute('style', text || '');
+      }
+      return res;
     };
 
     const origGetPriority = declProto.getPropertyPriority as ((name: string) => string) | undefined;
@@ -1267,6 +1529,10 @@ const styleToElement = new WeakMap<object, Element>();
         return decl.getPropertyPriority(name);
       }
       return '';
+    };
+
+    declProto.getPropertyCSSValue = function (_name: string) {
+      return null;
     };
 
     const declProtoWithSymbols = declProto as Record<string | symbol, unknown>;
@@ -1400,6 +1666,34 @@ export function createWptContext(
     DOMException: (window as { DOMException?: unknown }).DOMException,
     Event: (window as { Event?: unknown }).Event,
     CustomEvent: (window as { CustomEvent?: unknown }).CustomEvent,
+    Range: (window as { Range?: unknown }).Range || (globalThis as { Range?: unknown }).Range || class Range {
+      startContainer: unknown = null;
+      startOffset = 0;
+      endContainer: unknown = null;
+      endOffset = 0;
+      collapsed = true;
+      commonAncestorContainer: unknown = null;
+      setStart() {}
+      setEnd() {}
+      collapse() {}
+      selectNode() {}
+      selectNodeContents() {}
+      compareBoundaryPoints() { return 0; }
+      deleteContents() {}
+      extractContents() { return null; }
+      cloneContents() { return null; }
+      insertNode() {}
+      surroundContents() {}
+      cloneRange() { return this; }
+      detach() {}
+      isPointInRange() { return true; }
+      comparePoint() { return 0; }
+      intersectsNode() { return true; }
+      getBoundingClientRect() { return { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 }; }
+      getClientRects() { return []; }
+      createContextualFragment() { return null; }
+    },
+    MutationObserver: (window as { MutationObserver?: unknown }).MutationObserver || (globalThis as { MutationObserver?: unknown }).MutationObserver || class MutationObserver { constructor(_cb: Function) {} observe() {} disconnect() {} takeRecords() { return []; } },
     navigator: (window as { __navigator?: unknown }).__navigator || { preferences: createNavigatorPreferences() },
     location: (window as { location?: unknown }).location || { href: 'http://localhost/test.html', origin: 'http://localhost' },
     ...Object.fromEntries(Object.entries(TypedOM).filter(([k]) => k !== 'CSSPositionValue')),
@@ -1572,8 +1866,18 @@ export function createWptContext(
       return acc;
     }, {}) : {}),
     
-    test: (fn: Function, name?: string) => {
-      const testName = get_test_name(fn, name, 'anonymous-test', tests);
+    test: (func_or_name: Function | string, name?: string | Function) => {
+      let fn: Function | null = null;
+      let testName = 'anonymous-test';
+      if (typeof func_or_name === 'function') {
+        fn = func_or_name;
+        testName = get_test_name(fn, typeof name === 'string' ? name : undefined, 'anonymous-test', tests);
+      } else if (typeof func_or_name === 'string') {
+        testName = func_or_name;
+        if (typeof name === 'function') {
+          fn = name;
+        }
+      }
       if (ctx.harnessCompleted || ctx.harnessAborted) {
         tests.push({
           type: 'test',
@@ -1609,22 +1913,43 @@ export function createWptContext(
             }
           }, delay);
         },
+        step_func: (stepFn?: Function) => {
+          return function(this: unknown, ...args: unknown[]) {
+            if (typeof stepFn === 'function') {
+              return stepFn.apply(this, args);
+            }
+          };
+        },
+        step_func_done: (stepFn?: Function) => {
+          return function(this: unknown, ...args: unknown[]) {
+            if (typeof stepFn === 'function') {
+              stepFn.apply(this, args);
+            }
+          };
+        },
+        unreached_func: (description?: string) => {
+          return function() {
+            assert.fail(`Unreached function called: ${description || 'unreached'}`);
+          };
+        },
         done: () => {}
       };
 
-      try {
-        returnValue = fn(testObj);
-      } catch (err: unknown) {
-        status = 1; // FAIL
-        message = messageOf(err);
-      } finally {
-        for (const cleanFn of cleanups) {
-          try {
-            cleanFn();
-          } catch (cleanErr: unknown) {
-            ctx.harnessErrorStatus = 1;
-            ctx.harnessErrorMessage = messageOf(cleanErr);
-            ctx.harnessCompleted = true;
+      if (fn) {
+        try {
+          returnValue = fn.call(testObj, testObj);
+        } catch (err: unknown) {
+          status = 1; // FAIL
+          message = messageOf(err);
+        } finally {
+          for (const cleanFn of cleanups) {
+            try {
+              cleanFn();
+            } catch (cleanErr: unknown) {
+              ctx.harnessErrorStatus = 1;
+              ctx.harnessErrorMessage = messageOf(cleanErr);
+              ctx.harnessCompleted = true;
+            }
           }
         }
       }
@@ -1670,8 +1995,18 @@ export function createWptContext(
         cleanups: []
       });
     },
-    async_test: (fn: Function, name?: string) => {
-      const testName = get_test_name(fn, name, 'anonymous-test', tests);
+    async_test: (func_or_name?: Function | string, name?: string | Function) => {
+      let fn: Function | null = null;
+      let testName = 'anonymous-test';
+      if (typeof func_or_name === 'function') {
+        fn = func_or_name;
+        testName = get_test_name(fn, typeof name === 'string' ? name : undefined, 'anonymous-test', tests);
+      } else if (typeof func_or_name === 'string') {
+        testName = func_or_name;
+        if (typeof name === 'function') {
+          fn = name;
+        }
+      }
       if (ctx.harnessCompleted || ctx.harnessAborted) {
         tests.push({
           type: 'async_test',
@@ -1759,20 +2094,27 @@ export function createWptContext(
             testObj.cleanups = [];
           }
           testObj.cleanups.push(cleanFn);
+        },
+        unreached_func: (description?: string) => {
+          return function() {
+            assert.fail(`Unreached function called: ${description || 'unreached'}`);
+          };
         }
       };
 
       let returnValue: unknown;
-      try {
-        returnValue = fn(tObj);
-      } catch (err: unknown) {
-        if (err instanceof HarnessError || (err && typeof err === 'object' && 'name' in err && (err as Record<string, unknown>).name === 'HarnessError')) {
-          throw err;
-        }
-        testObj.status = 1; // FAIL
-        testObj.message = messageOf(err);
-        if (testObj.resolve) {
-          testObj.resolve();
+      if (fn) {
+        try {
+          returnValue = fn.call(tObj, tObj);
+        } catch (err: unknown) {
+          if (err instanceof HarnessError || (err && typeof err === 'object' && 'name' in err && (err as Record<string, unknown>).name === 'HarnessError')) {
+            throw err;
+          }
+          testObj.status = 1; // FAIL
+          testObj.message = messageOf(err);
+          if (testObj.resolve) {
+            testObj.resolve();
+          }
         }
       }
 
@@ -1794,6 +2136,15 @@ export function createWptContext(
     },
     assert_not_equals: (actual: unknown, expected: unknown, message?: string) => {
       assert.notStrictEqual(actual, expected, message ?? '');
+    },
+    assert_regexp_match: (actual: string, regexp: RegExp, description?: string) => {
+      if (!regexp.test(actual)) {
+        throw new AssertionErrorProxy({
+          message: `${description || 'assert_regexp_match'}: expected ${JSON.stringify(actual)} to match ${regexp}`,
+          actual,
+          expected: regexp
+        });
+      }
     },
     assert_throws_exactly: (expected: unknown, func: () => void, description?: string) => {
       try {

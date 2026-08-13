@@ -114,9 +114,10 @@ describe('Readonly properties', () => {
 
   it('should make CSSSupportsRule conditionText readonly', () => {
     const rule = new CSSSupportsRule('condition', [], () => ({} as unknown as Rule));
-    // @ts-expect-error - conditionText should be readonly
-    rule.conditionText = 'foo';
-    assert.ok(true);
+    assert.throws(() => {
+      // @ts-expect-error - conditionText should be readonly
+      rule.conditionText = 'foo';
+    }, TypeError);
   });
 
   it('should make CSSContainerRule containerQuery readonly', () => {

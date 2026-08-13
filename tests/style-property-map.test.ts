@@ -145,20 +145,24 @@ describe('StylePropertyMap', () => {
 
     // 1. keys() iterator
     const keys = Array.from(map.keys());
-    assert.deepStrictEqual(keys, ['color', 'margin-top', 'margin-bottom']);
+    assert.deepStrictEqual(keys, ['color', 'margin-bottom', 'margin-top']);
 
     // 2. values() iterator
     const values = Array.from(map.values());
     assert.strictEqual(values.length, 3);
     assert.strictEqual(values[0][0].toString(), 'red');
-    assert.strictEqual(values[1][0].toString(), '10px');
-    assert.strictEqual(values[2][0].toString(), '15px');
+    assert.strictEqual(values[1][0].toString(), '15px');
+    assert.strictEqual(values[2][0].toString(), '10px');
 
     // 3. entries() iterator
     const entries = Array.from(map.entries());
     assert.strictEqual(entries.length, 3);
     assert.deepStrictEqual(entries[0][0], 'color');
     assert.strictEqual(entries[0][1][0].toString(), 'red');
+    assert.deepStrictEqual(entries[1][0], 'margin-bottom');
+    assert.strictEqual(entries[1][1][0].toString(), '15px');
+    assert.deepStrictEqual(entries[2][0], 'margin-top');
+    assert.strictEqual(entries[2][1][0].toString(), '10px');
 
     // 4. Symbol.iterator
     const iterableEntries = Array.from(map);
@@ -173,8 +177,8 @@ describe('StylePropertyMap', () => {
     });
     assert.deepStrictEqual(iterated, [
       ['color', 'red'],
-      ['margin-top', '10px'],
-      ['margin-bottom', '15px']
+      ['margin-bottom', '15px'],
+      ['margin-top', '10px']
     ]);
   });
 

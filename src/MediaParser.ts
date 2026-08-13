@@ -141,7 +141,7 @@ export class MediaParser {
       } else if (v.type === 'function') {
         const fn = v as CSSFunction;
         const mathVal = parseMathFunction(fn.name, fn.value);
-        if (mathVal) {
+        if (mathVal && fn.name.toLowerCase() === 'calc') {
           const simp = simplify(mathVal);
           if (simp instanceof CSSUnitValue) {
             let val = simp;

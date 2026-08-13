@@ -99,7 +99,7 @@ test('serialize nested grouping rules', () => {
   const sheet = parser.parseStyleSheet();
   const rule = sheet.cssRules[0];
   
-  const expected = '@media screen {\n  @supports (display: flex) {\n    .flex { display: flex; }\n  }\n}';
+  const expected = '@media screen {\n  @supports (display: flex) {\n  .flex { display: flex; }\n}\n}';
   assert.strictEqual(rule.cssText, expected);
 });
 

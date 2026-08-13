@@ -18,21 +18,21 @@
 // Normative specifications:
 // Geometry APIs: https://drafts.fxtf.org/geometry/#dommatrix
 
-function multiplyArrays(a: Float64Array, b: Float64Array): Float64Array {
-  const out = new Float64Array(16);
-  for (let r = 0; r < 4; r++) {
-    for (let c = 0; c < 4; c++) {
-      let sum = 0;
-      for (let k = 0; k < 4; k++) {
-        sum += a[r * 4 + k] * b[k * 4 + c];
-      }
-      out[r * 4 + c] = sum;
+import { degToRad, angleFromVector } from './utils.ts';
+
+// 4x4 matrix multiplication writing into destination array
+export function multiplyArrays(a: Float64Array, b: Float64Array, out: Float64Array = new Float64Array(16)): Float64Array {
+  const res = out === a || out === b ? new Float64Array(16) : out;
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      res[i * 4 + j] = a[i * 4] * b[j] + a[i * 4 + 1] * b[4 + j] + a[i * 4 + 2] * b[8 + j] + a[i * 4 + 3] * b[12 + j];
     }
   }
+  if (res !== out) out.set(res);
   return out;
 }
 
-function transpose(m: Float64Array | Float32Array | number[]): Float64Array {
+export function transpose(m: Float64Array | Float32Array | number[]): Float64Array {
   const out = new Float64Array(16);
   out[0] = m[0];   out[1] = m[4];   out[2] = m[8];   out[3] = m[12];
   out[4] = m[1];   out[5] = m[5];   out[6] = m[9];   out[7] = m[13];
@@ -41,115 +41,44 @@ function transpose(m: Float64Array | Float32Array | number[]): Float64Array {
   return out;
 }
 
-function getRz(deg: number): Float64Array {
-  const rad = deg * Math.PI / 180;
-  const c = Math.cos(rad);
-  const s = Math.sin(rad);
-  return new Float64Array([
-    c, s, 0, 0,
-    -s, c, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1
-  ]);
-}
+export function invertMatrix(m: Float64Array): { success: boolean; result: Float64Array } {
+  const s0 = m[0] * m[5] - m[1] * m[4], s1 = m[0] * m[6] - m[2] * m[4], s2 = m[0] * m[7] - m[3] * m[4];
+  const s3 = m[1] * m[6] - m[2] * m[5], s4 = m[1] * m[7] - m[3] * m[5], s5 = m[2] * m[7] - m[3] * m[6];
+  const c0 = m[8] * m[13] - m[9] * m[12], c1 = m[8] * m[14] - m[10] * m[12], c2 = m[8] * m[15] - m[11] * m[12];
+  const c3 = m[9] * m[14] - m[10] * m[13], c4 = m[9] * m[15] - m[11] * m[13], c5 = m[10] * m[15] - m[11] * m[14];
 
-function getRy(deg: number): Float64Array {
-  const rad = deg * Math.PI / 180;
-  const c = Math.cos(rad);
-  const s = Math.sin(rad);
-  return new Float64Array([
-    c, 0, -s, 0,
-    0, 1, 0, 0,
-    s, 0, c, 0,
-    0, 0, 0, 1
-  ]);
-}
-
-function getRx(deg: number): Float64Array {
-  const rad = deg * Math.PI / 180;
-  const c = Math.cos(rad);
-  const s = Math.sin(rad);
-  return new Float64Array([
-    1, 0, 0, 0,
-    0, c, s, 0,
-    0, -s, c, 0,
-    0, 0, 0, 1
-  ]);
-}
-
-function invertMatrix(M: Float64Array): { success: boolean; result: Float64Array } {
-  const out = new Float64Array(16);
-  const m11 = M[0], m12 = M[1], m13 = M[2], m14 = M[3];
-  const m21 = M[4], m22 = M[5], m23 = M[6], m24 = M[7];
-  const m31 = M[8], m32 = M[9], m33 = M[10], m34 = M[11];
-  const m41 = M[12], m42 = M[13], m43 = M[14], m44 = M[15];
-
-  // Row 1 cofactors
-  const c11 = m22 * (m33 * m44 - m43 * m34) - m32 * (m23 * m44 - m43 * m24) + m42 * (m23 * m34 - m33 * m24);
-  const c12 = -(m12 * (m33 * m44 - m43 * m34) - m32 * (m13 * m44 - m43 * m14) + m42 * (m13 * m34 - m33 * m14));
-  const c13 = m12 * (m23 * m44 - m43 * m24) - m22 * (m13 * m44 - m43 * m14) + m42 * (m13 * m24 - m23 * m14);
-  const c14 = -(m12 * (m23 * m34 - m33 * m24) - m22 * (m13 * m34 - m33 * m14) + m32 * (m13 * m24 - m23 * m14));
-
-  // Determinant
-  const det = m11 * c11 + m21 * c12 + m31 * c13 + m41 * c14;
-
-  if (det === 0) {
-    const nanResult = new Float64Array(16);
-    nanResult.fill(NaN);
-    return { success: false, result: nanResult };
+  const det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
+  if (!Number.isFinite(det) || det === 0) {
+    return { success: false, result: new Float64Array(16).fill(NaN) };
   }
+  const invDet = 1 / det;
+  const out = new Float64Array(16);
 
-  const detInv = 1 / det;
+  out[0] = ( m[5] * c5 - m[6] * c4 + m[7] * c3) * invDet;
+  out[1] = (-m[1] * c5 + m[2] * c4 - m[3] * c3) * invDet;
+  out[2] = ( m[13] * s5 - m[14] * s4 + m[15] * s3) * invDet;
+  out[3] = (-m[9] * s5 + m[10] * s4 - m[11] * s3) * invDet;
 
-  // Assign Row 1 cofactors to Column 1 of output
-  out[0] = c11 * detInv;
-  out[1] = c12 * detInv;
-  out[2] = c13 * detInv;
-  out[3] = c14 * detInv;
+  out[4] = (-m[4] * c5 + m[6] * c2 - m[7] * c1) * invDet;
+  out[5] = ( m[0] * c5 - m[2] * c2 + m[3] * c1) * invDet;
+  out[6] = (-m[12] * s5 + m[14] * s2 - m[15] * s1) * invDet;
+  out[7] = ( m[8] * s5 - m[10] * s2 + m[11] * s1) * invDet;
 
-  // Row 2 cofactors
-  const c21 = -(m21 * (m33 * m44 - m43 * m34) - m31 * (m23 * m44 - m43 * m24) + m41 * (m23 * m34 - m33 * m24));
-  const c22 = m11 * (m33 * m44 - m43 * m34) - m31 * (m13 * m44 - m43 * m14) + m41 * (m13 * m34 - m33 * m14);
-  const c23 = -(m11 * (m23 * m44 - m43 * m24) - m21 * (m13 * m44 - m43 * m14) + m41 * (m13 * m24 - m23 * m14));
-  const c24 = m11 * (m23 * m34 - m33 * m24) - m21 * (m13 * m34 - m33 * m14) + m31 * (m13 * m24 - m23 * m14);
+  out[8] = ( m[4] * c4 - m[5] * c2 + m[7] * c0) * invDet;
+  out[9] = (-m[0] * c4 + m[1] * c2 - m[3] * c0) * invDet;
+  out[10] = ( m[12] * s4 - m[13] * s2 + m[15] * s0) * invDet;
+  out[11] = (-m[8] * s4 + m[9] * s2 - m[11] * s0) * invDet;
 
-  // Assign Row 2 cofactors to Column 2 of output
-  out[4] = c21 * detInv;
-  out[5] = c22 * detInv;
-  out[6] = c23 * detInv;
-  out[7] = c24 * detInv;
-
-  // Row 3 cofactors
-  const c31 = m21 * (m32 * m44 - m42 * m34) - m31 * (m22 * m44 - m42 * m24) + m41 * (m22 * m34 - m32 * m24);
-  const c32 = -(m11 * (m32 * m44 - m42 * m34) - m31 * (m12 * m44 - m42 * m14) + m41 * (m12 * m34 - m32 * m14));
-  const c33 = m11 * (m22 * m44 - m42 * m24) - m21 * (m12 * m44 - m42 * m14) + m41 * (m12 * m24 - m22 * m14);
-  const c34 = -(m11 * (m22 * m34 - m32 * m24) - m21 * (m12 * m34 - m32 * m14) + m31 * (m12 * m24 - m22 * m14));
-
-  // Assign Row 3 cofactors to Column 3 of output
-  out[8] = c31 * detInv;
-  out[9] = c32 * detInv;
-  out[10] = c33 * detInv;
-  out[11] = c34 * detInv;
-
-  // Row 4 cofactors
-  const c41 = -(m21 * (m32 * m43 - m42 * m33) - m31 * (m22 * m43 - m42 * m23) + m41 * (m22 * m33 - m32 * m23));
-  const c42 = m11 * (m32 * m43 - m42 * m33) - m31 * (m12 * m43 - m42 * m13) + m41 * (m12 * m33 - m32 * m13);
-  const c43 = -(m11 * (m22 * m43 - m42 * m23) - m21 * (m12 * m43 - m42 * m13) + m41 * (m12 * m23 - m22 * m13));
-  const c44 = m11 * (m22 * m33 - m32 * m23) - m21 * (m12 * m33 - m32 * m13) + m31 * (m12 * m23 - m22 * m13);
-
-  // Assign Row 4 cofactors to Column 4 of output
-  out[12] = c41 * detInv;
-  out[13] = c42 * detInv;
-  out[14] = c43 * detInv;
-  out[15] = c44 * detInv;
+  out[12] = (-m[4] * c3 + m[5] * c1 - m[6] * c0) * invDet;
+  out[13] = ( m[0] * c3 - m[1] * c1 + m[2] * c0) * invDet;
+  out[14] = (-m[12] * s3 + m[13] * s1 - m[14] * s0) * invDet;
+  out[15] = ( m[8] * s3 - m[9] * s1 + m[10] * s0) * invDet;
 
   return { success: true, result: out };
 }
 
-function parseMatrixString(str: string): { is2D: boolean; values: Float64Array } {
-  const clean = str.trim().replace(/\s+/g, ' ');
-  
-  if (clean === '' || clean.toLowerCase() === 'none') {
+function parseIdentityOrNone(str: string): { is2D: boolean; values: Float64Array } | null {
+  if (str === '' || str.toLowerCase() === 'none') {
     const values = new Float64Array(16);
     values[0] = 1;
     values[5] = 1;
@@ -157,51 +86,63 @@ function parseMatrixString(str: string): { is2D: boolean; values: Float64Array }
     values[15] = 1;
     return { is2D: true, values };
   }
-  
-  const matrixMatch = clean.match(/^matrix\(([^)]+)\)$/i);
-  if (matrixMatch) {
-    const parts = matrixMatch[1].split(/[\s,]+/).filter(Boolean);
-    if (parts.length === 6) {
-      const numbers = parts.map(Number);
-      if (numbers.some(isNaN)) {
-        throw new DOMException(`Invalid matrix values in string: "${str}"`, 'SyntaxError');
-      }
-      const values = new Float64Array(16);
-      values[0] = numbers[0]; // a
-      values[1] = numbers[1]; // b
-      values[2] = 0;
-      values[3] = 0;
-      values[4] = numbers[2]; // c
-      values[5] = numbers[3]; // d
-      values[6] = 0;
-      values[7] = 0;
-      values[8] = 0;
-      values[9] = 0;
-      values[10] = 1;         // m33
-      values[11] = 0;
-      values[12] = numbers[4]; // e
-      values[13] = numbers[5]; // f
-      values[14] = 0;
-      values[15] = 1;         // m44
-      return { is2D: true, values };
-    }
-  }
+  return null;
+}
 
-  const matrix3dMatch = clean.match(/^matrix3d\(([^)]+)\)$/i);
-  if (matrix3dMatch) {
-    const parts = matrix3dMatch[1].split(/[\s,]+/).filter(Boolean);
-    if (parts.length === 16) {
-      const numbers = parts.map(Number);
-      if (numbers.some(isNaN)) {
-        throw new DOMException(`Invalid matrix3d values in string: "${str}"`, 'SyntaxError');
-      }
-      return { is2D: false, values: new Float64Array(numbers) };
-    }
+function parseMatrix2D(str: string): { is2D: boolean; values: Float64Array } | null {
+  const match = str.match(/^matrix\(([^)]+)\)$/i);
+  if (!match) return null;
+  const parts = match[1].split(/[\s,]+/).filter(Boolean);
+  if (parts.length !== 6) return null;
+  const numbers = parts.map(Number);
+  if (numbers.some(isNaN)) {
+    throw new DOMException(`Invalid matrix values in string: "${str}"`, 'SyntaxError');
   }
+  const values = new Float64Array(16);
+  values[0] = numbers[0];  // a (m11)
+  values[1] = numbers[1];  // b (m12)
+  values[4] = numbers[2];  // c (m21)
+  values[5] = numbers[3];  // d (m22)
+  values[10] = 1;          // m33
+  values[12] = numbers[4]; // e (m41)
+  values[13] = numbers[5]; // f (m42)
+  values[15] = 1;          // m44
+  return { is2D: true, values };
+}
 
+function parseMatrix3D(str: string): { is2D: boolean; values: Float64Array } | null {
+  const match = str.match(/^matrix3d\(([^)]+)\)$/i);
+  if (!match) return null;
+  const parts = match[1].split(/[\s,]+/).filter(Boolean);
+  if (parts.length !== 16) return null;
+  const numbers = parts.map(Number);
+  if (numbers.some(isNaN)) {
+    throw new DOMException(`Invalid matrix3d values in string: "${str}"`, 'SyntaxError');
+  }
+  return { is2D: false, values: new Float64Array(numbers) };
+}
+
+function parseTransformHook(str: string): { is2D: boolean; values: Float64Array } | null {
   if (parseTransformListHook) {
     return parseTransformListHook(str);
   }
+  return null;
+}
+
+function parseMatrixString(str: string): { is2D: boolean; values: Float64Array } {
+  const clean = str.trim().replace(/\s+/g, ' ');
+  
+  const identity = parseIdentityOrNone(clean);
+  if (identity) return identity;
+
+  const m2d = parseMatrix2D(clean);
+  if (m2d) return m2d;
+
+  const m3d = parseMatrix3D(clean);
+  if (m3d) return m3d;
+
+  const fromHook = parseTransformHook(clean);
+  if (fromHook) return fromHook;
 
   throw new DOMException(`Failed to parse DOMMatrix string: "${str}"`, 'SyntaxError');
 }
@@ -260,7 +201,7 @@ export class DOMPoint extends DOMPointReadOnly {
   }
 }
 
-interface DOMMatrixInit {
+export interface DOMMatrixInit {
   a?: number; b?: number; c?: number; d?: number; e?: number; f?: number;
   m11?: number; m12?: number; m13?: number; m14?: number;
   m21?: number; m22?: number; m23?: number; m24?: number;
@@ -268,6 +209,36 @@ interface DOMMatrixInit {
   m41?: number; m42?: number; m43?: number; m44?: number;
   is2D?: boolean;
   toFloat64Array?: () => number[] | Float64Array;
+}
+
+const NON_2D_INDICES: [number, number][] = [
+  [2, 0], [3, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 1], [11, 0], [14, 0], [15, 1]
+];
+const NON_2D_KEYS: [keyof DOMMatrixInit, number][] = [
+  ['m13', 0], ['m14', 0], ['m23', 0], ['m24', 0], ['m31', 0], ['m32', 0], ['m33', 1], ['m34', 0], ['m43', 0], ['m44', 1]
+];
+const ALIASES: [keyof DOMMatrixInit, keyof DOMMatrixInit][] = [
+  ['a', 'm11'], ['b', 'm12'], ['c', 'm21'], ['d', 'm22'], ['e', 'm41'], ['f', 'm42']
+];
+
+export function has3DComponents(init: DOMMatrixInit | DOMMatrixReadOnly | Float64Array | Float32Array | number[]): boolean {
+  if (init instanceof DOMMatrixReadOnly) return !init.is2D;
+  if (init instanceof Float64Array || init instanceof Float32Array || Array.isArray(init)) {
+    if (init.length === 6) return false;
+    if (init.length === 16) {
+      return NON_2D_INDICES.some(([idx, expected]) => init[idx] !== expected);
+    }
+    return true;
+  }
+  return NON_2D_KEYS.some(([k, expected]) => init[k] !== undefined && init[k] !== expected);
+}
+
+function validateMatrixInitAliases(dict: DOMMatrixInit): void {
+  for (const [k2d, k3d] of ALIASES) {
+    if (dict[k2d] !== undefined && dict[k3d] !== undefined && dict[k2d] !== dict[k3d]) {
+      throw new TypeError(`DOMMatrixInit: conflicting "${k2d}" and "${k3d}" values`);
+    }
+  }
 }
 
 function parseMatrixInit(init: unknown): { is2D: boolean; values: Float64Array } {
@@ -283,19 +254,8 @@ function parseMatrixInit(init: unknown): { is2D: boolean; values: Float64Array }
     return { is2D: dict.is2D ?? true, values: transpose(arr) };
   }
 
-  const has3D = (
-    (dict.m13 !== undefined && dict.m13 !== 0) ||
-    (dict.m14 !== undefined && dict.m14 !== 0) ||
-    (dict.m23 !== undefined && dict.m23 !== 0) ||
-    (dict.m24 !== undefined && dict.m24 !== 0) ||
-    (dict.m31 !== undefined && dict.m31 !== 0) ||
-    (dict.m32 !== undefined && dict.m32 !== 0) ||
-    (dict.m33 !== undefined && dict.m33 !== 1) ||
-    (dict.m34 !== undefined && dict.m34 !== 0) ||
-    (dict.m43 !== undefined && dict.m43 !== 0) ||
-    (dict.m44 !== undefined && dict.m44 !== 1)
-  );
-
+  validateMatrixInitAliases(dict);
+  const has3D = has3DComponents(dict);
   const is2D = dict.is2D ?? !has3D;
 
   if (is2D && has3D) {
@@ -339,6 +299,9 @@ export class DOMMatrixReadOnly {
         0, 0, 1, 0,
         0, 0, 0, 1
       ]);
+    } else if (init instanceof DOMMatrixReadOnly) {
+      this._is2D = init._is2D;
+      this._values = new Float64Array(init._values);
     } else if (typeof init === 'string') {
       const parsed = parseMatrixString(init);
       this._is2D = parsed.is2D;
@@ -388,6 +351,16 @@ export class DOMMatrixReadOnly {
 
   get is2D(): boolean { return this._is2D; }
 
+  get isIdentity(): boolean {
+    const m = this._values;
+    return (
+      m[0] === 1 && m[1] === 0 && m[2] === 0 && m[3] === 0 &&
+      m[4] === 0 && m[5] === 1 && m[6] === 0 && m[7] === 0 &&
+      m[8] === 0 && m[9] === 0 && m[10] === 1 && m[11] === 0 &&
+      m[12] === 0 && m[13] === 0 && m[14] === 0 && m[15] === 1
+    );
+  }
+
   get m11(): number { return this._values[0]; }
   get m12(): number { return this._values[1]; }
   get m13(): number { return this._values[2]; }
@@ -424,8 +397,20 @@ export class DOMMatrixReadOnly {
     return DOMMatrix.fromMatrix(this).scaleSelf(sx, sy, sz, ox, oy, oz);
   }
 
+  scaleNonUniform(sx = 1, sy = 1): DOMMatrix {
+    return this.scale(sx, sy, 1, 0, 0, 0);
+  }
+
+  scale3d(scale = 1, ox = 0, oy = 0, oz = 0): DOMMatrix {
+    return this.scale(scale, scale, scale, ox, oy, oz);
+  }
+
   rotate(rotX = 0, rotY?: number, rotZ?: number): DOMMatrix {
     return DOMMatrix.fromMatrix(this).rotateSelf(rotX, rotY, rotZ);
+  }
+
+  rotateFromVector(x = 0, y = 0): DOMMatrix {
+    return this.rotate(angleFromVector(x, y));
   }
 
   rotateAxisAngle(x = 0, y = 0, z = 0, angle = 0): DOMMatrix {
@@ -442,32 +427,6 @@ export class DOMMatrixReadOnly {
 
   skewY(sy = 0): DOMMatrix {
     return DOMMatrix.fromMatrix(this).skewYSelf(sy);
-  }
-
-  inverse(): DOMMatrix {
-    const res = DOMMatrix.fromMatrix(this);
-    const { success, result } = invertMatrix(res._values);
-    res._values = result;
-    if (!success) {
-      res._is2D = false;
-    }
-    return res;
-  }
-
-  toFloat32Array(): Float32Array {
-    return new Float32Array(transpose(this._values));
-  }
-
-  toFloat64Array(): Float64Array {
-    return transpose(this._values);
-  }
-
-  toString(): string {
-    if (this._is2D) {
-      return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`;
-    } else {
-      return `matrix3d(${Array.from(this._values).join(', ')})`;
-    }
   }
 
   flipX(): DOMMatrix {
@@ -488,16 +447,8 @@ export class DOMMatrixReadOnly {
     return res;
   }
 
-  rotateFromVector(x = 0, y = 0): DOMMatrix {
-    let angle = 0;
-    if (x !== 0 || y !== 0) {
-      angle = Math.atan2(y, x) * 180 / Math.PI;
-    }
-    return this.rotate(angle);
-  }
-
-  scale3d(scale = 1, ox = 0, oy = 0, oz = 0): DOMMatrix {
-    return this.scale(scale, scale, scale, ox, oy, oz);
+  inverse(): DOMMatrix {
+    return DOMMatrix.fromMatrix(this).invertSelf();
   }
 
   transformPoint(point?: DOMPointInit): DOMPoint {
@@ -506,13 +457,37 @@ export class DOMMatrixReadOnly {
     const z = point?.z ?? 0;
     const w = point?.w ?? 1;
 
-    const nx = this.m11 * x + this.m21 * y + this.m31 * z + this.m41 * w;
-    const ny = this.m12 * x + this.m22 * y + this.m32 * z + this.m42 * w;
-    const nz = this.m13 * x + this.m23 * y + this.m33 * z + this.m43 * w;
-    const nw = this.m14 * x + this.m24 * y + this.m34 * z + this.m44 * w;
+    let nx: number, ny: number, nz: number, nw: number;
+    if (this._is2D && z === 0 && w === 1) {
+      nx = this.a * x + this.c * y + this.e;
+      ny = this.b * x + this.d * y + this.f;
+      nz = 0;
+      nw = 1;
+    } else {
+      nx = this.m11 * x + this.m21 * y + this.m31 * z + this.m41 * w;
+      ny = this.m12 * x + this.m22 * y + this.m32 * z + this.m42 * w;
+      nz = this.m13 * x + this.m23 * y + this.m33 * z + this.m43 * w;
+      nw = this.m14 * x + this.m24 * y + this.m34 * z + this.m44 * w;
+    }
 
-    const DOMPointClass = (globalThis as unknown as Record<string, typeof DOMPoint>).DOMPoint || DOMPoint;
+    const DOMPointClass = (typeof globalThis !== 'undefined' && (globalThis as unknown as { DOMPoint?: typeof DOMPoint }).DOMPoint) || DOMPoint;
     return new DOMPointClass(nx, ny, nz, nw);
+  }
+
+  toFloat32Array(): Float32Array {
+    return new Float32Array(transpose(this._values));
+  }
+
+  toFloat64Array(): Float64Array {
+    return transpose(this._values);
+  }
+
+  toString(): string {
+    if (this._is2D) {
+      return `matrix(${this.a}, ${this.b}, ${this.c}, ${this.d}, ${this.e}, ${this.f})`;
+    } else {
+      return `matrix3d(${Array.from(this._values).join(', ')})`;
+    }
   }
 
   toJSON() {
@@ -522,7 +497,8 @@ export class DOMMatrixReadOnly {
       m21: this.m21, m22: this.m22, m23: this.m23, m24: this.m24,
       m31: this.m31, m32: this.m32, m33: this.m33, m34: this.m34,
       m41: this.m41, m42: this.m42, m43: this.m43, m44: this.m44,
-      is2D: this.is2D
+      is2D: this.is2D,
+      isIdentity: this.isIdentity
     };
   }
 }
@@ -546,54 +522,12 @@ export class DOMMatrix extends DOMMatrixReadOnly {
     return new DOMMatrix(transpose(array));
   }
 
-  override get is2D(): boolean {
-    return this._is2D;
-  }
-
   override set is2D(val: boolean) {
-    if (val) {
-      const has3D = (
-        this.m13 !== 0 ||
-        this.m14 !== 0 ||
-        this.m23 !== 0 ||
-        this.m24 !== 0 ||
-        this.m31 !== 0 ||
-        this.m32 !== 0 ||
-        this.m33 !== 1 ||
-        this.m34 !== 0 ||
-        this.m43 !== 0 ||
-        this.m44 !== 1
-      );
-      if (has3D) {
-        throw new TypeError('Failed to set is2D to true: 3D components are present and non-default');
-      }
+    if (val && has3DComponents(this._values)) {
+      throw new TypeError('Failed to set is2D to true: 3D components are present and non-default');
     }
     this._is2D = val;
   }
-
-  override get m11(): number { return this._values[0]; }
-  override get m12(): number { return this._values[1]; }
-  override get m13(): number { return this._values[2]; }
-  override get m14(): number { return this._values[3]; }
-  override get m21(): number { return this._values[4]; }
-  override get m22(): number { return this._values[5]; }
-  override get m23(): number { return this._values[6]; }
-  override get m24(): number { return this._values[7]; }
-  override get m31(): number { return this._values[8]; }
-  override get m32(): number { return this._values[9]; }
-  override get m33(): number { return this._values[10]; }
-  override get m34(): number { return this._values[11]; }
-  override get m41(): number { return this._values[12]; }
-  override get m42(): number { return this._values[13]; }
-  override get m43(): number { return this._values[14]; }
-  override get m44(): number { return this._values[15]; }
-
-  override get a(): number { return this._values[0]; }
-  override get b(): number { return this._values[1]; }
-  override get c(): number { return this._values[4]; }
-  override get d(): number { return this._values[5]; }
-  override get e(): number { return this._values[12]; }
-  override get f(): number { return this._values[13]; }
 
   set m11(val: number) { this._values[0] = val; }
   set m12(val: number) { this._values[1] = val; }
@@ -621,8 +555,21 @@ export class DOMMatrix extends DOMMatrixReadOnly {
 
   multiplySelf(other: unknown): DOMMatrix {
     const otherMatrix = DOMMatrix.fromMatrix(other);
-    this._values = multiplyArrays(this._values, otherMatrix._values);
-    if (!otherMatrix.is2D) {
+    if (this._is2D && otherMatrix._is2D) {
+      const M = this._values;
+      const O = otherMatrix._values;
+      const a1 = M[0], b1 = M[1], c1 = M[4], d1 = M[5], e1 = M[12], f1 = M[13];
+      const a2 = O[0], b2 = O[1], c2 = O[4], d2 = O[5], e2 = O[12], f2 = O[13];
+      M[0] = a1 * a2 + b1 * c2;
+      M[1] = a1 * b2 + b1 * d2;
+      M[4] = c1 * a2 + d1 * c2;
+      M[5] = c1 * b2 + d1 * d2;
+      M[12] = e1 * a2 + f1 * c2 + e2;
+      M[13] = e1 * b2 + f1 * d2 + f2;
+      return this;
+    }
+    multiplyArrays(this._values, otherMatrix._values, this._values);
+    if (!otherMatrix._is2D) {
       this._is2D = false;
     }
     return this;
@@ -630,14 +577,32 @@ export class DOMMatrix extends DOMMatrixReadOnly {
 
   preMultiplySelf(other: unknown): DOMMatrix {
     const otherMatrix = DOMMatrix.fromMatrix(other);
-    this._values = multiplyArrays(otherMatrix._values, this._values);
-    if (!otherMatrix.is2D) {
+    if (this._is2D && otherMatrix._is2D) {
+      const M = this._values;
+      const O = otherMatrix._values;
+      const a1 = O[0], b1 = O[1], c1 = O[4], d1 = O[5], e1 = O[12], f1 = O[13];
+      const a2 = M[0], b2 = M[1], c2 = M[4], d2 = M[5], e2 = M[12], f2 = M[13];
+      M[0] = a1 * a2 + b1 * c2;
+      M[1] = a1 * b2 + b1 * d2;
+      M[4] = c1 * a2 + d1 * c2;
+      M[5] = c1 * b2 + d1 * d2;
+      M[12] = e1 * a2 + f1 * c2 + e2;
+      M[13] = e1 * b2 + f1 * d2 + f2;
+      return this;
+    }
+    multiplyArrays(otherMatrix._values, this._values, this._values);
+    if (!otherMatrix._is2D) {
       this._is2D = false;
     }
     return this;
   }
 
   translateSelf(tx = 0, ty = 0, tz = 0): DOMMatrix {
+    if (this._is2D && tz === 0) {
+      this._values[12] += tx;
+      this._values[13] += ty;
+      return this;
+    }
     const M = this._values;
     for (let r = 0; r < 4; r++) {
       const idx = r * 4;
@@ -654,12 +619,25 @@ export class DOMMatrix extends DOMMatrixReadOnly {
 
   scaleSelf(sx = 1, sy?: number, sz = 1, ox = 0, oy = 0, oz = 0): DOMMatrix {
     const actualSy = sy ?? sx;
-    
+    if (this._is2D && sz === 1 && oz === 0) {
+      const M = this._values;
+      M[0] *= sx;
+      M[1] *= actualSy;
+      M[4] *= sx;
+      M[5] *= actualSy;
+      if (ox !== 0 || oy !== 0) {
+        M[12] = (M[12] + ox) * sx - ox;
+        M[13] = (M[13] + oy) * actualSy - oy;
+      } else {
+        M[12] *= sx;
+        M[13] *= actualSy;
+      }
+      return this;
+    }
     const hasOrigin = ox !== 0 || oy !== 0 || oz !== 0;
     if (hasOrigin) {
       this.translateSelf(ox, oy, oz);
     }
-    
     const M = this._values;
     for (let r = 0; r < 4; r++) {
       const idx = r * 4;
@@ -667,23 +645,28 @@ export class DOMMatrix extends DOMMatrixReadOnly {
       M[idx + 1] *= actualSy;
       M[idx + 2] *= sz;
     }
-    
     if (sz !== 1 || oz !== 0) {
       this._is2D = false;
     }
-    
     if (hasOrigin) {
       this.translateSelf(-ox, -oy, -oz);
     }
-    
     return this;
+  }
+
+  scaleNonUniformSelf(sx = 1, sy = 1): DOMMatrix {
+    return this.scaleSelf(sx, sy, 1, 0, 0, 0);
+  }
+
+  scale3dSelf(scale = 1, ox = 0, oy = 0, oz = 0): DOMMatrix {
+    return this.scaleSelf(scale, scale, scale, ox, oy, oz);
   }
 
   rotateSelf(rotX = 0, rotY?: number, rotZ?: number): DOMMatrix {
     let rx = rotX;
     let ry = rotY;
     let rz = rotZ;
-    
+
     if (ry === undefined && rz === undefined) {
       rz = rx;
       rx = 0;
@@ -692,48 +675,101 @@ export class DOMMatrix extends DOMMatrixReadOnly {
       ry = ry ?? 0;
       rz = rz ?? 0;
     }
-    
-    if (rz !== 0) {
-      this._values = multiplyArrays(this._values, getRz(rz));
+
+    if (rx === 0 && ry === 0) {
+      if (rz === 0) return this;
+      const rad = degToRad(rz);
+      const c = Math.cos(rad);
+      const s = Math.sin(rad);
+      if (this._is2D) {
+        const M = this._values;
+        const a = M[0], b = M[1], c0 = M[4], d0 = M[5], e = M[12], f = M[13];
+        M[0] = a * c - b * s;
+        M[1] = a * s + b * c;
+        M[4] = c0 * c - d0 * s;
+        M[5] = c0 * s + d0 * c;
+        M[12] = e * c - f * s;
+        M[13] = e * s + f * c;
+        return this;
+      }
     }
-    if (ry !== 0) {
-      this._values = multiplyArrays(this._values, getRy(ry));
+
+    const radZ = degToRad(rz);
+    const cz = Math.cos(radZ);
+    const sz = Math.sin(radZ);
+
+    const radY = degToRad(ry);
+    const cy = Math.cos(radY);
+    const sy = Math.sin(radY);
+
+    const radX = degToRad(rx);
+    const cx = Math.cos(radX);
+    const sx = Math.sin(radX);
+
+    const r00 = cz * cy;
+    const r01 = sz * cx + cz * sy * sx;
+    const r02 = sz * sx - cz * sy * cx;
+    const r10 = -sz * cy;
+    const r11 = cz * cx - sz * sy * sx;
+    const r12 = cz * sx + sz * sy * cx;
+    const r20 = sy;
+    const r21 = -cy * sx;
+    const r22 = cy * cx;
+
+    const M = this._values;
+    for (let i = 0; i < 16; i += 4) {
+      const m0 = M[i], m1 = M[i + 1], m2 = M[i + 2];
+      M[i]     = m0 * r00 + m1 * r10 + m2 * r20;
+      M[i + 1] = m0 * r01 + m1 * r11 + m2 * r21;
+      M[i + 2] = m0 * r02 + m1 * r12 + m2 * r22;
+    }
+
+    if (rx !== 0 || ry !== 0) {
       this._is2D = false;
     }
-    if (rx !== 0) {
-      this._values = multiplyArrays(this._values, getRx(rx));
-      this._is2D = false;
-    }
-    
+
     return this;
   }
 
+  rotateFromVectorSelf(x = 0, y = 0): DOMMatrix {
+    return this.rotateSelf(angleFromVector(x, y));
+  }
+
   rotateAxisAngleSelf(x = 0, y = 0, z = 0, angle = 0): DOMMatrix {
-    const len = Math.sqrt(x*x + y*y + z*z);
+    const len = Math.hypot(x, y, z);
     if (len === 0) return this;
-    
+
     const ux = x / len;
     const uy = y / len;
     const uz = z / len;
-    
-    const rad = angle * Math.PI / 180;
+
+    const rad = degToRad(angle);
     const c = Math.cos(rad);
     const s = Math.sin(rad);
     const t = 1 - c;
-    
-    const R = new Float64Array([
-      t*ux*ux + c,      t*ux*uy + s*uz,   t*ux*uz - s*uy,   0,
-      t*ux*uy - s*uz,   t*uy*uy + c,      t*uy*uz + s*ux,   0,
-      t*ux*uz + s*uy,   t*uy*uz - s*ux,   t*uz*uz + c,      0,
-      0,                0,                0,                1
-    ]);
-    
-    this._values = multiplyArrays(this._values, R);
-    
+
+    const r00 = t * ux * ux + c;
+    const r01 = t * ux * uy + s * uz;
+    const r02 = t * ux * uz - s * uy;
+    const r10 = t * ux * uy - s * uz;
+    const r11 = t * uy * uy + c;
+    const r12 = t * uy * uz + s * ux;
+    const r20 = t * ux * uz + s * uy;
+    const r21 = t * uy * uz - s * ux;
+    const r22 = t * uz * uz + c;
+
+    const M = this._values;
+    for (let i = 0; i < 16; i += 4) {
+      const m0 = M[i], m1 = M[i + 1], m2 = M[i + 2];
+      M[i]     = m0 * r00 + m1 * r10 + m2 * r20;
+      M[i + 1] = m0 * r01 + m1 * r11 + m2 * r21;
+      M[i + 2] = m0 * r02 + m1 * r12 + m2 * r22;
+    }
+
     if (x !== 0 || y !== 0 || z !== 1) {
       this._is2D = false;
     }
-    
+
     return this;
   }
 
@@ -742,7 +778,8 @@ export class DOMMatrix extends DOMMatrixReadOnly {
   }
 
   skewXSelf(sx = 0): DOMMatrix {
-    const rad = sx * Math.PI / 180;
+    if (sx === 0) return this;
+    const rad = degToRad(sx);
     const s = Math.tan(rad);
     const M = this._values;
     for (let r = 0; r < 4; r++) {
@@ -753,7 +790,8 @@ export class DOMMatrix extends DOMMatrixReadOnly {
   }
 
   skewYSelf(sy = 0): DOMMatrix {
-    const rad = sy * Math.PI / 180;
+    if (sy === 0) return this;
+    const rad = degToRad(sy);
     const s = Math.tan(rad);
     const M = this._values;
     for (let r = 0; r < 4; r++) {
@@ -764,24 +802,29 @@ export class DOMMatrix extends DOMMatrixReadOnly {
   }
 
   invertSelf(): DOMMatrix {
+    if (this._is2D) {
+      const a = this._values[0], b = this._values[1], c = this._values[4], d = this._values[5], e = this._values[12], f = this._values[13];
+      const det = a * d - b * c;
+      if (!Number.isFinite(det) || det === 0) {
+        this._values.fill(NaN);
+        this._is2D = false;
+        return this;
+      }
+      const invDet = 1 / det;
+      this._values[0] = d * invDet;
+      this._values[1] = -b * invDet;
+      this._values[4] = -c * invDet;
+      this._values[5] = a * invDet;
+      this._values[12] = (c * f - d * e) * invDet;
+      this._values[13] = (b * e - a * f) * invDet;
+      return this;
+    }
     const { success, result } = invertMatrix(this._values);
     this._values = result;
     if (!success) {
       this._is2D = false;
     }
     return this;
-  }
-
-  rotateFromVectorSelf(x = 0, y = 0): DOMMatrix {
-    let angle = 0;
-    if (x !== 0 || y !== 0) {
-      angle = Math.atan2(y, x) * 180 / Math.PI;
-    }
-    return this.rotateSelf(angle);
-  }
-
-  scale3dSelf(scale = 1, ox = 0, oy = 0, oz = 0): DOMMatrix {
-    return this.scaleSelf(scale, scale, scale, ox, oy, oz);
   }
 
   setMatrixValue(value: string): DOMMatrix {
@@ -792,18 +835,17 @@ export class DOMMatrix extends DOMMatrixReadOnly {
   }
 }
 
-if (typeof globalThis !== 'undefined') {
-  const g = globalThis as unknown as Record<string, unknown>;
-  if (!g.DOMMatrixReadOnly) {
-    g.DOMMatrixReadOnly = DOMMatrixReadOnly;
-  }
-  if (!g.DOMMatrix) {
-    g.DOMMatrix = DOMMatrix;
-  }
-  if (!g.DOMPointReadOnly) {
-    g.DOMPointReadOnly = DOMPointReadOnly;
-  }
-  if (!g.DOMPoint) {
-    g.DOMPoint = DOMPoint;
+// Inherit getters from DOMMatrixReadOnly onto DOMMatrix where DOMMatrix defines setters
+for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(DOMMatrixReadOnly.prototype))) {
+  if (desc.get && key !== 'constructor') {
+    const subDesc = Object.getOwnPropertyDescriptor(DOMMatrix.prototype, key);
+    if (subDesc && !subDesc.get && subDesc.set) {
+      Object.defineProperty(DOMMatrix.prototype, key, {
+        get: desc.get,
+        set: subDesc.set,
+        enumerable: subDesc.enumerable,
+        configurable: true,
+      });
+    }
   }
 }

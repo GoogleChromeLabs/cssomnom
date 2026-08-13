@@ -1369,6 +1369,7 @@ export abstract class CSSNumericValue extends CSSStyleValue {
             throw new DOMException(`Invalid types in mathematical function: ${css}`, 'SyntaxError');
           }
           if ((v as CSSFunction).name.toLowerCase() === 'calc') {
+            // css-values-4 § 10.7 #calc-simplification
             return simplify(mathNode);
           }
           return mathNode;
@@ -1610,10 +1611,6 @@ export class CSSNumericArray {
 
 
 export { DOMMatrixReadOnly, DOMMatrix };
-
-function newDOMMatrix(elements?: number[]): DOMMatrix {
-  return new DOMMatrix(elements);
-}
 
 
 // CSS Typed OM: CSSUnitValue
@@ -1963,11 +1960,14 @@ export function createCSSStyleValue(v: ComponentValue, property?: string): CSSSt
     if (['calc', 'min', 'max', 'clamp'].includes(nameLower)) {
        const mathNode = parseMathFunction(fn.name, fn.value);
        if (mathNode) {
-         const simplified = simplify(mathNode);
-         if (simplified instanceof CSSUnitValue) {
-           return new CSSMathSum(simplified);
+         if (nameLower === 'calc') {
+           const simplified = simplify(mathNode);
+           if (simplified instanceof CSSUnitValue) {
+             return new CSSMathSum(simplified);
+           }
+           return simplified;
          }
-         return simplified;
+         return mathNode;
        }
     }
     if (nameLower === 'var') {
@@ -2276,11 +2276,15 @@ export class CSSUnparsedValue extends CSSStyleValue {
         }
         return Reflect.get(target, prop, receiver);
       },
+      // css-typed-om § 3.4 #unparsedvalue-objects
       set(target, prop, value, receiver) {
         if (typeof prop === 'string' && /^\d+$/.test(prop)) {
           const index = parseInt(prop, 10);
-          if (index < 0 || index >= target.length) {
-            throw new RangeError(`Index ${index} is out of bounds (length ${target.length})`);
+          if (index < 0 || index > target._values.length) {
+            throw new RangeError(`Index ${index} is out of bounds (length ${target._values.length})`);
+          }
+          if (typeof value !== 'string' && !(value instanceof CSSVariableReferenceValue)) {
+            throw new TypeError('Value must be a string or CSSVariableReferenceValue');
           }
           target._values[index] = value;
           return true;
@@ -2938,12 +2942,13 @@ function matchesFlex(type: CSSNumericType): boolean {
 
 // css-typed-om § 3.2 #the-stylepropertymap
 // css-properties-values-api § 3 #syntax-strings
-function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propLower: string): boolean {
+function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propKey: string): boolean {
+  const propLower = propKey.toLowerCase();
   if (value instanceof CSSUnparsedValue || value instanceof CSSVariableReferenceValue) {
     return true;
   }
   if (value.constructor === CSSStyleValue) {
-    if (value._associatedProperty !== null && value._associatedProperty !== propLower) {
+    if (value._associatedProperty !== null && value._associatedProperty !== propKey) {
       return false;
     }
     return true;
@@ -3127,9 +3132,9 @@ export class CSSTranslate extends CSSTransformComponent {
     const z = this.z.to('px').value;
     
     if (this.is2D) {
-      return newDOMMatrix([1, 0, 0, 1, x, y]);
+      return new DOMMatrix([1, 0, 0, 1, x, y]);
     } else {
-      return newDOMMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
+      return new DOMMatrix([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
     }
   }
 }
@@ -3188,9 +3193,9 @@ export class CSSScale extends CSSTransformComponent {
     const z = this.z.to('number').value;
     
     if (this.is2D) {
-      return newDOMMatrix([x, 0, 0, y, 0, 0]);
+      return new DOMMatrix([x, 0, 0, y, 0, 0]);
     } else {
-      return newDOMMatrix([x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]);
+      return new DOMMatrix([x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1]);
     }
   }
 }
@@ -3291,7 +3296,7 @@ export class CSSRotate extends CSSTransformComponent {
     if (this.is2D) {
       const c = Math.cos(rad);
       const s = Math.sin(rad);
-      return newDOMMatrix([c, s, -s, c, 0, 0]);
+      return new DOMMatrix([c, s, -s, c, 0, 0]);
     } else {
       let x = this.x.to('number').value;
       let y = this.y.to('number').value;
@@ -3312,7 +3317,7 @@ export class CSSRotate extends CSSTransformComponent {
       const s = Math.sin(rad);
       const t = 1 - c;
       
-      return newDOMMatrix([
+      return new DOMMatrix([
         t * x * x + c,
         t * x * y + s * z,
         t * x * z - s * y,
@@ -3366,7 +3371,7 @@ export class CSSSkew extends CSSTransformComponent {
   override toMatrix(): DOMMatrix {
     const axRad = this.ax.to('rad').value;
     const ayRad = this.ay.to('rad').value;
-    return newDOMMatrix([1, Math.tan(ayRad), Math.tan(axRad), 1, 0, 0]);
+    return new DOMMatrix([1, Math.tan(ayRad), Math.tan(axRad), 1, 0, 0]);
   }
 }
 
@@ -3390,7 +3395,7 @@ export class CSSSkewX extends CSSTransformComponent {
   }
   override toMatrix(): DOMMatrix {
     const axRad = this.ax.to('rad').value;
-    return newDOMMatrix([1, 0, Math.tan(axRad), 1, 0, 0]);
+    return new DOMMatrix([1, 0, Math.tan(axRad), 1, 0, 0]);
   }
 }
 
@@ -3414,7 +3419,7 @@ export class CSSSkewY extends CSSTransformComponent {
   }
   override toMatrix(): DOMMatrix {
     const ayRad = this.ay.to('rad').value;
-    return newDOMMatrix([1, Math.tan(ayRad), 0, 1, 0, 0]);
+    return new DOMMatrix([1, Math.tan(ayRad), 0, 1, 0, 0]);
   }
 }
 
@@ -3534,11 +3539,15 @@ export class CSSTransformValue extends CSSStyleValue {
         }
         return Reflect.get(target, prop, receiver);
       },
+      // css-typed-om § 7 #transformvalue-objects
       set(target, prop, value, receiver) {
         if (typeof prop === 'string' && /^\d+$/.test(prop)) {
           const index = parseInt(prop, 10);
-          if (index < 0 || index >= target.components.length) {
+          if (index < 0 || index > target.components.length) {
             throw new RangeError(`Index ${index} is out of bounds (length ${target.components.length})`);
+          }
+          if (!(value instanceof CSSTransformComponent)) {
+            throw new TypeError('Value must be an instance of CSSTransformComponent');
           }
           target.components[index] = value;
           return true;
@@ -3562,7 +3571,7 @@ export class CSSTransformValue extends CSSStyleValue {
   }
 
   toMatrix(): DOMMatrix {
-    let result = this.components[0]?.toMatrix() ?? newDOMMatrix([1, 0, 0, 1, 0, 0]);
+    let result = this.components[0]?.toMatrix() ?? new DOMMatrix([1, 0, 0, 1, 0, 0]);
     for (let i = 1; i < this.components.length; i++) {
       const next = this.components[i].toMatrix();
       result = result.multiply(next);
@@ -3787,17 +3796,45 @@ export class StylePropertyMapReadOnly {
     return this._style.declarations || [];
   }
 
+  // css-typed-om § 3.2 #the-stylepropertymap
   private _getKeys(): string[] {
-    const keys = new Set<string>();
-    if (this._style) {
+    const rawKeys = new Set<string>();
+    const declarations = this._getDeclarations();
+    if (declarations.length > 0) {
+      for (const d of declarations) {
+        if (d.name) rawKeys.add(d.name);
+      }
+    } else if (this._style) {
       for (let i = 0; i < this._style.length; i++) {
-        const prop = this._style[i];
+        const prop = this._style[i] || (typeof this._style.item === 'function' ? this._style.item(i) : '');
         if (prop) {
-          keys.add(prop);
+          rawKeys.add(prop);
         }
       }
     }
-    return Array.from(keys);
+
+    const standardProps = new Set<string>();
+    const vendorProps = new Set<string>();
+    const customProps = new Set<string>();
+
+    for (const key of rawKeys) {
+      if (key.startsWith('--')) {
+        // Custom properties: preserved exactly as written (case-sensitive)
+        customProps.add(key);
+      } else if (key.startsWith('-')) {
+        // Vendor-prefixed / experimental properties: ASCII lowercased
+        vendorProps.add(key.toLowerCase());
+      } else {
+        // Standard properties: ASCII lowercased
+        standardProps.add(key.toLowerCase());
+      }
+    }
+
+    const sortedStandard = Array.from(standardProps).sort(compareStrings);
+    const sortedVendor = Array.from(vendorProps).sort(compareStrings);
+    const sortedCustom = Array.from(customProps).sort(compareStrings);
+
+    return [...sortedStandard, ...sortedVendor, ...sortedCustom];
   }
 
   get size(): number {
@@ -3833,9 +3870,10 @@ export class StylePropertyMapReadOnly {
 
   get(property: string): CSSStyleValue | undefined {
     validateProperty(property);
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     const res = this._getRaw(property);
     if (res) {
-      res._associatedProperty = property;
+      res._associatedProperty = propKey;
       return res;
     }
     return undefined;
@@ -3921,9 +3959,10 @@ export class StylePropertyMapReadOnly {
 
   getAll(property: string): CSSStyleValue[] {
     validateProperty(property);
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     const res = this._getAllRaw(property);
     for (const val of res) {
-      val._associatedProperty = property;
+      val._associatedProperty = propKey;
     }
     return res;
   }
@@ -4058,8 +4097,8 @@ function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
 // css-typed-om § 3.2 #the-stylepropertymap
 function validateValuesForProperty(property: string, values: (CSSStyleValue | string)[]): string {
   validateProperty(property);
-  const propLower = property.toLowerCase();
-  const isList = LIST_PROPERTIES.has(propLower);
+  const propKey = property.startsWith('--') ? property : property.toLowerCase();
+  const isList = LIST_PROPERTIES.has(propKey);
 
   if (!isList && values.length > 1) {
     throw new TypeError(`Property ${property} is not list-valued and cannot accept multiple values`);
@@ -4076,12 +4115,12 @@ function validateValuesForProperty(property: string, values: (CSSStyleValue | st
     }
   }
 
-  const syntax = propLower.startsWith('--') ? PropertyRegistry.get(property)?.syntax : STANDARD_PROPERTIES_SYNTAX[propLower];
+  const syntax = propKey.startsWith('--') ? PropertyRegistry.get(property)?.syntax : STANDARD_PROPERTIES_SYNTAX[propKey];
 
   const valStrings: string[] = [];
   for (const val of values) {
     if (typeof val === 'string') {
-      if (!propLower.startsWith('--')) {
+      if (!propKey.startsWith('--')) {
         try {
           CSSStyleValue.parseAll(property, val);
         } catch (e) {
@@ -4090,10 +4129,10 @@ function validateValuesForProperty(property: string, values: (CSSStyleValue | st
       }
       valStrings.push(val);
     } else {
-      if (val._associatedProperty !== null && val._associatedProperty !== propLower) {
+      if (val._associatedProperty !== null && val._associatedProperty !== propKey) {
         throw new TypeError(`CSSStyleValue is associated with ${val._associatedProperty}, not ${property}`);
       }
-      if (syntax && !matchesStyleValueSyntax(val, syntax, propLower)) {
+      if (syntax && !matchesStyleValueSyntax(val, syntax, propKey)) {
         throw new TypeError(`Invalid value of type ${val.constructor.name} for property ${property}`);
       }
       if (val instanceof CSSUnitValue) {
@@ -4110,7 +4149,7 @@ function validateValuesForProperty(property: string, values: (CSSStyleValue | st
 
   const finalString = valStrings.join(isList ? ', ' : ' ');
 
-  if (!propLower.startsWith('--')) {
+  if (!propKey.startsWith('--')) {
     try {
       CSSStyleValue.parseAll(property, finalString);
     } catch (e) {
@@ -4144,9 +4183,10 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
 
   override get(property: string): CSSStyleValue | undefined {
     validateProperty(property);
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     const res = this._getRaw(property);
     if (res) {
-      res._associatedProperty = property;
+      res._associatedProperty = propKey;
       return res;
     }
     return undefined;
@@ -4154,15 +4194,15 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
 
   protected override _getRaw(property: string): CSSStyleValue | null {
     const value = getPropertyValueSafe(this._style, property);
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     if (!value) {
-      getStyleCache(this._style).delete(property.toLowerCase());
+      getStyleCache(this._style).delete(propKey);
       return null;
     }
 
-    const propLower = property.toLowerCase();
-    const cached = getStyleCache(this._style).get(propLower);
+    const cached = getStyleCache(this._style).get(propKey);
     if (cached && cached.length > 0) {
-      const isList = LIST_PROPERTIES.has(propLower);
+      const isList = LIST_PROPERTIES.has(propKey);
       const separator = isList ? ', ' : ' ';
       const cachedStr = cached.map(v => v.toString()).join(separator);
       if (isEquivalent(cachedStr, value)) {
@@ -4174,7 +4214,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       const tokens = tokenize(value);
       const componentValues = ParseHooks.parseComponentValues(tokens);
       const res = new CSSUnparsedValue(tokensToUnparsedSegments(componentValues));
-      getStyleCache(this._style).set(propLower, [res]);
+      getStyleCache(this._style).set(propKey, [res]);
       return res;
     }
     
@@ -4182,44 +4222,45 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       const tokens = tokenize(value);
       const componentValues = ParseHooks.parseComponentValues(tokens);
       const res = new CSSUnparsedValue(tokensToUnparsedSegments(componentValues));
-      getStyleCache(this._style).set(propLower, [res]);
+      getStyleCache(this._style).set(propKey, [res]);
       return res;
     }
     
     try {
       const parsed = CSSStyleValue.parseAll(property, value);
       if (parsed.length > 0) {
-        getStyleCache(this._style).set(propLower, parsed);
+        getStyleCache(this._style).set(propKey, parsed);
         return parsed[0];
       }
       return null;
     } catch (e) {
       const res = new CSSStyleValue(value, privateToken);
-      getStyleCache(this._style).set(propLower, [res]);
+      getStyleCache(this._style).set(propKey, [res]);
       return res;
     }
   }
 
   override getAll(property: string): CSSStyleValue[] {
     validateProperty(property);
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     const res = this._getAllRaw(property);
     for (const val of res) {
-      val._associatedProperty = property;
+      val._associatedProperty = propKey;
     }
     return res;
   }
 
   protected override _getAllRaw(property: string): CSSStyleValue[] {
     const value = getPropertyValueSafe(this._style, property);
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     if (!value) {
-      getStyleCache(this._style).delete(property.toLowerCase());
+      getStyleCache(this._style).delete(propKey);
       return [];
     }
 
-    const propLower = property.toLowerCase();
-    const cached = getStyleCache(this._style).get(propLower);
+    const cached = getStyleCache(this._style).get(propKey);
     if (cached) {
-      const isList = LIST_PROPERTIES.has(propLower);
+      const isList = LIST_PROPERTIES.has(propKey);
       const separator = isList ? ', ' : ' ';
       const cachedStr = cached.map(v => v.toString()).join(separator);
       if (isEquivalent(cachedStr, value)) {
@@ -4231,17 +4272,17 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       const tokens = tokenize(value);
       const componentValues = ParseHooks.parseComponentValues(tokens);
       const res = [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
-      getStyleCache(this._style).set(propLower, res);
+      getStyleCache(this._style).set(propKey, res);
       return res;
     }
     
     try {
       const parsed = CSSStyleValue.parseAll(property, value);
-      getStyleCache(this._style).set(propLower, parsed);
+      getStyleCache(this._style).set(propKey, parsed);
       return parsed;
     } catch (e) {
       const res = [new CSSStyleValue(value, privateToken)];
-      getStyleCache(this._style).set(propLower, res);
+      getStyleCache(this._style).set(propKey, res);
       return res;
     }
   }
@@ -4257,21 +4298,25 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     if (values.length === 0) {
       throw new TypeError(`set() on property ${property} requires at least one value.`);
     }
-    const propLower = property.toLowerCase();
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     const finalString = validateValuesForProperty(property, values);
     setPropertySafe(this._style, this._element, property, finalString);
     try {
       const parsed = CSSStyleValue.parseAll(property, finalString);
-      getStyleCache(this._style).set(propLower, parsed);
+      getStyleCache(this._style).set(propKey, parsed);
     } catch (e) {
-      getStyleCache(this._style).delete(propLower);
+      getStyleCache(this._style).delete(propKey);
     }
   }
 
+  // css-typed-om § 3.2 #dom-stylepropertymap-append
   append(property: string, ...values: (CSSStyleValue | string)[]): void {
     validateProperty(property);
     this._checkPendingSubstitution(property);
     for (const val of values) {
+      if (typeof val === 'string' && val.includes('var(')) {
+        throw new TypeError("Cannot append CSSUnparsedValue or CSSVariableReferenceValue.");
+      }
       if (val instanceof CSSUnparsedValue || val instanceof CSSVariableReferenceValue) {
         throw new TypeError("Cannot append CSSUnparsedValue or CSSVariableReferenceValue.");
       }
@@ -4279,15 +4324,25 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     if (values.length === 0) {
       throw new TypeError(`append() on property ${property} requires at least one value.`);
     }
-    const propLower = property.toLowerCase();
-    if (!LIST_PROPERTIES.has(propLower)) {
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
+    if (!LIST_PROPERTIES.has(propKey)) {
       throw new TypeError(`Property ${property} is not list-valued and cannot be appended to.`);
     }
-    const finalString = validateValuesForProperty(property, values);
+
+    // Check if existing property contains a var() reference per css-typed-om § 3.2 step 7
     const current = getPropertyValueSafe(this._style, property);
+    if (current && current.includes('var(')) {
+      throw new TypeError(`Cannot append to property ${property} because it contains a var() reference.`);
+    }
+    const existingRaw = this._getRaw(property);
+    if (existingRaw instanceof CSSUnparsedValue || existingRaw instanceof CSSVariableReferenceValue) {
+      throw new TypeError(`Cannot append to property ${property} because it contains a var() reference.`);
+    }
+
+    const finalString = validateValuesForProperty(property, values);
     const newValue = current ? `${current}, ${finalString}` : finalString;
 
-    if (!propLower.startsWith('--')) {
+    if (!propKey.startsWith('--')) {
       try {
         CSSStyleValue.parseAll(property, newValue);
       } catch (e) {
@@ -4298,17 +4353,18 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     setPropertySafe(this._style, this._element, property, newValue);
     try {
       const parsed = CSSStyleValue.parseAll(property, newValue);
-      getStyleCache(this._style).set(propLower, parsed);
+      getStyleCache(this._style).set(propKey, parsed);
     } catch (e) {
-      getStyleCache(this._style).delete(propLower);
+      getStyleCache(this._style).delete(propKey);
     }
   }
 
   delete(property: string): void {
     validateProperty(property);
     this._checkPendingSubstitution(property);
+    const propKey = property.startsWith('--') ? property : property.toLowerCase();
     setPropertySafe(this._style, this._element, property, null);
-    getStyleCache(this._style).delete(property.toLowerCase());
+    getStyleCache(this._style).delete(propKey);
   }
 
   clear(): void {

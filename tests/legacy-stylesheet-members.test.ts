@@ -39,7 +39,7 @@ describe('Legacy CSSStyleSheet members', () => {
     const sheet = new CSSStyleSheet();
     sheet.addRule('div');
     assert.strictEqual(sheet.cssRules.length, 1);
-    assert.strictEqual(sheet.cssRules[0].cssText, 'div {}');
+    assert.strictEqual(sheet.cssRules[0].cssText, 'div { }');
   });
 
   test('sheet.addRule() with omitted style uses "undefined" string internally', () => {

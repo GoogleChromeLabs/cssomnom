@@ -7,8 +7,9 @@ This document explains how to maintain the CSSOM parser repository, including up
 The maintenance workflow typically involves three steps:
 
 1.  **Update Submodules**: Pull the latest changes from the W3C CSSWG drafts and Web Platform Tests.
-2.  **Generate Fixtures**: Extract test cases from the updated WPT files.
-3.  **Run Tests**: Verify that the parser still works and passes the tests.
+2.  **Run Codegen & Generate Fixtures**: Extract spec data and test fixtures from updated submodules.
+3.  **Audit & Revise Feasibility Manifest**: Re-evaluate browser-dependent exclusions against the feasibility criteria.
+4.  **Run Tests & Sync Progress**: Verify unit tests and update WPT conformance logs.
 
 ### Convenient Commands
 
@@ -32,19 +33,33 @@ pnpm run submodules:upgrade
 ```
 This runs `git submodule update --init --remote && pnpm run submodules:update` to pull remote updates and recursively initialize.
 
-**2. Generate Fixtures:**
+**2. Run Full Codegen:**
+```bash
+pnpm run codegen
+```
+Generates CSS properties, syntax dictionaries, SVG presentation attributes, colors, and unit definitions from the updated specs.
+
+**3. Generate Fixtures:**
 ```bash
 pnpm run fixtures:generate
 ```
 This runs `node scripts/external_suites/extract_all.ts`.
 
-**3. Run Tests:**
+**4. Revise Feasibility Manifest:**
+When WPT test files are added, modified, or removed in `submodules/web-platform-tests/`, follow the Delphi Consensus Workflow documented in [`scripts/wpt/node/feasibility/README.md`](./scripts/wpt/node/feasibility/README.md) to audit and update [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+
 ```bash
-pnpm test
+# Run feasibility audit
+node scripts/wpt/node/feasibility/audit.ts
 ```
-Or run the full preflight check (typecheck, linter, and tests):
+
+**5. Run Tests & Update Progress:**
 ```bash
+# Run preflight unit tests and linter
 pnpm run preflight
+
+# Update WPT conformance progress table
+pnpm run wpt:node:progress
 ```
 
 ## Spec Compliance Maintenance
@@ -56,6 +71,24 @@ When specifications are updated in the submodules, we need to ensure our impleme
 2.  **Update Comments**: If section numbers or anchors changed, update the comments in `src/tokenizer.ts` and `src/parser.ts` to reflect the new spec locations.
 3.  **Implement Changes**: If the spec introduced new parsing rules or modified existing ones, update the implementation accordingly.
 4.  **Verify**: Run tests to ensure no regressions.
+
+## WPT Submodule Upgrades & Feasibility Manifest Auditing
+
+When `submodules/web-platform-tests/` is upgraded:
+
+1.  **Anti-Greenwashing Invariant**: Never exclude tests merely because they fail or require complex AST handling. Tests are excluded *only* when physically impossible in pure headless Node.js (e.g. 2D coordinate hit-testing, layout rasterization, live WebDriver hardware input events).
+2.  **Delphi Consensus Protocol**: Re-run the Delphi review workflow documented in [`scripts/wpt/node/feasibility/README.md`](./scripts/wpt/node/feasibility/README.md) to audit any new test failures:
+    ```bash
+    # 1. Export current failure clusters
+    node scripts/wpt/node/feasibility/export_dataset.ts
+
+    # 2. Reconcile subagent votes & regenerate manifest
+    node scripts/wpt/node/feasibility/generate_manifest.ts
+
+    # 3. Verify feasibility metrics
+    node scripts/wpt/node/feasibility/audit.ts
+    ```
+3.  **Synchronize Baseline Tables**: Update [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json) and verify that the feasibility baseline in [`wpt-progress.md`](./wpt-progress.md) matches the updated manifest counts.
 
 ## Spec Compliance Auditing via Subagents
 

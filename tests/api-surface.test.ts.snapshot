@@ -4,6 +4,7 @@ exports[`API Surface Area 1`] = `
   "CSSAtRule",
   "CSSColor",
   "CSSColorValue",
+  "CSSConditionRule",
   "CSSContainerRule",
   "CSSCounterStyleRule",
   "CSSCustomMediaRule",
