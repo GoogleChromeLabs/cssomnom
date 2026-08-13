@@ -21,6 +21,12 @@ import {
 } from './dom-stubs.ts';
 import { VirtualClock } from './virtual-clock.ts';
 
+export const nativeSetTimeout = globalThis.setTimeout;
+export const nativeClearTimeout = globalThis.clearTimeout;
+export const nativeSetInterval = globalThis.setInterval;
+export const nativeClearInterval = globalThis.clearInterval;
+export const nativePerformance = globalThis.performance;
+
 (globalThis as unknown as { DOMMatrixReadOnly: unknown }).DOMMatrixReadOnly = DOMMatrixReadOnly;
 (globalThis as unknown as { DOMMatrix: unknown }).DOMMatrix = DOMMatrix;
 (globalThis as unknown as { DOMPointReadOnly: unknown }).DOMPointReadOnly = DOMPointReadOnly;
@@ -148,15 +154,6 @@ export function createWptContext(
   const perfObj = {
     now: () => virtualClock.currentTime
   };
-  try {
-    Object.defineProperty(win, 'performance', {
-      value: perfObj,
-      configurable: true,
-      writable: true
-    });
-  } catch {
-    (win as Record<string, unknown>).performance = perfObj;
-  }
 
   const setTimeoutFn = (cb: Function, delay?: number, ...args: unknown[]) => virtualClock.setTimeout(cb, delay, ...args);
   const clearTimeoutFn = (id: unknown) => virtualClock.clearTimeout(id);
@@ -165,12 +162,7 @@ export function createWptContext(
   const requestAnimationFrameFn = (cb: (time: number) => void) => virtualClock.requestAnimationFrame(cb);
   const cancelAnimationFrameFn = (id: unknown) => virtualClock.cancelAnimationFrame(id);
 
-  win.setTimeout = setTimeoutFn;
-  win.clearTimeout = clearTimeoutFn;
-  win.setInterval = setIntervalFn;
-  win.clearInterval = clearIntervalFn;
-  win.requestAnimationFrame = requestAnimationFrameFn;
-  win.cancelAnimationFrame = cancelAnimationFrameFn;
+
 
   const ctx: Record<string, unknown> = {
     // Expose elements with IDs as globals (must precede harness functions so IDs like id="test" don't clobber harness functions)
