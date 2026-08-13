@@ -227,7 +227,8 @@ export interface SafeWorkerPoolOptions {
 
 export function getMemorySafeConcurrency(): number {
   const freeMemGB = os.freemem() / (1024 * 1024 * 1024);
-  return Math.min(16, Math.max(1, Math.floor(freeMemGB / 1.5)));
+  const cpuLimit = Math.max(1, (os.availableParallelism ? os.availableParallelism() : os.cpus().length) - 2);
+  return Math.min(12, Math.min(cpuLimit, Math.max(1, Math.floor(freeMemGB / 2))));
 }
 
 export async function safeWorkerPool<T, R>(

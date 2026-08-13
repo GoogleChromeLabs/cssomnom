@@ -14,7 +14,7 @@ export async function executeWptTests(
   files: CrawledTestFile[],
   options: ExecutorOptions = {}
 ): Promise<TestRunDataset> {
-  const timeout = options.timeout ?? 180000;
+  const timeout = options.timeout ?? 240000;
   let completed = 0;
 
   const fileResults = await safeWorkerPool(

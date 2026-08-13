@@ -1272,10 +1272,30 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     return originalAddEventListener.call(this, type, listener, options);
   };
 
+  win.__triggerRenderUpdate = function () {
+    if (resizeListeners.size > 0) {
+      const ev = new (win.Event as { new (t: string): Event })('resize');
+      for (const l of Array.from(resizeListeners)) {
+        try { l(ev); } catch {}
+      }
+    }
+    if (win.__activeMqls) {
+      for (const mql of Array.from(win.__activeMqls as Set<{ _checkChange: () => void }>)) {
+        try { mql._checkChange(); } catch {}
+      }
+    }
+  };
+
   if (!('requestAnimationFrame' in win)) {
     win.requestAnimationFrame = function (cb: (time: number) => void) {
       return setTimeout(() => {
         checkAutofocus();
+        (win as unknown as { __triggerRenderUpdate?: () => void }).__triggerRenderUpdate?.();
+        const iframes = (win.document as { querySelectorAll?: (s: string) => Element[] })?.querySelectorAll?.('iframe') || [];
+        for (const ifr of Array.from(iframes)) {
+          const cw = (ifr as unknown as { contentWindow?: { __triggerRenderUpdate?: () => void } }).contentWindow;
+          cw?.__triggerRenderUpdate?.();
+        }
         cb(performance.now());
       }, 16);
     };
