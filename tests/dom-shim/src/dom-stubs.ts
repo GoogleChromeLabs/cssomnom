@@ -3,19 +3,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseHTML } from 'linkedom';
-import { parseStyleSheet, parseRule } from '../../src/parser.ts';
-import { CSSStyleSheet, MediaList } from '../../src/CSSOM.ts';
-import { CSSStyleDeclaration } from '../../src/CSSStyleDeclaration.ts';
-import { ParseHooks } from '../../src/parse-hooks.ts';
-import { getCascadedStyle } from '../../src/cascade.ts';
-import { matches, querySelectorAll, querySelector } from '../../src/matcher.ts';
-import { camelToDashed } from '../../src/utils.ts';
-import { MediaParser } from '../../src/MediaParser.ts';
-import { tokenize } from '../../src/tokenizer.ts';
-import * as TypedOM from '../../src/typed-om.ts';
-import { unitToPixels, unitToRadians } from '../../src/data/gen/units.ts';
+import { parseStyleSheet, parseRule } from '../../../src/parser.ts';
+import { CSSStyleSheet, MediaList } from '../../../src/CSSOM.ts';
+import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
+import { ParseHooks } from '../../../src/parse-hooks.ts';
+import { getCascadedStyle } from '../../../src/cascade.ts';
+import { matches, querySelectorAll, querySelector } from '../../../src/matcher.ts';
+import { camelToDashed } from '../../../src/utils.ts';
+import { MediaParser } from '../../../src/MediaParser.ts';
+import { tokenize } from '../../../src/tokenizer.ts';
+import * as TypedOM from '../../../src/typed-om.ts';
+import { unitToPixels, unitToRadians } from '../../../src/data/gen/units.ts';
 import { setupIframePrototype } from './iframe-runner.ts';
-import type { MediaEnvironment, Rule } from '../../src/types.ts';
+import type { MediaEnvironment, Rule } from '../../../src/types.ts';
 import type { WindowType } from './testharness-bridge.ts';
 
 export class FallbackRange {
@@ -330,6 +330,27 @@ export function getMediaEnvForWindow(winContext: unknown): Partial<MediaEnvironm
   };
 }
 
+/**
+ * Updates ownerDocument recursively on an inserted or adopted node and its subtree,
+ * invalidating computed style caches.
+ */
+export function updateOwnerDocument(node: unknown, targetDoc: Document): void {
+  if (!node || typeof node !== 'object') return;
+  const n = node as {
+    ownerDocument?: Document;
+    childNodes?: ArrayLike<unknown>;
+    children?: ArrayLike<unknown>;
+  };
+  if (n.ownerDocument !== targetDoc) {
+    n.ownerDocument = targetDoc;
+    computedStyleMapCache.delete(n);
+  }
+  const childNodes = n.childNodes || n.children || [];
+  for (let i = 0; i < childNodes.length; i++) {
+    updateOwnerDocument(childNodes[i], targetDoc);
+  }
+}
+
 let prototypesPatched = false;
 
 export function patchDomPrototypes(window: WindowType, patchWindow: (win: WindowType) => void): void {
@@ -338,7 +359,7 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
 
   const win = window as unknown as Record<string, unknown>;
 
-  // Node & Element prototype patches for LINK and IFRAME load events
+  // Node & Element prototype patches for cross-document migration, LINK, and IFRAME load events
   // @ts-expect-error - Linkedom document types are incomplete
   const dummyElForPatch = win.document?.createElement?.('div');
   if (dummyElForPatch) {
@@ -347,6 +368,15 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       if (Object.prototype.hasOwnProperty.call(proto, 'appendChild')) {
         const originalAppendChild = proto.appendChild as (node: unknown) => unknown;
         proto.appendChild = function (this: unknown, node: unknown) {
+          const thisNode = this as { ownerDocument?: Document } | null;
+          const targetDoc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
+          if (targetDoc && node && typeof node === 'object') {
+            const n = node as { parentNode?: unknown };
+            if (n.parentNode && targetDoc.activeElement && (targetDoc.activeElement === node || (typeof (node as { contains?: (n: unknown) => boolean }).contains === 'function' && (node as { contains: (n: unknown) => boolean }).contains(targetDoc.activeElement)))) {
+              targetDoc.activeElement = null;
+            }
+            updateOwnerDocument(node, targetDoc);
+          }
           const res = originalAppendChild.call(this, node);
           const nodeEl = node as {
             nodeName?: string;
@@ -358,7 +388,6 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
               queueMicrotask(() => {
                 try {
                   if (nodeEl.dispatchEvent) {
-                    const thisNode = this as { ownerDocument?: Document } | null;
                     const doc = thisNode?.ownerDocument || thisNode;
                     const winContext = doc ? (doc as Document).defaultView || window : window;
                     const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
@@ -373,9 +402,18 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       }
 
       if (Object.prototype.hasOwnProperty.call(proto, 'insertBefore')) {
-        const originalInsertBefore = proto.insertBefore as (node: unknown, child: unknown) => unknown;
-        proto.insertBefore = function (this: unknown, node: unknown, child: unknown) {
-          const res = originalInsertBefore.call(this, node, child);
+        const originalInsertBefore = proto.insertBefore as (node: unknown, child?: unknown) => unknown;
+        proto.insertBefore = function (this: unknown, node: unknown, child?: unknown) {
+          const thisNode = this as { ownerDocument?: Document } | null;
+          const targetDoc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
+          if (targetDoc && node && typeof node === 'object') {
+            const n = node as { parentNode?: unknown };
+            if (n.parentNode && targetDoc.activeElement && (targetDoc.activeElement === node || (typeof (node as { contains?: (n: unknown) => boolean }).contains === 'function' && (node as { contains: (n: unknown) => boolean }).contains(targetDoc.activeElement)))) {
+              targetDoc.activeElement = null;
+            }
+            updateOwnerDocument(node, targetDoc);
+          }
+          const res = child !== undefined ? originalInsertBefore.call(this, node, child) : originalInsertBefore.call(this, node);
           const nodeEl = node as {
             nodeName?: string;
             getAttribute?: (name: string) => string | null;
@@ -386,7 +424,6 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
               queueMicrotask(() => {
                 try {
                   if (nodeEl.dispatchEvent) {
-                    const thisNode = this as { ownerDocument?: Document } | null;
                     const doc = thisNode?.ownerDocument || thisNode;
                     const winContext = doc ? (doc as Document).defaultView || window : window;
                     const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
@@ -399,6 +436,47 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
           return res;
         };
       }
+
+      if (Object.prototype.hasOwnProperty.call(proto, 'replaceChild')) {
+        const originalReplaceChild = proto.replaceChild as (newChild: unknown, oldChild: unknown) => unknown;
+        proto.replaceChild = function (this: unknown, newChild: unknown, oldChild: unknown) {
+          const thisNode = this as { ownerDocument?: Document } | null;
+          const targetDoc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as Document | null;
+          if (targetDoc && newChild && typeof newChild === 'object') {
+            updateOwnerDocument(newChild, targetDoc);
+          }
+          return originalReplaceChild.call(this, newChild, oldChild);
+        };
+      }
+
+      if (Object.prototype.hasOwnProperty.call(proto, 'removeChild')) {
+        const originalRemoveChild = proto.removeChild as (child: unknown) => unknown;
+        proto.removeChild = function (this: unknown, child: unknown) {
+          const thisNode = this as { ownerDocument?: Document } | null;
+          const doc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
+          if (doc && doc.activeElement && child && typeof child === 'object') {
+            if (doc.activeElement === child || (typeof (child as { contains?: (n: unknown) => boolean }).contains === 'function' && (child as { contains: (n: unknown) => boolean }).contains(doc.activeElement))) {
+              doc.activeElement = null;
+            }
+          }
+          return originalRemoveChild.call(this, child);
+        };
+      }
+
+      if (Object.prototype.hasOwnProperty.call(proto, 'remove')) {
+        const originalRemove = proto.remove as () => unknown;
+        proto.remove = function (this: unknown) {
+          const thisNode = this as { ownerDocument?: Document } | null;
+          const doc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
+          if (doc && doc.activeElement && thisNode && typeof thisNode === 'object') {
+            if (doc.activeElement === thisNode || (typeof (thisNode as { contains?: (n: unknown) => boolean }).contains === 'function' && (thisNode as { contains: (n: unknown) => boolean }).contains(doc.activeElement))) {
+              doc.activeElement = null;
+            }
+          }
+          return originalRemove.call(this);
+        };
+      }
+
       proto = Object.getPrototypeOf(proto);
     }
   }
@@ -598,6 +676,22 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       configurable: true
     });
 
+    // Document.prototype.adoptNode
+    const origAdoptNode = documentConstructor.prototype.adoptNode as ((node: unknown) => unknown) | undefined;
+    documentConstructor.prototype.adoptNode = function (this: Document, node: unknown) {
+      if (node && typeof node === 'object') {
+        const n = node as { parentNode?: { removeChild?: (child: unknown) => void } };
+        if (n.parentNode && typeof n.parentNode.removeChild === 'function') {
+          n.parentNode.removeChild(n);
+        }
+        updateOwnerDocument(node, this);
+      }
+      if (origAdoptNode) {
+        return origAdoptNode.call(this, node);
+      }
+      return node;
+    };
+
     Object.defineProperty(documentConstructor.prototype, 'fonts', {
       get(this: object) {
         let fonts = documentFontsMap.get(this);
@@ -680,6 +774,36 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
         this.innerHTML = html;
       };
     }
+  }
+
+  if (window.HTMLElement && window.HTMLElement.prototype) {
+    const htmlProto = window.HTMLElement.prototype as unknown as {
+      focus?: () => void;
+      blur?: () => void;
+    };
+    htmlProto.focus = function (this: HTMLElement) {
+      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown; contains?: (n: unknown) => boolean }) | null;
+      if (doc && typeof doc.contains === 'function' && !doc.contains(this)) {
+        return;
+      }
+      if (doc) {
+        doc.activeElement = this;
+      }
+      const winCtx = doc?.defaultView || window;
+      const FocusEv = (winCtx as unknown as { FocusEvent?: typeof Event }).FocusEvent || winCtx.Event || Event;
+      const ev = new FocusEv('focus', { bubbles: false, cancelable: false });
+      this.dispatchEvent(ev);
+    };
+    htmlProto.blur = function (this: HTMLElement) {
+      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown }) | null;
+      if (doc && doc.activeElement === this) {
+        doc.activeElement = null;
+      }
+      const winCtx = doc?.defaultView || window;
+      const FocusEv = (winCtx as unknown as { FocusEvent?: typeof Event }).FocusEvent || winCtx.Event || Event;
+      const ev = new FocusEv('blur', { bubbles: false, cancelable: false });
+      this.dispatchEvent(ev);
+    };
   }
 
   if (window.Document && window.Document.prototype) {
@@ -1090,6 +1214,30 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
   const resizeListeners = new Set<Function>();
   win.__resizeListeners = resizeListeners;
 
+  // Ensure FocusEvent is present on window
+  if (!('FocusEvent' in win)) {
+    const EventBase = (win.Event || Event) as { new (type: string, dict?: unknown): Event };
+    class FocusEvent extends EventBase {
+      relatedTarget: unknown;
+      constructor(type: string, eventInitDict?: { bubbles?: boolean; cancelable?: boolean; relatedTarget?: unknown }) {
+        super(type, eventInitDict);
+        this.relatedTarget = eventInitDict?.relatedTarget ?? null;
+      }
+    }
+    win.FocusEvent = FocusEvent;
+  }
+
+  const checkAutofocus = () => {
+    const docObj = win.document as (Document & { activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
+    if (docObj && typeof docObj.querySelector === 'function' && !docObj.activeElement) {
+      const autofocusEl = docObj.querySelector('[autofocus]');
+      if (autofocusEl) {
+        docObj.activeElement = autofocusEl;
+      }
+    }
+  };
+  checkAutofocus();
+
   const originalAddEventListener = window.addEventListener;
   win.addEventListener = function (
     this: typeof window,
@@ -1104,9 +1252,13 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
         resizeListeners.add((e: Event) => (listener as EventListenerObject).handleEvent(e));
       }
     }
+    if ((type === 'load' || type === 'DOMContentLoaded')) {
+      checkAutofocus();
+    }
     if (type === 'load' && win.__loadEventFired) {
       queueMicrotask(() => {
         try {
+          checkAutofocus();
           if (typeof listener === 'function') {
             const eventConstructor = window as unknown as { Event: new (type: string) => Event };
             listener.call(window, new eventConstructor.Event('load'));
@@ -1119,6 +1271,20 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     }
     return originalAddEventListener.call(this, type, listener, options);
   };
+
+  if (!('requestAnimationFrame' in win)) {
+    win.requestAnimationFrame = function (cb: (time: number) => void) {
+      return setTimeout(() => {
+        checkAutofocus();
+        cb(performance.now());
+      }, 16);
+    };
+  }
+  if (!('cancelAnimationFrame' in win)) {
+    win.cancelAnimationFrame = function (id: unknown) {
+      clearTimeout(id as NodeJS.Timeout);
+    };
+  }
 
   // Implement postMessage if missing
   if (!('postMessage' in win)) {

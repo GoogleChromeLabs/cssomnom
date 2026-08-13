@@ -659,6 +659,37 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return true;
   }
 
+  if (name === 'focus') {
+    const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
+    const active = doc?.activeElement;
+    if (!active || active !== element) return false;
+    return typeof doc?.contains === 'function' ? doc.contains(element) : true;
+  }
+
+  if (name === 'focus-visible') {
+    const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
+    const active = doc?.activeElement;
+    if (!active || active !== element) return false;
+    return typeof doc?.contains === 'function' ? doc.contains(element) : true;
+  }
+
+  if (name === 'focus-within') {
+    const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
+    const active = doc?.activeElement;
+    if (!active) return false;
+    if (typeof doc?.contains === 'function' && !doc.contains(active as DOMElement)) return false;
+    if (active === element) return true;
+    if (typeof (element as { contains?: (n: unknown) => boolean }).contains === 'function') {
+      return (element as { contains: (n: unknown) => boolean }).contains(active);
+    }
+    let cur = (active as DOMElement).parentElement || (active as DOMElement).parentNode;
+    while (cur) {
+      if (cur === element) return true;
+      cur = (cur as DOMElement).parentElement || (cur as DOMElement).parentNode;
+    }
+    return false;
+  }
+
   if (name === 'has-slotted') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'slot') {

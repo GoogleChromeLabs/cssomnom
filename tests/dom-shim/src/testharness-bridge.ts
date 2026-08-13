@@ -2,8 +2,8 @@
 
 import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
-import * as TypedOM from '../../src/typed-om.ts';
-import { DOMMatrixReadOnly, DOMMatrix, DOMPointReadOnly, DOMPoint } from '../../src/DOMMatrix.ts';
+import * as TypedOM from '../../../src/typed-om.ts';
+import { DOMMatrixReadOnly, DOMMatrix, DOMPointReadOnly, DOMPoint } from '../../../src/DOMMatrix.ts';
 import {
   HarnessError,
   AssertionErrorProxy,
@@ -85,6 +85,17 @@ export function createWptContext(
 
   const win = window as unknown as Record<string, unknown>;
 
+  const checkAutofocus = () => {
+    const docObj = document as (Document & { activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
+    if (docObj && typeof docObj.querySelector === 'function' && !docObj.activeElement) {
+      const autofocusEl = docObj.querySelector('[autofocus]');
+      if (autofocusEl) {
+        docObj.activeElement = autofocusEl;
+      }
+    }
+  };
+  checkAutofocus();
+
   const ctx: Record<string, unknown> = {
     // Expose elements with IDs as globals (must precede harness functions so IDs like id="test" don't clobber harness functions)
     ...(document.querySelectorAll ? Array.from(document.querySelectorAll('[id]')).reduce<Record<string, unknown>>((acc, el) => {
@@ -109,6 +120,7 @@ export function createWptContext(
     DOMException: win.DOMException,
     Event: win.Event,
     CustomEvent: win.CustomEvent,
+    FocusEvent: win.FocusEvent,
     Range: win.Range || (globalThis as { Range?: unknown }).Range || FallbackRange,
     MutationObserver: win.MutationObserver || (globalThis as { MutationObserver?: unknown }).MutationObserver || FallbackMutationObserver,
     navigator: win.__navigator || { preferences: createNavigatorPreferences() },
@@ -153,6 +165,7 @@ export function createWptContext(
       const timer = setTimeout(() => {
         activeRafs.delete(id);
         try {
+          checkAutofocus();
           const checkWindow = (w: Record<string, unknown>) => {
             const env = getMediaEnvForWindow(w);
             const prevW = w.__lastWidth as number | undefined;

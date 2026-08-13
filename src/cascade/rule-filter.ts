@@ -24,7 +24,9 @@ import {
   CSSLayerBlockRule,
   CSSStyleSheet,
   CSSMediaRule,
+  CSSSupportsRule,
 } from '../CSSOM.ts';
+import { supports } from '../parser-api.ts';
 import { tokenize } from '../tokenizer.ts';
 import { Parser, parseStyleSheet } from '../parser.ts';
 import { MediaParser } from '../MediaParser.ts';
@@ -363,6 +365,15 @@ export function collectMatchedDeclarations(
         }
         if (!rule.startSelector || matchingScopeNode) {
           walkRules(childRules, parentSelector, currentLayer, matchingScopeNode);
+        }
+      } else if (
+        rule instanceof CSSSupportsRule ||
+        ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'supports')
+      ) {
+        const condText = rule instanceof CSSSupportsRule ? rule.conditionText : serialize((rule as ASTAtRule).prelude || []).trim();
+        if (supports(condText)) {
+          const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
+          walkRules(childRules, parentSelector, currentLayer, scopeNode);
         }
       } else if (rule instanceof CSSGroupingRule) {
         walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode);

@@ -7,7 +7,7 @@ import { parseHTML } from 'linkedom';
 import { HarnessError, messageOf } from './wpt-assertions.ts';
 import { createWptContext, type WindowType, type DocumentType, type WptSandboxTest } from './testharness-bridge.ts';
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
+const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 export const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
 
 export interface IframeSandboxContext {
@@ -389,12 +389,17 @@ export function setupIframePrototype(
         (iframeWindow as unknown as Record<string, unknown>).__lastHeight = 100;
         patchWindow(iframeWindow);
 
+        const iframeEl = this as { ownerDocument?: Document };
+
         // Route postMessage to parent window (main window)
         iframeWindow.postMessage = function (this: typeof iframeWindow, data: unknown) {
-          const event = new mainWindow.CustomEvent('message');
+          const parentDoc = iframeEl.ownerDocument;
+          const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
+          const EventConstructor = (parentWin.CustomEvent || parentWin.Event || CustomEvent || Event) as { new (t: string): CustomEvent };
+          const event = new EventConstructor('message');
           Object.defineProperty(event, 'data', { value: data, enumerable: true });
           Object.defineProperty(event, 'source', { value: this, enumerable: true });
-          mainWindow.dispatchEvent(event);
+          parentWin.dispatchEvent(event);
         };
 
         const iframeDocument = iframeDom.document;
@@ -402,7 +407,9 @@ export function setupIframePrototype(
         iframeContentWindowMap.set(this, iframeWindow);
 
         iframeDocument.write = function (src: string) {
-          runIframeDocumentWrite(iframeWindow, iframeDocument, src, mainWindow, patchWindow);
+          const parentDoc = iframeEl.ownerDocument;
+          const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
+          runIframeDocumentWrite(iframeWindow, iframeDocument, src, parentWin, patchWindow);
         };
         iframeDocument.close = function () {};
         doc = iframeDocument;
@@ -428,7 +435,7 @@ export function setupIframePrototype(
     },
     set(this: object, val: string) {
       iframeSrcDocMap.set(this, val);
-      const self = this as { contentDocument?: { write?: (s: string) => void }; dispatchEvent?: (ev: Event) => boolean };
+      const self = this as { contentDocument?: { write?: (s: string) => void }; dispatchEvent?: (ev: Event) => boolean; ownerDocument?: Document };
       const doc = self.contentDocument;
       if (doc && typeof doc.write === 'function') {
         try {
@@ -438,7 +445,9 @@ export function setupIframePrototype(
       queueMicrotask(() => {
         try {
           if (self.dispatchEvent) {
-            const eventConstructor = mainWindow as unknown as { Event: new (type: string) => Event };
+            const parentDoc = self.ownerDocument;
+            const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
+            const eventConstructor = parentWin as unknown as { Event: new (type: string) => Event };
             self.dispatchEvent(new eventConstructor.Event('load'));
           }
         } catch {}
