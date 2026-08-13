@@ -15,10 +15,7 @@
  * limitations under the License.
  */
 
-// Barrel export for backwards compatibility
-export * from './typed-om/index.ts';
-export type { CSSUnit } from './data/gen/units.ts';
-export type { CSSNumericType } from './typed-om/numeric/CSSNumericType.ts';
-export type { CSSMatrixComponentOptions } from './typed-om/transform/transform-components.ts';
-export type { StyleReadOnlyLike } from './typed-om/style-map/StylePropertyMapReadOnly.ts';
-export type { StyleLike } from './typed-om/style-map/StylePropertyMap.ts';
+import { CSSStyleValue } from './CSSStyleValue.ts';
+
+// Spec: CSS Typed OM Level 1 § 3.5 #imagevalue-objects
+export abstract class CSSImageValue extends CSSStyleValue {}

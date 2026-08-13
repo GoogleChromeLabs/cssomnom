@@ -2426,9 +2426,9 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - CSS Values and Units Module Level 4: `submodules/csswg-drafts/css-values-4/Overview.bs`
 
 ### Tasks
-- [ ] **Code Simplifier Input**:
+- [x] **Code Simplifier Input**:
   - Run Code Simplifier subagents on `src/typed-om.ts` to isolate duplicated constructor guards and WebIDL type conversions.
-- [ ] **Spec-Aligned Module Decomposition**:
+- [x] **Spec-Aligned Module Decomposition**:
   - `src/typed-om/values/`: Base `CSSStyleValue`, `CSSKeywordValue`, `CSSUnparsedValue`, `CSSVariableReferenceValue` (CSS Typed OM 1 § 3).
   - `src/typed-om/numeric/`: `CSSNumericValue`, `CSSUnitValue`, `CSSNumericArray`, and calculation tree nodes `CSSMathValue`, `CSSMathSum`, `CSSMathProduct`, `CSSMathNegate`, `CSSMathInvert`, `CSSMathMin`, `CSSMathMax`, `CSSMathClamp`, `CSSMathRound` (CSS Typed OM 1 § 4).
   - `src/typed-om/color/`: `CSSColorValue`, `CSSRGB`, `CSSHSL`, `CSSHWB`, `CSSLab`, `CSSLCH`, `CSSOKLab`, `CSSOKLCH`, `CSSColor` (CSS Typed OM 2 & CSS Color 4).
@@ -2437,10 +2437,10 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - `src/typed-om/maps/`: `StylePropertyMapReadOnly`, `StylePropertyMap` (CSS Typed OM 1 § 2).
   - `src/typed-om/reify/`: `createCSSStyleValue`, `reifyValue`, and standard syntax validators.
   - `src/typed-om/index.ts`: Re-export all classes and interfaces maintaining 100% backwards compatibility and zero circular dependencies with `src/parse-hooks.ts`.
-- [ ] **Zero-Regression & Preflight Verification**:
+- [x] **Zero-Regression & Preflight Verification**:
   - Verify with `scripts/wpt/node/snapshot-and-verify.ts --verify` (0 regressions).
   - Run `pnpm run preflight`.
-- [ ] **Multi-Agent Review Loop**:
+- [x] **Multi-Agent Review Loop**:
   - Codex Reviewer + Gatekeeper Grizz audit.
 
 ---
