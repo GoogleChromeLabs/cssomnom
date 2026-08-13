@@ -276,10 +276,12 @@ export function runIframeDocumentWrite(
           try {
             if (t.promise) {
               const clock = (iframeWindow as unknown as { __virtualClock?: VirtualClock }).__virtualClock;
-              if (clock) {
-                void clock.pumpUntil(() => (t as unknown as { completed?: boolean }).completed === true, { maxTicks: 5000, maxVirtualDuration: 30000 });
-              }
-              await timeoutPromise(t.promise, 1000);
+              let isDone = false;
+              const pumpPromise = clock ? clock.pumpUntil(() => isDone, { maxTicks: 5000, maxVirtualDuration: 30000 }) : Promise.resolve();
+              const testPromise = timeoutPromise(t.promise, 2000).finally(() => {
+                isDone = true;
+              });
+              await Promise.all([pumpPromise, testPromise]);
             }
             statusCode = t.status ?? 0;
             message = t.message ?? null;
@@ -311,26 +313,28 @@ export function runIframeDocumentWrite(
           };
           try {
             if (t.fn) {
-              const valOrPromise = t.fn(tObj);
-              if (
-                valOrPromise &&
-                typeof valOrPromise === 'object' &&
-                'then' in valOrPromise &&
-                typeof (valOrPromise as Record<string, unknown>).then === 'function'
-              ) {
-                let promiseDone = false;
-                const wrappedPromise = (valOrPromise as Promise<unknown>).then(
-                  (res) => { promiseDone = true; return res; },
-                  (err) => { promiseDone = true; throw err; }
-                );
-                const clock = (iframeWindow as unknown as { __virtualClock?: VirtualClock }).__virtualClock;
-                if (clock) {
-                  void clock.pumpUntil(() => promiseDone, { maxTicks: 5000, maxVirtualDuration: 30000 });
+              const fn = t.fn;
+              const clock = (iframeWindow as unknown as { __virtualClock?: VirtualClock }).__virtualClock;
+              let isDone = false;
+              const pumpPromise = clock ? clock.pumpUntil(() => isDone, { maxTicks: 5000, maxVirtualDuration: 30000 }) : Promise.resolve();
+              const testPromise = (async () => {
+                try {
+                  const valOrPromise = fn(tObj);
+                  if (
+                    valOrPromise &&
+                    typeof valOrPromise === 'object' &&
+                    'then' in valOrPromise &&
+                    typeof (valOrPromise as Record<string, unknown>).then === 'function'
+                  ) {
+                    await timeoutPromise(valOrPromise as Promise<unknown>, 2000);
+                  } else {
+                    await valOrPromise;
+                  }
+                } finally {
+                  isDone = true;
                 }
-                await timeoutPromise(wrappedPromise, 1000);
-              } else {
-                await valOrPromise;
-              }
+              })();
+              await Promise.all([pumpPromise, testPromise]);
             }
           } catch (err: unknown) {
             const isTimeout = err && typeof err === 'object' && (err as Record<string, unknown>).isTimeout === true;

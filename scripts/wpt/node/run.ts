@@ -202,9 +202,15 @@ export function runWptFile(filePath: string): WptFileResult {
       const wrappedFn = async () => {
         if (t.type === 'async_test' && t.promise) {
           if (clock) {
-            void clock.pumpUntil(() => (t as unknown as { completed?: boolean }).completed === true, { maxTicks: 5000, maxVirtualDuration: 30000 });
+            let isDone = false;
+            const pumpPromise = clock.pumpUntil(() => isDone, { maxTicks: 5000, maxVirtualDuration: 30000 });
+            const testPromise = t.promise.finally(() => {
+              isDone = true;
+            });
+            await Promise.all([pumpPromise, testPromise]);
+          } else {
+            await t.promise;
           }
-          await t.promise;
         }
         if ((t.status ?? 0) !== 0) {
           throw new Error(t.message || `Test failed with status ${t.status}`);
@@ -244,23 +250,25 @@ export function runWptFile(filePath: string): WptFileResult {
     const wrappedFn = async () => {
       try {
         if (t.fn) {
-          const res = t.fn.call(testHarnessParam, testHarnessParam);
-          if (
-            res &&
-            typeof res === 'object' &&
-            'then' in res &&
-            typeof (res as Record<string, unknown>).then === 'function'
-          ) {
-            let promiseDone = false;
-            const wrappedPromise = (res as Promise<unknown>).then(
-              (v) => { promiseDone = true; return v; },
-              (err) => { promiseDone = true; throw err; }
-            );
-            if (clock) {
-              void clock.pumpUntil(() => promiseDone, { maxTicks: 5000, maxVirtualDuration: 30000 });
+          const fn = t.fn;
+          let isDone = false;
+          const pumpPromise = clock ? clock.pumpUntil(() => isDone, { maxTicks: 5000, maxVirtualDuration: 30000 }) : Promise.resolve();
+          const testPromise = (async () => {
+            try {
+              const res = fn.call(testHarnessParam, testHarnessParam);
+              if (
+                res &&
+                typeof res === 'object' &&
+                'then' in res &&
+                typeof (res as Record<string, unknown>).then === 'function'
+              ) {
+                await res;
+              }
+            } finally {
+              isDone = true;
             }
-            await wrappedPromise;
-          }
+          })();
+          await Promise.all([pumpPromise, testPromise]);
         }
       } finally {
         for (const cleanup of cleanups) {

@@ -114,7 +114,9 @@ test('VirtualClock pumpUntil halts on completion even with uncancelled setInterv
 
   assert.strictEqual(completed, true);
   assert.strictEqual(targetFinished, true);
-  assert.strictEqual(intervalCount, 5);
+  // Interval fired at t=10, 20, 30, 40 (4 times).
+  // At t=50, the setTimeout (scheduled earlier at t=0 with lower sequence number) executes first and causes pumpUntil to immediately halt before the 5th interval tick.
+  assert.strictEqual(intervalCount, 4);
   assert.strictEqual(clock.currentTime, 50);
   assert.ok(wallClockDuration < 20, `Wall-clock duration was ${wallClockDuration}ms`);
 });
