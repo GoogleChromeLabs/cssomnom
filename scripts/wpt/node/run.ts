@@ -1,4 +1,6 @@
+/** MANDATORY INVOCATION FLAG: Always run this file with `node --max-old-space-size=512 scripts/wpt/node/run.ts <file>` to enforce a 512MB heap limit and prevent unconstrained memory growth. */
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
+
 
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM, createWptContext, type WptSandboxTest } from '../../../tests/wpt-shim.ts';
@@ -74,19 +76,22 @@ export function runWptFile(filePath: string): WptFileResult {
       if (prop === 'navigator') {
         return sandbox.navigator;
       }
-      if (prop === 'Array' || prop === 'Object' || prop === 'String' || prop === 'Number' || prop === 'Boolean' || prop === 'Symbol' || prop === 'Math' || prop === 'Date' || prop === 'RegExp' || prop === 'JSON') {
-        return Reflect.get(globalThis, prop);
-      }
       if (typeof prop === 'string') {
-        const val = target[prop];
-        if (val !== undefined) {
-          if (typeof val === 'function') {
-            return val.bind(target);
-          }
-          return val;
+        if (prop in globalThis) {
+          return Reflect.get(globalThis, prop);
         }
         if (prop in sandbox) {
           return Reflect.get(sandbox, prop);
+        }
+        const val = target[prop];
+        if (val !== undefined) {
+          if (typeof val === 'function') {
+            if (val.prototype && val.prototype.constructor === val) {
+              return val;
+            }
+            return val.bind(target);
+          }
+          return val;
         }
         if (dom.document && typeof dom.document.getElementById === 'function') {
           const el = dom.document.getElementById(prop);
@@ -100,7 +105,7 @@ export function runWptFile(filePath: string): WptFileResult {
         return true;
       }
       if (typeof prop === 'string') {
-        return (target[prop] !== undefined) || (prop in sandbox) || (Boolean(dom.document?.getElementById?.(prop)));
+        return (target[prop] !== undefined) || (prop in sandbox) || (prop in globalThis) || (Boolean(dom.document?.getElementById?.(prop)));
       }
       return prop in sandbox;
     },
@@ -117,27 +122,6 @@ export function runWptFile(filePath: string): WptFileResult {
   sandbox.document = dom.document;
   sandbox.globalThis = windowProxy;
   sandbox.self = windowProxy;
-  sandbox.Array = globalThis.Array;
-  sandbox.Object = globalThis.Object;
-  sandbox.String = globalThis.String;
-  sandbox.Number = globalThis.Number;
-  sandbox.Boolean = globalThis.Boolean;
-  sandbox.Symbol = globalThis.Symbol;
-  sandbox.Math = globalThis.Math;
-  sandbox.Date = globalThis.Date;
-  sandbox.RegExp = globalThis.RegExp;
-  sandbox.JSON = globalThis.JSON;
-
-  winObj.Array = globalThis.Array;
-  winObj.Object = globalThis.Object;
-  winObj.String = globalThis.String;
-  winObj.Number = globalThis.Number;
-  winObj.Boolean = globalThis.Boolean;
-  winObj.Symbol = globalThis.Symbol;
-  winObj.Math = globalThis.Math;
-  winObj.Date = globalThis.Date;
-  winObj.RegExp = globalThis.RegExp;
-  winObj.JSON = globalThis.JSON;
 
   // Copy common globals explicitly if they are on window
   const commonGlobals = [
@@ -332,12 +316,8 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
             console.error(`  ✖ ${testItem.name.replace(/\n/g, '\\n')}`);
             console.error(err);
           }
-          // Yield to event loop for 10ms to allow GC, OS scheduling, and prevent system freeze
-          await new Promise(resolve => setTimeout(resolve, 10));
         }
         result.cleanup();
-        // Yield 10ms between files
-        await new Promise(resolve => setTimeout(resolve, 10));
       } catch (err) {
         console.error(`Failed to run file ${relPath}:`, err);
         console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);

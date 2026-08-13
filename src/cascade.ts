@@ -37,6 +37,12 @@ import type { DOMElement } from './matcher.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { NAMED_COLORS } from './data/gen/colors.ts';
+import {
+  SVG_PRESENTATION_ATTRIBUTES,
+  COLOR_PROPERTIES,
+  DEFAULT_PROPERTY_VALUES,
+  BLOCK_TAGS,
+} from './data/gen/cascade-data.ts';
 import { camelToDashed } from './utils.ts';
 import type {
   Rule,
@@ -86,153 +92,6 @@ const INHERITED_PROPERTIES = new Set([
   'cursor',
   'direction',
   'writing-mode',
-]);
-
-/**
- * Standard SVG presentation attributes that map to CSS properties in the cascade.
- * svg-2 § 6.2 #presentation-attributes
- * css-cascade-5 § 3 #cascade-origins
- */
-const SVG_PRESENTATION_ATTRIBUTES = new Set([
-  'alignment-baseline',
-  'baseline-shift',
-  'clip',
-  'clip-path',
-  'clip-rule',
-  'color',
-  'color-interpolation',
-  'color-interpolation-filters',
-  'color-rendering',
-  'cursor',
-  'direction',
-  'display',
-  'dominant-baseline',
-  'fill',
-  'fill-opacity',
-  'fill-rule',
-  'filter',
-  'flood-color',
-  'flood-opacity',
-  'font-family',
-  'font-size',
-  'font-size-adjust',
-  'font-stretch',
-  'font-style',
-  'font-variant',
-  'font-weight',
-  'glyph-orientation-vertical',
-  'image-rendering',
-  'letter-spacing',
-  'lighting-color',
-  'marker-end',
-  'marker-mid',
-  'marker-start',
-  'mask',
-  'mask-type',
-  'opacity',
-  'overflow',
-  'paint-order',
-  'pointer-events',
-  'shape-rendering',
-  'stop-color',
-  'stop-opacity',
-  'stroke',
-  'stroke-dasharray',
-  'stroke-dashoffset',
-  'stroke-linecap',
-  'stroke-linejoin',
-  'stroke-miterlimit',
-  'stroke-opacity',
-  'stroke-width',
-  'text-anchor',
-  'text-decoration',
-  'text-decoration-line',
-  'text-decoration-style',
-  'text-rendering',
-  'transform',
-  'vector-effect',
-  'visibility',
-  'word-spacing',
-  'writing-mode',
-]);
-
-/**
- * Standard CSS color properties that normalize computed color format.
- * css-color-4 § 4 #resolving-color-values
- */
-const COLOR_PROPERTIES = new Set([
-  'color',
-  'background-color',
-  'border-color',
-  'border-top-color',
-  'border-right-color',
-  'border-bottom-color',
-  'border-left-color',
-  'outline-color',
-  'text-decoration-color',
-  'column-rule-color',
-  'caret-color',
-]);
-
-/**
- * Default initial property values for standard CSS and SVG presentation attributes.
- * css-cascade-5 § 7.1 #initial-values
- * svg-2 § 6.2 #presentation-attributes
- */
-const DEFAULT_PROPERTY_VALUES: Record<string, string> = {
-  'alignment-baseline': 'baseline',
-  'baseline-shift': 'baseline',
-  'clip-rule': 'nonzero',
-  'color': 'rgb(0, 0, 0)',
-  'color-interpolation-filters': '',
-  'cursor': 'auto',
-  'direction': 'ltr',
-  'display': 'inline',
-  'dominant-baseline': 'auto',
-  'fill': 'black',
-  'fill-opacity': '1',
-  'fill-rule': 'nonzero',
-  'filter': 'none',
-  'flood-color': '',
-  'flood-opacity': '1',
-  'font-family': 'Times New Roman',
-  'font-size': '16px',
-  'font-size-adjust': 'none',
-  'font-stretch': '100%',
-  'font-style': 'normal',
-  'font-weight': '400',
-  'glyph-orientation-vertical': 'auto',
-  'kerning': 'auto',
-  'letter-spacing': 'normal',
-  'lighting-color': '',
-  'opacity': '1',
-  'overflow': 'visible',
-  'pointer-events': 'visiblePainted',
-  'stop-color': '',
-  'stop-opacity': '1',
-  'stroke': '',
-  'stroke-dasharray': 'none',
-  'stroke-dashoffset': '0px',
-  'stroke-linecap': 'butt',
-  'stroke-linejoin': 'miter',
-  'stroke-miterlimit': '4',
-  'stroke-opacity': '1',
-  'stroke-width': '1px',
-  'text-anchor': 'start',
-  'text-decoration-line': 'none',
-  'text-decoration-style': 'solid',
-  'visibility': 'visible',
-  'word-spacing': '0px',
-  'writing-mode': 'lr-tb',
-  'background-color': 'rgba(0, 0, 0, 0)',
-  'border-spacing': '0px',
-  'text-indent': '0px',
-};
-
-const BLOCK_TAGS = new Set([
-  'HTML', 'BODY', 'DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
-  'UL', 'OL', 'LI', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'NAV',
-  'BLOCKQUOTE', 'PRE', 'FIGURE', 'FIGCAPTION', 'FORM', 'FIELDSET', 'TABLE', 'HR'
 ]);
 
 function getUaDefault(prop: string, element: unknown): string {

@@ -20,38 +20,15 @@
 
 import { degToRad, angleFromVector } from './utils.ts';
 
-// Fully unrolled 4x4 matrix multiplication writing into destination array
+// 4x4 matrix multiplication writing into destination array
 export function multiplyArrays(a: Float64Array, b: Float64Array, out: Float64Array = new Float64Array(16)): Float64Array {
-  const a00 = a[0],  a01 = a[1],  a02 = a[2],  a03 = a[3];
-  const a10 = a[4],  a11 = a[5],  a12 = a[6],  a13 = a[7];
-  const a20 = a[8],  a21 = a[9],  a22 = a[10], a23 = a[11];
-  const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
-
-  const b00 = b[0],  b01 = b[1],  b02 = b[2],  b03 = b[3];
-  const b10 = b[4],  b11 = b[5],  b12 = b[6],  b13 = b[7];
-  const b20 = b[8],  b21 = b[9],  b22 = b[10], b23 = b[11];
-  const b30 = b[12], b31 = b[13], b32 = b[14], b33 = b[15];
-
-  out[0]  = a00 * b00 + a01 * b10 + a02 * b20 + a03 * b30;
-  out[1]  = a00 * b01 + a01 * b11 + a02 * b21 + a03 * b31;
-  out[2]  = a00 * b02 + a01 * b12 + a02 * b22 + a03 * b32;
-  out[3]  = a00 * b03 + a01 * b13 + a02 * b23 + a03 * b33;
-
-  out[4]  = a10 * b00 + a11 * b10 + a12 * b20 + a13 * b30;
-  out[5]  = a10 * b01 + a11 * b11 + a12 * b21 + a13 * b31;
-  out[6]  = a10 * b02 + a11 * b12 + a12 * b22 + a13 * b32;
-  out[7]  = a10 * b03 + a11 * b13 + a12 * b23 + a13 * b33;
-
-  out[8]  = a20 * b00 + a21 * b10 + a22 * b20 + a23 * b30;
-  out[9]  = a20 * b01 + a21 * b11 + a22 * b21 + a23 * b31;
-  out[10] = a20 * b02 + a21 * b12 + a22 * b22 + a23 * b32;
-  out[11] = a20 * b03 + a21 * b13 + a22 * b23 + a23 * b33;
-
-  out[12] = a30 * b00 + a31 * b10 + a32 * b20 + a33 * b30;
-  out[13] = a30 * b01 + a31 * b11 + a32 * b21 + a33 * b31;
-  out[14] = a30 * b02 + a31 * b12 + a32 * b22 + a33 * b32;
-  out[15] = a30 * b03 + a31 * b13 + a32 * b23 + a33 * b33;
-
+  const res = out === a || out === b ? new Float64Array(16) : out;
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      res[i * 4 + j] = a[i * 4] * b[j] + a[i * 4 + 1] * b[4 + j] + a[i * 4 + 2] * b[8 + j] + a[i * 4 + 3] * b[12 + j];
+    }
+  }
+  if (res !== out) out.set(res);
   return out;
 }
 
@@ -64,71 +41,38 @@ export function transpose(m: Float64Array | Float32Array | number[]): Float64Arr
   return out;
 }
 
-export function invertMatrix(M: Float64Array): { success: boolean; result: Float64Array } {
-  const out = new Float64Array(16);
-  const m11 = M[0], m12 = M[1], m13 = M[2], m14 = M[3];
-  const m21 = M[4], m22 = M[5], m23 = M[6], m24 = M[7];
-  const m31 = M[8], m32 = M[9], m33 = M[10], m34 = M[11];
-  const m41 = M[12], m42 = M[13], m43 = M[14], m44 = M[15];
+export function invertMatrix(m: Float64Array): { success: boolean; result: Float64Array } {
+  const s0 = m[0] * m[5] - m[1] * m[4], s1 = m[0] * m[6] - m[2] * m[4], s2 = m[0] * m[7] - m[3] * m[4];
+  const s3 = m[1] * m[6] - m[2] * m[5], s4 = m[1] * m[7] - m[3] * m[5], s5 = m[2] * m[7] - m[3] * m[6];
+  const c0 = m[8] * m[13] - m[9] * m[12], c1 = m[8] * m[14] - m[10] * m[12], c2 = m[8] * m[15] - m[11] * m[12];
+  const c3 = m[9] * m[14] - m[10] * m[13], c4 = m[9] * m[15] - m[11] * m[13], c5 = m[10] * m[15] - m[11] * m[14];
 
-  // Row 1 cofactors
-  const c11 = m22 * (m33 * m44 - m43 * m34) - m32 * (m23 * m44 - m43 * m24) + m42 * (m23 * m34 - m33 * m24);
-  const c12 = -(m12 * (m33 * m44 - m43 * m34) - m32 * (m13 * m44 - m43 * m14) + m42 * (m13 * m34 - m33 * m14));
-  const c13 = m12 * (m23 * m44 - m43 * m24) - m22 * (m13 * m44 - m43 * m14) + m42 * (m13 * m24 - m23 * m14);
-  const c14 = -(m12 * (m23 * m34 - m33 * m24) - m22 * (m13 * m34 - m33 * m14) + m32 * (m13 * m24 - m23 * m14));
-
-  // Determinant
-  const det = m11 * c11 + m21 * c12 + m31 * c13 + m41 * c14;
-
+  const det = s0 * c5 - s1 * c4 + s2 * c3 + s3 * c2 - s4 * c1 + s5 * c0;
   if (!Number.isFinite(det) || det === 0) {
-    const nanResult = new Float64Array(16);
-    nanResult.fill(NaN);
-    return { success: false, result: nanResult };
+    return { success: false, result: new Float64Array(16).fill(NaN) };
   }
+  const invDet = 1 / det;
+  const out = new Float64Array(16);
 
-  const detInv = 1 / det;
+  out[0] = ( m[5] * c5 - m[6] * c4 + m[7] * c3) * invDet;
+  out[1] = (-m[1] * c5 + m[2] * c4 - m[3] * c3) * invDet;
+  out[2] = ( m[13] * s5 - m[14] * s4 + m[15] * s3) * invDet;
+  out[3] = (-m[9] * s5 + m[10] * s4 - m[11] * s3) * invDet;
 
-  // Assign Row 1 cofactors to Column 1 of output
-  out[0] = c11 * detInv;
-  out[1] = c12 * detInv;
-  out[2] = c13 * detInv;
-  out[3] = c14 * detInv;
+  out[4] = (-m[4] * c5 + m[6] * c2 - m[7] * c1) * invDet;
+  out[5] = ( m[0] * c5 - m[2] * c2 + m[3] * c1) * invDet;
+  out[6] = (-m[12] * s5 + m[14] * s2 - m[15] * s1) * invDet;
+  out[7] = ( m[8] * s5 - m[10] * s2 + m[11] * s1) * invDet;
 
-  // Row 2 cofactors
-  const c21 = -(m21 * (m33 * m44 - m43 * m34) - m31 * (m23 * m44 - m43 * m24) + m41 * (m23 * m34 - m33 * m24));
-  const c22 = m11 * (m33 * m44 - m43 * m34) - m31 * (m13 * m44 - m43 * m14) + m41 * (m13 * m34 - m33 * m14);
-  const c23 = -(m11 * (m23 * m44 - m43 * m24) - m21 * (m13 * m44 - m43 * m14) + m41 * (m13 * m24 - m23 * m14));
-  const c24 = m11 * (m23 * m34 - m33 * m24) - m21 * (m13 * m34 - m33 * m14) + m31 * (m13 * m24 - m23 * m14);
+  out[8] = ( m[4] * c4 - m[5] * c2 + m[7] * c0) * invDet;
+  out[9] = (-m[0] * c4 + m[1] * c2 - m[3] * c0) * invDet;
+  out[10] = ( m[12] * s4 - m[13] * s2 + m[15] * s0) * invDet;
+  out[11] = (-m[8] * s4 + m[9] * s2 - m[11] * s0) * invDet;
 
-  // Assign Row 2 cofactors to Column 2 of output
-  out[4] = c21 * detInv;
-  out[5] = c22 * detInv;
-  out[6] = c23 * detInv;
-  out[7] = c24 * detInv;
-
-  // Row 3 cofactors
-  const c31 = m21 * (m32 * m44 - m42 * m34) - m31 * (m22 * m44 - m42 * m24) + m41 * (m22 * m34 - m32 * m24);
-  const c32 = -(m11 * (m32 * m44 - m42 * m34) - m31 * (m12 * m44 - m42 * m14) + m41 * (m12 * m34 - m32 * m14));
-  const c33 = m11 * (m22 * m44 - m42 * m24) - m21 * (m12 * m44 - m42 * m14) + m41 * (m12 * m24 - m22 * m14);
-  const c34 = -(m11 * (m22 * m34 - m32 * m24) - m21 * (m12 * m34 - m32 * m14) + m31 * (m12 * m24 - m22 * m14));
-
-  // Assign Row 3 cofactors to Column 3 of output
-  out[8] = c31 * detInv;
-  out[9] = c32 * detInv;
-  out[10] = c33 * detInv;
-  out[11] = c34 * detInv;
-
-  // Row 4 cofactors
-  const c41 = -(m21 * (m32 * m43 - m42 * m33) - m31 * (m22 * m43 - m42 * m23) + m41 * (m22 * m33 - m32 * m23));
-  const c42 = m11 * (m32 * m43 - m42 * m33) - m31 * (m12 * m43 - m42 * m13) + m41 * (m12 * m33 - m32 * m13);
-  const c43 = -(m11 * (m22 * m43 - m42 * m23) - m21 * (m12 * m43 - m42 * m13) + m41 * (m12 * m23 - m22 * m13));
-  const c44 = m11 * (m22 * m33 - m32 * m23) - m21 * (m12 * m33 - m32 * m13) + m31 * (m12 * m23 - m22 * m13);
-
-  // Assign Row 4 cofactors to Column 4 of output
-  out[12] = c41 * detInv;
-  out[13] = c42 * detInv;
-  out[14] = c43 * detInv;
-  out[15] = c44 * detInv;
+  out[12] = (-m[4] * c3 + m[5] * c1 - m[6] * c0) * invDet;
+  out[13] = ( m[0] * c3 - m[1] * c1 + m[2] * c0) * invDet;
+  out[14] = (-m[12] * s3 + m[13] * s1 - m[14] * s0) * invDet;
+  out[15] = ( m[8] * s3 - m[9] * s1 + m[10] * s0) * invDet;
 
   return { success: true, result: out };
 }
@@ -267,54 +211,33 @@ export interface DOMMatrixInit {
   toFloat64Array?: () => number[] | Float64Array;
 }
 
+const NON_2D_INDICES: [number, number][] = [
+  [2, 0], [3, 0], [6, 0], [7, 0], [8, 0], [9, 0], [10, 1], [11, 0], [14, 0], [15, 1]
+];
+const NON_2D_KEYS: [keyof DOMMatrixInit, number][] = [
+  ['m13', 0], ['m14', 0], ['m23', 0], ['m24', 0], ['m31', 0], ['m32', 0], ['m33', 1], ['m34', 0], ['m43', 0], ['m44', 1]
+];
+const ALIASES: [keyof DOMMatrixInit, keyof DOMMatrixInit][] = [
+  ['a', 'm11'], ['b', 'm12'], ['c', 'm21'], ['d', 'm22'], ['e', 'm41'], ['f', 'm42']
+];
+
 export function has3DComponents(init: DOMMatrixInit | DOMMatrixReadOnly | Float64Array | Float32Array | number[]): boolean {
-  if (init instanceof DOMMatrixReadOnly) {
-    return !init.is2D;
-  }
+  if (init instanceof DOMMatrixReadOnly) return !init.is2D;
   if (init instanceof Float64Array || init instanceof Float32Array || Array.isArray(init)) {
     if (init.length === 6) return false;
     if (init.length === 16) {
-      return (
-        init[2] !== 0 || init[3] !== 0 ||
-        init[6] !== 0 || init[7] !== 0 ||
-        init[8] !== 0 || init[9] !== 0 || init[10] !== 1 || init[11] !== 0 ||
-        init[14] !== 0 || init[15] !== 1
-      );
+      return NON_2D_INDICES.some(([idx, expected]) => init[idx] !== expected);
     }
     return true;
   }
-  return (
-    (init.m13 !== undefined && init.m13 !== 0) ||
-    (init.m14 !== undefined && init.m14 !== 0) ||
-    (init.m23 !== undefined && init.m23 !== 0) ||
-    (init.m24 !== undefined && init.m24 !== 0) ||
-    (init.m31 !== undefined && init.m31 !== 0) ||
-    (init.m32 !== undefined && init.m32 !== 0) ||
-    (init.m33 !== undefined && init.m33 !== 1) ||
-    (init.m34 !== undefined && init.m34 !== 0) ||
-    (init.m43 !== undefined && init.m43 !== 0) ||
-    (init.m44 !== undefined && init.m44 !== 1)
-  );
+  return NON_2D_KEYS.some(([k, expected]) => init[k] !== undefined && init[k] !== expected);
 }
 
 function validateMatrixInitAliases(dict: DOMMatrixInit): void {
-  if (dict.a !== undefined && dict.m11 !== undefined && dict.a !== dict.m11) {
-    throw new TypeError('DOMMatrixInit: conflicting "a" and "m11" values');
-  }
-  if (dict.b !== undefined && dict.m12 !== undefined && dict.b !== dict.m12) {
-    throw new TypeError('DOMMatrixInit: conflicting "b" and "m12" values');
-  }
-  if (dict.c !== undefined && dict.m21 !== undefined && dict.c !== dict.m21) {
-    throw new TypeError('DOMMatrixInit: conflicting "c" and "m21" values');
-  }
-  if (dict.d !== undefined && dict.m22 !== undefined && dict.d !== dict.m22) {
-    throw new TypeError('DOMMatrixInit: conflicting "d" and "m22" values');
-  }
-  if (dict.e !== undefined && dict.m41 !== undefined && dict.e !== dict.m41) {
-    throw new TypeError('DOMMatrixInit: conflicting "e" and "m41" values');
-  }
-  if (dict.f !== undefined && dict.m42 !== undefined && dict.f !== dict.m42) {
-    throw new TypeError('DOMMatrixInit: conflicting "f" and "m42" values');
+  for (const [k2d, k3d] of ALIASES) {
+    if (dict[k2d] !== undefined && dict[k3d] !== undefined && dict[k2d] !== dict[k3d]) {
+      throw new TypeError(`DOMMatrixInit: conflicting "${k2d}" and "${k3d}" values`);
+    }
   }
 }
 

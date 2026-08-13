@@ -4,10 +4,66 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { execFile, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
 import { getBrowserOnlyFileCount } from './feasibility/audit.ts';
+import { runWptFile } from './run.ts';
 
-const execFilePromise = promisify(execFile);
+function execFilePromise(
+  file: string,
+  args: string[],
+  options: { timeout?: number }
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = execFile(file, args, { timeout: options.timeout }, (err, stdout, stderr) => {
+      if (watchdogTimer) clearInterval(watchdogTimer);
+      if (err) {
+        return reject(Object.assign(err, { stdout, stderr }));
+      }
+      resolve({ stdout, stderr });
+    });
+
+    let dStateCount = 0;
+    const watchdogTimer = setInterval(() => {
+      if (!child.pid || child.killed) {
+        clearInterval(watchdogTimer);
+        return;
+      }
+      try {
+        const statPath = `/proc/${child.pid}/stat`;
+        if (fs.existsSync(statPath)) {
+          const statContent = fs.readFileSync(statPath, 'utf-8');
+          const lastParen = statContent.lastIndexOf(')');
+          if (lastParen !== -1) {
+            const fields = statContent.slice(lastParen + 2).trim().split(/\s+/);
+            const state = fields[0];
+            const rssPages = parseInt(fields[21], 10);
+            const rssMB = (rssPages * 4096) / (1024 * 1024);
+
+            if (rssMB > 1024) {
+              console.warn(`[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > 1024MB). Terminating with SIGKILL.`);
+              child.kill('SIGKILL');
+              clearInterval(watchdogTimer);
+              return;
+            }
+
+            if (state === 'D') {
+              dStateCount++;
+              if (dStateCount >= 2) {
+                console.warn(`[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 2 consecutive checks. Terminating with SIGKILL.`);
+                child.kill('SIGKILL');
+                clearInterval(watchdogTimer);
+                return;
+              }
+            } else {
+              dStateCount = 0;
+            }
+          }
+        }
+      } catch {
+        // Child process may have exited during check
+      }
+    }, 250);
+  });
+}
 
 interface SpecConfig {
   path: string;
@@ -73,9 +129,14 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
   const allKnownFailures: Record<string, string[]> = {};
   const allSyntaxErrors: Record<string, string> = {};
 
-  const concurrency = options.concurrency ?? Math.min(16, Math.max(1, os.availableParallelism() - 1));
+  const concurrency = options.concurrency ?? Math.min(24, Math.max(1, Math.floor((os.freemem() / (1024 * 1024 * 1024)) / 1.5)));
   if (options.verbose) {
     console.log(`Using parallel concurrency limit: ${concurrency}`);
+  }
+
+  if (options.updateProgress && (options.spec || options.file)) {
+    console.error('Error: --update-progress cannot be run on a partial spec or single file.');
+    process.exit(1);
   }
 
   let specsToRun = Object.entries(config.specs);
@@ -130,17 +191,11 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     let specPassing = 0;
 
     const results = await pool(concurrency, filteredFiles, async (filePath) => {
-      // Monitor system health and throttle if load is too high or free memory is low
-      const cpuCount = os.cpus().length;
-      let load = os.loadavg()[0];
-      let freeMem = os.freemem() / (1024 * 1024 * 1024); // GB
-      
-      if (load > cpuCount * 0.95 || freeMem < 1.5) {
-        console.warn(`[System Health Guard] High Load: ${load.toFixed(1)} (cores: ${cpuCount}), Free Mem: ${freeMem.toFixed(2)}GB. Pausing worker for 1000ms...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        // Refresh load stats after sleep
-        load = os.loadavg()[0];
-        freeMem = os.freemem() / (1024 * 1024 * 1024);
+      // Monitor memory health and pause if memory is dangerously low (< 500MB)
+      const freeMem = os.freemem() / (1024 * 1024 * 1024); // GB
+      if (freeMem < 0.5) {
+        console.warn(`[System Health Guard] Free Mem critically low: ${freeMem.toFixed(2)}GB. Pausing worker for 500ms...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       let passing = 0;
@@ -149,7 +204,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
+        const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=512', 'scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -180,10 +235,19 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
           total = parseInt(match[2], 10);
         } else {
           passing = 0;
-          total = 1;
+          if (errorObj.killed || errorObj.signal) {
+            total = 1;
+          } else {
+            try {
+              const extracted = runWptFile(filePath);
+              total = Math.max(1, extracted.tests.length);
+            } catch {
+              total = 1;
+            }
+          }
         }
         if (options.updateBaseline) {
-          const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || mergedOutput.includes('Runner timed out');
+          const isTimeout = errorObj.killed === true || errorObj.signal === 'SIGTERM' || errorObj.signal === 'SIGKILL' || mergedOutput.includes('Runner timed out');
           const hasSummary = mergedOutput.includes('Summary:');
           if (isTimeout) {
             loadError = 'Runner timed out (execution took longer than 3.5s)';
@@ -281,6 +345,12 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     }
     const overallPassRate = grandTotal > 0 ? ((grandPassing / grandTotal) * 100).toFixed(2) : '0.00';
     const normalizedPassRate = grandFeasible > 0 ? Math.min(100, (grandPassing / grandFeasible) * 100).toFixed(2) : '0.00';
+
+    const EXPECTED_MINIMUM_TESTS = 16000;
+    if (grandTotal < EXPECTED_MINIMUM_TESTS) {
+      console.error(`Error: Overall total tests (${grandTotal}) is below minimum sanity threshold (${EXPECTED_MINIMUM_TESTS}). Aborting progress update to prevent log corruption.`);
+      process.exit(1);
+    }
 
     // Get git details
     let commitHash = 'unknown';

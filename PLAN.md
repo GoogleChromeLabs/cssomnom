@@ -2333,6 +2333,32 @@ Objective: Implement spec-compliant `revert` / `revert-layer` cascade fallback r
   - Add unit tests verifying fallback rollbacks, whitespace preservation, and cycle evaluation in a dedicated conformance suite (`tests/variables-phase94.test.ts`).
   - Verify WPT `css/css-variables` score and unit tests pass with 100% preflight conformance.
 
+---
+
+## Phase 95: Crawler Watchdog Protection, Cascade Codegen & DOMMatrix Simplification
+
+Objective: Harden the WPT crawler against unconstrained memory growth and uninterruptible sleep state D thrashing, generate cascade constants from spec data, and simplify DOMMatrix matrix arithmetic.
+
+### Tasks
+- [x] **Crawler Harness Memory & State D Protection (`scripts/wpt/node/run.ts`, `scripts/wpt/node/crawl.ts`)**:
+  - Added mandatory invocation flag notice (`--max-old-space-size=512`) to `scripts/wpt/node/run.ts`.
+  - Configured child process execution in `scripts/wpt/node/crawl.ts` to pass `--max-old-space-size=512`.
+  - Implemented `/proc/[pid]/stat` real-time watchdog polling every 250ms with RSS cap (> 1024MB -> SIGKILL) and state D detection (2 consecutive checks -> SIGKILL).
+  - Implemented memory-budgeted parallel concurrency formula capped at 24 workers max.
+  - Enforced `EXPECTED_MINIMUM_TESTS = 16000` sanity check before mutating `wpt-progress.md`.
+- [x] **DOMMatrix Simplification (`src/DOMMatrix.ts`)**:
+  - Replaced unrolled `multiplyArrays` with a concise 10-line 2-loop nested dot-product supporting destination buffers.
+  - Replaced 68-line 3x3 cofactor expansion in `invertMatrix` with a compact 30-line 2x2 block Laplace expansion.
+  - Compacted `validateMatrixInitAliases` and `has3DComponents` loops while preserving all 2D in-place fast paths and prototype getter inheritance.
+- [x] **Cascade Codegen (`scripts/codegen/generate_cascade_data.ts`, `src/cascade.ts`, `scripts/codegen/generate_all.ts`)**:
+  - Created `scripts/codegen/generate_cascade_data.ts` consuming `@webref/css` and `mdn-data` to generate `src/data/gen/cascade-data.ts`.
+  - Updated `src/cascade.ts` to import `SVG_PRESENTATION_ATTRIBUTES`, `COLOR_PROPERTIES`, `DEFAULT_PROPERTY_VALUES`, and `BLOCK_TAGS` from generated data.
+  - Added `generate_cascade_data.ts` to `scripts/codegen/generate_all.ts`.
+- [x] **Verification & Preflight**:
+  - Ran `pnpm run codegen` and `pnpm run preflight`.
+  - All unit tests pass with 0 type errors and 0 linter warnings.
+
+
 
 
 
