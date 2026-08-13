@@ -2361,6 +2361,34 @@ Objective: Harden the WPT crawler against unconstrained memory growth and uninte
   - Ran `pnpm run codegen` and `pnpm run preflight`.
   - All unit tests pass with 0 type errors and 0 linter warnings.
 
+---
+
+## Phase 96: CSS Variables & CSSOM Conformance Push (Targeting 95%+ Conformance)
+
+Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%+) and `css/cssom` (65.33% -> 85%+) to push overall feasible WPT conformance past 95%.
+
+**Spec References**:
+- CSS Custom Properties for Cascading Variables Module Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+- CSS Object Model (CSSOM): `submodules/csswg-drafts/cssom-1/Overview.bs`
+- Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs`
+
+### Tasks
+- [ ] **CSS Variables Shorthand Substitution & `env()` Support (`src/cascade.ts`)**:
+  - Implement custom property substitution within shorthand property expansions (`font`, `border`, `margin`, `padding`, `background`).
+  - Add standard user-agent `env()` fallback handling per CSS Environment Variables 1.
+  - Implement case-sensitive custom property lookup (`--foo` vs `--FOO`).
+- [ ] **CSSOM Rule Indexing & Hierarchy Exceptions (`src/CSSOM.ts`)**:
+  - Implement strict W3C DOM exception handling on `insertRule` (`HierarchyRequestError` when inserting `@import` after style rules, `IndexSizeError` on out-of-bounds indices).
+  - Implement `@keyframes` rule indexing (`appendRule`, `deleteRule`, `findRule`).
+  - Implement `CSSStyleDeclaration` indexed item access (`style[0]`, `style[1]`, `style.length`).
+- [ ] **Selectors 4 `:is()` / `:where()` / `:has()` Specificity (`src/cascade.ts`, `src/parser.ts`)**:
+  - Calculate `:is(...)` and `:has(...)` specificity as the maximum specificity among argument selectors.
+  - Set `:where(...)` specificity to `[0, 0, 0]`.
+  - Serialize comma-separated `:not(a, b)` selector argument lists per Selectors 4 § 4.2.
+- [ ] **Verification & Preflight**:
+  - Run full test suite with `pnpm run preflight`.
+  - Update `wpt-progress.md` with `pnpm run wpt:node:progress` and verify overall conformance reaches 95%+.
+
 
 
 
