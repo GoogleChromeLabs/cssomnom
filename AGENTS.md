@@ -41,6 +41,12 @@ To avoid circular dependencies between the core parser and the CSSOM/Typed OM la
 We intentionally deviate from some specifications for pragmatism, performance, or Node.js compatibility (e.g., providing synchronous versions of Houdini APIs).
 - **Rule**: Before proposing refactors to align strictly with IDL, review `README.md` to understand documented intentional deviations.
 
+### Safe Subprocess Execution & Mechanical Preflight Enforcement (`safe-child-process.ts`)
+To prevent unmonitored child process spawning, worker process memory ballooning, swap thrashing, and process hangs, all test execution and worker pooling MUST use the centralized safe execution kernel.
+- **Rule**: Direct imports of `node:child_process` or `child_process` in `scripts/` and `tests/` are banned and enforced via `pnpm run check:safe-exec` during preflight.
+- **Exceptions**: Only the centralized safe kernel (`scripts/wpt/node/safe-child-process.ts`) and synchronous codegen build scripts (`scripts/codegen/generate_all.ts`, `scripts/external_suites/extract_all.ts`, `scripts/wpt/browser/run.ts`) may import `child_process`.
+- **Solution**: Always import `safeExecTestFile` and `safeWorkerPool` from `scripts/wpt/node/safe-child-process.ts`. Every child process spawned via `safeExecTestFile` is constrained with `--max-old-space-size=512`, guarded by a 250ms `/proc/[pid]/stat` RSS (>2048MB) and state 'D' watchdog (`SIGKILL`), and tracked for cleanup upon parent termination.
+
 ## Spec Evolution & Maintainability
 
 ### Automation Over Hardcoding

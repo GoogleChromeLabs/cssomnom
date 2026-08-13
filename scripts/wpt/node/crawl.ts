@@ -3,7 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { execFile, execSync } from 'node:child_process';
+import { safeExecTestFile, safeWorkerPool, getGitCommitInfo } from './safe-child-process.ts';
 
 function countDeclaredTests(filePath: string): number {
   try {
@@ -13,64 +13,6 @@ function countDeclaredTests(filePath: string): number {
   } catch {
     return 1;
   }
-}
-
-function execFilePromise(
-  file: string,
-  args: string[],
-  options: { timeout?: number }
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    const child = execFile(file, args, { timeout: options.timeout }, (err, stdout, stderr) => {
-      if (watchdogTimer) clearInterval(watchdogTimer);
-      if (err) {
-        return reject(Object.assign(err, { stdout, stderr }));
-      }
-      resolve({ stdout, stderr });
-    });
-
-    let dStateCount = 0;
-    const watchdogTimer = setInterval(() => {
-      if (!child.pid || child.killed) {
-        clearInterval(watchdogTimer);
-        return;
-      }
-      try {
-        const statPath = `/proc/${child.pid}/stat`;
-        if (fs.existsSync(statPath)) {
-          const statContent = fs.readFileSync(statPath, 'utf-8');
-          const lastParen = statContent.lastIndexOf(')');
-          if (lastParen !== -1) {
-            const fields = statContent.slice(lastParen + 2).trim().split(/\s+/);
-            const state = fields[0];
-            const rssPages = parseInt(fields[21], 10);
-            const rssMB = (rssPages * 4096) / (1024 * 1024);
-
-            if (rssMB > 1536) {
-              console.warn(`[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > 1536MB). Terminating with SIGKILL.`);
-              child.kill('SIGKILL');
-              clearInterval(watchdogTimer);
-              return;
-            }
-
-            if (state === 'D') {
-              dStateCount++;
-              if (dStateCount >= 2) {
-                console.warn(`[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 2 consecutive checks. Terminating with SIGKILL.`);
-                child.kill('SIGKILL');
-                clearInterval(watchdogTimer);
-                return;
-              }
-            } else {
-              dStateCount = 0;
-            }
-          }
-        }
-      } catch {
-        // Child process may have exited during check
-      }
-    }, 250);
-  });
 }
 
 interface SpecConfig {
@@ -101,28 +43,6 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
     }
   }
   return fileList;
-}
-
-async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = [];
-  const promises: Promise<void>[] = [];
-  let index = 0;
-
-  async function worker() {
-    while (index < items.length) {
-      const currentIndex = index++;
-      const item = items[currentIndex];
-      results[currentIndex] = await fn(item);
-      // Yield to event loop to allow system process scheduler to settle
-      await new Promise(resolve => setTimeout(resolve, 20));
-    }
-  }
-
-  for (let i = 0; i < Math.min(limit, items.length); i++) {
-    promises.push(worker());
-  }
-  await Promise.all(promises);
-  return results;
 }
 
 export async function runCrawler(options: { spec?: string; file?: string; verbose?: boolean; concurrency?: number; updateProgress?: boolean; updateBaseline?: boolean } = {}): Promise<Record<string, SpecResult>> {
@@ -206,21 +126,14 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     let specTotal = 0;
     let specPassing = 0;
 
-    const results = await pool(concurrency, filteredFiles, async (filePath) => {
-      // Monitor memory health and pause if memory is dangerously low (< 500MB)
-      const freeMem = os.freemem() / (1024 * 1024 * 1024); // GB
-      if (freeMem < 0.5) {
-        console.warn(`[System Health Guard] Free Mem critically low: ${freeMem.toFixed(2)}GB. Pausing worker for 500ms...`);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
+    const results = await safeWorkerPool(filteredFiles, async (filePath) => {
       let passing = 0;
       let total = 0;
       const failedTests: string[] = [];
       let loadError: string | undefined;
 
       try {
-        const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=1024', 'scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
+        const { stdout, stderr } = await safeExecTestFile(filePath, { timeout: 15000 });
         const mergedOutput = stdout + '\n' + stderr;
         if (options.verbose) {
           console.log(mergedOutput);
@@ -277,7 +190,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
         }
       }
       return { passing, total, failedTests: failedTests.length > 0 ? failedTests : undefined, loadError };
-    });
+    }, { concurrency });
 
     for (let i = 0; i < filteredFiles.length; i++) {
       const filePath = filteredFiles[i];
@@ -367,13 +280,7 @@ export async function runCrawler(options: { spec?: string; file?: string; verbos
     }
 
     // Get git details
-    let commitHash = 'unknown';
-    let isDirty = false;
-    try {
-      commitHash = execSync('git rev-parse --short HEAD', { encoding: 'utf-8' }).trim();
-      const status = execSync('git status --porcelain', { encoding: 'utf-8' }).trim();
-      isDirty = status.length > 0;
-    } catch {}
+    const { commitHash, isDirty } = getGitCommitInfo();
     const commitStr = commitHash + (isDirty ? '*' : '');
     const dateStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
 

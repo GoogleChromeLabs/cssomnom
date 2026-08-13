@@ -2,11 +2,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import * as os from 'node:os';
-
-const execFilePromise = promisify(execFile);
+import { safeExecTestFile, safeWorkerPool } from './safe-child-process.ts';
 
 interface NearMiss {
   file: string;
@@ -33,32 +30,14 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = [];
-  let index = 0;
-  async function worker() {
-    while (index < items.length) {
-      const currentIndex = index++;
-      results[currentIndex] = await fn(items[currentIndex]);
-      await new Promise(resolve => setTimeout(resolve, 15));
-    }
-  }
-  const workers: Promise<void>[] = [];
-  for (let i = 0; i < Math.min(limit, items.length); i++) {
-    workers.push(worker());
-  }
-  await Promise.all(workers);
-  return results;
-}
-
 async function analyzeSpec(specName: string, specPath: string): Promise<NearMiss[]> {
   const files = crawlDirectory(path.resolve(process.cwd(), specPath));
   const concurrency = Math.min(16, Math.max(1, os.availableParallelism() - 1));
   const nearMisses: NearMiss[] = [];
 
-  await pool(concurrency, files, async (filePath) => {
+  await safeWorkerPool(files, async (filePath) => {
     try {
-      const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=512', 'scripts/wpt/node/run.ts', filePath], { timeout: 15000 });
+      const { stdout, stderr } = await safeExecTestFile(filePath, { timeout: 15000 });
       const merged = stdout + '\n' + stderr;
       const lines = merged.split('\n');
 
@@ -132,7 +111,7 @@ async function analyzeSpec(specName: string, specPath: string): Promise<NearMiss
         }
       }
     }
-  });
+  }, { concurrency });
 
   return nearMisses;
 }

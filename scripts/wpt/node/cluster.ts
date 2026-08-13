@@ -3,10 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFilePromise = promisify(execFile);
+import { safeExecTestFile, safeWorkerPool } from './safe-child-process.ts';
 
 interface FailureRecord {
   spec: string;
@@ -71,28 +68,6 @@ function classifyError(raw: string): { errorType: string; cleanMessage: string }
   return { errorType, cleanMessage };
 }
 
-async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = [];
-  let index = 0;
-
-  async function worker() {
-    while (index < items.length) {
-      const currentIndex = index++;
-      const item = items[currentIndex];
-      results[currentIndex] = await fn(item);
-      // Yield to event loop to allow system process scheduler to settle and keep UI responsive
-      await new Promise(resolve => setTimeout(resolve, 25));
-    }
-  }
-
-  const workers: Promise<void>[] = [];
-  for (let i = 0; i < Math.min(limit, items.length); i++) {
-    workers.push(worker());
-  }
-  await Promise.all(workers);
-  return results;
-}
-
 async function analyzeSpec(specName: string, specPath: string, excludes: string[] = [], customConcurrency?: number) {
   const fullSpecPath = path.resolve(process.cwd(), specPath);
   console.log(`\n================================================================================`);
@@ -110,7 +85,7 @@ async function analyzeSpec(specName: string, specPath: string, excludes: string[
   const concurrency = customConcurrency ?? Math.min(16, Math.max(1, os.availableParallelism() - 1));
   console.log(`Processing ${files.length} test files with concurrency: ${concurrency} (with health throttling & 25ms worker yields)...`);
 
-  const fileResults = await pool(concurrency, files, async (filePath) => {
+  const fileResults = await safeWorkerPool(files, async (filePath) => {
     // System health guard
     const cpuCount = os.cpus().length;
     let load = os.loadavg()[0];
@@ -126,7 +101,7 @@ async function analyzeSpec(specName: string, specPath: string, excludes: string[
     let fileTotal = 0;
 
     try {
-      const { stdout, stderr } = await execFilePromise(process.execPath, ['--max-old-space-size=512', 'scripts/wpt/node/run.ts', filePath], { timeout: 10000 });
+      const { stdout, stderr } = await safeExecTestFile(filePath, { timeout: 10000 });
       const merged = stdout + '\n' + stderr;
       const summaryMatch = merged.match(/Summary: (\d+)\/(\d+) passed/);
       if (summaryMatch) {

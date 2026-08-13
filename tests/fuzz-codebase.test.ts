@@ -18,10 +18,27 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as child_process from 'node:child_process';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
 import type { ParseError } from '../src/types.ts';
+
+function findCssFiles(dir: string): string[] {
+  const results: string[] = [];
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        results.push(...findCssFiles(fullPath));
+      } else if (entry.isFile() && entry.name.endsWith('.css')) {
+        results.push(fullPath);
+      }
+    }
+  } catch {
+    // Ignore errors
+  }
+  return results;
+}
 
 test('Fuzz codebase with local CSS files', () => {
   const fuzzDir = process.env.FUZZ_DIR;
@@ -36,14 +53,7 @@ test('Fuzz codebase with local CSS files', () => {
   }
 
   console.log(`Finding CSS files in ${fuzzDir}...`);
-  let cssFiles: string[] = [];
-  try {
-    const output = child_process.execSync('fd --glob "*.css"', { cwd: fuzzDir, encoding: 'utf8' });
-    cssFiles = output.split('\n').filter(Boolean).map(f => path.resolve(fuzzDir, f));
-  } catch (e) {
-    console.log('Failed to run fd command, skipping test.', e);
-    return;
-  }
+  const cssFiles = findCssFiles(fuzzDir);
 
   console.log(`Found ${cssFiles.length} CSS files to fuzz.`);
 

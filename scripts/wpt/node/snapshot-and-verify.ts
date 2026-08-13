@@ -2,8 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { execFile } from 'node:child_process';
-import * as os from 'node:os';
+import { safeExecTestFile, safeWorkerPool } from './safe-child-process.ts';
 
 interface SpecConfig {
   path: string;
@@ -12,65 +11,6 @@ interface SpecConfig {
 
 interface SandboxConfig {
   specs: Record<string, SpecConfig>;
-}
-
-function execFilePromise(
-  file: string,
-  args: string[],
-  options: { timeout?: number }
-): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    let watchdogTimer: NodeJS.Timeout | null = null;
-    const child = execFile(file, args, { timeout: options.timeout, maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
-      if (watchdogTimer) clearInterval(watchdogTimer);
-      if (err) {
-        return reject(Object.assign(err, { stdout, stderr }));
-      }
-      resolve({ stdout, stderr });
-    });
-
-    let dStateCount = 0;
-    watchdogTimer = setInterval(() => {
-      if (!child.pid || child.killed) {
-        if (watchdogTimer) clearInterval(watchdogTimer);
-        return;
-      }
-      try {
-        const statPath = `/proc/${child.pid}/stat`;
-        if (fs.existsSync(statPath)) {
-          const statContent = fs.readFileSync(statPath, 'utf-8');
-          const lastParen = statContent.lastIndexOf(')');
-          if (lastParen !== -1) {
-            const fields = statContent.slice(lastParen + 2).trim().split(/\s+/);
-            const state = fields[0];
-            const rssPages = parseInt(fields[21], 10);
-            const rssMB = (rssPages * 4096) / (1024 * 1024);
-
-            if (rssMB > 1024) {
-              console.warn(`[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > 1024MB). Terminating with SIGKILL.`);
-              child.kill('SIGKILL');
-              if (watchdogTimer) clearInterval(watchdogTimer);
-              return;
-            }
-
-            if (state === 'D') {
-              dStateCount++;
-              if (dStateCount >= 2) {
-                console.warn(`[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 2 consecutive checks. Terminating with SIGKILL.`);
-                child.kill('SIGKILL');
-                if (watchdogTimer) clearInterval(watchdogTimer);
-                return;
-              }
-            } else {
-              dStateCount = 0;
-            }
-          }
-        }
-      } catch {
-        // Child process may have exited during check
-      }
-    }, 250);
-  });
 }
 
 function crawlDirectory(dir: string, fileList: string[] = []): string[] {
@@ -90,24 +30,6 @@ function crawlDirectory(dir: string, fileList: string[] = []): string[] {
   return fileList;
 }
 
-async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = [];
-  let index = 0;
-  async function worker() {
-    while (index < items.length) {
-      const currentIndex = index++;
-      results[currentIndex] = await fn(items[currentIndex]);
-      await new Promise(resolve => setTimeout(resolve, 15));
-    }
-  }
-  const workers: Promise<void>[] = [];
-  for (let i = 0; i < Math.min(limit, items.length); i++) {
-    workers.push(worker());
-  }
-  await Promise.all(workers);
-  return results;
-}
-
 interface TestRunResult {
   file: string;
   passingSubtests: string[];
@@ -118,11 +40,7 @@ interface TestRunResult {
 async function runFile(filePath: string): Promise<TestRunResult> {
   const relativePath = path.relative(process.cwd(), filePath);
   try {
-    const { stdout, stderr } = await execFilePromise(
-      process.execPath,
-      ['--max-old-space-size=512', 'scripts/wpt/node/run.ts', filePath],
-      { timeout: 15000 }
-    );
+    const { stdout, stderr } = await safeExecTestFile(filePath, { timeout: 15000 });
     const merged = stdout + '\n' + stderr;
     const passingSubtests: string[] = [];
     const failedSubtests: string[] = [];
@@ -181,10 +99,7 @@ export async function capturePassingSet(): Promise<Record<string, string[]>> {
     }
   }
 
-  const freeMemGB = os.freemem() / (1024 * 1024 * 1024);
-  const concurrency = Math.min(16, Math.max(1, Math.floor(freeMemGB / 1.5)));
-  console.log(`Auditing passing test set across ${allFiles.length} files with concurrency=${concurrency} (freeMem=${freeMemGB.toFixed(1)}GB)...`);
-  const results = await pool(concurrency, allFiles, runFile);
+  const results = await safeWorkerPool(allFiles, runFile);
 
   let totalPassing = 0;
   for (const r of results) {
