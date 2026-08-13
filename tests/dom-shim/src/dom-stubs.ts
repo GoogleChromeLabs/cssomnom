@@ -575,66 +575,10 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
   // HTMLLinkElement.prototype
   const htmlLinkEl = win.HTMLLinkElement as { prototype: Record<string, unknown> } | undefined;
   if (htmlLinkEl) {
-    Object.defineProperty(htmlLinkEl.prototype, 'onload', {
-      get(this: { _onloadHandler?: ((e: Event) => void) | null }) {
-        return this._onloadHandler || null;
-      },
-      set(this: { _onloadHandler?: ((e: Event) => void) | null; dispatchEvent?: (e: Event) => boolean; ownerDocument?: Document }, fn) {
-        this._onloadHandler = fn;
-        if (typeof fn === 'function') {
-          queueMicrotask(() => {
-            if (this._onloadHandler === fn) {
-              const EventCtor = ((this.ownerDocument?.defaultView?.Event || win.Event || globalThis.Event || Event) as unknown as { new(t: string): Event });
-              const ev = new EventCtor('load');
-              try {
-                fn.call(this, ev);
-              } catch {}
-              try {
-                this.dispatchEvent?.(ev);
-              } catch {}
-            }
-          });
-        }
-      },
-      configurable: true,
-      enumerable: true
-    });
-
-    Object.defineProperty(htmlLinkEl.prototype, 'disabled', {
-      get(this: { _disabled?: boolean; getAttribute?: (attr: string) => string | null }) {
-        if (typeof this._disabled === 'boolean') {
-          return this._disabled;
-        }
-        return this.getAttribute ? this.getAttribute('disabled') !== null : false;
-      },
-      set(this: { _disabled?: boolean; _onloadHandler?: ((e: Event) => void) | null; dispatchEvent?: (e: Event) => boolean; ownerDocument?: Document }, val: boolean) {
-        const wasDisabled = this._disabled ?? false;
-        this._disabled = Boolean(val);
-        if (wasDisabled && !this._disabled) {
-          queueMicrotask(() => {
-            if (!this._disabled) {
-              const EventCtor = ((this.ownerDocument?.defaultView?.Event || win.Event || globalThis.Event || Event) as unknown as { new(t: string): Event });
-              const ev = new EventCtor('load');
-              if (typeof this._onloadHandler === 'function') {
-                try {
-                  this._onloadHandler.call(this, ev);
-                } catch {}
-              }
-              try {
-                this.dispatchEvent?.(ev);
-              } catch {}
-            }
-          });
-        }
-      },
-      configurable: true,
-      enumerable: true
-    });
-
     Object.defineProperty(htmlLinkEl.prototype, 'sheet', {
       configurable: true,
       enumerable: true,
-      get(this: object & { getAttribute?: (attr: string) => string | null; ownerDocument?: Document; _onloadHandler?: ((e: Event) => void) | null; dispatchEvent?: (e: Event) => boolean }) {
+      get(this: object & { getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
         let sheet = styleSheetMap.get(this);
         if (!sheet) {
           let rules: Rule[] = [];
@@ -652,20 +596,6 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
           sheet = CSSStyleSheet.createInternal(rules, parseRule);
           Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
           styleSheetMap.set(this, sheet);
-
-          if (typeof this.dispatchEvent === 'function') {
-            const dispatch = this.dispatchEvent;
-            const onloadHandler = this._onloadHandler;
-            queueMicrotask(() => {
-              try {
-                const loadEv = new ((win.Event as { new(t: string): Event }) || Event)('load');
-                dispatch.call(this, loadEv);
-                if (typeof onloadHandler === 'function') {
-                  onloadHandler(loadEv);
-                }
-              } catch {}
-            });
-          }
         }
         return sheet;
       }
