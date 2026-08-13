@@ -2470,6 +2470,34 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Verify with `scripts/wpt/node/snapshot-and-verify.ts --verify` (0 regressions, 16,769 passing tests).
   - Run `pnpm run preflight` (0 TypeScript errors, 0 linter warnings, 100% unit tests passing).
 
+---
+
+## Phase 100: Unified Agent-Native WPT CLI Consolidation (`scripts/wpt/node/`)
+**Goal**: Consolidate redundant, disparate WPT runner scripts (`crawl.ts`, `snapshot-and-verify.ts`, `cluster.ts`, `diff.ts`, `benchmark-monsters.ts`, `profile-scan.ts`) into a single-pass, modular Agent-Native CLI using native `node:util` `parseArgs`, structured core modules (<200 LOC each), and disk cache acceleration.
+
+### Tasks
+- [x] **Core Architecture Decomposition (`scripts/wpt/node/core/`)**:
+  - `core/types.ts`: Shared TypeScript interfaces (`TestRunDataset`, `ParsedFileResult`, `FailureCluster`, `ExpectationDiffItem`, `BaselineAuditReport`).
+  - `core/config.ts`: Config loader, spec validator (`VALID_SPECS`), feasible targets, and baseline path resolvers.
+  - `core/crawler.ts`: Directory tree walker with spec resolution, path filtering, and exclusion rules.
+  - `core/parser.ts`: Single source of truth for parsing runner outputs (`✔`, `✖`, `+ expected - actual`, timeouts, crashes, load errors), error clustering, and diff extraction.
+  - `core/executor.ts`: Single-pass execution engine wrapping `safeWorkerPool` from `../safe-child-process.ts`.
+  - `core/cache.ts`: Saves and loads `.wpt-cache/last-run.json` for instant offline analysis.
+- [x] **Command Handlers (`scripts/wpt/node/commands/`)**:
+  - `commands/run.ts`: Single-pass test runner supporting `--filter-by-spec`, `--filter-by-path`, `--verify-exact-baseline`, `--show-failure-clusters`, `--show-expectation-diff`, `--write-progress-markdown`, `--write-passing-set-baseline`, `--json`, `--dry-run`, `--limit`, `--concurrency`.
+  - `commands/cluster.ts`: Instant offline failure pattern analyzer (<30ms from cache) with `--live` option.
+  - `commands/diff.ts`: Instant offline baseline diff comparator with categorized near-miss assertions and `--live` option.
+- [x] **Entrypoint (`scripts/wpt/node/cli.ts`)**:
+  - Unified entrypoint using `node:util` `parseArgs` with `strict: true` and informative error handling and help text.
+- [x] **Packaging & Cleanup**:
+  - Preserved kernel (`run.ts`, `safe-child-process.ts`).
+  - Removed legacy redundant scripts via `trash`: `crawl.ts`, `snapshot-and-verify.ts`, `cluster.ts`, `diff.ts`, `benchmark-monsters.ts`, `profile-scan.ts`.
+  - Updated `package.json` with `wpt`, `wpt:run`, `wpt:crawl`, `wpt:progress`, `wpt:baseline`, `wpt:verify`, `wpt:cluster`, `wpt:diff`.
+  - Added unit test suite `tests/wpt-cli.test.ts`.
+- [x] **Preflight & Verification**:
+  - `pnpm run preflight` 100% passing (0 typecheck errors, 0 linter warnings, safe-exec check pass, 100% unit tests passing).
+
+
 
 
 
