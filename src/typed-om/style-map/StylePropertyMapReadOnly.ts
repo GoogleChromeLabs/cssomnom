@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-import type { Declaration, ComponentValue } from '../../types.ts';
+import type { Declaration } from '../../types.ts';
 import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 import { CSSUnparsedValue, tokensToUnparsedSegments } from '../values/CSSUnparsedValue.ts';
-import { SHORTHANDS } from '../../shorthands.ts';
 import { serialize } from '../../serializer.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { ParseHooks } from '../../parse-hooks.ts';
@@ -148,17 +147,10 @@ export class StylePropertyMapReadOnly {
 
   has(property: string): boolean {
     validateProperty(property);
-    const shorthand = SHORTHANDS[property];
     const declarations = this._getDeclarations();
     if (declarations.length > 0) {
-      if (shorthand) {
-        return shorthand.longhands.every(lh => declarations.some(d => d.name === lh));
-      }
       return declarations.some((d: Declaration) => d.name === property);
     } else {
-      if (shorthand) {
-        return shorthand.longhands.every(lh => this._style.getPropertyValue(lh) !== '');
-      }
       return this._style.getPropertyValue(property) !== '';
     }
   }
@@ -174,29 +166,8 @@ export class StylePropertyMapReadOnly {
   }
 
   protected _getAllRaw(property: string): CSSStyleValue[] {
-    const shorthand = SHORTHANDS[property];
     const declarations = this._getDeclarations();
     if (declarations.length > 0) {
-      if (shorthand) {
-        const longhandValues: Record<string, ComponentValue[]> = {};
-        let allSet = true;
-        for (const lh of shorthand.longhands) {
-          const decl = declarations.find(d => d.name === lh);
-          if (!decl) {
-            allSet = false;
-            break;
-          }
-          longhandValues[lh] = decl.value;
-        }
-        if (allSet) {
-          const contracted = shorthand.contract(longhandValues);
-          if (contracted !== null) {
-            return [new CSSUnparsedValue([contracted])];
-          }
-        }
-        return [];
-      }
-
       const decl = declarations.find((d: Declaration) => d.name === property);
       if (!decl) return [];
       if (property.startsWith('--')) {
@@ -209,14 +180,6 @@ export class StylePropertyMapReadOnly {
         return [new CSSStyleValue(serialized, privateToken)];
       }
     } else {
-      if (shorthand) {
-        const val = this._style.getPropertyValue(property);
-        if (val) {
-          return [new CSSUnparsedValue([val])];
-        }
-        return [];
-      }
-
       const val = this._style.getPropertyValue(property);
       if (val === '') return [];
       if (property.startsWith('--')) {

@@ -30,7 +30,6 @@ import {
   isEquivalent,
   validateValuesForProperty
 } from './style-validation.ts';
-import { SHORTHANDS } from '../../shorthands.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { ParseHooks } from '../../parse-hooks.ts';
 import { validateProperty, privateToken } from '../utils/validation.ts';
@@ -106,14 +105,6 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     }
 
     if (property.startsWith('--')) {
-      const tokens = tokenize(value);
-      const componentValues = ParseHooks.parseComponentValues(tokens);
-      const res = [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
-      getStyleCache(this._style).set(propKey, res);
-      return res;
-    }
-
-    if (SHORTHANDS[property]) {
       const tokens = tokenize(value);
       const componentValues = ParseHooks.parseComponentValues(tokens);
       const res = [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
