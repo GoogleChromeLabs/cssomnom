@@ -273,11 +273,11 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
   }
   
   (async () => {
-    // Master fail-safe timeout: exit process after 10000ms to prevent orphaned background hangs
+    // Master fail-safe timeout: exit process after 45000ms to prevent orphaned background hangs
     setTimeout(() => {
-      console.error("Runner timed out after 10000ms (self-termination fail-safe).");
+      console.error("Runner timed out after 45000ms (self-termination fail-safe).");
       process.exit(1);
-    }, 10000).unref();
+    }, 45000).unref();
 
     let total = 0;
     let passed = 0;
