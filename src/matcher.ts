@@ -57,6 +57,17 @@ export interface DOMElement {
   closest?(selector: string): DOMElement | null;
 }
 
+/**
+ * Converts only ASCII uppercase characters (A-Z, U+0041..U+005A) to lowercase (a-z, U+0061..U+007A).
+ * Non-ASCII characters (e.g. Kelvin sign \u212A, Turkish \u0130, Greek \u03A9, Cyrillic \u0414) remain untouched.
+ *
+ * selectors-4 § 3.2 Characters and case sensitivity (#case-sensitive)
+ * html#case-sensitivity-of-selectors
+ */
+export function toAsciiLowerCase(str: string): string {
+  return str.replace(/[A-Z]/g, c => String.fromCharCode(c.charCodeAt(0) + 32));
+}
+
 export function isElement(node: unknown): node is DOMElement {
   return (
     typeof node === 'object' &&
@@ -283,9 +294,11 @@ function matchCompoundSelector(element: DOMElement, compound: CompoundSelector, 
 function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?: DOMElement): boolean {
   switch (simple.type) {
     // selectors-4 § 5.1 #type-selectors
+    // selectors-4 § 3.2 #case-sensitive
+    // html#case-sensitivity-of-selectors
     case 'type-selector': {
-      const elLocal = (element.localName || element.tagName || '').toLowerCase();
-      const selName = simple.name.toLowerCase();
+      const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
+      const selName = toAsciiLowerCase(simple.name);
       if (selName !== '*' && elLocal !== selName) return false;
       if (simple.namespace !== undefined && simple.namespace !== '*') {
         const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
@@ -302,8 +315,9 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
     }
 
     // selectors-4 § 5.2 #universal-selector
+    // selectors-4 § 3.2 #case-sensitive
     case 'universal-selector': {
-      const elLocal = (element.localName || element.tagName || '').toLowerCase();
+      const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
       if (simple.namespace !== undefined && simple.namespace !== '*') {
         const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
         if (simple.namespace === '') {
@@ -361,6 +375,8 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
 /**
  * Matches attribute selectors including null namespaces, operators, and sensitivity flags.
  * selectors-4 § 7 #attribute-selectors
+ * selectors-4 § 3.2 #case-sensitive
+ * html#case-sensitivity-of-selectors
  */
 function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): boolean {
   const attrName = sel.name;
@@ -395,12 +411,12 @@ function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): bo
   let expected = sel.value ?? '';
 
   const isCaseInsensitive =
-    sel.flags?.toLowerCase() === 'i' ||
+    toAsciiLowerCase(sel.flags || '') === 'i' ||
     (sel.flags !== 's' && isHTMLCaseInsensitiveAttribute(element, attrName));
 
   if (isCaseInsensitive) {
-    actual = actual.toLowerCase();
-    expected = expected.toLowerCase();
+    actual = toAsciiLowerCase(actual);
+    expected = toAsciiLowerCase(expected);
   }
 
   switch (sel.operator) {
@@ -425,9 +441,13 @@ function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): bo
   }
 }
 
+/**
+ * HTML Standard § 15.3.1 Case-sensitivity of selectors
+ * https://html.spec.whatwg.org/multipage/semantics-other.html#case-sensitivity-of-selectors
+ */
 function isHTMLCaseInsensitiveAttribute(element: DOMElement, attrName: string): boolean {
-  const tag = (element.localName || element.tagName || '').toLowerCase();
-  const attr = attrName.toLowerCase();
+  const tag = toAsciiLowerCase(element.localName || element.tagName || '');
+  const attr = toAsciiLowerCase(attrName);
   if (tag === 'input' && attr === 'type') return true;
   return false;
 }
@@ -435,9 +455,10 @@ function isHTMLCaseInsensitiveAttribute(element: DOMElement, attrName: string): 
 /**
  * Matches functional, structural, and state pseudo-classes.
  * selectors-4 § 8 #pseudo-classes
+ * selectors-4 § 3.2 #case-sensitive
  */
 function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelector, scope?: DOMElement): boolean {
-  const name = pseudo.name.toLowerCase();
+  const name = toAsciiLowerCase(pseudo.name);
 
   // selectors-4 § 3.7 #legacy-pseudo-element-aliases
   if (name === 'after' || name === 'before' || name === 'first-letter' || name === 'first-line') {
@@ -514,8 +535,8 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   }
 
   // Type-based siblings
-  const elLocal = (element.localName || element.tagName || '').toLowerCase();
-  const typeSiblings = siblings.filter(s => (s.localName || s.tagName || '').toLowerCase() === elLocal);
+  const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
+  const typeSiblings = siblings.filter(s => toAsciiLowerCase(s.localName || s.tagName || '') === elLocal);
   const typeIndex1Based = typeSiblings.indexOf(element) + 1;
 
   if (name === 'first-of-type') {
@@ -556,14 +577,14 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
 
   // selectors-4 § 9.1 #the-dir-pseudo
   if (name === 'dir') {
-    const expectedDir = getPseudoArgumentString(pseudo).toLowerCase();
+    const expectedDir = toAsciiLowerCase(getPseudoArgumentString(pseudo));
     const actualDir = getElementDirection(element);
     return actualDir === expectedDir;
   }
 
   // selectors-4 § 10.1 #the-heading-pseudo
   if (name === 'heading') {
-    const tag = (element.localName || element.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     const match = tag.match(/^h([1-6])$/);
     if (!match) return false;
     const level = Number(match[1]);
@@ -573,20 +594,21 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   }
 
   // selectors-4 § 9.2 #the-lang-pseudo
+  // selectors-4 § 3.2 #case-sensitive
   if (name === 'lang') {
     const langArgs = getPseudoArgumentString(pseudo).split(/\s*,\s*/);
-    const elementLang = getElementLanguage(element).toLowerCase();
+    const elementLang = toAsciiLowerCase(getElementLanguage(element));
     return langArgs.some(arg => {
-      const clean = arg.trim().toLowerCase().replace(/^["']|["']$/g, '');
+      const clean = toAsciiLowerCase(arg.trim()).replace(/^["']|["']$/g, '');
       return elementLang === clean || elementLang.startsWith(clean + '-');
     });
   }
 
   // Form states and interactions
   if (name === 'checked') {
-    const tag = (element.localName || element.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'input') {
-      const type = (element.getAttribute ? element.getAttribute('type') : '')?.toLowerCase();
+      const type = toAsciiLowerCase(element.getAttribute ? element.getAttribute('type') || '' : '');
       if (type === 'checkbox' || type === 'radio') {
         return (element as unknown as { checked?: boolean }).checked || element.hasAttribute?.('checked') || false;
       }
@@ -601,7 +623,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return isElementDisabled(element);
   }
   if (name === 'enabled') {
-    const tag = (element.localName || element.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (['button', 'input', 'select', 'textarea', 'optgroup', 'option', 'fieldset'].includes(tag)) {
       return !isElementDisabled(element);
     }
@@ -609,14 +631,14 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   }
 
   if (name === 'read-only') {
-    const tag = (element.localName || element.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'input' || tag === 'textarea') {
       return element.hasAttribute?.('readonly') || isElementDisabled(element);
     }
     return true;
   }
   if (name === 'read-write') {
-    const tag = (element.localName || element.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'input' || tag === 'textarea') {
       return !element.hasAttribute?.('readonly') && !isElementDisabled(element);
     }
@@ -624,7 +646,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   }
 
   if (name === 'link' || name === 'any-link') {
-    const tag = (element.localName || element.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     return ['a', 'area', 'link'].includes(tag) && !!(element.hasAttribute?.('href') || element.getAttribute?.('href'));
   }
 
@@ -638,7 +660,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   }
 
   if (name === 'has-slotted') {
-    const tag = (element.localName || element.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'slot') {
       if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
         const slottedNodes = typeof element.assignedNodes === 'function' ? element.assignedNodes({ flatten: true }) : Array.from(element.children || []);
@@ -739,7 +761,7 @@ function matchAnPlusB(index: number, a: number, b: number): boolean {
 }
 
 function getElementDirection(element: DOMElement): 'ltr' | 'rtl' {
-  const dir = element.getAttribute?.('dir')?.toLowerCase();
+  const dir = toAsciiLowerCase(element.getAttribute?.('dir') || '');
   if (dir === 'ltr' || dir === 'rtl') return dir;
   if (dir === 'auto') {
     const text = element.textContent || '';
@@ -754,8 +776,8 @@ function getElementDirection(element: DOMElement): 'ltr' | 'rtl' {
     }
     return 'ltr';
   }
-  const tag = (element.localName || element.tagName || '').toLowerCase();
-  if (tag === 'input' && element.getAttribute?.('type')?.toLowerCase() === 'tel') {
+  const tag = toAsciiLowerCase(element.localName || element.tagName || '');
+  if (tag === 'input' && toAsciiLowerCase(element.getAttribute?.('type') || '') === 'tel') {
     return 'ltr';
   }
   if (element.parentElement) {
@@ -777,10 +799,10 @@ function getElementLanguage(element: DOMElement): string {
 function isElementDisabled(element: DOMElement): boolean {
   if (element.hasAttribute?.('disabled')) return true;
   if (element.parentElement) {
-    const tag = (element.parentElement.localName || element.parentElement.tagName || '').toLowerCase();
+    const tag = toAsciiLowerCase(element.parentElement.localName || element.parentElement.tagName || '');
     if (tag === 'fieldset' && element.parentElement.hasAttribute?.('disabled')) {
       const firstLegend = (element.parentElement.children ? Array.from(element.parentElement.children) : []).find(
-        c => (c.localName || c.tagName || '').toLowerCase() === 'legend'
+        c => toAsciiLowerCase(c.localName || c.tagName || '') === 'legend'
       );
       if (!firstLegend || !firstLegend.contains?.(element)) {
         return true;

@@ -1032,7 +1032,11 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
         return 600;
       }
-      const styleH = this.style?.height;
+      let styleH = this.style?.height;
+      if (!styleH && this.ownerDocument) {
+        const cascaded = getCascadedStyle(this);
+        styleH = cascaded.getPropertyValue('height');
+      }
       if (styleH) {
         const val = parseFloat(styleH);
         if (styleH.endsWith('px')) return val;
@@ -1043,6 +1047,17 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
         if (styleH.endsWith('mm')) return (val * 96) / 25.4;
         if (styleH.endsWith('pt')) return (val * 96) / 72;
         if (styleH.endsWith('pc')) return (val * 96) / 6;
+      }
+      if (this.children && this.children.length > 0) {
+        let total = 0;
+        for (let i = 0; i < this.children.length; i++) {
+          const child = this.children[i] as HTMLElement;
+          const childH = child.style?.height || getCascadedStyle(child).getPropertyValue('height');
+          if (childH) {
+            total += parseFloat(childH) || 0;
+          }
+        }
+        if (total > 0) return total;
       }
       return 0;
     },
