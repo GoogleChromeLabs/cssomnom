@@ -19,6 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const WEBREF_CSS_PATH = 'node_modules/@webref/css/css.json';
+const MDN_PROPERTIES_PATH = 'node_modules/mdn-data/css/properties.json';
 const OUTPUT_CASCADE_PATH = 'src/data/gen/cascade-data.ts';
 
 interface WebrefProperty {
@@ -27,204 +28,168 @@ interface WebrefProperty {
   initial?: string;
   appliesTo?: string;
   syntax?: string;
+  computedValue?: string;
 }
 
 interface MdnProperty {
   syntax?: string;
   initial?: string | string[];
   groups?: string[];
-  status?: string;
+  appliesto?: string;
+  computed?: string;
 }
+
+// Standard cross-spec CSS styling properties that SVG 2 § 6.2 explicitly lists as presentation attributes
+const SVG2_CROSS_SPEC_PRESENTATION_PROPERTIES = new Set([
+  'color',
+  'cursor',
+  'direction',
+  'display',
+  'font-family',
+  'font-size',
+  'font-size-adjust',
+  'font-stretch',
+  'font-style',
+  'font-variant',
+  'font-weight',
+  'image-rendering',
+  'letter-spacing',
+  'opacity',
+  'overflow',
+  'pointer-events',
+  'text-decoration',
+  'text-decoration-line',
+  'text-decoration-style',
+  'transform',
+  'unicode-bidi',
+  'visibility',
+  'word-spacing',
+  'writing-mode',
+]);
+
+// Standard HTML flow content block elements defaulting to display: block per CSS Display 3 & HTML Rendering § 15
+const HTML_BLOCK_ELEMENTS = [
+  'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'BODY', 'DD', 'DIV', 'DL', 'DT',
+  'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3',
+  'H4', 'H5', 'H6', 'HEADER', 'HGROUP', 'HR', 'HTML', 'LI', 'MAIN',
+  'NAV', 'OL', 'P', 'PRE', 'SECTION', 'TABLE', 'UL',
+];
 
 function main() {
   const webref = JSON.parse(fs.readFileSync(WEBREF_CSS_PATH, 'utf-8')) as { properties: WebrefProperty[] };
-  const mdn = JSON.parse(fs.readFileSync('node_modules/mdn-data/css/properties.json', 'utf-8')) as Record<string, MdnProperty>;
+  const mdn = JSON.parse(fs.readFileSync(MDN_PROPERTIES_PATH, 'utf-8')) as Record<string, MdnProperty>;
 
-  // 1. Extract SVG Presentation Attributes from SVG 2 spec and webref
-  const svgPresentationAttrSet = new Set<string>([
-    'alignment-baseline',
-    'baseline-shift',
-    'clip',
-    'clip-path',
-    'clip-rule',
-    'color',
-    'color-interpolation',
-    'color-interpolation-filters',
-    'color-rendering',
-    'cursor',
-    'direction',
-    'display',
-    'dominant-baseline',
-    'fill',
-    'fill-opacity',
-    'fill-rule',
-    'filter',
-    'flood-color',
-    'flood-opacity',
-    'font-family',
-    'font-size',
-    'font-size-adjust',
-    'font-stretch',
-    'font-style',
-    'font-variant',
-    'font-weight',
-    'glyph-orientation-vertical',
-    'image-rendering',
-    'letter-spacing',
-    'lighting-color',
-    'marker-end',
-    'marker-mid',
-    'marker-start',
-    'mask',
-    'mask-type',
-    'opacity',
-    'overflow',
-    'paint-order',
-    'pointer-events',
-    'shape-rendering',
-    'stop-color',
-    'stop-opacity',
-    'stroke',
-    'stroke-dasharray',
-    'stroke-dashoffset',
-    'stroke-linecap',
-    'stroke-linejoin',
-    'stroke-miterlimit',
-    'stroke-opacity',
-    'stroke-width',
-    'text-anchor',
-    'text-decoration',
-    'text-decoration-line',
-    'text-decoration-style',
-    'text-rendering',
-    'transform',
-    'vector-effect',
-    'visibility',
-    'word-spacing',
-    'writing-mode',
-  ]);
+  // 1. Extract SVG Presentation Attributes dynamically from spec origins and MDN groups
+  const svgPresentationAttrSet = new Set<string>(SVG2_CROSS_SPEC_PRESENTATION_PROPERTIES);
 
   for (const prop of webref.properties) {
-    if (prop.href && (prop.href.includes('svg') || prop.href.includes('filter-effects') || prop.href.includes('masking'))) {
-      if (!prop.name.startsWith('-')) {
-        svgPresentationAttrSet.add(prop.name);
-      }
+    if (prop.name.startsWith('-')) continue;
+    const href = prop.href || '';
+    const applies = (prop.appliesTo || '').toLowerCase();
+
+    const isSvgSpec =
+      href.includes('svgwg.org') ||
+      href.includes('svg2-draft') ||
+      href.includes('fill-stroke') ||
+      href.includes('strokes') ||
+      href.includes('filter-effects') ||
+      href.includes('css-masking') ||
+      href.includes('css-transforms');
+
+    const isSvgApplies =
+      applies.includes('svg') ||
+      applies.includes('shapes') ||
+      applies.includes('graphics elements') ||
+      applies.includes('container elements');
+
+    if (isSvgSpec || isSvgApplies) {
+      svgPresentationAttrSet.add(prop.name);
+    }
+  }
+
+  for (const [name, prop] of Object.entries(mdn)) {
+    if (name.startsWith('-')) continue;
+    const groups = prop.groups || [];
+    const applies = (prop.appliesto || '').toLowerCase();
+
+    if (
+      groups.includes('Scalable Vector Graphics') ||
+      groups.includes('Filter Effects') ||
+      groups.includes('CSS Masking') ||
+      applies.includes('svg')
+    ) {
+      svgPresentationAttrSet.add(name);
     }
   }
 
   const svgPresentationAttributes = Array.from(svgPresentationAttrSet).sort();
 
-  // 2. Extract Color Properties from MDN and CSS specs
-  const colorPropertySet = new Set<string>([
-    'color',
-    'background-color',
-    'border-color',
-    'border-top-color',
-    'border-right-color',
-    'border-bottom-color',
-    'border-left-color',
-    'outline-color',
-    'text-decoration-color',
-    'column-rule-color',
-    'caret-color',
-    'flood-color',
-    'lighting-color',
-    'stop-color',
-    'accent-color',
-  ]);
+  // 2. Extract Color Properties dynamically by syntax parsing
+  const colorPropertySet = new Set<string>();
+
+  for (const prop of webref.properties) {
+    if (prop.name.startsWith('-')) continue;
+    const syntax = prop.syntax || '';
+    if (syntax.includes('<color>') || syntax.includes('<color-property>') || syntax.includes('<paint>')) {
+      colorPropertySet.add(prop.name);
+    }
+  }
 
   for (const [name, prop] of Object.entries(mdn)) {
-    if (prop.syntax && (prop.syntax.includes('<color>') || prop.syntax.includes('<color-property>'))) {
-      if (!name.startsWith('-')) {
-        colorPropertySet.add(name);
-      }
+    if (name.startsWith('-')) continue;
+    const syntax = prop.syntax || '';
+    if (syntax.includes('<color>') || syntax.includes('<color-property>') || syntax.includes('<paint>')) {
+      colorPropertySet.add(name);
     }
   }
 
   const colorProperties = Array.from(colorPropertySet).sort();
 
-  // 3. Compile Default Initial Property Values per CSS Cascade 5 & SVG 2
-  const defaultPropertyValues: Record<string, string> = {
-    'alignment-baseline': 'baseline',
+  // 3. Extract Default Initial Property Values dynamically
+  const defaultPropertyValues: Record<string, string> = {};
+
+  for (const prop of webref.properties) {
+    if (
+      prop.name.startsWith('-') ||
+      !prop.initial ||
+      prop.initial.includes('see individual') ||
+      prop.initial.includes('N/A') ||
+      prop.initial.includes('depends on')
+    ) {
+      continue;
+    }
+    defaultPropertyValues[prop.name] = prop.initial;
+  }
+
+  for (const [name, prop] of Object.entries(mdn)) {
+    if (
+      name.startsWith('-') ||
+      !prop.initial ||
+      typeof prop.initial !== 'string' ||
+      prop.initial.includes('seeProse') ||
+      prop.initial.includes('dependsOnUserAgent')
+    ) {
+      continue;
+    }
+    if (!defaultPropertyValues[name]) {
+      defaultPropertyValues[name] = prop.initial;
+    }
+  }
+
+  // Canonical CSSOM computed/resolved fallbacks for standard cascade properties
+  const computedFallbacks: Record<string, string> = {
     'background-color': 'rgba(0, 0, 0, 0)',
-    'baseline-shift': 'baseline',
-    'border-spacing': '0px',
-    'clip-rule': 'nonzero',
     'color': 'rgb(0, 0, 0)',
-    'color-interpolation-filters': '',
-    'cursor': 'auto',
-    'direction': 'ltr',
-    'display': 'inline',
-    'dominant-baseline': 'auto',
-    'fill': 'black',
-    'fill-opacity': '1',
-    'fill-rule': 'nonzero',
-    'filter': 'none',
-    'flood-color': '',
-    'flood-opacity': '1',
     'font-family': 'Times New Roman',
     'font-size': '16px',
-    'font-size-adjust': 'none',
-    'font-stretch': '100%',
-    'font-style': 'normal',
     'font-weight': '400',
-    'glyph-orientation-vertical': 'auto',
-    'kerning': 'auto',
-    'letter-spacing': 'normal',
-    'lighting-color': '',
-    'opacity': '1',
-    'overflow': 'visible',
-    'pointer-events': 'visiblePainted',
-    'stop-color': '',
-    'stop-opacity': '1',
-    'stroke': '',
-    'stroke-dasharray': 'none',
-    'stroke-dashoffset': '0px',
-    'stroke-linecap': 'butt',
-    'stroke-linejoin': 'miter',
-    'stroke-miterlimit': '4',
-    'stroke-opacity': '1',
     'stroke-width': '1px',
-    'text-anchor': 'start',
-    'text-decoration-line': 'none',
-    'text-decoration-style': 'solid',
-    'text-indent': '0px',
-    'visibility': 'visible',
-    'word-spacing': '0px',
-    'writing-mode': 'lr-tb',
   };
+  Object.assign(defaultPropertyValues, computedFallbacks);
 
-  // 4. Block Tags Set per HTML and CSS Display
-  const blockTags = [
-    'ARTICLE',
-    'BLOCKQUOTE',
-    'BODY',
-    'DIV',
-    'FIELDSET',
-    'FIGCAPTION',
-    'FIGURE',
-    'FOOTER',
-    'FORM',
-    'H1',
-    'H2',
-    'H3',
-    'H4',
-    'H5',
-    'H6',
-    'HEADER',
-    'HR',
-    'HTML',
-    'LI',
-    'MAIN',
-    'NAV',
-    'OL',
-    'P',
-    'PRE',
-    'SECTION',
-    'TABLE',
-    'UL',
-  ].sort();
+  const sortedDefaultKeys = Object.keys(defaultPropertyValues).sort();
 
+  // 4. Generate Output Code
   let code = `/**
  * @license
  * Copyright 2026 Google LLC
@@ -250,7 +215,7 @@ function main() {
  * svg-2 § 6.2 #presentation-attributes
  * css-cascade-5 § 3 #cascade-origins
  */
-export const SVG_PRESENTATION_ATTRIBUTES: Set<string> = new Set([\n`;
+export const SVG_PRESENTATION_ATTRIBUTES: ReadonlySet<string> = new Set([\n`;
 
   for (const attr of svgPresentationAttributes) {
     code += `  '${attr}',\n`;
@@ -261,7 +226,7 @@ export const SVG_PRESENTATION_ATTRIBUTES: Set<string> = new Set([\n`;
  * Standard CSS color properties that normalize computed color format.
  * css-color-4 § 4 #resolving-color-values
  */
-export const COLOR_PROPERTIES: Set<string> = new Set([\n`;
+export const COLOR_PROPERTIES: ReadonlySet<string> = new Set([\n`;
 
   for (const prop of colorProperties) {
     code += `  '${prop}',\n`;
@@ -273,21 +238,21 @@ export const COLOR_PROPERTIES: Set<string> = new Set([\n`;
  * css-cascade-5 § 7.1 #initial-values
  * svg-2 § 6.2 #presentation-attributes
  */
-export const DEFAULT_PROPERTY_VALUES: Record<string, string> = {\n`;
+export const DEFAULT_PROPERTY_VALUES: Readonly<Record<string, string>> = {\n`;
 
-  const sortedDefaultKeys = Object.keys(defaultPropertyValues).sort();
   for (const key of sortedDefaultKeys) {
-    code += `  '${key}': '${defaultPropertyValues[key]}',\n`;
+    code += `  '${key}': ${JSON.stringify(defaultPropertyValues[key])},\n`;
   }
   code += `};\n\n`;
 
   code += `/**
  * Standard HTML block elements defaulting to display: block.
  * css-display-3 § 2
+ * html § 15 #rendering
  */
-export const BLOCK_TAGS: Set<string> = new Set([\n`;
+export const BLOCK_TAGS: ReadonlySet<string> = new Set([\n`;
 
-  for (const tag of blockTags) {
+  for (const tag of HTML_BLOCK_ELEMENTS.sort()) {
     code += `  '${tag}',\n`;
   }
   code += `]);\n`;

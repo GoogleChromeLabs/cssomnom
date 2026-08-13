@@ -254,7 +254,7 @@ describe('Phase 94: CSS Variables 1 Cascade, Cycle Detection & revert/revert-lay
       const cs = getCascadedStyle(rect);
 
       assert.equal(cs.getPropertyValue('alignment-baseline'), 'baseline');
-      assert.equal(cs.getPropertyValue('baseline-shift'), 'baseline');
+      assert.equal(cs.getPropertyValue('baseline-shift'), '0');
       assert.equal(cs.getPropertyValue('clip-rule'), 'nonzero');
       assert.equal(cs.getPropertyValue('fill'), 'black');
       assert.equal(cs.getPropertyValue('stroke-width'), '1px');
