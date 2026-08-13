@@ -98,7 +98,9 @@ test('async_test lifecycle mock in sandbox context', async () => {
 
   (returnedTest.done as Function)();
   
-  await tests[0].promise;
+  if (tests[0].type === 'async_test') {
+    await tests[0].promise;
+  }
   
   // Run cleanups manually to test it
   for (const cleanup of tests[0].cleanups || []) {

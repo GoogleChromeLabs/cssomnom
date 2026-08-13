@@ -2389,6 +2389,88 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Ran full test suite with `pnpm run preflight` (4,000+ unit tests passing, 0 lint errors, 0 type errors).
   - Updated `wpt-progress.md` with `pnpm run wpt:node:progress` and verified WPT conformance progress.
 
+---
+
+## Phase 97: WPT Test Harness & Shim Simplification (`tests/wpt-shim.ts`)
+**Goal**: Refactor, simplify, and modularize the 2,400-line `tests/wpt-shim.ts` testing infrastructure with mathematical zero-regression verification against the baseline snapshot.
+
+**Spec & Infrastructure References**:
+- W3C `testharness.js` API: `submodules/web-platform-tests/resources/testharness.js`
+- Style & Architecture Manifesto: `~/.gemini/STYLE.md`
+
+### Tasks
+- [x] **Code Simplifier Input**:
+  - Run Code Simplifier subagents (`code_reuse_reviewer`, `code_quality_reviewer`, `efficiency_reviewer`, `style_principles_reviewer`) on `tests/wpt-shim.ts`.
+- [x] **Snapshot Passing Test Set**:
+  - Capture exact passing test assertions into `tests/fixtures/baselines/wpt-passing-set-baseline.json` via `scripts/wpt/node/snapshot-and-verify.ts`.
+- [x] **Modularize Test Shims**:
+  - Extract DOM polyfills (`Range`, `MutationObserver`, `StyleSheetListImpl`, WeakMap state, `ComputedStylePropertyMap`) into `tests/shims/dom-stubs.ts`.
+  - Extract WPT assertions, DOMException dictionaries, and error classes into `tests/shims/wpt-assertions.ts`.
+  - Extract iframe DOM creation, script runner, and postMessage event bus into `tests/shims/iframe-runner.ts`.
+  - Extract `testharness.js` context bridge, discriminated union `WptSandboxTest`, and test lifecycle into `tests/shims/testharness-bridge.ts`.
+  - Streamline `tests/wpt-shim.ts` to clean outline orchestrator re-exporting all APIs with 100% backward compatibility.
+- [x] **Zero-Regression & Preflight Verification**:
+  - Run `node --max-old-space-size=1024 scripts/wpt/node/snapshot-and-verify.ts --verify` to verify 0 dropped/regressed tests (16,749 passing assertions, +301 newly passing, 0 regressed).
+  - Run `pnpm run preflight` (100% unit tests passing, 0 type errors, 0 linter warnings).
+- [x] **Multi-Agent Review Loop**:
+  - Decomposed and verified against `STYLE.md` anti-greenwashing rules and outline orchestration.
+
+---
+
+## Phase 98: Spec-Aligned Modularization of CSS Typed OM (`src/typed-om/`)
+**Goal**: Deconstruct the 4,618-line `src/typed-om.ts` into a spec-aligned directory structure (`src/typed-om/`) reflecting W3C CSS Typed OM Level 1 & 2 normative specification sections, eliminating duplicated parameter guards while maintaining 100% public API compatibility and zero test regressions.
+
+**Spec References**:
+- CSS Typed OM Level 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
+- CSS Typed OM Level 2: `submodules/css-houdini-drafts/css-typed-om-2/Overview.bs`
+- CSS Values and Units Module Level 4: `submodules/csswg-drafts/css-values-4/Overview.bs`
+
+### Tasks
+- [ ] **Code Simplifier Input**:
+  - Run Code Simplifier subagents on `src/typed-om.ts` to isolate duplicated constructor guards and WebIDL type conversions.
+- [ ] **Spec-Aligned Module Decomposition**:
+  - `src/typed-om/values/`: Base `CSSStyleValue`, `CSSKeywordValue`, `CSSUnparsedValue`, `CSSVariableReferenceValue` (CSS Typed OM 1 § 3).
+  - `src/typed-om/numeric/`: `CSSNumericValue`, `CSSUnitValue`, `CSSNumericArray`, and calculation tree nodes `CSSMathValue`, `CSSMathSum`, `CSSMathProduct`, `CSSMathNegate`, `CSSMathInvert`, `CSSMathMin`, `CSSMathMax`, `CSSMathClamp`, `CSSMathRound` (CSS Typed OM 1 § 4).
+  - `src/typed-om/color/`: `CSSColorValue`, `CSSRGB`, `CSSHSL`, `CSSHWB`, `CSSLab`, `CSSLCH`, `CSSOKLab`, `CSSOKLCH`, `CSSColor` (CSS Typed OM 2 & CSS Color 4).
+  - `src/typed-om/transforms/`: `CSSTransformComponent`, `CSSTranslate`, `CSSRotate`, `CSSScale`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSPerspective`, `CSSMatrixComponent`, `CSSTransformValue` (CSS Typed OM 1 § 5).
+  - `src/typed-om/position/`: `CSSPositionValue` (CSS Typed OM 1 § 6).
+  - `src/typed-om/maps/`: `StylePropertyMapReadOnly`, `StylePropertyMap` (CSS Typed OM 1 § 2).
+  - `src/typed-om/reify/`: `createCSSStyleValue`, `reifyValue`, and standard syntax validators.
+  - `src/typed-om/index.ts`: Re-export all classes and interfaces maintaining 100% backwards compatibility and zero circular dependencies with `src/parse-hooks.ts`.
+- [ ] **Zero-Regression & Preflight Verification**:
+  - Verify with `scripts/wpt/node/snapshot-and-verify.ts --verify` (0 regressions).
+  - Run `pnpm run preflight`.
+- [ ] **Multi-Agent Review Loop**:
+  - Codex Reviewer + Gatekeeper Grizz audit.
+
+---
+
+## Phase 99: Spec-Aligned Cascade Pipeline Architecture (`src/cascade/`)
+**Goal**: Re-architect `src/cascade.ts` (1,643 lines) into clean, sequential pipeline modules reflecting the W3C CSS Cascading and Inheritance Level 5 value processing pipeline (§ 2 Origin & Importance, § 3 Cascade Sorting Order, § 4 Defaulting, § 5 Specified/Computed Stages, CSS Variables 1 § 3).
+
+**Spec References**:
+- CSS Cascading and Inheritance Level 5: `submodules/csswg-drafts/css-cascade-5/Overview.bs`
+- CSS Custom Properties for Cascading Variables Module Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+- CSS Environment Variables Module Level 1: `submodules/csswg-drafts/css-env-1/Overview.bs`
+
+### Tasks
+- [ ] **Code Simplifier Input**:
+  - Run Code Simplifier subagents on `src/cascade.ts` to identify interleaved pipeline steps and redundant state.
+- [ ] **Spec-Aligned Cascade Pipeline Decomposition**:
+  - `src/cascade/collector.ts`: Harvest declarations across document styles, adopted stylesheets, inline styles, and SVG presentation attributes.
+  - `src/cascade/sorter.ts`: Strict 6-tier cascade sorting per CSS Cascade 5 § 3 (Origin & Importance $\rightarrow$ Shadow Context $\rightarrow$ Specificity $\rightarrow$ Scope $\rightarrow$ Order of Appearance).
+  - `src/cascade/variables.ts`: Custom property cycle graph detection and `var()` / `env()` substitution with fallback evaluation.
+  - `src/cascade/shorthands.ts`: Dynamic post-substitution shorthand expansion into constituent leaf longhands.
+  - `src/cascade/defaulting.ts`: Cascade keyword rollbacks (`initial`, `inherit`, `unset`, `revert`, `revert-layer`).
+  - `src/cascade/computed.ts`: CSS Color 4 normalization (`normalizeComputedColor`), length unit resolution, and initial value defaulting.
+  - `src/cascade/index.ts`: Clean outline orchestrator implementing `getCascadedStyle(element)`.
+- [ ] **Zero-Regression & Preflight Verification**:
+  - Verify with `scripts/wpt/node/snapshot-and-verify.ts --verify` (0 regressions).
+  - Run `pnpm run preflight`.
+- [ ] **Multi-Agent Review Loop**:
+  - Codex Reviewer + Gatekeeper Grizz audit.
+
+
 
 
 
