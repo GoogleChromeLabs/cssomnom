@@ -2537,20 +2537,6 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 103: Typed OM Failure Cluster #1: `CSSUnparsedValue` Roundtrip & Transform `is2D` Immutability
-**Goal**: Eliminate the largest remaining failure cluster (~1,036 failures across 211 files) by implementing strict `is2D` immutability in CSSTransformComponent subclasses and fixing `CSSUnparsedValue` token serialization roundtripping.
-
-### Tasks
-- [ ] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
-  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSRotate`, `CSSTranslate`, `CSSScale` is a no-op or correctly updates 2D/3D state without throwing unexpected exceptions.
-- [ ] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
-  - In `src/typed-om/values/CSSUnparsedValue.ts`: Fix `toString()` and token list iteration to accurately serialize mixed strings and `CSSVariableReferenceValue` instances.
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
-  - Run `pnpm run wpt:verify` to confirm 0 regressions and record newly passing assertions.
-
----
-
 ## Phase 104: Deterministic Virtual Clock & Microtask Flusher in `tests/dom-shim/`
 **Goal**: Implement a deterministic virtual macro-tick and micro-tick flusher in `tests/dom-shim/src/testharness-bridge.ts` and `dom-stubs.ts` so async WPT tests (`step_timeout`, `requestAnimationFrame`) execute synchronously without wall-clock delays.
 
@@ -2563,6 +2549,52 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - [x] **Unit Testing & Performance Benchmark**:
   - Added comprehensive unit tests in `tests/dom-shim/tests/virtual-clock.test.ts`.
   - Verified 0 regressions across 1,687 WPT test files (16,797 passing assertions).
+
+---
+
+## Phase 105: `wpt.fyi` Upstream Chrome Baseline Fetcher & 3-Way Differential Comparison
+**Goal**: Fetch and cache official upstream Chrome WPT baseline data directly from `wpt.fyi` API / Google Cloud Storage, enabling automated 3-way differential comparisons between Node.js (`cssomnom`), Injected Browser (`cssomnom` in Chrome), and Vanilla Upstream Chrome (reference unpolyfilled engine).
+
+### Tasks
+- [ ] **`wpt.fyi` Data Ingestion Engine (`scripts/wpt/browser/fetch-wptfyi.ts`)**:
+  - Implement `fetchWptFyiRun({ product: 'chrome', revision })` querying `https://wpt.fyi/api/runs` for the exact or closest matching WPT git revision.
+  - Download and cache the upstream `report.json` to `.wpt-cache/report-chrome-upstream.json`.
+- [ ] **3-Way Differential Comparator**:
+  - Extend `scripts/wpt/browser/parity.ts` to support 3-way comparison (`Node` vs `Injected Chrome` vs `Vanilla Upstream Chrome`).
+  - Identify tests where `cssomnom` fixes or polyfills browser shortcomings vs tests where `cssomnom` differs from standard Blink behavior.
+- [ ] **CLI & Unit Testing**:
+  - Add `wpt fetch-upstream` subcommand to CLI and `"wpt:fetch-upstream"` in `package.json`.
+  - Add unit tests in `tests/wpt-cli.test.ts`.
+
+---
+
+## Phase 106: Differential Parity Matrix Interpretation & Spec Gap Triage
+**Goal**: Run the Differential Parity Oracle across all 7 W3C CSS suites, interpret findings across the 4 truth quadrants, and construct an empirical roadmap of high-priority bugs vs tightened shims.
+
+### Tasks
+- [ ] **Full-Suite Parity Matrix Execution**:
+  - Execute live parity comparison across all 7 W3C CSS suites (`css-typed-om`, `selectors`, `cssom`, `css-variables`, `mediaqueries`, `css-syntax`, `css-nesting`).
+- [ ] **Truth Tier Analysis & Categorization**:
+  - *Verified Conformance Analysis*: Confirm gold-standard passes matching reference Blink behavior.
+  - *Spec Gap Triage*: Cluster all Node FAIL + Chrome PASS assertions to map root causes (e.g. style mutation invalidation, revert fallbacks, syntax strictness).
+  - *Over-Mocking Audit*: Inspect all Node PASS + Chrome FAIL assertions and tighten any overly lenient shims in `tests/dom-shim/`.
+- [ ] **Publish Conformance Parity Report**:
+  - Document the findings in `docs/conformance-parity-report.md`.
+
+---
+
+## Phase 103: Typed OM Failure Cluster #1: `CSSUnparsedValue` Roundtrip & Transform `is2D` Immutability
+**Goal**: Eliminate the largest remaining failure cluster (~1,036 failures across 211 files) by implementing strict `is2D` immutability in CSSTransformComponent subclasses and fixing `CSSUnparsedValue` token serialization roundtripping.
+
+### Tasks
+- [ ] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
+  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSRotate`, `CSSTranslate`, `CSSScale` is a no-op or correctly updates 2D/3D state without throwing unexpected exceptions.
+- [ ] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
+  - In `src/typed-om/values/CSSUnparsedValue.ts`: Fix `toString()` and token list iteration to accurately serialize mixed strings and `CSSVariableReferenceValue` instances.
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
+  - Run `pnpm run wpt:verify` to confirm 0 regressions and record newly passing assertions.
+
 
 
 
