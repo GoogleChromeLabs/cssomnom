@@ -11,14 +11,18 @@ To guarantee absolute specification conformance, type-safety, and test honesty, 
 ```mermaid
 graph TD
     Orchestrator[1. Orchestrator: Plan & Delegate] -->|1. Spawn | Developer[2. Developer: champ]
-    Developer -->|2. Commit Code| Reviewer[3. Reviewer: codex_reviewer_cmd]
-    Reviewer -->|3. Approve or Reject| Orchestrator
-    Orchestrator -->|4. If approved, spawn| Grizz[4. Gatekeeper: Grizz]
-    Grizz -->|5. Accept| Ship[5. Phase Closed]
-    Grizz -->|🔴 Reject: Cheats/Muted Rules| Developer
+    Developer -->|2. Commit Code| ParallelAudit[2. Parallel Audit Gate]
+    ParallelAudit -->|Spawn Concurrent| Reviewer[3. Reviewer: codex_reviewer_cmd]
+    ParallelAudit -->|Spawn Concurrent| Grizz[4. Gatekeeper: Grizz]
+    Reviewer -->|Review & Quality Verdict| Orchestrator[5. Orchestrator Consolidation]
+    Grizz -->|Hostile Security & Conformance Verdict| Orchestrator
+    Orchestrator -->|Both Approve| Ship[6. Phase Closed]
+    Orchestrator -->|🔴 Rejection: Fix Required| Developer
 ```
 
 ### The Personas & Segregation of Duties
+
+> **Concurrent Parallel Auditing**: Once Developer (`champ`) commits code, Orchestrator MUST spawn both **Reviewer (`codex_reviewer_cmd`)** and **Gatekeeper (`Grizz`)** concurrently in parallel in a single turn to minimize turnaround latency. Both subagents audit independently from their respective perspectives (code quality vs hostile anti-greenwashing), and both must pass for a phase to be accepted.
 
 1.  **The Orchestrator**:
     *   *Role*: Plans roadmaps (`PLAN.md`), updates progress logs (`wpt-progress.md`), and delegates tasks.

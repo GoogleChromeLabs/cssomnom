@@ -2361,6 +2361,210 @@ Objective: Harden the WPT crawler against unconstrained memory growth and uninte
   - Ran `pnpm run codegen` and `pnpm run preflight`.
   - All unit tests pass with 0 type errors and 0 linter warnings.
 
+---
+
+## Phase 96: CSS Variables & CSSOM Conformance Push (Targeting 95%+ Conformance)
+
+Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%+) and `css/cssom` (65.33% -> 85%+) to push overall feasible WPT conformance past 95%.
+
+**Spec References**:
+- CSS Custom Properties for Cascading Variables Module Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+- CSS Object Model (CSSOM): `submodules/csswg-drafts/cssom-1/Overview.bs`
+- Selectors Level 4: `submodules/csswg-drafts/selectors-4/Overview.bs`
+
+### Tasks
+- [x] **CSS Variables Shorthand Substitution & `env()` Support (`src/cascade.ts`)**:
+  - Implemented custom property substitution within shorthand property expansions (`font`, `border`, `margin`, `padding`, `background`).
+  - Added standard user-agent `env()` fallback handling per CSS Environment Variables 1.
+  - Implemented case-sensitive custom property lookup (`--foo` vs `--FOO`).
+- [x] **CSSOM Rule Indexing & Hierarchy Exceptions (`src/CSSOM.ts`)**:
+  - Implemented strict W3C DOM exception handling on `insertRule` (`HierarchyRequestError` when inserting `@import` after style rules in non-constructed stylesheets, `SyntaxError` for constructed stylesheets, `IndexSizeError` on out-of-bounds indices).
+  - Implemented `@keyframes` rule indexing (`appendRule`, `deleteRule`, `findRule`).
+  - Implemented `CSSStyleDeclaration` indexed item access (`style[0]`, `style[1]`, `style.length`).
+- [x] **Selectors 4 `:is()` / `:where()` / `:has()` Specificity (`src/cascade.ts`, `src/parser.ts`)**:
+  - Calculated `:is(...)` and `:has(...)` specificity as the maximum specificity among argument selectors.
+  - Set `:where(...)` specificity to `[0, 0, 0]`.
+  - Serialized comma-separated `:not(a, b)` selector argument lists per Selectors 4 § 4.2.
+- [x] **Verification & Preflight**:
+  - Ran full test suite with `pnpm run preflight` (4,000+ unit tests passing, 0 lint errors, 0 type errors).
+  - Updated `wpt-progress.md` with `pnpm run wpt:node:progress` and verified WPT conformance progress.
+
+---
+
+## Phase 97: WPT Test Harness & Shim Simplification (`tests/wpt-shim.ts`)
+**Goal**: Refactor, simplify, and modularize the 2,400-line `tests/wpt-shim.ts` testing infrastructure with mathematical zero-regression verification against the baseline snapshot.
+
+**Spec & Infrastructure References**:
+- W3C `testharness.js` API: `submodules/web-platform-tests/resources/testharness.js`
+- Style & Architecture Manifesto: `~/.gemini/STYLE.md`
+
+### Tasks
+- [x] **Code Simplifier Input**:
+  - Run Code Simplifier subagents (`code_reuse_reviewer`, `code_quality_reviewer`, `efficiency_reviewer`, `style_principles_reviewer`) on `tests/wpt-shim.ts`.
+- [x] **Snapshot Passing Test Set**:
+  - Capture exact passing test assertions into `tests/fixtures/baselines/wpt-passing-set-baseline.json` via `scripts/wpt/node/snapshot-and-verify.ts`.
+- [x] **Modularize Test Shims**:
+  - Extract DOM polyfills (`Range`, `MutationObserver`, `StyleSheetListImpl`, WeakMap state, `ComputedStylePropertyMap`) into `tests/shims/dom-stubs.ts`.
+  - Extract WPT assertions, DOMException dictionaries, and error classes into `tests/shims/wpt-assertions.ts`.
+  - Extract iframe DOM creation, script runner, and postMessage event bus into `tests/shims/iframe-runner.ts`.
+  - Extract `testharness.js` context bridge, discriminated union `WptSandboxTest`, and test lifecycle into `tests/shims/testharness-bridge.ts`.
+  - Streamline `tests/wpt-shim.ts` to clean outline orchestrator re-exporting all APIs with 100% backward compatibility.
+- [x] **Zero-Regression & Preflight Verification**:
+  - Run `node --max-old-space-size=1024 scripts/wpt/node/snapshot-and-verify.ts --verify` to verify 0 dropped/regressed tests (16,749 passing assertions, +301 newly passing, 0 regressed).
+  - Run `pnpm run preflight` (100% unit tests passing, 0 type errors, 0 linter warnings).
+- [x] **Multi-Agent Review Loop**:
+  - Decomposed and verified against `STYLE.md` anti-greenwashing rules and outline orchestration.
+
+---
+
+## Phase 98: Spec-Aligned Modularization of CSS Typed OM (`src/typed-om/`)
+**Goal**: Deconstruct the 4,618-line `src/typed-om.ts` into a spec-aligned directory structure (`src/typed-om/`) reflecting W3C CSS Typed OM Level 1 & 2 normative specification sections, eliminating duplicated parameter guards while maintaining 100% public API compatibility and zero test regressions.
+
+**Spec References**:
+- CSS Typed OM Level 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
+- CSS Typed OM Level 2: `submodules/css-houdini-drafts/css-typed-om-2/Overview.bs`
+- CSS Values and Units Module Level 4: `submodules/csswg-drafts/css-values-4/Overview.bs`
+
+### Tasks
+- [x] **Code Simplifier Input**:
+  - Run Code Simplifier subagents on `src/typed-om.ts` to isolate duplicated constructor guards and WebIDL type conversions.
+- [x] **Spec-Aligned Module Decomposition**:
+  - `src/typed-om/values/`: Base `CSSStyleValue`, `CSSKeywordValue`, `CSSUnparsedValue`, `CSSVariableReferenceValue` (CSS Typed OM 1 § 3).
+  - `src/typed-om/numeric/`: `CSSNumericValue`, `CSSUnitValue`, `CSSNumericArray`, and calculation tree nodes `CSSMathValue`, `CSSMathSum`, `CSSMathProduct`, `CSSMathNegate`, `CSSMathInvert`, `CSSMathMin`, `CSSMathMax`, `CSSMathClamp`, `CSSMathRound` (CSS Typed OM 1 § 4).
+  - `src/typed-om/color/`: `CSSColorValue`, `CSSRGB`, `CSSHSL`, `CSSHWB`, `CSSLab`, `CSSLCH`, `CSSOKLab`, `CSSOKLCH`, `CSSColor` (CSS Typed OM 2 & CSS Color 4).
+  - `src/typed-om/transforms/`: `CSSTransformComponent`, `CSSTranslate`, `CSSRotate`, `CSSScale`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSPerspective`, `CSSMatrixComponent`, `CSSTransformValue` (CSS Typed OM 1 § 5).
+  - `src/typed-om/position/`: `CSSPositionValue` (CSS Typed OM 1 § 6).
+  - `src/typed-om/maps/`: `StylePropertyMapReadOnly`, `StylePropertyMap` (CSS Typed OM 1 § 2).
+  - `src/typed-om/reify/`: `createCSSStyleValue`, `reifyValue`, and standard syntax validators.
+  - `src/typed-om/index.ts`: Re-export all classes and interfaces maintaining 100% backwards compatibility and zero circular dependencies with `src/parse-hooks.ts`.
+- [x] **Zero-Regression & Preflight Verification**:
+  - Verify with `scripts/wpt/node/snapshot-and-verify.ts --verify` (0 regressions).
+  - Run `pnpm run preflight`.
+- [x] **Multi-Agent Review Loop**:
+  - Codex Reviewer + Gatekeeper Grizz audit.
+
+---
+
+## Phase 99: Spec-Aligned Cascade Pipeline Architecture (`src/cascade/`)
+**Goal**: Re-architect `src/cascade.ts` (1,643 lines) into clean, sequential pipeline modules reflecting the W3C CSS Cascading and Inheritance Level 5 value processing pipeline (§ 2 Origin & Importance, § 3 Cascade Sorting Order, § 4 Defaulting, § 5 Specified/Computed Stages, CSS Variables 1 § 3).
+
+**Spec References**:
+- CSS Cascading and Inheritance Level 5: `submodules/csswg-drafts/css-cascade-5/Overview.bs`
+- CSS Custom Properties for Cascading Variables Module Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+- CSS Environment Variables Module Level 1: `submodules/csswg-drafts/css-env-1/Overview.bs`
+
+### Tasks
+- [x] **Code Simplifier Input**:
+  - Run Code Simplifier subagents on `src/cascade.ts` to identify interleaved pipeline steps and redundant state.
+- [x] **Spec-Aligned Cascade Pipeline Decomposition**:
+  - `src/cascade/types.ts`: `MatchedDeclaration`, `CascadeOrigin` constants/type, `Specificity`, `DOMElement`, `INHERITED_PROPERTIES`.
+  - `src/cascade/layer-manager.ts`: `@layer` discovery, registration, nested path resolution, and layer precedence (CSS Cascade 5 § 4).
+  - `src/cascade/rule-filter.ts`: Rule walking, `@media` / `@supports` / `@scope` filtering, selector matching (`matches`), and unified declaration extraction across AST rules, `CSSStyleDeclaration`, and SVG presentation attributes (CSS Cascade 5 § 2).
+  - `src/cascade/cascade-sorter.ts`: Strict 6-tier cascade sorting per CSS Cascade 5 § 6 (Origin & Importance $\rightarrow$ Shadow Context $\rightarrow$ Layer $\rightarrow$ Specificity $\rightarrow$ Scope Proximity $\rightarrow$ Order of Appearance).
+  - `src/cascade/variable-resolver.ts`: Custom property cycle graph detection, `var()` and `env()` substitution with fallback evaluation (CSS Variables 1 § 3, CSS Env 1 § 3).
+  - `src/cascade/color-resolver.ts`: `SYSTEM_COLORS`, `normalizeComputedColor`, RGB/HSL/named color normalization (CSS Color 4).
+  - `src/cascade/value-processor.ts`: Cascaded to specified value resolution, CSS-wide keyword rollbacks (`initial`, `inherit`, `unset`, `revert`, `revert-layer`), and post-substitution shorthand expansion into constituent longhands (CSS Cascade 5 § 7).
+  - `src/cascade/index.ts`: Outline orchestrator implementing `getCascadedStyle(element)` and `CSSComputedStyleDeclaration`.
+  - `src/cascade.ts`: Forward all exports from `./cascade/index.ts` maintaining 100% backward compatibility for all consumers and tests.
+- [x] **Zero-Regression & Preflight Verification**:
+  - Verify with `scripts/wpt/node/snapshot-and-verify.ts --verify` (0 regressions, 16,769 passing tests).
+  - Run `pnpm run preflight` (0 TypeScript errors, 0 linter warnings, 100% unit tests passing).
+
+---
+
+## Phase 100: Unified Agent-Native WPT CLI Consolidation (`scripts/wpt/node/`)
+**Goal**: Consolidate redundant, disparate WPT runner scripts (`crawl.ts`, `snapshot-and-verify.ts`, `cluster.ts`, `diff.ts`, `benchmark-monsters.ts`, `profile-scan.ts`) into a single-pass, modular Agent-Native CLI using native `node:util` `parseArgs`, structured core modules (<200 LOC each), and disk cache acceleration.
+
+### Tasks
+- [x] **Core Architecture Decomposition (`scripts/wpt/node/core/`)**:
+  - `core/types.ts`: Shared TypeScript interfaces (`TestRunDataset`, `ParsedFileResult`, `FailureCluster`, `ExpectationDiffItem`, `BaselineAuditReport`).
+  - `core/config.ts`: Config loader, spec validator (`VALID_SPECS`), feasible targets, and baseline path resolvers.
+  - `core/crawler.ts`: Directory tree walker with spec resolution, path filtering, and exclusion rules.
+  - `core/parser.ts`: Single source of truth for parsing runner outputs (`✔`, `✖`, `+ expected - actual`, timeouts, crashes, load errors), error clustering, and diff extraction.
+  - `core/executor.ts`: Single-pass execution engine wrapping `safeWorkerPool` from `../safe-child-process.ts`.
+  - `core/cache.ts`: Saves and loads `.wpt-cache/last-run.json` for instant offline analysis.
+- [x] **Command Handlers (`scripts/wpt/node/commands/`)**:
+  - `commands/run.ts`: Single-pass test runner supporting `--filter-by-spec`, `--filter-by-path`, `--verify-exact-baseline`, `--show-failure-clusters`, `--show-expectation-diff`, `--write-progress-markdown`, `--write-passing-set-baseline`, `--json`, `--dry-run`, `--limit`, `--concurrency`.
+  - `commands/cluster.ts`: Instant offline failure pattern analyzer (<30ms from cache) with `--live` option.
+  - `commands/diff.ts`: Instant offline baseline diff comparator with categorized near-miss assertions and `--live` option.
+- [x] **Entrypoint (`scripts/wpt/node/cli.ts`)**:
+  - Unified entrypoint using `node:util` `parseArgs` with `strict: true` and informative error handling and help text.
+- [x] **Packaging & Cleanup**:
+  - Preserved kernel (`run.ts`, `safe-child-process.ts`).
+  - Removed legacy redundant scripts via `trash`: `crawl.ts`, `snapshot-and-verify.ts`, `cluster.ts`, `diff.ts`, `benchmark-monsters.ts`, `profile-scan.ts`.
+  - Updated `package.json` with `wpt`, `wpt:run`, `wpt:crawl`, `wpt:progress`, `wpt:baseline`, `wpt:verify`, `wpt:cluster`, `wpt:diff`.
+  - Added unit test suite `tests/wpt-cli.test.ts`.
+- [x] **Preflight & Verification**:
+## Phase 101: Typed OM Strict Constructor Validation & Browser Geometry Classification
+**Goal**: Implement strict WebIDL constructor type checks for CSS Typed OM color and transform subclasses, enforce error handling in `CSSStyleValue.parseAll()`, support fallback reification in `StylePropertyMap`, and classify layout geometry tests in the browser exclusion manifest.
+
+### Tasks
+- [x] **Typed OM Strict Constructor TypeErrors & Validation**:
+  - `src/typed-om/color/color-spaces.ts`: Added argument count checks ($\ge 3$ arguments for `CSSRGB`, `CSSHSL`, `CSSHWB`, `CSSLab`, `CSSLCH`, `CSSOKLab`, `CSSOKLCH`; $\ge 2$ arguments for `CSSColor`). Enforced strict `CSSNumericValue` instance check with `<angle>` type check on `CSSHWB.h`.
+  - `src/typed-om/transform/transform-components.ts`: Enforced strict argument counts and numeric type checking with dimension validation for `CSSTranslate`, `CSSScale`, `CSSRotate`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSPerspective`, and `CSSMatrixComponent`.
+- [x] **`CSSStyleValue.parseAll()` & Custom Property Validation**:
+  - `src/typed-om/values/style-value-parser.ts`: Throws `TypeError` on empty property names, empty css values, `'--'`, and invalid custom property math expressions (e.g., `calc(1 +)`).
+  - Keyword and color property handling: Supports valid syntax keywords (`currentcolor`, `auto`, `invert`, `none`) and reifies valid colors via `CSSColorValue.parse`.
+- [x] **`StylePropertyMap` Unsupported Property Fallbacks**:
+  - Supports reifying unsupported and unparsed property declarations (`will-change`, `filter`, `cursor`) as base `CSSStyleValue` instances with roundtrip preservation.
+- [x] **Classify Layout Geometry Tests in Browser Manifest**:
+  - `tests/fixtures/wpt-browser-only-manifest.json`: Updated 47 layout geometry tests matching `clusterId: "dom-geometry-client-rects"` to category `DOM_VIEWPORT_GEOMETRY`.
+- [x] **Unit Testing & Zero-Regression Verification**:
+  - Created `tests/typed-om-constructors.test.ts` verifying all constructor rules, error dispatches, and fallbacks.
+  - `pnpm run preflight`: 0 TypeScript errors, 0 oxlint warnings, safe-exec check pass, 100% unit tests passing.
+  - `pnpm run wpt:verify`: 0 regressions across 1,687 test files with +28 newly passing tests (16,797 passing tests).
+
+---
+
+## Phase 102: Cross-Browser Differential Parity Oracle (Node.js vs Headless Chrome)
+**Goal**: Build an automated Differential Parity Oracle that executes WPT tests in Headless Chrome (`wpt run chrome`), compares the live browser results against Node.js `.wpt-cache/last-run.json`, and categorizes results into verified passes, feasibility boundaries, and potential over-mocking false positives.
+
+### Tasks
+- [ ] **Headless Chrome Execution Integration**:
+  - Enhance `scripts/wpt/browser/run.ts` to export structured WPT JSON report artifacts (`dist/report-chrome.json`).
+- [ ] **Differential Parity Engine (`scripts/wpt/browser/parity.ts`)**:
+  - Build parity comparator matching test subtest assertions between `last-run.json` (Node) and `report-chrome.json` (Blink).
+  - Output classified Parity Matrix:
+    1. *Verified Conformance*: Pass in Node + Pass in Chrome.
+    2. *Verified Specification Gaps*: Fail in Node + Pass in Chrome.
+    3. *Feasibility Boundaries*: Fail in Node + Fail in Chrome (confirms browser-only / unsupported / contested WPT tests).
+    4. *Over-Mocking False Positives*: Pass in Node + Fail in Chrome (flags overly lenient shims).
+- [ ] **CLI Wiring**:
+  - Add `wpt parity` subcommand and `pnpm run wpt:parity` in `package.json`.
+- [ ] **Verification**:
+  - Run `pnpm run wpt:parity` across `css-typed-om` and `selectors` suites.
+
+---
+
+## Phase 103: Typed OM Failure Cluster #1: `CSSUnparsedValue` Roundtrip & Transform `is2D` Immutability
+**Goal**: Eliminate the largest remaining failure cluster (~1,036 failures across 211 files) by implementing strict `is2D` immutability in CSSTransformComponent subclasses and fixing `CSSUnparsedValue` token serialization roundtripping.
+
+### Tasks
+- [ ] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
+  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSRotate`, `CSSTranslate`, `CSSScale` is a no-op or correctly updates 2D/3D state without throwing unexpected exceptions.
+- [ ] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
+  - In `src/typed-om/values/CSSUnparsedValue.ts`: Fix `toString()` and token list iteration to accurately serialize mixed strings and `CSSVariableReferenceValue` instances.
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
+  - Run `pnpm run wpt:verify` to confirm 0 regressions and record newly passing assertions.
+
+---
+
+## Phase 104: Deterministic Virtual Clock & Microtask Flusher in `tests/dom-shim/`
+**Goal**: Implement a deterministic virtual macro-tick and micro-tick flusher in `tests/dom-shim/src/testharness-bridge.ts` and `dom-stubs.ts` so async WPT tests (`step_timeout`, `requestAnimationFrame`) execute synchronously without wall-clock delays.
+
+### Tasks
+- [x] **Investigate Virtual Clock Architectures**:
+  - Researched HappyDOM, JSDOM, and WPT `testharness.js` discrete event models.
+- [x] **Implement Deterministic Virtual Timer Queue**:
+  - Built `VirtualClock` in `tests/dom-shim/src/virtual-clock.ts` with discrete event scheduling, microtask flushing, and rAF frame boundaries.
+  - Integrated into `tests/dom-shim/src/testharness-bridge.ts`, `dom-stubs.ts`, `iframe-runner.ts`, and `scripts/wpt/node/run.ts`.
+- [x] **Unit Testing & Performance Benchmark**:
+  - Added comprehensive unit tests in `tests/dom-shim/tests/virtual-clock.test.ts`.
+  - Verified 0 regressions across 1,687 WPT test files (16,797 passing assertions).
+
+
+
 
 
 

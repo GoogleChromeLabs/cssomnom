@@ -1,0 +1,51 @@
+/**
+ * @license
+ * Copyright 2026 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { CSSStyleValue } from './CSSStyleValue.ts';
+
+// Spec: CSS Typed OM Level 1 § 3.5 #imagevalue-objects
+export abstract class CSSImageValue extends CSSStyleValue {}
+
+export class CSSURLImageValue extends CSSImageValue {
+  private _url: string;
+
+  constructor(url: string) {
+    super();
+    this._url = url;
+  }
+
+  get url(): string {
+    return this._url;
+  }
+
+  override toString(): string {
+    return this._url.startsWith('url(') ? this._url : `url("${this._url}")`;
+  }
+}
+
+export class CSSGradientImageValue extends CSSImageValue {
+  private _gradientText: string;
+
+  constructor(gradientText: string) {
+    super();
+    this._gradientText = gradientText;
+  }
+
+  override toString(): string {
+    return this._gradientText;
+  }
+}

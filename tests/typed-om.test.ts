@@ -139,9 +139,8 @@ describe('Values & Typed OM', () => {
             assert.strictEqual(results[0].toString(), '10px 20px');
         });
 
-        test('should return empty array for empty string', () => {
-            const results = CSSStyleValue.parseAll('width', '');
-            assert.deepStrictEqual(results, []);
+        test('should throw TypeError for empty string', () => {
+            assert.throws(() => CSSStyleValue.parseAll('width', ''), TypeError);
         });
     });
 

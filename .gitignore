@@ -4,3 +4,4 @@ node_modules
 .gemini/
 .worktrees/
 scratch/
+.wpt-cache/

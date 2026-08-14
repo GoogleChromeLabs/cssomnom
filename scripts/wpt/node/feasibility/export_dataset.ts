@@ -3,10 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFilePromise = promisify(execFile);
+import { safeExecTestFile, safeWorkerPool } from '../safe-child-process.ts';
 
 interface FailureSample {
   file: string;
@@ -177,7 +174,7 @@ async function runTestFile(specName: string, filePath: string): Promise<FailureS
   const failures: FailureSample[] = [];
 
   try {
-    const { stdout, stderr } = await execFilePromise(process.execPath, ['scripts/wpt/node/run.ts', filePath], {
+    const { stdout, stderr } = await safeExecTestFile(filePath, {
       timeout: 4000,
     });
     const merged = stdout + '\n' + stderr;
@@ -225,27 +222,6 @@ async function runTestFile(specName: string, filePath: string): Promise<FailureS
   return failures;
 }
 
-async function pool<T, R>(limit: number, items: T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = [];
-  let index = 0;
-
-  async function worker() {
-    while (index < items.length) {
-      const currentIndex = index++;
-      const item = items[currentIndex];
-      results[currentIndex] = await fn(item);
-      await new Promise(resolve => setTimeout(resolve, 20));
-    }
-  }
-
-  const workers: Promise<void>[] = [];
-  for (let i = 0; i < Math.min(limit, items.length); i++) {
-    workers.push(worker());
-  }
-  await Promise.all(workers);
-  return results;
-}
-
 async function main() {
   const configPath = path.resolve(process.cwd(), 'tests/wpt-node-config.json');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
@@ -261,7 +237,7 @@ async function main() {
 
     console.log(`- Extracting ${specName} (${specFiles.length} files)...`);
 
-    const fileResults = await pool(concurrency, specFiles, f => runTestFile(specName, f));
+    const fileResults = await safeWorkerPool(specFiles, f => runTestFile(specName, f), { concurrency });
 
     for (const failures of fileResults) {
       for (const fail of failures) {

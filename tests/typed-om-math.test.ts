@@ -402,11 +402,11 @@ test('mod() and rem() type validation', () => {
   // Different types should fail
   assert.throws(() => {
     CSSStyleValue.parse('width', 'calc(mod(10px, 3s))');
-  }, DOMException);
+  }, TypeError);
   
   assert.throws(() => {
     CSSStyleValue.parse('width', 'calc(rem(10px, 3))');
-  }, DOMException);
+  }, TypeError);
 });
 test('CSSNumericValue.simplify() distribution conditions', () => {
   // calc(2 * (10px + min(5px, 1em))) should NOT distribute since min(5px, 1em) is not a leaf CSSUnitValue

@@ -846,6 +846,11 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
     expand: expandBorderSide('border'),
     contract: contractBorderSide('border'),
   },
+  'outline': {
+    longhands: SHORTHANDS_DATA['outline'],
+    expand: expandBorderSide('outline'),
+    contract: contractBorderSide('outline'),
+  },
   'border-color': {
     longhands: SHORTHANDS_DATA['border-color'],
     expand: expandBox(['border-top-color','border-right-color','border-bottom-color','border-left-color'], ['border-block-start-color','border-inline-start-color','border-block-end-color','border-inline-end-color']),
