@@ -34,6 +34,13 @@ import {
   hasValidCache,
 } from '../scripts/wpt/node/core/cache.ts';
 
+import {
+  formatProgressRow,
+  updateProgressLog,
+  syncProgressFromNotes,
+  attachGitNote,
+} from '../scripts/wpt/node/core/progress.ts';
+
 import type { TestRunDataset, ParsedFileResult } from '../scripts/wpt/node/core/types.ts';
 
 describe('WPT CLI Core Modules', () => {
@@ -242,4 +249,146 @@ describe('WPT CLI Core Modules', () => {
       }
     });
   });
+
+  describe('core/progress.ts', () => {
+    test('formats progress row with correct column structure and calculations', () => {
+      const dataset: TestRunDataset = {
+        timestamp: '2026-08-13 20:00:00',
+        commitHash: '1234567',
+        isDirty: false,
+        specSummaries: {
+          'css-typed-om': { passing: 11000, total: 12219, files: 200 },
+          'cssom': { passing: 600, total: 923, files: 50 },
+          'css-nesting': { passing: 117, total: 117, files: 10 },
+          'css-syntax': { passing: 398, total: 398, files: 20 },
+          'css-variables': { passing: 300, total: 548, files: 30 },
+          'selectors': { passing: 3500, total: 4147, files: 100 },
+          'mediaqueries': { passing: 417, total: 417, files: 15 },
+        },
+        totalPassing: 16332,
+        totalTests: 18769,
+        totalFiles: 425,
+        fileResults: [],
+      };
+
+      const row = formatProgressRow(dataset, '1234567');
+      assert.ok(row.startsWith('| 2026-08-13 20:00:00 | `1234567` |'));
+      assert.ok(row.includes('11000/12219'));
+      assert.ok(row.includes('600/923'));
+      assert.ok(row.includes('16332/18769'));
+      assert.ok(row.includes('87.02%'));
+      assert.ok(row.includes('**87.02%**'));
+    });
+
+    test('updates progress log and handles dry run, duplicates, and dirty status', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-progress-test-'));
+      const testProgressPath = path.join(tempDir, 'wpt-progress.md');
+
+      try {
+        const initialContent = [
+          '# Progress Log',
+          '',
+          '### Historical Conformance Progress Log',
+          '',
+          '| Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Raw Pass Rate | Normalized |',
+          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |',
+          '',
+        ].join('\n');
+        fs.writeFileSync(testProgressPath, initialContent, 'utf-8');
+
+        const dataset1: TestRunDataset = {
+          timestamp: '2026-08-13 18:00:00',
+          commitHash: 'abc1234',
+          isDirty: true,
+          specSummaries: {
+            'css-typed-om': { passing: 100, total: 100, files: 1 },
+          },
+          totalPassing: 100,
+          totalTests: 100,
+          totalFiles: 1,
+          fileResults: [],
+        };
+
+        // Dry run should not write to file
+        updateProgressLog(dataset1, true, testProgressPath);
+        assert.strictEqual(fs.readFileSync(testProgressPath, 'utf-8'), initialContent);
+
+        // Actual update should insert row with dirty asterisk
+        updateProgressLog(dataset1, false, testProgressPath);
+        let updatedContent = fs.readFileSync(testProgressPath, 'utf-8');
+        assert.ok(updatedContent.includes('`abc1234*`'));
+        assert.ok(updatedContent.includes('100/18769'));
+
+        // Duplicate run with identical metrics should be skipped
+        updateProgressLog(dataset1, false, testProgressPath);
+        const linesAfterDuplicate = fs.readFileSync(testProgressPath, 'utf-8').split('\n').filter(l => l.includes('`abc1234*`'));
+        assert.strictEqual(linesAfterDuplicate.length, 1);
+
+        // New dataset with different metrics should insert new top row
+        const dataset2: TestRunDataset = {
+          timestamp: '2026-08-13 18:05:00',
+          commitHash: 'def5678',
+          isDirty: false,
+          specSummaries: {
+            'css-typed-om': { passing: 200, total: 200, files: 2 },
+          },
+          totalPassing: 200,
+          totalTests: 200,
+          totalFiles: 2,
+          fileResults: [],
+        };
+        updateProgressLog(dataset2, false, testProgressPath);
+        updatedContent = fs.readFileSync(testProgressPath, 'utf-8');
+        const rows = updatedContent.split('\n').filter(l => l.startsWith('| 2026-'));
+        assert.strictEqual(rows.length, 2);
+        assert.ok(rows[0].includes('`def5678`'));
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('syncProgressFromNotes reconciles pending placeholder when note exists', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-notes-test-'));
+      const testProgressPath = path.join(tempDir, 'wpt-progress.md');
+
+      try {
+        const contentWithPending = [
+          '# Progress Log',
+          '',
+          '### Historical Conformance Progress Log',
+          '',
+          '| Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Raw Pass Rate | Normalized |',
+          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |',
+          '| 2026-08-13 19:00:00 | `pending*` | 500/12219 | 100/923 | 50/117 | 100/398 | 50/548 | 200/4147 | 100/417 | 1100/18769 | 5.86% | **5.86%** |',
+          '',
+        ].join('\n');
+        fs.writeFileSync(testProgressPath, contentWithPending, 'utf-8');
+
+        // Without matching note, leaves as pending
+        syncProgressFromNotes(testProgressPath);
+        assert.ok(fs.readFileSync(testProgressPath, 'utf-8').includes('`pending*`'));
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('attachGitNote safely handles unknown or invalid commits', () => {
+      const dataset: TestRunDataset = {
+        timestamp: '2026-08-13 19:00:00',
+        commitHash: 'unknown',
+        isDirty: false,
+        specSummaries: {},
+        totalPassing: 0,
+        totalTests: 0,
+        totalFiles: 0,
+        fileResults: [],
+      };
+      // Should gracefully return without throwing
+      assert.doesNotThrow(() => {
+        attachGitNote('unknown', dataset);
+        attachGitNote('', dataset);
+      });
+    });
+  });
 });
+

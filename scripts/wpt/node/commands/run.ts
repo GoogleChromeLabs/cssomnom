@@ -2,11 +2,12 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { loadWptConfig, validateSpecName, getBaselinePath, getProgressPath, VALID_SPECS, SPEC_ORDER, CANONICAL_FEASIBLE_TARGETS, CANONICAL_FEASIBLE_TOTAL } from '../core/config.ts';
+import { loadWptConfig, validateSpecName, getBaselinePath, VALID_SPECS } from '../core/config.ts';
 import { crawlSpecFiles } from '../core/crawler.ts';
 import { executeWptTests } from '../core/executor.ts';
 import { saveDatasetToCache } from '../core/cache.ts';
 import { clusterFailures, extractExpectationDiffs, auditBaseline } from '../core/parser.ts';
+import { updateProgressLog } from '../core/progress.ts';
 import type { TestRunDataset } from '../core/types.ts';
 
 export interface RunCommandOptions {
@@ -23,47 +24,6 @@ export interface RunCommandOptions {
   concurrency?: number;
 }
 
-export function updateProgressLog(dataset: TestRunDataset, dryRun = false, progressPath = getProgressPath()): void {
-  const commitStr = dataset.commitHash + (dataset.isDirty ? '*' : '');
-  const rowParts = [dataset.timestamp, `\`${commitStr}\``];
-  for (const key of SPEC_ORDER) {
-    const summary = dataset.specSummaries[key] || { passing: 0, total: 0 };
-    const target = CANONICAL_FEASIBLE_TARGETS[key] || summary.total;
-    rowParts.push(`${summary.passing}/${target}`);
-  }
-  const rawRate = dataset.totalTests > 0 ? ((dataset.totalPassing / dataset.totalTests) * 100).toFixed(2) : '0.00';
-  const normRate = CANONICAL_FEASIBLE_TOTAL > 0 ? Math.min(100, (dataset.totalPassing / CANONICAL_FEASIBLE_TOTAL) * 100).toFixed(2) : '0.00';
-  rowParts.push(`${dataset.totalPassing}/${CANONICAL_FEASIBLE_TOTAL}`, `${rawRate}%`, `**${normRate}%**`);
-  const newRow = `| ${rowParts.join(' | ')} |`;
-
-  if (dryRun) {
-    console.log(`[Dry Run] Would insert progress row:\n${newRow}`);
-    return;
-  }
-  if (!fs.existsSync(progressPath)) {
-    console.warn(`Warning: Progress file not found at ${progressPath}`);
-    return;
-  }
-  const content = fs.readFileSync(progressPath, 'utf-8');
-  const lines = content.split('\n');
-  const histIdx = lines.findIndex(l => l.includes('### Historical Conformance Progress Log'));
-  let delimIdx = -1;
-  if (histIdx !== -1) {
-    for (let i = histIdx; i < lines.length; i++) {
-      if (lines[i].includes(':---')) { delimIdx = i; break; }
-    }
-  }
-  if (delimIdx !== -1) {
-    const prev = lines[delimIdx + 1];
-    if (prev && prev.split('|').slice(3).map(s => s.trim()).join('|') === rowParts.slice(2).map(s => s.trim()).join('|')) {
-      console.log(`[WPT Progress] Conformance numbers unchanged (${dataset.totalPassing}/${dataset.totalTests}). Skipping duplicate row.`);
-      return;
-    }
-    lines.splice(delimIdx + 1, 0, newRow);
-    fs.writeFileSync(progressPath, lines.join('\n'), 'utf-8');
-    console.log(`Updated progress table in ${progressPath}`);
-  }
-}
 
 export async function runCommand(options: RunCommandOptions = {}): Promise<TestRunDataset> {
   if (options.filterBySpec && !validateSpecName(options.filterBySpec)) {

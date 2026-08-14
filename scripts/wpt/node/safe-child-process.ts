@@ -3,7 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
-import { execFile, execSync, type ChildProcess } from 'node:child_process';
+import { execFile, execFileSync, execSync, type ChildProcess } from 'node:child_process';
 
 const activeChildren = new Set<ChildProcess>();
 let cleanupRegistered = false;
@@ -272,3 +272,48 @@ export function getGitCommitInfo(): { commitHash: string; isDirty: boolean } {
   }
   return { commitHash, isDirty };
 }
+
+export function execGit(args: string[]): string {
+  try {
+    return execFileSync('git', args, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
+  } catch {
+    return '';
+  }
+}
+
+export function addGitNote(commitHash: string, noteContent: string, ref = 'wpt'): boolean {
+  try {
+    execFileSync('git', ['notes', `--ref=${ref}`, 'add', '-f', '-m', noteContent, commitHash], {
+      stdio: ['pipe', 'pipe', 'ignore'],
+      encoding: 'utf-8',
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getGitNotesLog(count = 5, ref = 'wpt'): { commitHash: string; note: string }[] {
+  try {
+    const stdout = execSync(`git log -n ${count} --notes=${ref} --format="%h %N"`, { encoding: 'utf-8' });
+    const results: { commitHash: string; note: string }[] = [];
+    const lines = stdout.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const spaceIdx = trimmed.indexOf(' ');
+      if (spaceIdx === -1) {
+        results.push({ commitHash: trimmed, note: '' });
+      } else {
+        results.push({
+          commitHash: trimmed.substring(0, spaceIdx),
+          note: trimmed.substring(spaceIdx + 1).trim(),
+        });
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
