@@ -41,6 +41,17 @@ import {
   attachGitNote,
 } from '../scripts/wpt/node/core/progress.ts';
 
+import {
+  compareParity,
+  formatParityMarkdown,
+  formatParityConsole,
+  normalizeWptPath,
+  resolveSpecFromPath,
+  type WptReportJson,
+} from '../scripts/wpt/browser/parity.ts';
+
+import { parityCommand } from '../scripts/wpt/node/commands/parity.ts';
+
 import type { TestRunDataset, ParsedFileResult } from '../scripts/wpt/node/core/types.ts';
 
 describe('WPT CLI Core Modules', () => {
@@ -393,6 +404,309 @@ describe('WPT CLI Core Modules', () => {
         attachGitNote('unknown', dataset);
         attachGitNote('', dataset);
       });
+    });
+  });
+
+  describe('browser/parity.ts & commands/parity.ts', () => {
+    test('normalizes paths and resolves spec domains accurately', () => {
+      assert.strictEqual(
+        normalizeWptPath('submodules/web-platform-tests/css/css-typed-om/test.html'),
+        'css/css-typed-om/test.html'
+      );
+      assert.strictEqual(
+        normalizeWptPath('/css/selectors/focus.html'),
+        'css/selectors/focus.html'
+      );
+      assert.strictEqual(
+        normalizeWptPath('\\css\\cssom\\style.html'),
+        'css/cssom/style.html'
+      );
+
+      assert.strictEqual(resolveSpecFromPath('css/css-typed-om/test.html'), 'css-typed-om');
+      assert.strictEqual(resolveSpecFromPath('css/selectors/test.html'), 'selectors');
+      assert.strictEqual(resolveSpecFromPath('css/cssom/test.html'), 'cssom');
+      assert.strictEqual(resolveSpecFromPath('css/css-variables/test.html'), 'css-variables');
+      assert.strictEqual(resolveSpecFromPath('css/mediaqueries/test.html'), 'mediaqueries');
+      assert.strictEqual(resolveSpecFromPath('css/css-syntax/test.html'), 'css-syntax');
+      assert.strictEqual(resolveSpecFromPath('css/css-nesting/test.html'), 'css-nesting');
+      assert.strictEqual(resolveSpecFromPath('custom/unknown/test.html'), 'custom');
+    });
+
+    test('categorizes all 4 truth matrix states correctly in compareParity', () => {
+      const mockNodeDataset: TestRunDataset = {
+        timestamp: '2026-08-14 00:00:00',
+        commitHash: 'abc1234',
+        isDirty: false,
+        specSummaries: {
+          'css-typed-om': { passing: 2, total: 4, files: 1 },
+          selectors: { passing: 1, total: 1, files: 1 },
+        },
+        totalPassing: 3,
+        totalTests: 5,
+        totalFiles: 2,
+        fileResults: [
+          {
+            file: 'submodules/web-platform-tests/css/css-typed-om/matrix-test.html',
+            spec: 'css-typed-om',
+            passing: 2,
+            total: 4,
+            passingSubtests: ['subtest-conformance', 'subtest-over-mock'],
+            failedSubtests: ['subtest-spec-gap', 'subtest-feasibility'],
+            subtests: [
+              { name: 'subtest-conformance', status: 'PASS' },
+              { name: 'subtest-spec-gap', status: 'FAIL', error: 'AssertionError: expected foo got bar' },
+              { name: 'subtest-feasibility', status: 'FAIL', error: 'Error: getClientRects not supported' },
+              { name: 'subtest-over-mock', status: 'PASS' },
+            ],
+            durationMs: 100,
+            peakRssMb: 40,
+            status: 'OK',
+          },
+          {
+            file: 'submodules/web-platform-tests/css/selectors/root-test.html',
+            spec: 'selectors',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['(root)'],
+            failedSubtests: [],
+            subtests: [],
+            durationMs: 50,
+            peakRssMb: 30,
+            status: 'OK',
+          },
+        ],
+      };
+
+      const mockBrowserReport: WptReportJson = {
+        browser: 'Headless Chrome 130',
+        results: [
+          {
+            test: '/css/css-typed-om/matrix-test.html',
+            status: 'OK',
+            subtests: [
+              { name: 'subtest-conformance', status: 'PASS' },
+              { name: 'subtest-spec-gap', status: 'PASS' },
+              { name: 'subtest-feasibility', status: 'FAIL', message: 'assert_equals: expected 10 got 0' },
+              { name: 'subtest-over-mock', status: 'FAIL', message: 'TypeError: failed in real blink' },
+            ],
+          },
+          {
+            test: '/css/selectors/root-test.html',
+            status: 'OK',
+            subtests: [],
+          },
+        ],
+      };
+
+      const report = compareParity({
+        nodeDataset: mockNodeDataset,
+        browserReportData: mockBrowserReport,
+        includeAllResults: true,
+      });
+
+      assert.strictEqual(report.browserName, 'Headless Chrome 130');
+      assert.strictEqual(report.nodeCommit, 'abc1234');
+      assert.strictEqual(report.totals.totalCompared, 5);
+
+      // Verified Conformance (Node: PASS, Browser: PASS) -> 2 (1 subtest + 1 root test)
+      assert.strictEqual(report.totals.verifiedConformance, 2);
+      // Verified Spec Gap (Node: FAIL, Browser: PASS) -> 1
+      assert.strictEqual(report.totals.verifiedSpecGaps, 1);
+      // Feasibility Boundary (Node: FAIL, Browser: FAIL) -> 1
+      assert.strictEqual(report.totals.feasibilityBoundaries, 1);
+      // Over-Mocking False Positive (Node: PASS, Browser: FAIL) -> 1
+      assert.strictEqual(report.totals.overMocking, 1);
+
+      assert.strictEqual(report.discrepancies.overMocking.length, 1);
+      assert.strictEqual(report.discrepancies.overMocking[0].subtest, 'subtest-over-mock');
+      assert.strictEqual(report.discrepancies.overMocking[0].category, 'OVER_MOCKING_FALSE_POSITIVE');
+
+      assert.strictEqual(report.discrepancies.specGaps.length, 1);
+      assert.strictEqual(report.discrepancies.specGaps[0].subtest, 'subtest-spec-gap');
+      assert.strictEqual(report.discrepancies.specGaps[0].category, 'VERIFIED_SPEC_GAP');
+
+      assert.strictEqual(report.discrepancies.feasibilityBoundaries.length, 1);
+      assert.strictEqual(report.discrepancies.feasibilityBoundaries[0].subtest, 'subtest-feasibility');
+      assert.strictEqual(report.discrepancies.feasibilityBoundaries[0].category, 'FEASIBILITY_BOUNDARY');
+
+      // Spec summary verification
+      assert.strictEqual(report.summaryBySpec['css-typed-om'].totalCompared, 4);
+      assert.strictEqual(report.summaryBySpec['css-typed-om'].verifiedConformance, 1);
+      assert.strictEqual(report.summaryBySpec['selectors'].totalCompared, 1);
+      assert.strictEqual(report.summaryBySpec['selectors'].verifiedConformance, 1);
+    });
+
+    test('supports --filter-by-spec in compareParity', () => {
+      const mockNodeDataset: TestRunDataset = {
+        timestamp: '2026-08-14 00:00:00',
+        commitHash: 'def5678',
+        isDirty: false,
+        specSummaries: {},
+        totalPassing: 2,
+        totalTests: 2,
+        totalFiles: 2,
+        fileResults: [
+          {
+            file: 'submodules/web-platform-tests/css/css-typed-om/test1.html',
+            spec: 'css-typed-om',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['sub1'],
+            failedSubtests: [],
+            subtests: [{ name: 'sub1', status: 'PASS' }],
+            durationMs: 10,
+            peakRssMb: 10,
+            status: 'OK',
+          },
+          {
+            file: 'submodules/web-platform-tests/css/selectors/test2.html',
+            spec: 'selectors',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['sub2'],
+            failedSubtests: [],
+            subtests: [{ name: 'sub2', status: 'PASS' }],
+            durationMs: 10,
+            peakRssMb: 10,
+            status: 'OK',
+          },
+        ],
+      };
+
+      const mockBrowserReport: WptReportJson = {
+        results: [
+          { test: '/css/css-typed-om/test1.html', status: 'OK', subtests: [{ name: 'sub1', status: 'PASS' }] },
+          { test: '/css/selectors/test2.html', status: 'OK', subtests: [{ name: 'sub2', status: 'PASS' }] },
+        ],
+      };
+
+      const filteredReport = compareParity({
+        nodeDataset: mockNodeDataset,
+        browserReportData: mockBrowserReport,
+        filterBySpec: 'css-typed-om',
+      });
+
+      assert.strictEqual(filteredReport.totals.totalCompared, 1);
+      assert.strictEqual(filteredReport.summaryBySpec['css-typed-om'].totalCompared, 1);
+      assert.strictEqual(filteredReport.summaryBySpec['selectors'].totalCompared, 0);
+
+      assert.throws(() => {
+        compareParity({
+          nodeDataset: mockNodeDataset,
+          browserReportData: mockBrowserReport,
+          filterBySpec: 'invalid-suite',
+        });
+      }, /Invalid spec filter/);
+    });
+
+    test('generates markdown table and console formatting', () => {
+      const mockNodeDataset: TestRunDataset = {
+        timestamp: '2026-08-14 00:00:00',
+        commitHash: 'test123',
+        isDirty: false,
+        specSummaries: {},
+        totalPassing: 1,
+        totalTests: 1,
+        totalFiles: 1,
+        fileResults: [
+          {
+            file: 'submodules/web-platform-tests/css/css-typed-om/sample.html',
+            spec: 'css-typed-om',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['sample'],
+            failedSubtests: [],
+            subtests: [{ name: 'sample', status: 'PASS' }],
+            durationMs: 10,
+            peakRssMb: 10,
+            status: 'OK',
+          },
+        ],
+      };
+
+      const mockBrowserReport: WptReportJson = {
+        browser: 'Headless Chrome',
+        results: [
+          { test: '/css/css-typed-om/sample.html', status: 'OK', subtests: [{ name: 'sample', status: 'PASS' }] },
+        ],
+      };
+
+      const report = compareParity({
+        nodeDataset: mockNodeDataset,
+        browserReportData: mockBrowserReport,
+      });
+
+      const md = formatParityMarkdown(report, 5);
+      assert.ok(md.includes('# Cross-Browser Differential Parity Matrix'));
+      assert.ok(md.includes('| **Typed OM** | 1 | 0 | 0 | 0 | 1 |'));
+      assert.ok(md.includes('### ⚠️ Over-Mocking False Positives'));
+      assert.ok(md.includes('None detected'));
+
+      const consoleOutput = formatParityConsole(report, 5);
+      assert.ok(consoleOutput.includes('Cross-Browser Differential Parity Matrix'));
+      assert.ok(consoleOutput.includes('TOTAL'));
+    });
+
+    test('executes parityCommand with json and mock datasets', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-parity-cmd-test-'));
+      const mockNodePath = path.join(tempDir, 'last-run.json');
+      const mockBrowserPath = path.join(tempDir, 'report-chrome.json');
+
+      try {
+        const mockNodeDataset: TestRunDataset = {
+          timestamp: '2026-08-14 00:00:00',
+          commitHash: 'cmd1234',
+          isDirty: false,
+          specSummaries: {},
+          totalPassing: 1,
+          totalTests: 1,
+          totalFiles: 1,
+          fileResults: [
+            {
+              file: 'submodules/web-platform-tests/css/css-typed-om/test.html',
+              spec: 'css-typed-om',
+              passing: 1,
+              total: 1,
+              passingSubtests: ['subtest-1'],
+              failedSubtests: [],
+              subtests: [{ name: 'subtest-1', status: 'PASS' }],
+              durationMs: 10,
+              peakRssMb: 10,
+              status: 'OK',
+            },
+          ],
+        };
+        fs.writeFileSync(mockNodePath, JSON.stringify(mockNodeDataset), 'utf-8');
+
+        const mockBrowserReport: WptReportJson = {
+          browser: 'Headless Chrome',
+          results: [
+            { test: '/css/css-typed-om/test.html', status: 'OK', subtests: [{ name: 'subtest-1', status: 'PASS' }] },
+          ],
+        };
+        fs.writeFileSync(mockBrowserPath, JSON.stringify(mockBrowserReport), 'utf-8');
+
+        const report = await parityCommand({
+          nodeCache: mockNodePath,
+          browserReport: mockBrowserPath,
+          json: true,
+        });
+
+        assert.strictEqual(report.nodeCommit, 'cmd1234');
+        assert.strictEqual(report.totals.totalCompared, 1);
+        assert.strictEqual(report.totals.verifiedConformance, 1);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('throws when datasets are missing', () => {
+      assert.throws(() => {
+        compareParity({
+          nodeCachePath: '/non/existent/path/last-run.json',
+          browserReportPath: '/non/existent/path/report.json',
+        });
+      }, /not found/);
     });
   });
 });
