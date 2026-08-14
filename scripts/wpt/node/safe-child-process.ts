@@ -71,7 +71,7 @@ export function safeExecTestFile(
   const maxRssMB = options.maxRssMb ?? 6144;
   const runnerPath = options.runnerPath ?? path.resolve(import.meta.dirname, 'run.ts');
   const extraArgs = options.args ?? [];
-  const pollIntervalMs = options.pollIntervalMs ?? 50;
+  const pollIntervalMs = options.pollIntervalMs ?? 250;
 
   const args = [
     `--max-old-space-size=${maxOldSpaceSize}`,
@@ -192,10 +192,10 @@ export function safeExecTestFile(
 
             if (state === 'D') {
               dStateCount++;
-              if (dStateCount >= 2) {
+              if (dStateCount >= 4) {
                 isWatchdogKilled = true;
                 console.warn(
-                  `[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 2 consecutive checks. Terminating with SIGKILL.`
+                  `[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 4 consecutive checks (1s). Terminating with SIGKILL.`
                 );
                 try {
                   child.kill('SIGKILL');
