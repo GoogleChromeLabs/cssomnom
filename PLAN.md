@@ -2610,15 +2610,23 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 ---
 
 ## Phase 107: Color Subclasses Strict WebIDL Validation & MathClamp Arity Checks
-**Goal**: Eliminate 314 over-mocking false positives by strictly validating `CSSHSL` / `CSSRGB` numeric argument types and enforcing $\ge 3$ arguments on `CSSMathClamp`.
+**Goal**: Eliminate over-mocking false positives by strictly validating color subclass arguments according to CSS Typed OM WebIDL algorithms and enforcing $\ge 3$ arguments on `CSSMathClamp`.
 
 ### Tasks
-- [ ] **Color Subclass Argument Typechecks**:
-  - Enforce `CSSNumericValue` instance validation in `src/typed-om/color/` constructors and property setters (throw `TypeError` on raw number/undefined).
-- [ ] **`CSSMathClamp` Arity Validation**:
-  - Enforce minimum 3 arguments (`min`, `val`, `max`) in `CSSMathClamp` constructor.
-- [ ] **Unit Tests & Verification**:
-  - Add unit tests in `tests/typed-om-constructors.test.ts` and verify with `pnpm run preflight`.
+- [x] **Color Subclass Argument Typechecks & Rectification**:
+  - Enforce spec-compliant rectification and WebIDL type checks in `src/typed-om/color/color-rectify.ts` and `src/typed-om/color/color-spaces.ts`:
+    - Strict `CSSNumericValue` validation for `CSSHWB.h` (throws `TypeError` on raw numbers/undefined, and `SyntaxError` DOMException on invalid dimensions).
+    - `CSSNumericValue` dimension checks across all subclasses throwing `DOMException` `SyntaxError`.
+    - Keyword validation (`none` / `undefined`) throwing `SyntaxError` DOMException on invalid strings/keywords.
+    - Arity validation across color constructors throwing `TypeError` for missing arguments.
+- [x] **`CSSMathClamp` Arity & Type Validation**:
+  - Enforce minimum 3 arguments (`lower`, `value`, `upper`) in `CSSMathClamp` constructor, throwing `TypeError` when fewer than 3 arguments are present.
+  - Enforce type compatibility across `lower`, `value`, and `upper` parameters in `CSSMathClamp`.
+  - Added arity checks on `CSSMathNegate` and `CSSMathInvert` constructors.
+- [x] **Unit Tests & Verification**:
+  - Added comprehensive unit tests in `tests/typed-om-constructors.test.ts`.
+  - Verified with `pnpm run preflight` (0 lint/type errors, all unit tests passing).
+  - Verified with `pnpm run wpt:verify` (0 regressions across all 1,687 WPT test files).
 
 
 

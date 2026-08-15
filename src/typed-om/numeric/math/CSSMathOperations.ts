@@ -40,6 +40,9 @@ function validateCompatibleSumTypes(numericArgs: CSSNumericValue[], context: str
 export class CSSMathNegate extends CSSMathValue {
   readonly value: CSSNumericValue;
   constructor(child: number | CSSNumericValue) {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to construct 'CSSMathNegate': 1 argument required, but only " + arguments.length + " present.");
+    }
     super();
     this.value = ensureNumeric(child);
   }
@@ -59,6 +62,9 @@ export class CSSMathNegate extends CSSMathValue {
 export class CSSMathInvert extends CSSMathValue {
   readonly value: CSSNumericValue;
   constructor(child: number | CSSNumericValue) {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to construct 'CSSMathInvert': 1 argument required, but only " + arguments.length + " present.");
+    }
     super();
     this.value = ensureNumeric(child);
   }
@@ -225,6 +231,9 @@ export class CSSMathClamp extends CSSMathValue {
   readonly value: CSSNumericValue;
   readonly upper: CSSNumericValue | CSSKeywordValue;
   constructor(lower: number | CSSNumericValue | CSSKeywordValue, value: number | CSSNumericValue, upper: number | CSSNumericValue | CSSKeywordValue) {
+    if (arguments.length < 3) {
+      throw new TypeError("Failed to construct 'CSSMathClamp': 3 arguments required, but only " + arguments.length + " present.");
+    }
     super();
     const l = typeof lower === 'number' ? new CSSUnitValue(lower, 'number') : lower;
     const v = ensureNumeric(value);
@@ -237,6 +246,11 @@ export class CSSMathClamp extends CSSMathValue {
     }
     if (u && typeof (u as CSSNumericValue).type === 'function') {
       if (!addTypesForSum((u as CSSNumericValue).type(), v.type())) {
+        throw new TypeError('Incompatible types in clamp');
+      }
+    }
+    if (l && u && typeof (l as CSSNumericValue).type === 'function' && typeof (u as CSSNumericValue).type === 'function') {
+      if (!addTypesForSum((l as CSSNumericValue).type(), (u as CSSNumericValue).type())) {
         throw new TypeError('Incompatible types in clamp');
       }
     }

@@ -200,8 +200,8 @@ describe('Values & Typed OM', () => {
         });
 
         test('CSSColor channels setter works and rectifies inputs', () => {
-            const color = new CSSColor('srgb', [0.1, 0.2, 0.3]);
-            color.channels = [0.4, 0.5, 0.6];
+            const color = new CSSColor('srgb', [new CSSUnitValue(0.1, 'number'), new CSSUnitValue(0.2, 'number'), new CSSUnitValue(0.3, 'number')]);
+            color.channels = [new CSSUnitValue(0.4, 'number'), new CSSUnitValue(0.5, 'number'), new CSSUnitValue(0.6, 'number')];
             assert.deepEqual(
                 color.channels.map(x => x.toString()),
                 ['0.4', '0.5', '0.6']

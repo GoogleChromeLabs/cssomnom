@@ -28,6 +28,10 @@ import {
   CSSColor,
   CSSUnitValue,
   CSSKeywordValue,
+  CSSMathClamp,
+  CSSMathNegate,
+  CSSMathInvert,
+  CSS,
   CSSTranslate,
   CSSScale,
   CSSRotate,
@@ -42,59 +46,116 @@ import {
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { DOMMatrix } from '../src/DOMMatrix.ts';
 
-describe('Phase 101: Typed OM Constructor Validation & Fallbacks', () => {
-  describe('Color Constructors', () => {
+describe('Phase 107: Color Subclasses Strict WebIDL Validation & MathClamp Arity Checks', () => {
+  describe('Color Constructors Strict WebIDL Validation', () => {
     test('CSSRGB argument counts and types', () => {
       // @ts-expect-error test fewer args
+      assert.throws(() => new CSSRGB(CSS.number(1), CSS.number(2)), TypeError);
+      // @ts-expect-error test fewer args
       assert.throws(() => new CSSRGB(1, 2), TypeError);
-      const rgb = new CSSRGB(1, 0.5, 0.2, 0.8);
-      assert.ok(rgb instanceof CSSRGB);
-      assert.strictEqual(rgb.toString(), 'rgba(100%, 50%, 20%, 0.8)');
+
+      // Raw numbers convert to percentage per Typed OM rectification algorithm
+      const rgbCoerced = new CSSRGB(1, 0.5, 0.2, 0.8);
+      assert.ok(rgbCoerced instanceof CSSRGB);
+      assert.strictEqual(rgbCoerced.toString(), 'rgba(100%, 50%, 20%, 0.8)');
+
+      // Valid CSSNumericValue instances
+      const rgbNumbers = new CSSRGB(CSS.number(255), CSS.number(0), CSS.number(0));
+      assert.ok(rgbNumbers instanceof CSSRGB);
+      assert.strictEqual(rgbNumbers.toString(), 'rgb(255, 0, 0)');
+
+      const rgbPercents = new CSSRGB(CSS.percent(100), CSS.percent(50), CSS.percent(20), CSS.percent(80));
+      assert.ok(rgbPercents instanceof CSSRGB);
+      assert.strictEqual(rgbPercents.toString(), 'rgba(100%, 50%, 20%, 0.8)');
+
+      // Incompatible dimension (e.g. px for channel, or number for alpha) throws SyntaxError DOMException
+      assert.throws(() => new CSSRGB(CSS.px(10), CSS.number(0), CSS.number(0)), (e: unknown) => {
+        return e instanceof DOMException && e.name === 'SyntaxError';
+      });
+      assert.throws(() => new CSSRGB(CSS.number(0), CSS.number(0), CSS.number(0), CSS.number(1)), (e: unknown) => {
+        return e instanceof DOMException && e.name === 'SyntaxError';
+      });
+
+      // Setters enforce types
+      const rgb = new CSSRGB(CSS.percent(100), CSS.percent(0), CSS.percent(0));
+      rgb.r = 0.5;
+      assert.strictEqual((rgb.r as CSSUnitValue).value, 50);
+      assert.strictEqual((rgb.r as CSSUnitValue).unit, 'percent');
+      assert.throws(() => { rgb.r = 'invalid-kw'; }, (e: unknown) => e instanceof DOMException && e.name === 'SyntaxError');
     });
 
-    test('CSSHSL argument counts', () => {
+    test('CSSHSL argument counts and strict types', () => {
       // @ts-expect-error test fewer args
-      assert.throws(() => new CSSHSL(120, 1), TypeError);
-      const hsl = new CSSHSL(120, 1, 0.5);
+      assert.throws(() => new CSSHSL(CSS.deg(120), CSS.percent(100)), TypeError);
+      // @ts-expect-error test fewer args
+      assert.throws(() => new CSSHSL(120, 100), TypeError);
+
+      // Raw numbers convert per Typed OM rectification algorithm
+      const hslFromNumbers = new CSSHSL(120, 1, 0.5);
+      assert.ok(hslFromNumbers instanceof CSSHSL);
+      assert.strictEqual(hslFromNumbers.toString(), 'hsl(120deg 100% 50%)');
+
+      // Valid CSSNumericValue instances
+      const hsl = new CSSHSL(CSS.deg(0), CSS.percent(100), CSS.percent(50));
       assert.ok(hsl instanceof CSSHSL);
+      assert.strictEqual(hsl.toString(), 'hsl(0deg 100% 50%)');
+
+      // Incompatible dimension (e.g. px for angle hue) throws SyntaxError DOMException
+      assert.throws(() => new CSSHSL(CSS.px(10), CSS.percent(100), CSS.percent(50)), (e: unknown) => {
+        return e instanceof DOMException && e.name === 'SyntaxError';
+      });
+      // Incompatible dimension (e.g. number for percentage channel) throws SyntaxError DOMException
+      assert.throws(() => new CSSHSL(CSS.deg(0), CSS.number(1), CSS.percent(50)), (e: unknown) => {
+        return e instanceof DOMException && e.name === 'SyntaxError';
+      });
     });
 
     test('CSSHWB strict argument validation (CSSNumericValue for hue)', () => {
       // @ts-expect-error test fewer args
-      assert.throws(() => new CSSHWB(new CSSUnitValue(180, 'deg'), 0), TypeError);
+      assert.throws(() => new CSSHWB(CSS.deg(180), CSS.percent(0)), TypeError);
       // Raw number for hue must throw TypeError per Typed OM 2 WebIDL
       // @ts-expect-error test raw number
       assert.throws(() => new CSSHWB(180, 0, 0), TypeError);
+      // Undefined for hue must throw TypeError
+      // @ts-expect-error test undefined
+      assert.throws(() => new CSSHWB(undefined, 0, 0), TypeError);
       // Non-angle CSSNumericValue must throw DOMException SyntaxError
-      assert.throws(() => new CSSHWB(new CSSUnitValue(180, 'px'), 0, 0), (e: unknown) => {
+      assert.throws(() => new CSSHWB(CSS.px(180), CSS.percent(0), CSS.percent(0)), (e: unknown) => {
         return e instanceof DOMException && e.name === 'SyntaxError';
       });
       // Valid angle CSSNumericValue
-      const hwb = new CSSHWB(new CSSUnitValue(180, 'deg'), 0.2, 0.3);
+      const hwb = new CSSHWB(CSS.deg(180), CSS.percent(20), CSS.percent(30));
       assert.ok(hwb instanceof CSSHWB);
       assert.strictEqual(hwb.toString(), 'hwb(180deg 20% 30%)');
     });
 
     test('CSSLab / CSSLCH / CSSOKLab / CSSOKLCH validation', () => {
+      // Fewer args
       // @ts-expect-error test fewer args
-      assert.throws(() => new CSSLab(0.5, 20), TypeError);
+      assert.throws(() => new CSSLab(CSS.percent(50), CSS.number(20)), TypeError);
       // @ts-expect-error test fewer args
-      assert.throws(() => new CSSLCH(0.5, 20), TypeError);
+      assert.throws(() => new CSSLCH(CSS.percent(50), CSS.percent(20)), TypeError);
       // @ts-expect-error test fewer args
-      assert.throws(() => new CSSOKLab(0.5, 0.1), TypeError);
+      assert.throws(() => new CSSOKLab(CSS.percent(50), CSS.number(0.1)), TypeError);
       // @ts-expect-error test fewer args
-      assert.throws(() => new CSSOKLCH(0.5, 0.1), TypeError);
+      assert.throws(() => new CSSOKLCH(CSS.percent(50), CSS.percent(10)), TypeError);
 
-      const lab = new CSSLab(0.5, 20, 30);
+      // Valid numbers convert per rectification
+      const labNum = new CSSLab(0.5, 20, 30);
+      assert.ok(labNum instanceof CSSLab);
+      assert.strictEqual(labNum.toString(), 'lab(50% 20 30)');
+
+      // Valid CSSNumericValue instances
+      const lab = new CSSLab(CSS.percent(50), CSS.number(20), CSS.number(30));
       assert.ok(lab instanceof CSSLab);
 
-      const lch = new CSSLCH(0.5, 0.2, 180);
+      const lch = new CSSLCH(CSS.percent(50), CSS.percent(20), CSS.deg(180));
       assert.ok(lch instanceof CSSLCH);
 
-      const oklab = new CSSOKLab(0.5, 0.1, 0.2);
+      const oklab = new CSSOKLab(CSS.percent(50), CSS.number(0.1), CSS.number(0.2));
       assert.ok(oklab instanceof CSSOKLab);
 
-      const oklch = new CSSOKLCH(0.5, 0.1, 180);
+      const oklch = new CSSOKLCH(CSS.percent(50), CSS.percent(10), CSS.deg(180));
       assert.ok(oklch instanceof CSSOKLCH);
     });
 
@@ -102,13 +163,52 @@ describe('Phase 101: Typed OM Constructor Validation & Fallbacks', () => {
       // @ts-expect-error test fewer args
       assert.throws(() => new CSSColor('srgb'), TypeError);
       // @ts-expect-error test non-string color space
-      assert.throws(() => new CSSColor(123, [1, 0, 0]), TypeError);
+      assert.throws(() => new CSSColor(123, [CSS.number(1), CSS.number(0), CSS.number(0)]), TypeError);
       // @ts-expect-error test non-array channels
       assert.throws(() => new CSSColor('srgb', '1 0 0'), TypeError);
 
-      const c = new CSSColor('srgb', [1, 0, 0]);
+      const c = new CSSColor('srgb', [CSS.number(1), CSS.number(0), CSS.number(0)]);
       assert.ok(c instanceof CSSColor);
       assert.strictEqual(c.toString(), 'color(srgb 1 0 0)');
+
+      const cNums = new CSSColor('srgb', [1, 0, 0]);
+      assert.ok(cNums instanceof CSSColor);
+      assert.strictEqual(cNums.toString(), 'color(srgb 1 0 0)');
+    });
+  });
+
+  describe('CSSMath Operations Validation', () => {
+    test('CSSMathClamp arity and type compatibility validation', () => {
+      // Fewer than 3 arguments throws TypeError
+      // @ts-expect-error test 0 args
+      assert.throws(() => new CSSMathClamp(), TypeError);
+      // @ts-expect-error test 1 arg
+      assert.throws(() => new CSSMathClamp(CSS.px(1)), TypeError);
+      // @ts-expect-error test 2 args
+      assert.throws(() => new CSSMathClamp(CSS.px(1), CSS.px(2)), TypeError);
+
+      // Valid 3 arguments
+      const clamp = new CSSMathClamp(CSS.px(10), CSS.px(50), CSS.px(100));
+      assert.ok(clamp instanceof CSSMathClamp);
+      assert.strictEqual(clamp.toString(), 'clamp(10px, 50px, 100px)');
+
+      // Incompatible unit types throws TypeError
+      assert.throws(() => new CSSMathClamp(CSS.px(1), CSS.deg(2), CSS.px(3)), TypeError);
+      assert.throws(() => new CSSMathClamp(CSS.px(1), CSS.px(2), CSS.deg(3)), TypeError);
+      assert.throws(() => new CSSMathClamp(CSS.deg(1), CSS.px(2), CSS.px(3)), TypeError);
+    });
+
+    test('CSSMathNegate and CSSMathInvert arity validation', () => {
+      // @ts-expect-error test 0 args
+      assert.throws(() => new CSSMathNegate(), TypeError);
+      // @ts-expect-error test 0 args
+      assert.throws(() => new CSSMathInvert(), TypeError);
+
+      const neg = new CSSMathNegate(CSS.px(10));
+      assert.strictEqual(neg.toString(), 'calc(-10px)');
+
+      const inv = new CSSMathInvert(CSS.px(10));
+      assert.strictEqual(inv.toString(), 'calc(1 / 10px)');
     });
   });
 
