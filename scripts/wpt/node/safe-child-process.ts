@@ -192,10 +192,10 @@ export function safeExecTestFile(
 
             if (state === 'D') {
               dStateCount++;
-              if (dStateCount >= 4) {
+              if (dStateCount >= 40) {
                 isWatchdogKilled = true;
                 console.warn(
-                  `[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 4 consecutive checks (1s). Terminating with SIGKILL.`
+                  `[Watchdog] Child PID ${child.pid} entered uninterruptible sleep state D for 40 consecutive checks (10s). Terminating with SIGKILL.`
                 );
                 try {
                   child.kill('SIGKILL');

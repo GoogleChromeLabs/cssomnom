@@ -1101,7 +1101,7 @@ export class Parser {
       }
     }
     if (name.startsWith('--')) {
-      if (!Parser.isValidDashedIdent(name) || !Parser.validateCustomPropertyValue(declValue)) {
+      if (name === '--' || !Parser.validateCustomPropertyValue(declValue)) {
         return null;
       }
     } else {
@@ -1134,7 +1134,7 @@ export class Parser {
   public static isValidDashedIdent(name: string): boolean {
     if (!name.startsWith('--') || name === '--') return false;
     const tokens = tokenize(name);
-    return tokens.length === 2 && tokens[0].type === 'ident' && tokens[0].value === name && tokens[1].type === 'EOF';
+    return tokens.length === 2 && tokens[0].type === 'ident' && tokens[1].type === 'EOF';
   }
 
   public static isCustomPropertyDeclaration(prelude: ComponentValue[]): boolean {

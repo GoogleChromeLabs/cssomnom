@@ -2596,13 +2596,16 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Eliminate the largest remaining failure cluster (~1,036 failures across 211 files) by implementing strict `is2D` immutability in CSSTransformComponent subclasses and fixing `CSSUnparsedValue` token serialization roundtripping.
 
 ### Tasks
-- [ ] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
-  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSRotate`, `CSSTranslate`, `CSSScale` is a no-op or correctly updates 2D/3D state without throwing unexpected exceptions.
-- [ ] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
-  - In `src/typed-om/values/CSSUnparsedValue.ts`: Fix `toString()` and token list iteration to accurately serialize mixed strings and `CSSVariableReferenceValue` instances.
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
-  - Run `pnpm run wpt:verify` to confirm 0 regressions and record newly passing assertions.
+- [x] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
+  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY` is an immutable no-op per spec, and `CSSTranslate`, `CSSRotate`, `CSSScale` preserve inputs and handle normalization during `toString()` without mutating instance slots.
+- [x] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
+  - In `src/typed-om/values/CSSVariableReferenceValue.ts`: Added identifier serialization for escaped custom property names and arity validation.
+  - In `src/parser.ts`: Fixed dashed-ident validation to properly support escaped identifiers.
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
+  - Ran `pnpm run preflight` (0 errors, 0 warnings).
+  - Ran `pnpm run wpt:verify` confirming 0 regressions and +36 newly passing assertions (16,805 / 18,892 total assertions, 100% on `cssPerspective.tentative.html`, `cssSkew.tentative.html`, `cssSkewX.tentative.html`, `cssSkewY.tentative.html`, and `cssUnparsedValue` suites).
+  - Updated `wpt-passing-set-baseline.json` and `wpt-progress.md`.
 
 ---
 
