@@ -2556,15 +2556,23 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Fetch and cache official upstream Chrome WPT baseline data directly from `wpt.fyi` API / Google Cloud Storage, enabling automated 3-way differential comparisons between Node.js (`cssomnom`), Injected Browser (`cssomnom` in Chrome), and Vanilla Upstream Chrome (reference unpolyfilled engine).
 
 ### Tasks
-- [ ] **`wpt.fyi` Data Ingestion Engine (`scripts/wpt/browser/fetch-wptfyi.ts`)**:
-  - Implement `fetchWptFyiRun({ product: 'chrome', revision })` querying `https://wpt.fyi/api/runs` for the exact or closest matching WPT git revision.
-  - Download and cache the upstream `report.json` to `.wpt-cache/report-chrome-upstream.json`.
-- [ ] **3-Way Differential Comparator**:
-  - Extend `scripts/wpt/browser/parity.ts` to support 3-way comparison (`Node` vs `Injected Chrome` vs `Vanilla Upstream Chrome`).
-  - Identify tests where `cssomnom` fixes or polyfills browser shortcomings vs tests where `cssomnom` differs from standard Blink behavior.
-- [ ] **CLI & Unit Testing**:
-  - Add `wpt fetch-upstream` subcommand to CLI and `"wpt:fetch-upstream"` in `package.json`.
-  - Add unit tests in `tests/wpt-cli.test.ts`.
+- [x] **`wpt.fyi` Data Ingestion Engine (`scripts/wpt/browser/fetch-wptfyi.ts`)**:
+  - Implemented `fetchWptFyiRun({ product, label, revision, runId })` querying `https://wpt.fyi/api/runs` and downloading/decompressing GCS baseline results.
+  - Added streaming/magic-byte decompression support (`node:zlib.gunzipSync`), spec domain filtering, and caching to `.wpt-cache/report-chrome-upstream.json`.
+- [x] **3-Way Differential Comparator (`scripts/wpt/browser/parity.ts`)**:
+  - Extended `compareParity` to support 3-way comparison (`Node` vs `Injected Chrome` vs `Vanilla Upstream Chrome`).
+  - Categorized all 5 Truth Matrix categories:
+    1. *`VERIFIED_CONFORMANCE`*: Node: PASS, Injected: PASS, Upstream: PASS.
+    2. *`POLYFILL_IMPROVEMENT`*: Node: PASS, Injected: PASS, Upstream: FAIL (identifies where cssomnom polyfills/fixes browser shortcomings).
+    3. *`VERIFIED_SPEC_GAP`*: Node: FAIL, Injected: FAIL, Upstream: PASS (genuine implementation gaps).
+    4. *`FEASIBILITY_BOUNDARY`*: Node: FAIL, Injected: FAIL, Upstream: FAIL (shared ecosystem limitations).
+    5. *`OVER_MOCKING_FALSE_POSITIVE`*: Node: PASS, Injected: FAIL, Upstream: FAIL (overly lenient shims).
+  - Formatted 3-way Markdown and console tables with dedicated Polyfill Improvements tracking.
+- [x] **CLI & Unit Testing**:
+  - Added `wpt fetch-upstream` subcommand to `scripts/wpt/node/cli.ts`, `commands/fetch-upstream.ts` (<50 LOC), and `"wpt:fetch-upstream"` in `package.json`.
+  - Added `-u, --upstream-report <path>` option to `scripts/wpt/node/commands/parity.ts` with default cache fallback.
+  - Added unit test suite in `tests/wpt-cli.test.ts` covering URL building, decompression, normalization, 3-way parity matrix, and commands.
+  - Verified with `pnpm run preflight`.
 
 ---
 

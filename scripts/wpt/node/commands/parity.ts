@@ -1,11 +1,14 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { VALID_SPECS, validateSpecName } from '../core/config.ts';
 import { compareParity, formatParityConsole, type ParityReport } from '../../browser/parity.ts';
 
 export interface ParityCommandOptions {
   filterBySpec?: string;
   browserReport?: string;
+  upstreamReport?: string;
   nodeCache?: string;
   limit?: number;
   json?: boolean;
@@ -18,10 +21,19 @@ export async function parityCommand(options: ParityCommandOptions = {}): Promise
 
   const limit = options.limit ?? 15;
 
+  let upstreamReportPath = options.upstreamReport;
+  if (!upstreamReportPath) {
+    const defaultUpstream = path.resolve('.wpt-cache/report-chrome-upstream.json');
+    if (fs.existsSync(defaultUpstream)) {
+      upstreamReportPath = defaultUpstream;
+    }
+  }
+
   let report: ParityReport;
   try {
     report = compareParity({
       browserReportPath: options.browserReport,
+      upstreamReportPath,
       nodeCachePath: options.nodeCache,
       filterBySpec: options.filterBySpec,
       limit,

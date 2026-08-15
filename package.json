@@ -73,6 +73,7 @@
     "wpt:cluster": "node --max-old-space-size=1024 scripts/wpt/node/cli.ts cluster",
     "wpt:diff": "node --max-old-space-size=1024 scripts/wpt/node/cli.ts diff",
     "wpt:parity": "node --max-old-space-size=1024 scripts/wpt/node/cli.ts parity",
+    "wpt:fetch-upstream": "node --max-old-space-size=1024 scripts/wpt/node/cli.ts fetch-upstream",
     "wpt:node": "node --max-old-space-size=1024 scripts/wpt/node/run.ts",
     "submodules:update": "git submodule update --init --recursive",
     "submodules:upgrade": "git submodule update --init --remote && pnpm run submodules:update",
