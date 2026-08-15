@@ -2580,14 +2580,15 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Run the Differential Parity Oracle across all 7 W3C CSS suites, interpret findings across the 4 truth quadrants, and construct an empirical roadmap of high-priority bugs vs tightened shims.
 
 ### Tasks
-- [ ] **Full-Suite Parity Matrix Execution**:
-  - Execute live parity comparison across all 7 W3C CSS suites (`css-typed-om`, `selectors`, `cssom`, `css-variables`, `mediaqueries`, `css-syntax`, `css-nesting`).
-- [ ] **Truth Tier Analysis & Categorization**:
-  - *Verified Conformance Analysis*: Confirm gold-standard passes matching reference Blink behavior.
-  - *Spec Gap Triage*: Cluster all Node FAIL + Chrome PASS assertions to map root causes (e.g. style mutation invalidation, revert fallbacks, syntax strictness).
-  - *Over-Mocking Audit*: Inspect all Node PASS + Chrome FAIL assertions and tighten any overly lenient shims in `tests/dom-shim/`.
-- [ ] **Publish Conformance Parity Report**:
-  - Document the findings in `docs/conformance-parity-report.md`.
+- [x] **Full-Suite Parity Matrix Execution**:
+  - Executed live parity comparison across all 7 W3C CSS suites against official Upstream Chrome (17,584 total compared assertions).
+- [x] **Truth Tier Analysis & Categorization**:
+  - *Verified Conformance*: 15,050 assertions (85.6%) confirmed matching Blink reference behavior.
+  - *Spec Gap Triage*: 1,771 assertions clustered into root causes (Transform `is2D` immutability, `CSSUnparsedValue` string serialization, style mutation invalidation, shorthand parsing).
+  - *Over-Mocking Audit*: 515 assertions identified where Node stubs were overly permissive (color constructor typechecks, whitespace serialization).
+  - *Feasibility Boundaries*: 248 assertions confirmed failing across both engines (retained in manifest).
+- [x] **Publish Conformance Parity Report**:
+  - Documented findings in `docs/conformance-parity-report.md`.
 
 ---
 
@@ -2602,6 +2603,20 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - [ ] **Unit Tests & Zero-Regression Verification**:
   - Add tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
   - Run `pnpm run wpt:verify` to confirm 0 regressions and record newly passing assertions.
+
+---
+
+## Phase 107: Color Subclasses Strict WebIDL Validation & MathClamp Arity Checks
+**Goal**: Eliminate 314 over-mocking false positives by strictly validating `CSSHSL` / `CSSRGB` numeric argument types and enforcing $\ge 3$ arguments on `CSSMathClamp`.
+
+### Tasks
+- [ ] **Color Subclass Argument Typechecks**:
+  - Enforce `CSSNumericValue` instance validation in `src/typed-om/color/` constructors and property setters (throw `TypeError` on raw number/undefined).
+- [ ] **`CSSMathClamp` Arity Validation**:
+  - Enforce minimum 3 arguments (`min`, `val`, `max`) in `CSSMathClamp` constructor.
+- [ ] **Unit Tests & Verification**:
+  - Add unit tests in `tests/typed-om-constructors.test.ts` and verify with `pnpm run preflight`.
+
 
 
 
