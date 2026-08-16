@@ -2707,35 +2707,120 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 111: `cssom` Shorthand Serialization, Page Rules & Font Normalization
-**Goal**: Resolve the next 4 major failure clusters in `css/cssom/` (+75 addressable assertions), pushing `cssom` normalized score from 78.25% past 90%.
+## Phase 111: Composite Shorthand Canonical Serialization & Font Normalization
+**Goal**: Implement minimal canonical serialization and sub-property contraction for composite shorthands (`border`, `outline`, `list-style`, `font-variant`, `font-family`, `flex`, `overflow`) per CSSOM § 6.4.3 and CSS Fonts 4, resolving 37 addressable gaps in `css/cssom/`.
 
 ### Tasks
-- [ ] **Composite Shorthand Canonical Contraction & Serialization (CSSOM § 6.4.3)**:
-  - In `src/serializer.ts` and `src/shorthands.ts`:
-    - Canonical 4-side contraction for `border` (`border: 1px red;` omitting initial values), `outline`, and `background`.
-    - `font-variant` shorthand contraction (`normal` vs `none` with constituent longhands `font-variant-ligatures`, `font-variant-caps`, `font-variant-numeric`).
-    - Computed property getters for `border-top`, `border-right`, `border-bottom`, `border-left` on computed style declarations.
-    - Target files: `shorthand-values.html`, `font-variant-shorthand-serialization.html`, `shorthand-serialization.html`, `getComputedStyle-getter-v-properties.tentative.html`.
-- [ ] **`font-family` Serialization Normalization (CSSOM § 6.4.3 & CSS Fonts 4)**:
-  - Unquote single-word and multi-word family identifiers that do not require quoting (`"Arial"` $\to$ `Arial`, `"Times New Roman"` $\to$ `Times New Roman`).
-  - Retain quotes for identifiers starting with digits (`"123Font"`) or matching CSS-wide keywords (`"initial"`).
-  - Target files: `font-family-serialization-001.html`, `font-family-serialization-002.html`.
-- [ ] **`CSSPageRule` & `MediaList` Normalization (CSSOM § 6.4.3 & § 6.5.5)**:
-  - In `src/CSSOM.ts`: `@page` case-insensitive pseudo-page selector parsing (`:first`, `:left`, `:right`, `:blank`) and whitespace rejection (`@page name :first` is invalid).
-  - `MediaList.mediaText` normalization handling duplicate commas, empty queries, and `disabled` attribute reflection on `CSSStyleSheet`.
-  - Target files: `cssom-pagerule.html`, `medialist-interfaces-001.html`, `style-sheet-interfaces-001.html`.
-- [ ] **`cssText` Case Normalization & Style Attribute Sync**:
-  - Lowercase property names/values on `cssText` assignments and retain prior valid state on syntax errors.
-  - Bidirectional synchronization between `element.style` and the HTML `style` attribute (queueing MutationObserver records).
-  - Target files: `cssstyledeclaration-csstext.html`, `css-style-attr-decl-block.html`.
+- [ ] **Canonical Minimal Serialization of `border` & `outline` (CSSOM § 6.4.3)**:
+  - In `src/shorthands.ts` and `src/serializer.ts`:
+    - Omit initial default values (`none` for style, `currentcolor` for color, `medium` for width) when the shorthand is valid without them (`border: 1px;` or `border: 1px red;`).
+    - Enforce `border-image` interference guard: `border` shorthand must serialize to `""` if any `border-image-*` longhand is non-initial.
+    - Implement dedicated `contractOutline` omitting default `none`/`currentcolor`/`medium`.
+    - Target files: `shorthand-values.html` (11 gaps), `border-shorthand-serialization.html` (2 gaps).
+- [ ] **`font-variant` Sub-Property Expansion & Contraction (CSS Fonts 4 § 5)**:
+  - Decompose and serialize across all constituent sub-properties (`font-variant-ligatures`, `font-variant-caps`, `font-variant-numeric`, `font-variant-alternates`, `font-variant-east-asian`, `font-variant-position`).
+  - Target file: `font-variant-shorthand-serialization.html` (6 gaps).
+- [ ] **`font-family` Identifier Quoting & Unquoting Normalization (CSSOM § 6.4.3)**:
+  - Unquote identifiers that do not require quotes (`"Arial"` $\to$ `Arial`, `"Times New Roman"` $\to$ `Times New Roman`).
+  - Retain quotes for identifiers starting with digits (`'34J'`), containing consecutive whitespace (`'Foo  Bar'`), or matching CSS-wide keywords (`'initial'`).
+  - Target files: `font-family-serialization-001.html` (6 gaps), `font-shorthand-serialization.html` (1 gap).
+- [ ] **`list-style`, `flex`, and `overflow` Multi-Value Serialization**:
+  - Implement `contractListStyle` for `list-style-type`, `list-style-position`, `list-style-image`.
+  - Support asymmetric values in `overflow-x`/`overflow-y` (`overflow: scroll hidden`) and `flex` keyword mixing.
+  - Target files: `shorthand-serialization.html` (4 gaps), `flex-serialization.html` (3 gaps), `overflow-serialization.html` (3 gaps).
 - [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add unit tests in `tests/cssom-shorthand-serialization.test.ts` and `tests/cssom-pagerule.test.ts`.
+  - Add unit tests in `tests/cssom-shorthand-serialization.test.ts`.
   - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
 
 ---
 
-## Phase 112: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
+## Phase 112: `CSSStyleDeclaration`, Custom Properties & Inline Style DOM Bridge
+**Goal**: Enforce strict invalid property dropping on `cssText`, preserve raw dashed identifiers for custom properties, and tighten the LinkeDOM `element.style` adapter bridge (+29 addressable assertions).
+
+### Tasks
+- [ ] **`CSSStyleDeclaration.cssText` Invalid Property Dropping & Case Normalization**:
+  - In `src/CSSStyleDeclaration.ts`: Drop unrecognized non-dashed properties when setting `cssText` and lowercase property names.
+  - Target files: `cssstyledeclaration-csstext.html` (5 gaps), `cssstyledeclaration-csstext-important.html` (1 gap).
+- [ ] **Custom Property Name Raw Indexing & Escaping**:
+  - In `src/parser.ts` and `src/CSSStyleDeclaration.ts`: Preserve raw identifier forms (`--a;b`, `--\61 b`, `--0`) for `style[i]` and `style.item(i)`.
+  - Target file: `variable-names.html` (4 gaps).
+- [ ] **DOM `style` Attribute Formatting & Reparsing Synchronization**:
+  - In `tests/dom-shim/src/dom-stubs.ts`:
+    - Format serialized declarations on the DOM `style` attribute with canonical `; ` spacing.
+    - Implement `item(index)` indexed access on `element.style`.
+    - Add mutation listeners on `<style>` `textContent` and `innerHTML` setters to trigger dynamic stylesheet reparsing.
+    - Remove obsolete `getPropertyCSSValue` from prototype per CSSOM 1.
+  - Target files: `css-style-attr-decl-block.html` (4 gaps), `inline-style-001.html` (3 gaps), `css-style-reparse.html` (2 gaps), `historical.html` (1 gap).
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add unit tests in `tests/cssom-style-declaration-bridge.test.ts`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+
+---
+
+## Phase 113: Constructable Stylesheets, `@page`/`@container` At-Rules & MediaList
+**Goal**: Complete modern constructable stylesheet mechanics (`CSSStyleSheet.replaceSync`, `baseURL`), `@page`/`@container` at-rule modifiers, and MediaList WebIDL algorithms (+45 addressable assertions).
+
+### Tasks
+- [ ] **Constructable Stylesheet Inheritance & `adoptedStyleSheets` Guards**:
+  - In `src/CSSOM.ts` and `tests/dom-shim/src/dom-stubs.ts`:
+    - Throw `NotAllowedError` (DOMException) when `replaceSync()` or `replace()` is called on non-constructed sheets.
+    - Resolve relative URLs against `options.baseURL` in `new CSSStyleSheet({ baseURL })` and throw `NotAllowedError` on invalid URLs.
+    - Enforce `NotAllowedError` in `adoptedStyleSheets` proxy mutators when foreign or non-constructed sheets are added.
+    - Invalidate cascade caches on shadow roots upon adopted sheet mutations.
+  - Target files: `CSSStyleSheet-constructable.html` (6 gaps), `CSSStyleSheet-constructable-baseURL.html` (3 gaps), `CSSStyleSheet-constructable-replace-on-regular-sheet.html` (3 gaps), `adoptedstylesheets-observablearray.html` (2 gaps).
+- [ ] **`CSSPageRule` & `CSSContainerRule` Descriptors**:
+  - In `src/CSSOM.ts`: Lowercase pseudo-page names (`:first`, `:left`, `:right`, `:blank`) and reject whitespace in `@page name :first`.
+  - Expose `containerName` getter on `CSSContainerRule`.
+  - Target files: `cssom-pagerule.html` (6 gaps), `CSSContainerRule.tentative.html` (1 gap).
+- [ ] **MediaList WebIDL Algorithms & `CSSConditionRule`**:
+  - Enforce WebIDL arity check on `deleteMedium()` (throws `TypeError` on 0 arguments).
+  - Preserve explicit `all` tokens in `mediaText` comma lists (`all, screen`).
+  - Make `CSSConditionRule.conditionText` a readonly attribute per spec.
+  - Target files: `medialist-interfaces-001.html` (4 gaps), `medialist-interfaces-002.html` (1 gap), `CSSConditionRule-conditionText.html` (1 gap).
+- [ ] **Unit Tests & Verification**:
+  - Add unit tests in `tests/cssom-constructable-atrules.test.ts`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+
+---
+
+## Phase 114: `getComputedStyle` Shorthand Synthesis & Stylesheet DOM Lifecycle
+**Goal**: Expose synthesized computed values for composite property getters (`borderTop`, `font`), throw `NoModificationAllowedError` on mutation, and implement CORS / preferred title stylesheet lifecycle (+47 addressable assertions).
+
+### Tasks
+- [ ] **`getComputedStyle` Shorthand Synthesis & Exception Types**:
+  - In `src/cascade/index.ts`: Synthesize computed shorthand getters for `border-top`, `border-right`, `border-bottom`, `border-left`, and `font`.
+  - Throw `DOMException("NoModificationAllowedError")` on computed style declaration mutations.
+  - Resolve `margin: auto` and positioned offsets to `0px` on standard layout elements.
+  - Target files: `getComputedStyle-getter-v-properties.tentative.html` (5 gaps), `computed-style-005.html` (4 gaps), `computed-style-set-property.html` (3 gaps).
+- [ ] **Document & Link Stylesheet Lifecycle & CORS Security Guards**:
+  - In `src/CSSOM.ts`: Throw `SecurityError` (DOMException) when accessing `sheet.cssRules` on cross-origin stylesheets.
+  - In `tests/dom-shim/src/dom-stubs.ts`: Implement preferred title-based stylesheet switching and `<link disabled>` reflection.
+  - Target files: `stylesheet-same-origin.sub.html` (6 gaps), `style-sheet-interfaces-001.html` (4 gaps), `stylesheet-title.html` (2 gaps), `HTMLLinkElement-disabled-001.html` (2 gaps).
+- [ ] **Reclassify Caret / Viewport 2D Hit-Testing in Feasibility Manifest**:
+  - Reclassify `caretPositionFromPoint.html` and `caretRangeFromPoint.tentative.html` (16 tests) in `tests/fixtures/wpt-browser-only-manifest.json` under `VIEWPORT_HIT_TESTING`.
+- [ ] **Unit Tests & Verification**:
+  - Add unit tests in `tests/cssom-computed-shorthands.test.ts`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+
+---
+
+## Phase 115: WPT Test Runner VM Cross-Realm Intrinsics & IDL Harness Interception
+**Goal**: Resolve the VM proxy intrinsic leak and relative IDL fetch interception in `scripts/wpt/node/run.ts`, unlocking **+1,127 potential passing assertions** across `serialize-values.html` and `idlharness.html`.
+
+### Tasks
+- [ ] **VM Realm `Array` / `Object` Intrinsic Leak Fix**:
+  - In `scripts/wpt/node/run.ts`: Ensure `windowProxy` resolves `Array`, `Object`, and standard globals to the VM realm context rather than host `globalThis` (`[] instanceof Array === true`).
+  - Target file: `serialize-values.html` (687 assertions).
+- [ ] **WPT `/interfaces/` Relative IDL Fetch Interception**:
+  - In `scripts/wpt/node/run.ts`: Intercept relative `fetch('/interfaces/*.idl')` calls and serve the files from `submodules/web-platform-tests/interfaces/`.
+  - Target file: `idlharness.html` (440 assertions).
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Verify 0 regressions across all 1,687 test files.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+
+---
+
+## Phase 116: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
 **Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
 
 ### Tasks
@@ -2754,7 +2839,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 113: `:scope`, `@scope` & Complex Relative Selectors
+## Phase 117: `:scope`, `@scope` & Complex Relative Selectors
 **Goal**: Implement relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element and resolve `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
 
 ### Tasks
