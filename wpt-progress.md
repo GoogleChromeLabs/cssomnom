@@ -8,23 +8,27 @@ This file tracks the conformance progress of the CSSOM / Typed OM implementation
 
 ### Feasibility & Cross-Engine Baseline Comparison
 
+> [!NOTE]
+> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Upstream chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across the corresponding in-scope test suites.
+
 | Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
 | :--- | :---: | :---: | :---: |
-| **`Typed OM`** | 11,509 / 12,219 (**94.2%**) | 10,690 / 11,230 (95.2%) | -1.0% |
-| **`Selectors`** | 3,521 / 4,147 (**84.9%**) | 3,865 / 4,156 (93.0%) | -8.1% |
-| **`CSSOM`** | 643 / 923 (**69.7%**) | 883 / 922 (95.8%) | -26.1% |
-| **`Variables`** | 392 / 548 (**71.5%**) | 465 / 534 (87.1%) | -15.6% |
-| **`Media Queries`** | 417 / 417 (**100.0%**) | 392 / 416 (94.2%) | 🟢 **+5.8%** |
-| **`Syntax`** | 412 / 398 (**100.0%**) | 392 / 398 (98.5%) | 🟢 **+1.5%** |
-| **`Nesting`** | 117 / 117 (**100.0%**) | 93 / 94 (98.9%) | 🟢 **+1.1%** |
-| **OVERALL** | **17,011 / 18,769 (90.6%)** | **16,780 / 17,750 (94.5%)** | **-3.9%** |
-
+| **`Typed OM`** | 11,507 / 12,219 (**94.2%**) | 12,341 / 13,125 (94.0%) | 🟢 **+0.1%** |
+| **`CSSOM`** | 752 / 923 (**81.5%**) | 6,381 / 6,661 (95.8%) | -14.3% |
+| **`Nesting`** | 117 / 117 (**100.0%**) | 139 / 140 (99.3%) | 🟢 **+0.7%** |
+| **`Syntax`** | 412 / 398 (**103.5%**) | 430 / 437 (98.4%) | 🟢 **+5.1%** |
+| **`Variables`** | 394 / 548 (**71.9%**) | 699 / 772 (90.5%) | -18.6% |
+| **`Selectors`** | 3,527 / 4,147 (**85.0%**) | 5,498 / 6,394 (86.0%) | -0.9% |
+| **`Media Queries`** | 417 / 417 (**100.0%**) | 1,799 / 1,825 (98.6%) | 🟢 **+1.4%** |
+| **OVERALL** | **17,126 / 18,769 (91.2%)** | **27,287 / 29,354 (93.0%)** | **-1.7%** |
 ---
 
 ### Historical Conformance Progress Log
 
 | Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Raw Pass Rate | Normalized |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 2026-08-16 22:21:50 | `eca0af7*` | 11507/12219 | 752/923 | 117/117 | 412/398 | 394/548 | 3527/4147 | 417/417 | 17126/18769 | 90.65% | **91.25%** |
 | 2026-08-16 03:23:58 | `bcbf591*` | 11509/12219 | 643/923 | 117/117 | 412/398 | 392/548 | 3521/4147 | 417/417 | 17011/18769 | 90.04% | **90.63%** |
 | 2026-08-16 02:15:07 | `eeafae6*` | 11431/12219 | 598/923 | 117/117 | 340/398 | 321/548 | 3521/4147 | 417/417 | 16745/18769 | 88.64% | **89.22%** |
 | 2026-08-15 20:20:07 | `14db331*` | 11401/12219 | 618/923 | 117/117 | 398/398 | 335/548 | 3520/4147 | 417/417 | 16806/18769 | 88.96% | **89.54%** |

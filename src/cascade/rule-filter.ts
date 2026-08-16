@@ -98,20 +98,25 @@ export function collectStyleSheetsAndRules(
     if (!sheet) return;
     const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
     if (s.disabled) return;
-    if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
-      const parsed = parseStyleSheet(s.textContent);
-      ruleList.push(...parsed);
-      return;
-    }
-    if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
-      addSheetRules(s.sheet);
-      return;
+    try {
+      if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
+        addSheetRules(s.sheet);
+        return;
+      }
+    } catch {
+      // linkedom style.sheet throws on modern CSS syntax (@layer, nesting)
     }
     if (s.cssRules && s.cssRules.length !== undefined) {
       for (let j = 0; j < s.cssRules.length; j++) {
         const r = s.cssRules[j];
         if (r) ruleList.push(r as unknown as CSSRule);
       }
+      return;
+    }
+    if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
+      const parsed = parseStyleSheet(s.textContent);
+      ruleList.push(...parsed);
+      return;
     }
   };
 
@@ -183,6 +188,41 @@ export function collectStyleSheetsAndRules(
   return ruleList;
 }
 
+function splitSelectorList(selectorText: string): string[] {
+  const result: string[] = [];
+  let depth = 0;
+  let inString: string | null = null;
+  let current = '';
+
+  for (let i = 0; i < selectorText.length; i++) {
+    const char = selectorText[i];
+    if (inString) {
+      current += char;
+      if (char === '\\' && i + 1 < selectorText.length) {
+        current += selectorText[++i];
+      } else if (char === inString) {
+        inString = null;
+      }
+    } else if (char === '"' || char === "'") {
+      inString = char;
+      current += char;
+    } else if (char === '(' || char === '[' || char === '{') {
+      depth++;
+      current += char;
+    } else if (char === ')' || char === ']' || char === '}') {
+      if (depth > 0) depth--;
+      current += char;
+    } else if (char === ',' && depth === 0) {
+      if (current.trim()) result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) result.push(current.trim());
+  return result.length > 0 ? result : [selectorText];
+}
+
 /**
  * Traverses rule list, evaluates conditional at-rules and selectors, and collects matched declarations.
  * css-cascade-5 § 2 #filtering
@@ -213,26 +253,50 @@ export function collectMatchedDeclarations(
       ) {
         const selectorText = (rule as CSSStyleRule).selectorText || serialize((rule as { prelude?: ComponentValue[] }).prelude || []).trim();
         const resolvedSelector = resolveNestedSelector(selectorText, parentSelector);
+        const selectors = splitSelectorList(resolvedSelector);
 
-        const normalizedPseudo = pseudoElement
-          ? (pseudoElement.startsWith('::') ? pseudoElement : `::${pseudoElement.replace(/^:/, '')}`)
-          : null;
+        let maxSpecificity: Specificity | null = null;
         let isMatchingSelector = false;
-        let selectorForMatching = resolvedSelector;
-        if (normalizedPseudo) {
-          if (resolvedSelector.endsWith(normalizedPseudo) || resolvedSelector.endsWith(`:${normalizedPseudo.slice(2)}`)) {
-            selectorForMatching = resolvedSelector.replace(/::?[a-zA-Z-]+$/, '').trim() || ':scope';
-            isMatchingSelector = matches(element, selectorForMatching, scopeNode);
+
+        for (const sel of selectors) {
+          let matchesThisSel = false;
+          let selectorForMatching = sel;
+          if (pseudoElement) {
+            const normTarget = pseudoElement.toLowerCase().replace(/\s+/g, '');
+            const isLegacy = ['::before', '::after', '::first-line', '::first-letter'].includes(normTarget);
+            const legacySingleColon = isLegacy ? `:${normTarget.slice(2)}` : null;
+
+            const pseudoRegex = /(::?[a-zA-Z-]+(?:\([^)]*\))?)\s*$/;
+            const match = sel.match(pseudoRegex);
+            if (match) {
+              const rawMatchedPseudo = match[1].toLowerCase().replace(/\s+/g, '');
+              let isMatch = rawMatchedPseudo === normTarget;
+              if (!isMatch && legacySingleColon && rawMatchedPseudo === legacySingleColon) {
+                isMatch = true;
+              }
+              if (isMatch) {
+                selectorForMatching = sel.slice(0, match.index).trim() || ':scope';
+                matchesThisSel = matches(element, selectorForMatching, scopeNode);
+              }
+            }
+          } else {
+            const hasPseudo = /::[a-zA-Z-]+(?:\([^)]*\))?$/.test(sel) || /:(before|after|first-line|first-letter)\b/.test(sel);
+            if (!hasPseudo) {
+              matchesThisSel = matches(element, sel, scopeNode);
+            }
           }
-        } else {
-          const hasPseudo = /::[a-zA-Z-]+$/.test(resolvedSelector) || /:(before|after|first-line|first-letter)\b/.test(resolvedSelector);
-          if (!hasPseudo) {
-            isMatchingSelector = matches(element, resolvedSelector, scopeNode);
+
+          if (matchesThisSel) {
+            isMatchingSelector = true;
+            const spec = getMatchingSpecificity(element, selectorForMatching);
+            if (!maxSpecificity || compareSpecificity(spec, maxSpecificity) > 0) {
+              maxSpecificity = spec;
+            }
           }
         }
 
-        if (isMatchingSelector) {
-          const spec = getMatchingSpecificity(element, selectorForMatching);
+        if (isMatchingSelector && maxSpecificity) {
+          const spec = maxSpecificity;
           const style = (rule as CSSStyleRule).style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
 

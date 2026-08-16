@@ -709,6 +709,16 @@ export class CSSGroupingRule extends CSSRule {
   }
 }
 
+function findParentStyleSheet(rule: CSSRule): CSSStyleSheet | null {
+  let sheet: CSSStyleSheet | null = rule.parentStyleSheet;
+  let curr: CSSRule | null = rule.parentRule;
+  while (!sheet && curr) {
+    sheet = curr.parentStyleSheet;
+    curr = curr.parentRule;
+  }
+  return sheet;
+}
+
 export class CSSStyleRule extends CSSGroupingRule {
   private _selectorText: string;
   private _selectorAST: import('./types.ts').SelectorList | null = null;
@@ -732,34 +742,55 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._style.cssText = value;
   }
 
-  get selectorText(): string {
-    if (this._selectorAST) {
-      let hasDefaultNamespace = false;
-      if (this.parentStyleSheet) {
-        for (const rule of this.parentStyleSheet.cssRules) {
-          if (rule.type === 10 && (rule as CSSNamespaceRule).prefix === '') {
+  private _getNamespaceContext(): { hasDefaultNamespace: boolean; defaultNamespacePrefixes: Set<string> } {
+    let hasDefaultNamespace = false;
+    const defaultNamespacePrefixes = new Set<string>();
+    const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
+    if (sheet) {
+      let defaultUri: string | null = null;
+      for (const rule of sheet.cssRules) {
+        if (rule.type === 10) {
+          const ns = rule as CSSNamespaceRule;
+          if (ns.prefix === '') {
             hasDefaultNamespace = true;
-            break;
+            defaultUri = ns.namespaceURI;
           }
         }
       }
-      return serializeSelectorList(this._selectorAST, hasDefaultNamespace);
+      if (defaultUri !== null) {
+        for (const rule of sheet.cssRules) {
+          if (rule.type === 10) {
+            const ns = rule as CSSNamespaceRule;
+            if (ns.namespaceURI === defaultUri && ns.prefix !== '') {
+              defaultNamespacePrefixes.add(ns.prefix);
+            }
+          }
+        }
+      }
+    }
+    return { hasDefaultNamespace, defaultNamespacePrefixes };
+  }
+
+  get selectorText(): string {
+    if (this._selectorAST) {
+      const nsContext = this._getNamespaceContext();
+      return serializeSelectorList(this._selectorAST, nsContext);
     }
     return this._selectorText;
   }
 
   set selectorText(value: string) {
     const declaredNamespaces = new Set<string>();
-    let hasDefaultNamespace = false;
-    if (this.parentStyleSheet) {
-      for (const rule of this.parentStyleSheet.cssRules) {
+    const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
+    if (sheet) {
+      for (const rule of sheet.cssRules) {
         if (rule.type === 10) {
           const prefix = (rule as CSSNamespaceRule).prefix;
           declaredNamespaces.add(prefix);
-          if (prefix === '') hasDefaultNamespace = true;
         }
       }
     }
+    const nsContext = this._getNamespaceContext();
     let isNested = false;
     let currParent: CSSRule | null = this.parentRule;
     while (currParent !== null) {
@@ -802,7 +833,7 @@ export class CSSStyleRule extends CSSGroupingRule {
         }
       }
       this._selectorAST = selectorAST;
-      this._selectorText = serializeSelectorList(selectorAST, hasDefaultNamespace);
+      this._selectorText = serializeSelectorList(selectorAST, nsContext);
     }
   }
 

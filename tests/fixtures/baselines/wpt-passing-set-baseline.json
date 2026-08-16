@@ -408,12 +408,18 @@
   ],
   "submodules/web-platform-tests/css/css-syntax/serialize-consecutive-tokens.html": [
     "Comments are handled correctly when computing a/* comment */b using t1:.",
+    "Comments are handled correctly when computing a/* comment */var(--t1) using t1:b.",
+    "Comments are handled correctly when computing var(--t1)b using t1:\"a/* unfinished \".",
+    "Comments are handled correctly when computing var(--t1)b using t1:'a \" '/* comment */.",
+    "Comments are handled correctly when computing var(--t1)b using t1:'a/* unfinished '.",
+    "Comments are handled correctly when computing var(--t1)b using t1:a/* comment */.",
     "Empty fallback between tokens must not disturb comment insertion",
     "Serialization of consecutive # and - tokens.",
     "Serialization of consecutive # and 123 tokens.",
     "Serialization of consecutive # and 123% tokens.",
     "Serialization of consecutive # and 123em tokens.",
     "Serialization of consecutive # and bar tokens.",
+    "Serialization of consecutive # and bar() tokens.",
     "Serialization of consecutive # and url(bar) tokens.",
     "Serialization of consecutive #foo and - tokens.",
     "Serialization of consecutive #foo and --> tokens.",
@@ -421,6 +427,7 @@
     "Serialization of consecutive #foo and 123% tokens.",
     "Serialization of consecutive #foo and 123em tokens.",
     "Serialization of consecutive #foo and bar tokens.",
+    "Serialization of consecutive #foo and bar() tokens.",
     "Serialization of consecutive #foo and url(bar) tokens.",
     "Serialization of consecutive + and 123 tokens.",
     "Serialization of consecutive + and 123% tokens.",
@@ -430,6 +437,7 @@
     "Serialization of consecutive - and 123% tokens.",
     "Serialization of consecutive - and 123em tokens.",
     "Serialization of consecutive - and bar tokens.",
+    "Serialization of consecutive - and bar() tokens.",
     "Serialization of consecutive - and url(bar) tokens.",
     "Serialization of consecutive . and 123 tokens.",
     "Serialization of consecutive . and 123% tokens.",
@@ -440,6 +448,7 @@
     "Serialization of consecutive 123 and 123% tokens.",
     "Serialization of consecutive 123 and 123em tokens.",
     "Serialization of consecutive 123 and bar tokens.",
+    "Serialization of consecutive 123 and bar() tokens.",
     "Serialization of consecutive 123 and url(bar) tokens.",
     "Serialization of consecutive 123foo and - tokens.",
     "Serialization of consecutive 123foo and --> tokens.",
@@ -447,9 +456,11 @@
     "Serialization of consecutive 123foo and 123% tokens.",
     "Serialization of consecutive 123foo and 123em tokens.",
     "Serialization of consecutive 123foo and bar tokens.",
+    "Serialization of consecutive 123foo and bar() tokens.",
     "Serialization of consecutive 123foo and url(bar) tokens.",
     "Serialization of consecutive @ and - tokens.",
     "Serialization of consecutive @ and bar tokens.",
+    "Serialization of consecutive @ and bar() tokens.",
     "Serialization of consecutive @ and url(bar) tokens.",
     "Serialization of consecutive @foo and - tokens.",
     "Serialization of consecutive @foo and --> tokens.",
@@ -457,13 +468,16 @@
     "Serialization of consecutive @foo and 123% tokens.",
     "Serialization of consecutive @foo and 123em tokens.",
     "Serialization of consecutive @foo and bar tokens.",
+    "Serialization of consecutive @foo and bar() tokens.",
     "Serialization of consecutive @foo and url(bar) tokens.",
+    "Serialization of consecutive foo and () tokens.",
     "Serialization of consecutive foo and - tokens.",
     "Serialization of consecutive foo and --> tokens.",
     "Serialization of consecutive foo and 123 tokens.",
     "Serialization of consecutive foo and 123% tokens.",
     "Serialization of consecutive foo and 123em tokens.",
     "Serialization of consecutive foo and bar tokens.",
+    "Serialization of consecutive foo and bar() tokens.",
     "Serialization of consecutive foo and url(bar) tokens."
   ],
   "submodules/web-platform-tests/css/css-syntax/serialize-escape-identifiers.html": [
@@ -819,10 +833,12 @@
   "submodules/web-platform-tests/css/css-typed-om/stylevalue-serialization/cssStyleValue-cssom.html": [
     "CSSStyleValue from computed CSSOM serializes correctly",
     "CSSStyleValue from specified CSSOM serializes correctly",
+    "Shorthand CSSStyleValue from computed CSSOM serializes correctly",
     "Shorthand CSSStyleValue from inline CSSOM serializes correctly"
   ],
   "submodules/web-platform-tests/css/css-typed-om/stylevalue-serialization/cssStyleValue-string.html": [
-    "CSSStyleValue parsed from string serializes to given string"
+    "CSSStyleValue parsed from string serializes to given string",
+    "Shorthand CSSStyleValue parsed from string serializes to given string"
   ],
   "submodules/web-platform-tests/css/css-typed-om/stylevalue-serialization/cssTransformValue.tentative.html": [
     "CSSMathInvert with 0 parameter and nested serializes correctly",
@@ -1343,6 +1359,7 @@
     "CSSMathSum can be constructed from more than one number CSSUnitValue",
     "CSSMathSum.operator is readonly",
     "Constructing a CSSMathClamp with different unit arguments throws a SyntaxError",
+    "Constructing a CSSMathClamp with less than 3 arguments throws a SyntaxError",
     "Constructing a CSSMathMax with no arguments throws a SyntaxError",
     "Constructing a CSSMathMin with no arguments throws a SyntaxError",
     "Constructing a CSSMathProduct with no arguments throws a SyntaxError",
@@ -1477,6 +1494,12 @@
     "Computed StylePropertyMap contains custom property declarations in style rules",
     "Computed StylePropertyMap is live"
   ],
+  "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/get-auto-min-size.html": [
+    "An absolute flex-child computed StylePropertyMap.get reports the auto minimum size correctly.",
+    "An absolute grid-child computed StylePropertyMap.get reports the auto minimum size correctly.",
+    "An inflow flex-item computed StylePropertyMap.get reports the auto minimum size correctly.",
+    "An inflow grid-item computed StylePropertyMap.get reports the auto minimum size correctly."
+  ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/get-disconnected-element.html": [
     "get() returns undefined on disconnected element"
   ],
@@ -1488,6 +1511,7 @@
     "Computed position sticky even if it does not apply"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/get-shorthand.html": [
+    "Getting a shorthand property from initial computed style returns a base CSSStyleValue",
     "Getting an shorthand property set explicitly in computed style returns a base CSSStyleValue"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/get.html": [
@@ -1499,6 +1523,7 @@
     "Getting a valid property from computed style returns the correct entry"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/getAll-shorthand.html": [
+    "StylePropertyMap.getAll() with a shorthand property from initial computed style returns a list containing a base CSSStyleValue",
     "StylePropertyMap.getAll() with a shorthand property set explicitly in computed style returns a list containing a base CSSStyleValue"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/getAll.tentative.html": [
@@ -1536,9 +1561,11 @@
     "Calling StylePropertyMap.append with an invalid CSSStyleValue throws TypeError",
     "Calling StylePropertyMap.append with an invalid String value throws TypeError",
     "Calling StylePropertyMap.append with an null property name throws TypeError",
-    "Calling StylePropertyMap.append with an unsupported property name throws TypeError"
+    "Calling StylePropertyMap.append with an unsupported property name throws TypeError",
+    "StylePropertyMap.append is case-insensitive"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/declared/clear.html": [
+    "Can clear a CSS rule containing properties",
     "Clearing an empty CSS rule is a no-op",
     "Declared StylePropertyMap.clear updates the CSS rule"
   ],
@@ -1622,7 +1649,8 @@
     "Setting a non list-valued property with list-valued string throws TypeError",
     "Setting a non list-valued property with multiple arguments throws TypeError",
     "Setting a property with CSSStyleValue or String updates its value",
-    "Setting a property with a CSSStyleValue whose associated property does not match throws TypeError"
+    "Setting a property with a CSSStyleValue whose associated property does not match throws TypeError",
+    "StylePropertyMap.set is case-insensitive"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/append.tentative.html": [
     "Appending a list-valued property with CSSStyleValue or String updates its values",
@@ -1637,6 +1665,7 @@
     "Calling StylePropertyMap.append with an invalid String value throws TypeError",
     "Calling StylePropertyMap.append with an null property name throws TypeError",
     "Calling StylePropertyMap.append with an unsupported property name throws TypeError",
+    "StylePropertyMap.append is case-insensitive",
     "StylePropertyMap.append rejects appending to CSS-wide keywords"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/attribute-changed-callback.html": [
@@ -1644,9 +1673,12 @@
     "attributeStyleMap.clear() triggers attributeChangedCallback",
     "attributeStyleMap.delete() triggers attributeChangedCallback",
     "attributeStyleMap.delete() with custom property triggers attributeChangedCallback",
-    "attributeStyleMap.set() with custom property triggers attributeChangedCallback"
+    "attributeStyleMap.set() triggers MutationObserver without duplicates",
+    "attributeStyleMap.set() with custom property triggers attributeChangedCallback",
+    "attributeStyleMap.set() with shorthand property triggers attributeChangedCallback"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/clear.html": [
+    "Can clear an inline style containing properties",
     "Clearing an empty inline style is a no-op",
     "Inline StylePropertyMap.clear updates the element inline style"
   ],
@@ -1654,6 +1686,7 @@
     "Deleting an unsupported property name throws a TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/delete-shorthand.html": [
+    "Deleting a longhand property in the inline style removes both it and its shorthand",
     "Deleting a shorthand property in the inline style removes both it and its longhands",
     "Deleting a shorthand property not in the inline style is a no-op"
   ],
@@ -1661,7 +1694,8 @@
     "Deleting a custom property in the inline style removes it from the inline style",
     "Deleting a list-valued property in the inline style removes it from the inline style",
     "Deleting a property in the inline style removes it from the inline style",
-    "Deleting a property not in the inline style is a no-op"
+    "Deleting a property not in the inline style is a no-op",
+    "Inline StylePropertyMap.delete is not case-sensitive"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/get-invalid.html": [
     "Calling StylePropertyMap.get with an unsupported property throws a TypeError"
@@ -1672,6 +1706,7 @@
     "Getting an shorthand property set explicitly in inline style returns a base CSSStyleValue"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/get.html": [
+    "Declared StylePropertyMap.get is not case-sensitive",
     "Declared StylePropertyMap.get reflects changes in the inline style",
     "Getting a custom property not in the inline style returns undefined",
     "Getting a list-valued property from inline style returns only the first value",
@@ -1689,7 +1724,8 @@
     "Calling StylePropertyMap.getAll with a property not in the property model returns an empty list",
     "Calling StylePropertyMap.getAll with a valid custom property returns a single element list with the correct entry",
     "Calling StylePropertyMap.getAll with a valid property returns a single element list with the correct entry",
-    "Calling StylePropertyMap.getAll with an unsupported property throws a TypeError"
+    "Calling StylePropertyMap.getAll with an unsupported property throws a TypeError",
+    "StylePropertyMap.getAll is case-insensitive"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/has.tentative.html": [
     "Calling StylePropertyMap.has with a custom property not in the property model returns false",
@@ -1697,6 +1733,7 @@
     "Calling StylePropertyMap.has with a valid custom property returns true",
     "Calling StylePropertyMap.has with a valid list-valued property returns true",
     "Calling StylePropertyMap.has with a valid property in mixed case returns false",
+    "Calling StylePropertyMap.has with a valid property in mixed case returns true",
     "Calling StylePropertyMap.has with a valid property returns true",
     "Calling StylePropertyMap.has with an unsupported property throws a TypeError"
   ],
@@ -1706,6 +1743,8 @@
     "StylePropertyMap iterator returns list-valued properties with the correct CSSStyleValue"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/set-shorthand.html": [
+    "Setting a shorthand with a CSSStyleValue updates inline style",
+    "Setting a shorthand with a string updates inline style",
     "Setting a shorthand with an invalid CSSStyleValue on inline style throws TypeError",
     "Setting a shorthand with an invalid String on inline style throws TypeError"
   ],
@@ -1723,7 +1762,8 @@
     "Setting a non list-valued property with list-valued string throws TypeError",
     "Setting a non list-valued property with multiple arguments throws TypeError",
     "Setting a property with CSSStyleValue or String updates its value",
-    "Setting a property with a CSSStyleValue whose associated property does not match throws TypeError"
+    "Setting a property with a CSSStyleValue whose associated property does not match throws TypeError",
+    "StylePropertyMap.set is case-insensitive"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/invalidation.html": [
     "anonymous-test-0"
@@ -1809,6 +1849,9 @@
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/all.html": [
     "Can set 'all' to CSS-wide keywords: inherit",
+    "Can set 'all' to CSS-wide keywords: initial",
+    "Can set 'all' to CSS-wide keywords: revert",
+    "Can set 'all' to CSS-wide keywords: unset",
     "Can set 'all' to var() references:  var(--A)",
     "Setting 'all' to a flexible length: -3.14fr throws TypeError",
     "Setting 'all' to a flexible length: 0fr throws TypeError",
@@ -1951,6 +1994,7 @@
     "Can set 'animation-duration' to a time: 3.14s",
     "Can set 'animation-duration' to a time: calc(0ms + 0s)",
     "Can set 'animation-duration' to var() references:  var(--A)",
+    "Computed value of animation-duration is auto",
     "Setting 'animation-duration' to a flexible length: -3.14fr throws TypeError",
     "Setting 'animation-duration' to a flexible length: 0fr throws TypeError",
     "Setting 'animation-duration' to a flexible length: 1fr throws TypeError",
@@ -2526,7 +2570,11 @@
     "Setting 'background-size' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/background.html": [
+    "'background' does not support 'green'",
     "Can set 'background' to CSS-wide keywords: inherit",
+    "Can set 'background' to CSS-wide keywords: initial",
+    "Can set 'background' to CSS-wide keywords: revert",
+    "Can set 'background' to CSS-wide keywords: unset",
     "Can set 'background' to var() references:  var(--A)",
     "Setting 'background' to a flexible length: -3.14fr throws TypeError",
     "Setting 'background' to a flexible length: 0fr throws TypeError",
@@ -2987,8 +3035,10 @@
     "Setting 'border-image-width' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/border-radius.html": [
+    "'border-radius' does not support '10% / 50%'",
     "'border-radius' does not support '25% 10%'",
     "'border-radius' does not support '30px'",
+    "'border-radius' does not support '50% 20% / 10% 40%'",
     "Can set 'border-bottom-left-radius' to CSS-wide keywords: inherit",
     "Can set 'border-bottom-left-radius' to CSS-wide keywords: initial",
     "Can set 'border-bottom-left-radius' to CSS-wide keywords: revert",
@@ -3831,9 +3881,14 @@
     "Setting 'clip' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/color-interpolation.html": [
+    "Can set 'color-interpolation' to CSS-wide keywords: inherit",
+    "Can set 'color-interpolation' to CSS-wide keywords: initial",
+    "Can set 'color-interpolation' to CSS-wide keywords: revert",
+    "Can set 'color-interpolation' to CSS-wide keywords: unset",
     "Can set 'color-interpolation' to the 'auto' keyword: auto",
     "Can set 'color-interpolation' to the 'linearrgb' keyword: linearrgb",
     "Can set 'color-interpolation' to the 'srgb' keyword: srgb",
+    "Can set 'color-interpolation' to var() references:  var(--A)",
     "Setting 'color-interpolation' to a flexible length: -3.14fr throws TypeError",
     "Setting 'color-interpolation' to a flexible length: 0fr throws TypeError",
     "Setting 'color-interpolation' to a flexible length: 1fr throws TypeError",
@@ -6823,6 +6878,7 @@
     "Can set 'border-block-color' to CSS-wide keywords: initial",
     "Can set 'border-block-color' to CSS-wide keywords: revert",
     "Can set 'border-block-color' to CSS-wide keywords: unset",
+    "Can set 'border-block-color' to the 'currentcolor' keyword: currentcolor",
     "Can set 'border-block-color' to var() references:  var(--A)",
     "Can set 'border-block-end' to CSS-wide keywords: inherit",
     "Can set 'border-block-end' to CSS-wide keywords: initial",
@@ -6880,11 +6936,16 @@
     "Can set 'border-block-style' to CSS-wide keywords: initial",
     "Can set 'border-block-style' to CSS-wide keywords: revert",
     "Can set 'border-block-style' to CSS-wide keywords: unset",
+    "Can set 'border-block-style' to the 'none' keyword: none",
+    "Can set 'border-block-style' to the 'solid' keyword: solid",
     "Can set 'border-block-style' to var() references:  var(--A)",
     "Can set 'border-block-width' to CSS-wide keywords: inherit",
     "Can set 'border-block-width' to CSS-wide keywords: initial",
     "Can set 'border-block-width' to CSS-wide keywords: revert",
     "Can set 'border-block-width' to CSS-wide keywords: unset",
+    "Can set 'border-block-width' to a length: 0px",
+    "Can set 'border-block-width' to a length: 3.14cm",
+    "Can set 'border-block-width' to a length: calc(0em + 0px)",
     "Can set 'border-block-width' to var() references:  var(--A)",
     "Can set 'border-end-end-radius' to CSS-wide keywords: inherit",
     "Can set 'border-end-end-radius' to CSS-wide keywords: initial",
@@ -6917,6 +6978,7 @@
     "Can set 'border-inline-color' to CSS-wide keywords: initial",
     "Can set 'border-inline-color' to CSS-wide keywords: revert",
     "Can set 'border-inline-color' to CSS-wide keywords: unset",
+    "Can set 'border-inline-color' to the 'currentcolor' keyword: currentcolor",
     "Can set 'border-inline-color' to var() references:  var(--A)",
     "Can set 'border-inline-end' to CSS-wide keywords: inherit",
     "Can set 'border-inline-end' to CSS-wide keywords: initial",
@@ -6974,11 +7036,16 @@
     "Can set 'border-inline-style' to CSS-wide keywords: initial",
     "Can set 'border-inline-style' to CSS-wide keywords: revert",
     "Can set 'border-inline-style' to CSS-wide keywords: unset",
+    "Can set 'border-inline-style' to the 'none' keyword: none",
+    "Can set 'border-inline-style' to the 'solid' keyword: solid",
     "Can set 'border-inline-style' to var() references:  var(--A)",
     "Can set 'border-inline-width' to CSS-wide keywords: inherit",
     "Can set 'border-inline-width' to CSS-wide keywords: initial",
     "Can set 'border-inline-width' to CSS-wide keywords: revert",
     "Can set 'border-inline-width' to CSS-wide keywords: unset",
+    "Can set 'border-inline-width' to a length: 0px",
+    "Can set 'border-inline-width' to a length: 3.14cm",
+    "Can set 'border-inline-width' to a length: calc(0em + 0px)",
     "Can set 'border-inline-width' to var() references:  var(--A)",
     "Can set 'border-start-end-radius' to CSS-wide keywords: inherit",
     "Can set 'border-start-end-radius' to CSS-wide keywords: initial",
@@ -7006,6 +7073,13 @@
     "Can set 'inset-block' to CSS-wide keywords: initial",
     "Can set 'inset-block' to CSS-wide keywords: revert",
     "Can set 'inset-block' to CSS-wide keywords: unset",
+    "Can set 'inset-block' to a length: 0px",
+    "Can set 'inset-block' to a length: 3.14cm",
+    "Can set 'inset-block' to a length: calc(0em + 0px)",
+    "Can set 'inset-block' to a percent: -3.14%",
+    "Can set 'inset-block' to a percent: 0%",
+    "Can set 'inset-block' to a percent: 3.14%",
+    "Can set 'inset-block' to a percent: calc(0% + 0%)",
     "Can set 'inset-block' to var() references:  var(--A)",
     "Can set 'inset-block-end' to CSS-wide keywords: inherit",
     "Can set 'inset-block-end' to CSS-wide keywords: initial",
@@ -7035,6 +7109,13 @@
     "Can set 'inset-inline' to CSS-wide keywords: initial",
     "Can set 'inset-inline' to CSS-wide keywords: revert",
     "Can set 'inset-inline' to CSS-wide keywords: unset",
+    "Can set 'inset-inline' to a length: 0px",
+    "Can set 'inset-inline' to a length: 3.14cm",
+    "Can set 'inset-inline' to a length: calc(0em + 0px)",
+    "Can set 'inset-inline' to a percent: -3.14%",
+    "Can set 'inset-inline' to a percent: 0%",
+    "Can set 'inset-inline' to a percent: 3.14%",
+    "Can set 'inset-inline' to a percent: calc(0% + 0%)",
     "Can set 'inset-inline' to var() references:  var(--A)",
     "Can set 'inset-inline-end' to CSS-wide keywords: inherit",
     "Can set 'inset-inline-end' to CSS-wide keywords: initial",
@@ -7064,6 +7145,13 @@
     "Can set 'margin-block' to CSS-wide keywords: initial",
     "Can set 'margin-block' to CSS-wide keywords: revert",
     "Can set 'margin-block' to CSS-wide keywords: unset",
+    "Can set 'margin-block' to a length: 0px",
+    "Can set 'margin-block' to a length: 3.14cm",
+    "Can set 'margin-block' to a length: calc(0em + 0px)",
+    "Can set 'margin-block' to a percent: -3.14%",
+    "Can set 'margin-block' to a percent: 0%",
+    "Can set 'margin-block' to a percent: 3.14%",
+    "Can set 'margin-block' to a percent: calc(0% + 0%)",
     "Can set 'margin-block' to var() references:  var(--A)",
     "Can set 'margin-block-end' to CSS-wide keywords: inherit",
     "Can set 'margin-block-end' to CSS-wide keywords: initial",
@@ -7093,6 +7181,13 @@
     "Can set 'margin-inline' to CSS-wide keywords: initial",
     "Can set 'margin-inline' to CSS-wide keywords: revert",
     "Can set 'margin-inline' to CSS-wide keywords: unset",
+    "Can set 'margin-inline' to a length: 0px",
+    "Can set 'margin-inline' to a length: 3.14cm",
+    "Can set 'margin-inline' to a length: calc(0em + 0px)",
+    "Can set 'margin-inline' to a percent: -3.14%",
+    "Can set 'margin-inline' to a percent: 0%",
+    "Can set 'margin-inline' to a percent: 3.14%",
+    "Can set 'margin-inline' to a percent: calc(0% + 0%)",
     "Can set 'margin-inline' to var() references:  var(--A)",
     "Can set 'margin-inline-end' to CSS-wide keywords: inherit",
     "Can set 'margin-inline-end' to CSS-wide keywords: initial",
@@ -7122,6 +7217,12 @@
     "Can set 'padding-block' to CSS-wide keywords: initial",
     "Can set 'padding-block' to CSS-wide keywords: revert",
     "Can set 'padding-block' to CSS-wide keywords: unset",
+    "Can set 'padding-block' to a length: 0px",
+    "Can set 'padding-block' to a length: 3.14cm",
+    "Can set 'padding-block' to a length: calc(0em + 0px)",
+    "Can set 'padding-block' to a percent: 0%",
+    "Can set 'padding-block' to a percent: 3.14%",
+    "Can set 'padding-block' to a percent: calc(0% + 0%)",
     "Can set 'padding-block' to var() references:  var(--A)",
     "Can set 'padding-block-end' to CSS-wide keywords: inherit",
     "Can set 'padding-block-end' to CSS-wide keywords: initial",
@@ -7149,6 +7250,12 @@
     "Can set 'padding-inline' to CSS-wide keywords: initial",
     "Can set 'padding-inline' to CSS-wide keywords: revert",
     "Can set 'padding-inline' to CSS-wide keywords: unset",
+    "Can set 'padding-inline' to a length: 0px",
+    "Can set 'padding-inline' to a length: 3.14cm",
+    "Can set 'padding-inline' to a length: calc(0em + 0px)",
+    "Can set 'padding-inline' to a percent: 0%",
+    "Can set 'padding-inline' to a percent: 3.14%",
+    "Can set 'padding-inline' to a percent: calc(0% + 0%)",
     "Can set 'padding-inline' to var() references:  var(--A)",
     "Can set 'padding-inline-end' to CSS-wide keywords: inherit",
     "Can set 'padding-inline-end' to CSS-wide keywords: initial",
@@ -9368,6 +9475,10 @@
     "Setting 'perspective' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/pointer-events.html": [
+    "Can set 'pointer-events' to CSS-wide keywords: inherit",
+    "Can set 'pointer-events' to CSS-wide keywords: initial",
+    "Can set 'pointer-events' to CSS-wide keywords: revert",
+    "Can set 'pointer-events' to CSS-wide keywords: unset",
     "Can set 'pointer-events' to the 'all' keyword: all",
     "Can set 'pointer-events' to the 'bounding-box' keyword: bounding-box",
     "Can set 'pointer-events' to the 'fill' keyword: fill",
@@ -9378,6 +9489,7 @@
     "Can set 'pointer-events' to the 'visiblefill' keyword: visiblefill",
     "Can set 'pointer-events' to the 'visiblepainted' keyword: visiblepainted",
     "Can set 'pointer-events' to the 'visiblestroke' keyword: visiblestroke",
+    "Can set 'pointer-events' to var() references:  var(--A)",
     "Setting 'pointer-events' to a flexible length: -3.14fr throws TypeError",
     "Setting 'pointer-events' to a flexible length: 0fr throws TypeError",
     "Setting 'pointer-events' to a flexible length: 1fr throws TypeError",
@@ -9407,6 +9519,9 @@
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/position-visibility.html": [
     "Can set 'position-visibility' to CSS-wide keywords: inherit",
+    "Can set 'position-visibility' to CSS-wide keywords: initial",
+    "Can set 'position-visibility' to CSS-wide keywords: revert",
+    "Can set 'position-visibility' to CSS-wide keywords: unset",
     "Can set 'position-visibility' to the 'always' keyword: always",
     "Can set 'position-visibility' to the 'anchors-valid' keyword: anchors-valid",
     "Can set 'position-visibility' to the 'anchors-visible' keyword: anchors-visible",
@@ -10576,6 +10691,10 @@
     "Setting 'stop-color' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/stop-opacity.html": [
+    "Can set 'stop-opacity' to CSS-wide keywords: inherit",
+    "Can set 'stop-opacity' to CSS-wide keywords: initial",
+    "Can set 'stop-opacity' to CSS-wide keywords: revert",
+    "Can set 'stop-opacity' to CSS-wide keywords: unset",
     "Can set 'stop-opacity' to a number: -3.14",
     "Can set 'stop-opacity' to a number: 0",
     "Can set 'stop-opacity' to a number: 3.14",
@@ -10584,6 +10703,7 @@
     "Can set 'stop-opacity' to a percent: 0%",
     "Can set 'stop-opacity' to a percent: 3.14%",
     "Can set 'stop-opacity' to a percent: calc(0% + 0%)",
+    "Can set 'stop-opacity' to var() references:  var(--A)",
     "Setting 'stop-opacity' to a flexible length: -3.14fr throws TypeError",
     "Setting 'stop-opacity' to a flexible length: 0fr throws TypeError",
     "Setting 'stop-opacity' to a flexible length: 1fr throws TypeError",
@@ -11365,6 +11485,9 @@
     "'text-emphasis-position' does not support setting 'over right'",
     "'text-emphasis-position' does not support setting 'under right'",
     "Can set 'text-emphasis-position' to CSS-wide keywords: inherit",
+    "Can set 'text-emphasis-position' to CSS-wide keywords: initial",
+    "Can set 'text-emphasis-position' to CSS-wide keywords: revert",
+    "Can set 'text-emphasis-position' to CSS-wide keywords: unset",
     "Can set 'text-emphasis-position' to the 'over' keyword: over",
     "Can set 'text-emphasis-position' to the 'under' keyword: under",
     "Can set 'text-emphasis-position' to var() references:  var(--A)",
@@ -12712,10 +12835,21 @@
     "Avoid masking differences on 'white-space' due to declaration changes",
     "Test changing 'background-color' value to become a css variable",
     "Test changing 'color' value to become a css variable",
-    "Test changing 'white-space' value to become a css variable"
+    "Test changing 'white-space' value to become a css variable",
+    "Test declaration changes on 'background-color' as variable",
+    "Test declaration changes on 'color' as variable",
+    "Test declaration changes on 'white-space' as variable"
+  ],
+  "submodules/web-platform-tests/css/css-variables/css-variable-change-style-002.html": [
+    "Declaration changes on 'background-color' propagate to all variable references",
+    "Declaration changes on 'color' propagate to all variable references",
+    "Declaration changes on 'white-space' propagate to all variable references"
   ],
   "submodules/web-platform-tests/css/css-variables/revert-in-fallback.html": [
-    "var(--unknown, revert) in custom property"
+    "var(--unknown, revert) in custom property",
+    "var(--unknown, revert) in longhand",
+    "var(--unknown, revert) in shorthand",
+    "var(--unknown, revert) in shorthand observed via longhand"
   ],
   "submodules/web-platform-tests/css/css-variables/revert-layer-in-fallback.html": [
     "var(--unknown, revert-layer) in custom property",
@@ -12807,6 +12941,12 @@
     "revert-layer after var() substitution takes effect on the cascade"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-css-wide-keywords.html": [
+    "`inherit` as a `var()` fallback for a non-inheriting registered custom property",
+    "`inherit` as a `var()` fallback for an inheriting registered custom property",
+    "`inherit` as a `var()` fallback for an unregistered custom property",
+    "`inherit` as a value for a non-inheriting registered custom property",
+    "`inherit` as a value for an inheriting registered custom property",
+    "`inherit` as a value for an unregistered custom property",
     "`initial` as a `var()` fallback for an unregistered custom property",
     "`initial` as a value for an unregistered custom property",
     "`revert-layer` as a `var()` fallback for a non-inheriting registered custom property",
@@ -12814,7 +12954,24 @@
     "`revert-layer` as a `var()` fallback for an unregistered custom property",
     "`revert-layer` as a value for a non-inheriting registered custom property",
     "`revert-layer` as a value for an inheriting registered custom property",
-    "`revert-layer` as a value for an unregistered custom property"
+    "`revert-layer` as a value for an unregistered custom property",
+    "`revert` as a `var()` fallback for an inheriting registered custom property",
+    "`revert` as a `var()` fallback for an unregistered custom property",
+    "`revert` as a value for an inheriting registered custom property",
+    "`revert` as a value for an unregistered custom property",
+    "`unset` as a `var()` fallback for an inheriting registered custom property",
+    "`unset` as a `var()` fallback for an unregistered custom property",
+    "`unset` as a value for an inheriting registered custom property",
+    "`unset` as a value for an unregistered custom property"
+  ],
+  "submodules/web-platform-tests/css/css-variables/variable-cssText.html": [
+    "target1",
+    "target2",
+    "target3",
+    "target4",
+    "target5",
+    "target7",
+    "target8"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-cycles.html": [
     "Cycle in unused fallback",
@@ -12983,12 +13140,22 @@
     "Testing 'text-decoration-style'.",
     "Testing 'visibility'."
   ],
+  "submodules/web-platform-tests/css/css-variables/variable-pseudo-element.html": [
+    "div1",
+    "div2"
+  ],
   "submodules/web-platform-tests/css/css-variables/variable-recalc-with-initial.html": [
     "anonymous-test-0"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-cssom.html": [
     "Verify correct results using CSSOM",
     "Verify correct results with CSSOM overriding markup-set values"
+  ],
+  "submodules/web-platform-tests/css/css-variables/variable-reference-name-substitution-attr-taint.html": [
+    "attr()-taint reaches the name argument through another custom property",
+    "attr()-tainted name argument makes an image-set() declaration invalid at computed-value time",
+    "attr()-tainted name argument taints a url() value",
+    "attr()-tainted name argument taints the value even when an earlier value was already tainted"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-name-substitution.html": [
     "-- as substituted name falls back",
@@ -12997,6 +13164,7 @@
     "fallback of an unparsed name is not syntax checked",
     "indirect cycle through the name argument",
     "invalid substituted name falls back",
+    "invalid substituted name without fallback is invalid at computed-value time",
     "multi-token substituted name falls back",
     "name argument substituting to nothing falls back",
     "string substituted name falls back",
@@ -13011,16 +13179,21 @@
     "anonymous-test-0"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-shorthands.html": [
+    "target1 margin",
     "target1 margin-bottom",
     "target1 margin-left",
     "target1 margin-right",
     "target1 margin-top",
+    "target2 margin",
     "target2 margin-bottom",
     "target2 margin-left",
     "target2 margin-right",
+    "target2 margin-top",
+    "target3 margin",
     "target3 margin-bottom",
     "target3 margin-left",
     "target3 margin-right",
+    "target3 margin-top",
     "target4 background"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-variable.html": [
@@ -13029,6 +13202,7 @@
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference.html": [
     "width: var(--prop 20px);",
+    "width: var(--prop) !important;",
     "width: var(--prop);",
     "width: var(--prop, );",
     "width: var(--prop, 20px);",
@@ -13074,6 +13248,15 @@
     "Test that !important on a property that has a variable reference can overwrite !important",
     "Test that var reference doesn’t overwrite !important"
   ],
+  "submodules/web-platform-tests/css/css-variables/variable-substitution-filters.html": [
+    "blur",
+    "brightness",
+    "contrast",
+    "grayscale",
+    "invert",
+    "saturate",
+    "sepia"
+  ],
   "submodules/web-platform-tests/css/css-variables/variable-substitution-shorthands.html": [
     "target1 margin-bottom",
     "target1 margin-left",
@@ -13087,11 +13270,20 @@
     "target3 margin-left",
     "target3 margin-right",
     "target3 margin-top",
+    "target4 margin-bottom",
+    "target4 margin-left",
+    "target4 margin-right",
+    "target4 margin-top",
     "target9 border-bottom-width",
     "target9 border-right-width",
     "target9 border-top-width"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-substitution-variable-declaration.html": [
+    "target1 --var2",
+    "target1 margin-bottom",
+    "target1 margin-left",
+    "target1 margin-right",
+    "target1 margin-top",
     "target10 --varA",
     "target10 --varB",
     "target2 --var1",
@@ -13175,7 +13367,9 @@
     "Object.prototype.toString applied to the namespace object"
   ],
   "submodules/web-platform-tests/css/cssom/css-style-attr-decl-block.html": [
-    "Expansion of all:unset and all:revert treated identically"
+    "Changes to style attribute should reflect on CSS declaration block",
+    "Expansion of all:unset and all:revert treated identically",
+    "Style attribute should create CSS declaration block based on its content"
   ],
   "submodules/web-platform-tests/css/cssom/css-style-attribute-modifications.html": [
     "Mutating the style declaration doesn't remove the style attribute"
@@ -13243,6 +13437,9 @@
     "indexed getter, length",
     "name, cssRules, appendRule, findRule, deleteRule"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSNamespaceRule.html": [
+    "anonymous-test-0"
+  ],
   "submodules/web-platform-tests/css/cssom/cssom-cssstyledeclaration-set.html": [
     "CSSStyleDeclaration on HTMLElement represents inline style changes"
   ],
@@ -13257,7 +13454,11 @@
     "All aliases can serialize target property set to its initial value",
     "All properties (except 'all') can serialize their initial value (specified)",
     "All shorthands (except 'all') can serialize their longhands set to their initial value",
-    "Can't serialize shorthand set to initial value when some longhand is missing"
+    "All shorthands can serialize their longhands set to 'initial'",
+    "Can't serialize shorthand set to 'initial' when some longhand is missing",
+    "Can't serialize shorthand set to initial value when some longhand is missing",
+    "Can't serialize shorthand when longhands are set to different css-wide keywords",
+    "Can't serialize shorthand when longhands have different priority"
   ],
   "submodules/web-platform-tests/css/cssom/cssom-pagerule.html": [
     "Cannot set cssText to invalid pseudo page - return default @page { }",
@@ -13369,15 +13570,39 @@
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-all-shorthand.html": [
     "getPropertyValue('all') returns css-wide keyword if possible",
+    "getPropertyValue('all') returns css-wide keyword when 'all' overrides prior property",
     "getPropertyValue('all') returns css-wide keyword when 'all' overrides prior property via insertRule",
+    "getPropertyValue('all') returns css-wide keyword when 'all' overrides shorthand 'margin'",
     "getPropertyValue('all') returns css-wide keyword when 'all' overrides shorthand 'margin' via insertRule",
+    "getPropertyValue('all') returns css-wide keyword when 'all' overrides shorthand 'margin' via setProperty",
     "getPropertyValue('all') returns empty string",
+    "getPropertyValue('all') returns empty string when property overridden after 'all'",
+    "getPropertyValue('all') returns empty string when property overridden after 'all' via insertRule",
+    "getPropertyValue('all') returns empty string when property overridden after 'all' via setProperty",
+    "getPropertyValue('all') returns empty string when single property overridden after 'all' via insertRule",
+    "getPropertyValue('all') returns empty string when single property overriden",
+    "getPropertyValue('all') returns empty string when single property overriden via setProperty",
+    "getPropertyValue('all') returns empty string with shorthand 'margin'",
+    "getPropertyValue('all') returns empty string with shorthand 'margin' via insertRule",
+    "getPropertyValue('all') returns empty string with shorthand 'margin' via setProperty",
+    "getPropertyValue('all') returns later 'all' value when it overrides earlier 'all' and properties",
     "getPropertyValue('all') returns later 'all' value when it overrides earlier 'all' and properties via insertRule",
-    "removeProperty('all') removes an 'all' declaration"
+    "getPropertyValue('margin') returns all's value when 'all' after 'margin-top'",
+    "getPropertyValue('margin') returns all's value when 'all' is redeclared after margin longhands",
+    "getPropertyValue('margin') returns all's value when all of 'margin's longhands are overridden by 'all'",
+    "getPropertyValue('margin') returns empty string when some of 'margin's longhands are overridden by 'all'",
+    "getPropertyValue('margin') returns serialized string when longhands are after 'all'",
+    "removeProperty('all') removes all declarations affected by 'all'",
+    "removeProperty('all') removes an 'all' declaration",
+    "setProperty('all') overrides existing properties and earlier 'all'",
+    "setProperty('all') sets all property values"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-csstext-all-shorthand.html": [
     "'all' shorthand alone",
     "'all' shorthand with 'direction' and 'unicode-bidi'",
+    "'all' shorthand with 'width' and 'height'",
+    "'all' shorthand with 'width', 'height' and custom properties",
+    "'all' shorthand with all longhands",
     "all:initial should not exclude custom from cssText"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-csstext-final-delimiter.html": [
@@ -13387,8 +13612,10 @@
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-csstext.html": [
     "another cssText order (non-alphabetical order)",
+    "cssText on computed style declaration returns the empty string",
     "cssText order",
-    "use rgb"
+    "use rgb",
+    "whitespaces in value"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-custom-properties.html": [
     "Custom properties are included in computed style"
@@ -13420,7 +13647,11 @@
     "anonymous-test-0"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-removeProperty-all.html": [
+    "anonymous-test-0",
     "anonymous-test-1"
+  ],
+  "submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-declarations.html": [
+    "property setter should update only the declaration being set"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-form-controls.html": [
     "button element",
@@ -13463,6 +13694,7 @@
     "CSSStyleRule: selectorText value: |#no-match| isMatch: false",
     "CSSStyleRule: selectorText value: |*:not(:active)| isMatch: true",
     "CSSStyleRule: selectorText value: |*| isMatch: true",
+    "CSSStyleRule: selectorText value: |*|*| isMatch: true",
     "CSSStyleRule: selectorText value: |*|a| isMatch: false",
     "CSSStyleRule: selectorText value: |*|div| isMatch: true",
     "CSSStyleRule: selectorText value: |.style1| isMatch: true",
@@ -13608,6 +13840,7 @@
     "Computed: mixed font-family list serialization",
     "Computed: multi-word family name serializes unquoted",
     "Computed: quoted 'serif' stays quoted",
+    "Computed: quoted multi-word name normalizes to unquoted",
     "Serialization of <generic-family>",
     "Serialization of NonGenericFontFamilyName,-webkit-body,-webkit-standard,-webkit-pictograph,emoji,fangsong,BlinkMacSystemFont",
     "Serialization of prefixed -webkit-<generic-family>",
@@ -13623,7 +13856,11 @@
     "Specified: three-word family name serializes unquoted"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-detached-subtree.html": [
+    "getComputedStyle returns no style for descendant outside the flat tree",
     "getComputedStyle returns no style for detached element",
+    "getComputedStyle returns no style for element in non-rendered iframe (display: none)",
+    "getComputedStyle returns no style for element in non-rendered iframe (display: none) from iframe's window",
+    "getComputedStyle returns no style for element outside the flat tree",
     "getComputedStyle returns no style for shadow tree outside of flattened tree"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-display-none-001.html": [
@@ -13636,7 +13873,11 @@
     "getComputedStyle gets invalidated in display: none subtrees due to attribute mutations"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-getter-v-properties.tentative.html": [
-    "border"
+    "border",
+    "font-size",
+    "margin-top",
+    "max-width",
+    "width"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-absolute-roundtrip.html": [
     "Fixed-length bottom property value should roundtrip",
@@ -13658,18 +13899,25 @@
     "Computed style properties should be sorted lexicographically"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-pseudo-checkmark.html": [
-    "Resolution of width is correct for pseudo-element (due to double-colon)"
+    "Resolution of width is correct for pseudo-element (due to double-colon)",
+    "Resolution of width is correct when pseudo-element argument is ignored (due to no colon)",
+    "Resolution of width is correct when pseudo-element argument is ignored (due to single-colon)"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-pseudo-picker-icon.html": [
-    "Resolution of width is correct for pseudo-element (due to double-colon)"
+    "Resolution of width is correct for pseudo-element (due to double-colon)",
+    "Resolution of width is correct when pseudo-element argument is ignored (due to no colon)",
+    "Resolution of width is correct when pseudo-element argument is ignored (due to single-colon)"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-pseudo-picker.html": [
+    "::picker(select) on non-select element resolves the style",
     "::picker(select) on non-select element with no rules resolves the style",
+    "::picker(select) returns picker element style",
     "Invalid pseudo-element should return empty style: ::picker",
     "Invalid pseudo-element should return empty style: ::picker( )",
     "Invalid pseudo-element should return empty style: ::picker()",
     "Invalid pseudo-element should return empty style: ::picker(div)",
-    "Invalid pseudo-element should return empty style: ::picker(select)a"
+    "Invalid pseudo-element should return empty style: ::picker(select)a",
+    "Invalid pseudo-element should return empty style: :picker(select)"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-pseudo-with-argument.html": [
     "This pseudo-element should not parse: ::before(test)",
@@ -13688,13 +13936,42 @@
     "This pseudo-element should not parse: :view-transition-group(name)",
     "This pseudo-element should not parse: :view-transition-image-pair(name)",
     "This pseudo-element should not parse: :view-transition-new(name)",
-    "This pseudo-element should not parse: :view-transition-old(name)"
+    "This pseudo-element should not parse: :view-transition-old(name)",
+    "This pseudo-element should parse: ::highlight( n\\61me )",
+    "This pseudo-element should parse: ::highlight( name",
+    "This pseudo-element should parse: ::highlight(\\nname",
+    "This pseudo-element should parse: ::highlight(name",
+    "This pseudo-element should parse: ::highlight(name)"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-pseudo.html": [
     "::file-selector-button resolves to the file input button element",
     "CSSStyleDeclaration is immutable",
+    "Dynamically change to display: contents on pseudo-elements",
+    "Item-based blockification of nonexistent pseudo-elements",
+    "Item-based blockification of pseudo-elements",
     "Prefixed ::-webkit-file-upload-button does not resolve in getComputedStyle",
-    "Resolution of width is correct when pseudo-element argument is invalid (due to a trailing token)"
+    "Pseudo-elements can use the full range of CSS syntax",
+    "Resolution of nonexistent pseudo-element styles",
+    "Resolution of pseudo-element styles in display: none elements",
+    "Resolution of width is correct for ::before and ::after pseudo-elements (double-colon)",
+    "Resolution of width is correct for ::before and ::after pseudo-elements (single-colon)",
+    "Resolution of width is correct for ::before and ::after pseudo-elements of display: contents elements",
+    "Resolution of width is correct when pseudo-element argument is ignored (due to no colon)",
+    "Resolution of width is correct when pseudo-element argument is invalid (due to a trailing token)",
+    "Unknown pseudo-element with a known identifier: backdrop",
+    "Unknown pseudo-element with a known identifier: file-selector-button",
+    "Unknown pseudo-element with a known identifier: grammar-error",
+    "Unknown pseudo-element with a known identifier: highlight(name)",
+    "Unknown pseudo-element with a known identifier: marker",
+    "Unknown pseudo-element with a known identifier: placeholder",
+    "Unknown pseudo-element with a known identifier: spelling-error",
+    "Unknown pseudo-element with a known identifier: view-transition",
+    "Unknown pseudo-element with a known identifier: view-transition-group(name)",
+    "Unknown pseudo-element with a known identifier: view-transition-image-pair(name)",
+    "Unknown pseudo-element with a known identifier: view-transition-new(name)",
+    "Unknown pseudo-element with a known identifier: view-transition-old(name)",
+    "Unknown pseudo-elements",
+    "display: contents on pseudo-elements"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-colors.html": [
     "The resolved value for 'background-color' is the used value",
@@ -13713,6 +13990,24 @@
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-min-max-clamping.html": [
     "Resolved value of width / height when there's no used value isn't clamped by min/max properties"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-min-size-auto.html": [
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-box\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-degenerate-aspect-ratio\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-two-part-degenerate-aspect-ratio\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-two-part-valid-aspect-ratio\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-valid-aspect-ratio\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-subtree-flex-item\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-subtree-grid-item\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-subtree-valid-aspect-ratio\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-valid-aspect-ratio\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"flex-item-column\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"flex-item-row\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"grid-item\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-box\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-with-degenerate-aspect-ratio\"",
+    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-with-valid-aspect-ratio\""
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-width-scroll.tentative.html": [
     "getComputedStyle() round-trips in presence of scrollbars"
@@ -13761,7 +14056,8 @@
     "Load event doesn't fire on removed link"
   ],
   "submodules/web-platform-tests/css/cssom/inline-style-001.html": [
-    "CSSStyleDeclaration_accessible"
+    "CSSStyleDeclaration_accessible",
+    "read"
   ],
   "submodules/web-platform-tests/css/cssom/insertRule-charset-no-index.html": [
     "insertRule with charset and omitted index argument",
@@ -13871,6 +14167,8 @@
     "Check that color changes correctly after shadow stylesheet selector and #container class is changed."
   ],
   "submodules/web-platform-tests/css/cssom/serialization-CSSDeclaration-with-important.html": [
+    "Inline style declaration with whitespace between '!' and 'important'.",
+    "Inline style declaration without whitespace between '!' and 'important'.",
     "Style set dynamically via cssText with whitespace between '!' and 'important'.",
     "Style set dynamically via cssText without whitespace between '!' and 'important'."
   ],
@@ -13927,6 +14225,12 @@
     "Type selector with any namespace followed by pseudo class",
     "Type selector with any namespace followed by pseudo element",
     "Type selector with namespace",
+    "Type selector with namespace equal to default namespace",
+    "Type selector with namespace equal to default namespace followed by attribute selector",
+    "Type selector with namespace equal to default namespace followed by class",
+    "Type selector with namespace equal to default namespace followed by id",
+    "Type selector with namespace equal to default namespace followed by pseudo class",
+    "Type selector with namespace equal to default namespace followed by pseudo element",
     "Type selector with namespace followed by attribute selector",
     "Type selector with namespace followed by class",
     "Type selector with namespace followed by id",
@@ -13944,13 +14248,36 @@
     "Universal selector followed by id",
     "Universal selector followed by pseudo class",
     "Universal selector followed by pseudo element",
+    "Universal selector in any namespace",
+    "Universal selector in any namespace followed by attribute selector",
+    "Universal selector in any namespace followed by class",
+    "Universal selector in any namespace followed by id",
+    "Universal selector in any namespace followed by pseudo class",
+    "Universal selector in any namespace followed by pseudo element",
     "Universal selector with namespace",
+    "Universal selector with namespace equal to default namespace",
+    "Universal selector with namespace equal to default namespace followed by attribute selector",
+    "Universal selector with namespace equal to default namespace followed by class",
+    "Universal selector with namespace equal to default namespace followed by id",
+    "Universal selector with namespace equal to default namespace followed by pseudo class",
+    "Universal selector with namespace equal to default namespace followed by pseudo element",
     "Universal selector with namespace followed by attribute selector",
     "Universal selector with namespace followed by class",
     "Universal selector with namespace followed by id",
     "Universal selector with namespace followed by pseudo class",
     "Universal selector with namespace followed by pseudo element",
-    "Universal selector without a namespace"
+    "Universal selector without a namespace",
+    "Universal selector without a namespace followed by attribute selector",
+    "Universal selector without a namespace followed by class",
+    "Universal selector without a namespace followed by id",
+    "Universal selector without a namespace followed by pseudo class",
+    "Universal selector without a namespace followed by pseudo element"
+  ],
+  "submodules/web-platform-tests/css/cssom/serialize-variable-reference.html": [
+    "Longhand with variable preserves original serialization but trims whitespace: without whitespace",
+    "Longhand with variable preserves original serialization: with whitespace",
+    "Shorthand with variable preserves original serialization but trims whitespace: without whitespace",
+    "Shorthand with variable preserves original serialization: with whitespace"
   ],
   "submodules/web-platform-tests/css/cssom/set-selector-text-attachment.html": [
     "Modifying property value invalidates style, even after selectorText mutation"
@@ -13962,11 +14289,18 @@
   ],
   "submodules/web-platform-tests/css/cssom/shorthand-serialization.html": [
     "Shorthand serialization with 'initial' value.",
+    "Shorthand serialization with shorthand and longhands mixed.",
     "Shorthand serialization with variable and variable from other shorthand."
   ],
   "submodules/web-platform-tests/css/cssom/shorthand-values.html": [
+    "The serialization of border-width: 1px; should be canonical.",
+    "The serialization of border: 1px solid red; should be canonical.",
     "The serialization of font-family: sans-serif; line-height: 2em; font-size: 3em; font-style: italic; font-weight: bold; should be canonical.",
-    "The serialization of list-style-type: lower-alpha; should be canonical."
+    "The serialization of list-style-type: lower-alpha; should be canonical.",
+    "The serialization of margin-top: 1px; margin-right: 2px; margin-bottom: 3px; margin-left: 4px; should be canonical.",
+    "The serialization of overflow-x: scroll; overflow-y: hidden; should be canonical.",
+    "The serialization of overflow-x: scroll; overflow-y: scroll; should be canonical.",
+    "The serialization of padding-top: 1px; padding-right: 2px; padding-bottom: 3px; padding-left: 4px; should be canonical."
   ],
   "submodules/web-platform-tests/css/cssom/style-attr-update-across-documents.html": [
     "Changing the style of a node that switched documents works"
@@ -14737,7 +15071,8 @@
     "\":focus-visible\" should be a valid selector"
   ],
   "submodules/web-platform-tests/css/selectors/focus-visible-023.html": [
-    "\":focus-visible\" should be a valid selector"
+    "\":focus-visible\" should be a valid selector",
+    ":focus-visible stop matching after blur"
   ],
   "submodules/web-platform-tests/css/selectors/focus-visible-024.html": [
     "\":focus-visible\" should be a valid selector"
@@ -14914,188 +15249,188 @@
     "anonymous-test-0"
   ],
   "submodules/web-platform-tests/css/selectors/heading.html": [
-    "<h1 data-expect-match=\"1\"></h1> :heading",
-    "<h1 data-expect-match=\"1\"></h1> :heading(1)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(2)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(3)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(4)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(5)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(6)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(7)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(8)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(9)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(0)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(0, 1, 2)",
-    "<h1 data-expect-match=\"1\"></h1> :heading(6, 7)",
-    "<h2 data-expect-match=\"2\"></h2> :heading",
-    "<h2 data-expect-match=\"2\"></h2> :heading(1)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(2)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(3)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(4)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(5)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(6)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(7)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(8)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(9)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(0)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(0, 1, 2)",
-    "<h2 data-expect-match=\"2\"></h2> :heading(6, 7)",
-    "<h3 data-expect-match=\"3\"></h3> :heading",
-    "<h3 data-expect-match=\"3\"></h3> :heading(1)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(2)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(3)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(4)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(5)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(6)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(7)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(8)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(9)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(0)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(0, 1, 2)",
-    "<h3 data-expect-match=\"3\"></h3> :heading(6, 7)",
-    "<h4 data-expect-match=\"4\"></h4> :heading",
-    "<h4 data-expect-match=\"4\"></h4> :heading(1)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(2)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(3)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(4)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(5)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(6)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(7)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(8)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(9)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(0)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(0, 1, 2)",
-    "<h4 data-expect-match=\"4\"></h4> :heading(6, 7)",
-    "<h5 data-expect-match=\"5\"></h5> :heading",
-    "<h5 data-expect-match=\"5\"></h5> :heading(1)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(2)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(3)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(4)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(5)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(6)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(7)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(8)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(9)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(0)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(0, 1, 2)",
-    "<h5 data-expect-match=\"5\"></h5> :heading(6, 7)",
-    "<h6 data-expect-match=\"6\"></h6> :heading",
-    "<h6 data-expect-match=\"6\"></h6> :heading(1)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(2)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(3)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(4)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(5)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(6)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(7)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(8)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(9)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(0)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(0, 1, 2)",
-    "<h6 data-expect-match=\"6\"></h6> :heading(6, 7)",
-    "<h7 data-expect-match=\"\"></h7> :heading",
-    "<h7 data-expect-match=\"\"></h7> :heading(1)",
-    "<h7 data-expect-match=\"\"></h7> :heading(2)",
-    "<h7 data-expect-match=\"\"></h7> :heading(3)",
-    "<h7 data-expect-match=\"\"></h7> :heading(4)",
-    "<h7 data-expect-match=\"\"></h7> :heading(5)",
-    "<h7 data-expect-match=\"\"></h7> :heading(6)",
-    "<h7 data-expect-match=\"\"></h7> :heading(7)",
-    "<h7 data-expect-match=\"\"></h7> :heading(8)",
-    "<h7 data-expect-match=\"\"></h7> :heading(9)",
-    "<h7 data-expect-match=\"\"></h7> :heading(0)",
-    "<h7 data-expect-match=\"\"></h7> :heading(0, 1, 2)",
-    "<h7 data-expect-match=\"\"></h7> :heading(6, 7)",
-    "<h8 data-expect-match=\"\"></h8> :heading",
-    "<h8 data-expect-match=\"\"></h8> :heading(1)",
-    "<h8 data-expect-match=\"\"></h8> :heading(2)",
-    "<h8 data-expect-match=\"\"></h8> :heading(3)",
-    "<h8 data-expect-match=\"\"></h8> :heading(4)",
-    "<h8 data-expect-match=\"\"></h8> :heading(5)",
-    "<h8 data-expect-match=\"\"></h8> :heading(6)",
-    "<h8 data-expect-match=\"\"></h8> :heading(7)",
-    "<h8 data-expect-match=\"\"></h8> :heading(8)",
-    "<h8 data-expect-match=\"\"></h8> :heading(9)",
-    "<h8 data-expect-match=\"\"></h8> :heading(0)",
-    "<h8 data-expect-match=\"\"></h8> :heading(0, 1, 2)",
-    "<h8 data-expect-match=\"\"></h8> :heading(6, 7)",
-    "<h9 data-expect-match=\"\"></h9> :heading",
-    "<h9 data-expect-match=\"\"></h9> :heading(1)",
-    "<h9 data-expect-match=\"\"></h9> :heading(2)",
-    "<h9 data-expect-match=\"\"></h9> :heading(3)",
-    "<h9 data-expect-match=\"\"></h9> :heading(4)",
-    "<h9 data-expect-match=\"\"></h9> :heading(5)",
-    "<h9 data-expect-match=\"\"></h9> :heading(6)",
-    "<h9 data-expect-match=\"\"></h9> :heading(7)",
-    "<h9 data-expect-match=\"\"></h9> :heading(8)",
-    "<h9 data-expect-match=\"\"></h9> :heading(9)",
-    "<h9 data-expect-match=\"\"></h9> :heading(0)",
-    "<h9 data-expect-match=\"\"></h9> :heading(0, 1, 2)",
-    "<h9 data-expect-match=\"\"></h9> :heading(6, 7)",
     "<h0 data-expect-match=\"\"></h0> :heading",
+    "<h0 data-expect-match=\"\"></h0> :heading(0)",
+    "<h0 data-expect-match=\"\"></h0> :heading(0, 1, 2)",
     "<h0 data-expect-match=\"\"></h0> :heading(1)",
     "<h0 data-expect-match=\"\"></h0> :heading(2)",
     "<h0 data-expect-match=\"\"></h0> :heading(3)",
     "<h0 data-expect-match=\"\"></h0> :heading(4)",
     "<h0 data-expect-match=\"\"></h0> :heading(5)",
     "<h0 data-expect-match=\"\"></h0> :heading(6)",
+    "<h0 data-expect-match=\"\"></h0> :heading(6, 7)",
     "<h0 data-expect-match=\"\"></h0> :heading(7)",
     "<h0 data-expect-match=\"\"></h0> :heading(8)",
     "<h0 data-expect-match=\"\"></h0> :heading(9)",
-    "<h0 data-expect-match=\"\"></h0> :heading(0)",
-    "<h0 data-expect-match=\"\"></h0> :heading(0, 1, 2)",
-    "<h0 data-expect-match=\"\"></h0> :heading(6, 7)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading",
+    "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(0)",
+    "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(0, 1, 2)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(1)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(2)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(3)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(4)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(5)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(6)",
+    "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(6, 7)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(7)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(8)",
     "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(9)",
-    "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(0)",
-    "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(0, 1, 2)",
-    "<h1 data-expect-match=\"1\" aria-level=\"2\"></h1> :heading(6, 7)",
+    "<h1 data-expect-match=\"1\"></h1> :heading",
+    "<h1 data-expect-match=\"1\"></h1> :heading(0)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(0, 1, 2)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(1)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(2)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(3)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(4)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(5)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(6)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(6, 7)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(7)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(8)",
+    "<h1 data-expect-match=\"1\"></h1> :heading(9)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading",
+    "<h1 data-expect-match=\"1\"></h1> in section :heading(0)",
+    "<h1 data-expect-match=\"1\"></h1> in section :heading(0, 1, 2)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(1)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(2)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(3)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(4)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(5)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(6)",
+    "<h1 data-expect-match=\"1\"></h1> in section :heading(6, 7)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(7)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(8)",
     "<h1 data-expect-match=\"1\"></h1> in section :heading(9)",
-    "<h1 data-expect-match=\"1\"></h1> in section :heading(0)",
-    "<h1 data-expect-match=\"1\"></h1> in section :heading(0, 1, 2)",
-    "<h1 data-expect-match=\"1\"></h1> in section :heading(6, 7)",
+    "<h2 data-expect-match=\"2\"></h2> :heading",
+    "<h2 data-expect-match=\"2\"></h2> :heading(0)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(0, 1, 2)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(1)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(2)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(3)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(4)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(5)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(6)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(6, 7)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(7)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(8)",
+    "<h2 data-expect-match=\"2\"></h2> :heading(9)",
+    "<h3 data-expect-match=\"3\"></h3> :heading",
+    "<h3 data-expect-match=\"3\"></h3> :heading(0)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(0, 1, 2)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(1)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(2)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(3)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(4)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(5)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(6)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(6, 7)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(7)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(8)",
+    "<h3 data-expect-match=\"3\"></h3> :heading(9)",
+    "<h4 data-expect-match=\"4\"></h4> :heading",
+    "<h4 data-expect-match=\"4\"></h4> :heading(0)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(0, 1, 2)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(1)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(2)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(3)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(4)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(5)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(6)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(6, 7)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(7)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(8)",
+    "<h4 data-expect-match=\"4\"></h4> :heading(9)",
+    "<h5 data-expect-match=\"5\"></h5> :heading",
+    "<h5 data-expect-match=\"5\"></h5> :heading(0)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(0, 1, 2)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(1)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(2)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(3)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(4)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(5)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(6)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(6, 7)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(7)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(8)",
+    "<h5 data-expect-match=\"5\"></h5> :heading(9)",
+    "<h6 data-expect-match=\"6\"></h6> :heading",
+    "<h6 data-expect-match=\"6\"></h6> :heading(0)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(0, 1, 2)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(1)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(2)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(3)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(4)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(5)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(6)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(6, 7)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(7)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(8)",
+    "<h6 data-expect-match=\"6\"></h6> :heading(9)",
+    "<h7 data-expect-match=\"\"></h7> :heading",
+    "<h7 data-expect-match=\"\"></h7> :heading(0)",
+    "<h7 data-expect-match=\"\"></h7> :heading(0, 1, 2)",
+    "<h7 data-expect-match=\"\"></h7> :heading(1)",
+    "<h7 data-expect-match=\"\"></h7> :heading(2)",
+    "<h7 data-expect-match=\"\"></h7> :heading(3)",
+    "<h7 data-expect-match=\"\"></h7> :heading(4)",
+    "<h7 data-expect-match=\"\"></h7> :heading(5)",
+    "<h7 data-expect-match=\"\"></h7> :heading(6)",
+    "<h7 data-expect-match=\"\"></h7> :heading(6, 7)",
+    "<h7 data-expect-match=\"\"></h7> :heading(7)",
+    "<h7 data-expect-match=\"\"></h7> :heading(8)",
+    "<h7 data-expect-match=\"\"></h7> :heading(9)",
+    "<h8 data-expect-match=\"\"></h8> :heading",
+    "<h8 data-expect-match=\"\"></h8> :heading(0)",
+    "<h8 data-expect-match=\"\"></h8> :heading(0, 1, 2)",
+    "<h8 data-expect-match=\"\"></h8> :heading(1)",
+    "<h8 data-expect-match=\"\"></h8> :heading(2)",
+    "<h8 data-expect-match=\"\"></h8> :heading(3)",
+    "<h8 data-expect-match=\"\"></h8> :heading(4)",
+    "<h8 data-expect-match=\"\"></h8> :heading(5)",
+    "<h8 data-expect-match=\"\"></h8> :heading(6)",
+    "<h8 data-expect-match=\"\"></h8> :heading(6, 7)",
+    "<h8 data-expect-match=\"\"></h8> :heading(7)",
+    "<h8 data-expect-match=\"\"></h8> :heading(8)",
+    "<h8 data-expect-match=\"\"></h8> :heading(9)",
+    "<h9 data-expect-match=\"\"></h9> :heading",
+    "<h9 data-expect-match=\"\"></h9> :heading(0)",
+    "<h9 data-expect-match=\"\"></h9> :heading(0, 1, 2)",
+    "<h9 data-expect-match=\"\"></h9> :heading(1)",
+    "<h9 data-expect-match=\"\"></h9> :heading(2)",
+    "<h9 data-expect-match=\"\"></h9> :heading(3)",
+    "<h9 data-expect-match=\"\"></h9> :heading(4)",
+    "<h9 data-expect-match=\"\"></h9> :heading(5)",
+    "<h9 data-expect-match=\"\"></h9> :heading(6)",
+    "<h9 data-expect-match=\"\"></h9> :heading(6, 7)",
+    "<h9 data-expect-match=\"\"></h9> :heading(7)",
+    "<h9 data-expect-match=\"\"></h9> :heading(8)",
+    "<h9 data-expect-match=\"\"></h9> :heading(9)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading",
+    "<hgroup data-expect-match=\"\"></hgroup> :heading(0)",
+    "<hgroup data-expect-match=\"\"></hgroup> :heading(0, 1, 2)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(1)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(2)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(3)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(4)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(5)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(6)",
+    "<hgroup data-expect-match=\"\"></hgroup> :heading(6, 7)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(7)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(8)",
     "<hgroup data-expect-match=\"\"></hgroup> :heading(9)",
-    "<hgroup data-expect-match=\"\"></hgroup> :heading(0)",
-    "<hgroup data-expect-match=\"\"></hgroup> :heading(0, 1, 2)",
-    "<hgroup data-expect-match=\"\"></hgroup> :heading(6, 7)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading",
+    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(0)",
+    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(0, 1, 2)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(1)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(2)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(3)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(4)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(5)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(6)",
+    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(6, 7)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(7)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(8)",
-    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(9)",
-    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(0)",
-    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(0, 1, 2)",
-    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(6, 7)"
+    "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(9)"
   ],
   "submodules/web-platform-tests/css/selectors/hover-002.html": [
     "Hover #hovered element should make it go green",
@@ -15819,10 +16154,7 @@
     "add .test to subject_child",
     "add .test to subject_descendant",
     "add .test to subject_parent",
-    "add the class 'test' again to the element in the tree inserted after subject",
     "add the class 'test' again to the element in the tree inserted after subject_ancestor",
-    "add the class 'test' again to the element in the tree inserted after subject_child",
-    "add the class 'test' again to the element in the tree inserted after subject_descendant",
     "add the class 'test' again to the element in the tree inserted before subject",
     "add the class 'test' again to the element in the tree inserted before subject_ancestor",
     "add the class 'test' again to the element in the tree inserted before subject_child",
@@ -15838,10 +16170,7 @@
     "add the class 'test' again to the element inserted before subject_child",
     "add the class 'test' again to the element inserted before subject_descendant",
     "add the class 'test' again to the element inserted before subject_parent",
-    "add the class 'test' to the element in the tree inserted again after subject",
     "add the class 'test' to the element in the tree inserted again after subject_ancestor",
-    "add the class 'test' to the element in the tree inserted again after subject_child",
-    "add the class 'test' to the element in the tree inserted again after subject_descendant",
     "add the class 'test' to the element in the tree inserted again before subject",
     "add the class 'test' to the element in the tree inserted again before subject_ancestor",
     "add the class 'test' to the element in the tree inserted again before subject_child",
@@ -15877,10 +16206,7 @@
     "insert element div.test before subject_child",
     "insert element div.test before subject_descendant",
     "insert element div.test before subject_parent",
-    "insert element div>div[test_attr] after subject",
     "insert element div>div[test_attr] after subject_ancestor",
-    "insert element div>div[test_attr] after subject_child",
-    "insert element div>div[test_attr] after subject_descendant",
     "insert element div>div[test_attr] before subject",
     "insert element div>div[test_attr] before subject_ancestor",
     "insert element div>div[test_attr] before subject_child",
@@ -15896,20 +16222,13 @@
     "insert element div[test_attr] before subject_child",
     "insert element div[test_attr] before subject_descendant",
     "insert element div[test_attr] before subject_parent",
-    "insert tree div>div after subject",
     "insert tree div>div after subject_ancestor",
-    "insert tree div>div after subject_child",
-    "insert tree div>div after subject_descendant",
-    "insert tree div>div after subject_parent",
     "insert tree div>div before subject",
     "insert tree div>div before subject_ancestor",
     "insert tree div>div before subject_child",
     "insert tree div>div before subject_descendant",
     "insert tree div>div before subject_parent",
-    "insert tree div>div.test after subject",
     "insert tree div>div.test after subject_ancestor",
-    "insert tree div>div.test after subject_child",
-    "insert tree div>div.test after subject_descendant",
     "insert tree div>div.test before subject",
     "insert tree div>div.test before subject_ancestor",
     "insert tree div>div.test before subject_child",
@@ -15940,11 +16259,7 @@
     "remove element div.test before subject_child",
     "remove element div.test before subject_descendant",
     "remove element div.test before subject_parent",
-    "remove element div>div[test_attr] after subject",
     "remove element div>div[test_attr] after subject_ancestor",
-    "remove element div>div[test_attr] after subject_child",
-    "remove element div>div[test_attr] after subject_descendant",
-    "remove element div>div[test_attr] after subject_parent",
     "remove element div>div[test_attr] before subject",
     "remove element div>div[test_attr] before subject_ancestor",
     "remove element div>div[test_attr] before subject_child",
@@ -15960,16 +16275,9 @@
     "remove element div[test_attr] before subject_child",
     "remove element div[test_attr] before subject_descendant",
     "remove element div[test_attr] before subject_parent",
-    "remove the class 'test' from the element in the tree inserted after subject",
     "remove the class 'test' from the element in the tree inserted after subject_ancestor",
-    "remove the class 'test' from the element in the tree inserted after subject_child",
-    "remove the class 'test' from the element in the tree inserted after subject_descendant",
     "remove the class 'test' from the element in the tree inserted after subject_parent",
-    "remove the class 'test' from the element in the tree inserted again after subject",
     "remove the class 'test' from the element in the tree inserted again after subject_ancestor",
-    "remove the class 'test' from the element in the tree inserted again after subject_child",
-    "remove the class 'test' from the element in the tree inserted again after subject_descendant",
-    "remove the class 'test' from the element in the tree inserted again after subject_parent",
     "remove the class 'test' from the element in the tree inserted again before subject",
     "remove the class 'test' from the element in the tree inserted again before subject_ancestor",
     "remove the class 'test' from the element in the tree inserted again before subject_child",
@@ -16000,20 +16308,13 @@
     "remove the class 'test' from the element inserted before subject_child",
     "remove the class 'test' from the element inserted before subject_descendant",
     "remove the class 'test' from the element inserted before subject_parent",
-    "remove tree div>div after subject",
     "remove tree div>div after subject_ancestor",
-    "remove tree div>div after subject_child",
-    "remove tree div>div after subject_descendant",
-    "remove tree div>div after subject_parent",
     "remove tree div>div before subject",
     "remove tree div>div before subject_ancestor",
     "remove tree div>div before subject_child",
     "remove tree div>div before subject_descendant",
     "remove tree div>div before subject_parent",
-    "remove tree div>div.test after subject",
     "remove tree div>div.test after subject_ancestor",
-    "remove tree div>div.test after subject_child",
-    "remove tree div>div.test after subject_descendant",
     "remove tree div>div.test after subject_parent",
     "remove tree div>div.test before subject",
     "remove tree div>div.test before subject_ancestor",
@@ -17679,6 +17980,9 @@
     "Sibling descendant through a universal selector",
     "Sibling subtree through an indirect adjacent combinator"
   ],
+  "submodules/web-platform-tests/css/selectors/invalidation/subject-has-invalidation-with-display-none-anchor-element.html": [
+    "anonymous-test-0"
+  ],
   "submodules/web-platform-tests/css/selectors/invalidation/typed-child-indexed-pseudo-classes-in-has.html": [
     "Initial colors: #first_of_type",
     "Initial colors: #last_of_type",
@@ -18105,6 +18409,7 @@
   ],
   "submodules/web-platform-tests/css/selectors/parsing/parse-has.html": [
     "\"*:has(.a)\" should be a valid selector",
+    "\"*|*:has(*)\" should be a valid selector",
     "\".a .b:has(.c .d) .e\" should be a valid selector",
     "\".a .b:has(.c .d)\" should be a valid selector",
     "\".a .b:has(.c)\" should be a valid selector",
@@ -18119,6 +18424,7 @@
     "\".a:is(.b:has(.c) .d)\" should be a valid selector",
     "\".a:not(:has(.b))\" should be a valid selector",
     "\":has(#a)\" should be a valid selector",
+    "\":has(*|*)\" should be a valid selector",
     "\":has(.a)\" should be a valid selector",
     "\":has(:hover)\" should be a valid selector",
     "\":has([a=\\\"b\\\"])\" should be a valid selector",
@@ -18189,7 +18495,9 @@
   ],
   "submodules/web-platform-tests/css/selectors/parsing/parse-not.html": [
     "\"*:not(foo)\" should be a valid selector",
+    "\"*|*:not(*)\" should be a valid selector",
     "\":host(:not(.a))\" should be a valid selector",
+    "\":not(*|*)\" should be a valid selector",
     "\":not(.a + .b)\" should be a valid selector",
     "\":not(.a .b ~ c)\" should be a valid selector",
     "\":not(.a .b ~ c, .d .e)\" should be a valid selector",
@@ -18333,7 +18641,8 @@
   ],
   "submodules/web-platform-tests/css/selectors/webkit-pseudo-element.html": [
     "User-action pseudo-classes are valid",
-    "qS and qSA shouldn't throw exception"
+    "qS and qSA shouldn't throw exception",
+    "rules include webkit-prefixed pseudo-element should be cascaded"
   ],
   "submodules/web-platform-tests/css/selectors/x-pseudo-element.html": [
     "x-prefixed pseudo-elements should make the whole rule invalid"

@@ -17,6 +17,8 @@
 import { serialize } from './serializer.ts';
 import type { ComponentValue } from './types.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
+import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
+import { LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
 
 export interface ShorthandDefinition {
   longhands: readonly string[];
@@ -618,6 +620,7 @@ const expandBox = (physical: readonly string[], logical: readonly string[]) => (
 };
 
 const contractBox = (physical: readonly string[], logical: readonly string[]) => (values: Record<string, ComponentValue[]>): string | null => {
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
   const t = values[physical[0]];
   const r = values[physical[1]];
   const b = values[physical[2]];
@@ -628,6 +631,11 @@ const contractBox = (physical: readonly string[], logical: readonly string[]) =>
     const sr = serialize(r).trim();
     const sb = serialize(b).trim();
     const sl = serialize(l).trim();
+
+    if ([st, sr, sb, sl].some(s => CSS_WIDE.includes(s.toLowerCase()))) {
+      if (st === sr && st === sb && st === sl) return st;
+      return null;
+    }
 
     if (st === sr && st === sb && st === sl) return st;
     if (st === sb && sr === sl) return `${st} ${sr}`;
@@ -645,6 +653,11 @@ const contractBox = (physical: readonly string[], logical: readonly string[]) =>
     const sbe = serialize(lbe).trim();
     const sis = serialize(lis).trim();
     const sie = serialize(lie).trim();
+
+    if ([sbs, sbe, sis, sie].some(s => CSS_WIDE.includes(s.toLowerCase()))) {
+      if (sbs === sbe && sbs === sis && sbs === sie) return sbs;
+      return null;
+    }
     
     let res = 'logical ';
     if (sbs === sbe && sbs === sis && sbs === sie) res += sbs;
@@ -670,8 +683,12 @@ const contractTwoValue = (longhands: readonly string[]) => (values: Record<strin
   const v1 = values[longhands[0]];
   const v2 = values[longhands[1]];
   if (!v1 || !v2) return null;
-  const s1 = serialize(v1);
-  const s2 = serialize(v2);
+  const s1 = serialize(v1).trim();
+  const s2 = serialize(v2).trim();
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  if (CSS_WIDE.includes(s1.toLowerCase()) || CSS_WIDE.includes(s2.toLowerCase())) {
+    return s1 === s2 ? s1 : null;
+  }
   return s1 === s2 ? s1 : `${s1} ${s2}`;
 };
 
@@ -721,6 +738,7 @@ const expandBorderSide = (prefix: string) => (values: ComponentValue[]): Record<
 };
 
 const contractBorderSide = (prefix: string) => (values: Record<string, ComponentValue[]>): string | null => {
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
   const widthProp = `${prefix}-width`;
   const styleProp = `${prefix}-style`;
   const colorProp = `${prefix}-color`;
@@ -733,6 +751,13 @@ const contractBorderSide = (prefix: string) => (values: Record<string, Component
   const sw = serialize(w).trim();
   const ss = serialize(s).trim();
   const sc = serialize(c).trim();
+
+  if ([sw, ss, sc].some(str => CSS_WIDE.includes(str.toLowerCase()))) {
+    if (sw.toLowerCase() === ss.toLowerCase() && sw.toLowerCase() === sc.toLowerCase()) {
+      return sw;
+    }
+    return null;
+  }
 
   if (sw === ss && sw === sc) {
     return sw;
@@ -799,12 +824,20 @@ const expandBorderRadius = (values: ComponentValue[]): Record<string, ComponentV
 };
 
 const contractBorderRadius = (values: Record<string, ComponentValue[]>): string | null => {
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
   const physical = ['border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius'];
 
   const hasPhysical = physical.every(prop => values[prop] !== undefined);
   if (!hasPhysical) return null;
 
   const longhands = physical.map(prop => values[prop]);
+  const serialized = longhands.map(lh => serialize(lh).trim());
+  if (serialized.some(s => CSS_WIDE.includes(s.toLowerCase()))) {
+    if (serialized.every(s => s.toLowerCase() === serialized[0].toLowerCase())) {
+      return serialized[0];
+    }
+    return null;
+  }
 
   const parsed = longhands.map(lh => {
     const filtered = lh.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
@@ -837,6 +870,45 @@ const contractBorderRadius = (values: Record<string, ComponentValue[]>): string 
     return `${hStr} / ${vStr}`;
   }
 };
+
+export const ALL_SHORTHAND_LONGHANDS: readonly string[] = Object.freeze(
+  Array.from(SUPPORTED_PROPERTIES).filter(prop => {
+    if (prop === 'all' || prop === 'direction' || prop === 'unicode-bidi' || prop.startsWith('--')) {
+      return false;
+    }
+    if (prop in SHORTHANDS_DATA) {
+      return false;
+    }
+    if (prop in LOGICAL_MAPPING) {
+      return false;
+    }
+    return true;
+  })
+);
+
+function expandAll(value: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  if (!value || value.length === 0) return null;
+  const result: Record<string, ComponentValue[]> = {};
+  for (const lh of ALL_SHORTHAND_LONGHANDS) {
+    result[lh] = value;
+  }
+  return result;
+}
+
+function contractAll(longhands: Record<string, ComponentValue[]>): string | null {
+  let firstVal: string | null = null;
+  for (const lh of ALL_SHORTHAND_LONGHANDS) {
+    const valTokens = longhands[lh];
+    if (!valTokens || valTokens.length === 0) return null;
+    const serialized = serialize(valTokens).trim();
+    if (firstVal === null) {
+      firstVal = serialized;
+    } else if (serialized !== firstVal) {
+      return null;
+    }
+  }
+  return firstVal;
+}
 
 export const SHORTHANDS: Record<string, ShorthandDefinition> = {
   'border-block': {
@@ -1046,10 +1118,16 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
     expand: expandBackground,
     contract: contractBackground,
   },
+  'all': {
+    longhands: ALL_SHORTHAND_LONGHANDS,
+    expand: expandAll,
+    contract: contractAll,
+  },
 };
 
 export const LONGHAND_TO_SHORTHAND: Record<string, string[]> = {};
 for (const [shorthand, def] of Object.entries(SHORTHANDS)) {
+  if (shorthand === 'all') continue;
   for (const longhand of def.longhands) {
     if (!LONGHAND_TO_SHORTHAND[longhand]) LONGHAND_TO_SHORTHAND[longhand] = [];
     LONGHAND_TO_SHORTHAND[longhand].push(shorthand);

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 import type { Token, ComponentValue, Declaration, CSSFunction, SimpleBlock, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
-import { SHORTHANDS } from './shorthands.ts';
+import { SHORTHANDS, ALL_SHORTHAND_LONGHANDS } from './shorthands.ts';
 import { formatNumber } from './utils/format.ts';
 import { parseAnPlusB } from './SelectorParser.ts';
 
@@ -636,6 +636,12 @@ function tryCombineGenericShorthand(
       if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
 
       const vals = allDecls.map(other => serialize(other!.value).trim());
+      const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+      if (vals.some(v => CSS_WIDE.includes(v.toLowerCase()))) {
+        if (!vals.every(v => v.toLowerCase() === vals[0].toLowerCase())) continue;
+        allDecls.forEach(other => processed.add(other!));
+        return { name: shorthand, value: vals[0], important: d.important };
+      }
       
       // For border-* shorthands that combine sides (block, inline), values must be identical to combine
       if (shorthand === 'border-block' || shorthand === 'border-inline') {
@@ -678,6 +684,17 @@ function tryCombineBorderFull(
     const sameColor = vals[2] === vals[5] && vals[2] === vals[8] && vals[2] === vals[11];
 
     if (sameWidth && sameStyle && sameColor) {
+      const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+      const v0 = vals[0].toLowerCase();
+      const v1 = vals[1].toLowerCase();
+      const v2 = vals[2].toLowerCase();
+      if ([v0, v1, v2].some(v => CSS_WIDE.includes(v))) {
+        if (v0 === v1 && v0 === v2) {
+          allDecls.forEach(other => processed.add(other!));
+          return `border: ${vals[0]}${d.important ? ' !important' : ''}`;
+        }
+        return null;
+      }
       const combinedValue = [vals[0], vals[1], vals[2]].filter(v => v !== '').join(' ');
       allDecls.forEach(other => processed.add(other!));
       return `border: ${combinedValue}${d.important ? ' !important' : ''}`;
@@ -811,6 +828,49 @@ export function serializeDeclarations(declarations: Declaration[]): string {
     declIndices.set(d, i);
   }
   
+  // Check if all longhands are present and set to the same CSS-wide keyword or var() with the same priority
+  if (declarations.length >= ALL_SHORTHAND_LONGHANDS.length) {
+    const firstDecl = declMap.get(ALL_SHORTHAND_LONGHANDS[0]);
+    if (firstDecl) {
+      const firstVal = serialize(firstDecl.value).trim();
+      const firstValLower = firstVal.toLowerCase();
+      const firstImportant = firstDecl.important;
+      if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(firstValLower) || firstValLower.startsWith('var(')) {
+        let allMatch = true;
+        for (const lh of ALL_SHORTHAND_LONGHANDS) {
+          const d = declMap.get(lh);
+          if (!d || serialize(d.value).trim().toLowerCase() !== firstValLower || d.important !== firstImportant) {
+            allMatch = false;
+            break;
+          }
+        }
+        if (allMatch) {
+          const allLonghandsSet = new Set(ALL_SHORTHAND_LONGHANDS as readonly string[]);
+          const allDecl: Declaration = {
+            type: 'declaration',
+            name: 'all',
+            value: firstDecl.value,
+            important: firstImportant,
+          };
+          const newDecls: Declaration[] = [];
+          let inserted = false;
+          for (let idx = 0; idx < declarations.length; idx++) {
+            const d = declarations[idx];
+            if (allLonghandsSet.has(d.name)) {
+              if (!inserted) {
+                newDecls.push(allDecl);
+                inserted = true;
+              }
+            } else {
+              newDecls.push(d);
+            }
+          }
+          return serializeDeclarations(newDecls);
+        }
+      }
+    }
+  }
+
   const processed = new Set<Declaration>();
   const result: string[] = [];
   
@@ -884,16 +944,25 @@ export function serializeDeclarations(declarations: Declaration[]): string {
   return result.join('; ') + ';';
 }
 
-export function serializeSelectorList(list: SelectorList, hasDefaultNamespace = false): string {
+export interface NamespaceContext {
+  hasDefaultNamespace?: boolean;
+  defaultNamespacePrefixes?: Set<string>;
+}
+
+export function serializeSelectorList(list: SelectorList, nsContext?: boolean | NamespaceContext): string {
+  const hasDefaultNamespace = typeof nsContext === 'boolean' ? nsContext : Boolean(nsContext?.hasDefaultNamespace);
+  const defaultNamespacePrefixes = typeof nsContext === 'object' && nsContext !== null ? nsContext.defaultNamespacePrefixes : undefined;
+  const context = { hasDefaultNamespace, defaultNamespacePrefixes };
   return list.selectors.map(s => {
     if (s.type === 'invalid-selector') {
       return serialize(s.tokens);
     }
-    return serializeComplexSelector(s, hasDefaultNamespace);
+    return serializeComplexSelector(s, context);
   }).join(', ');
 }
 
-function serializeComplexSelector(complex: ComplexSelector, hasDefaultNamespace = false): string {
+function serializeComplexSelector(complex: ComplexSelector, nsContext: { hasDefaultNamespace: boolean; defaultNamespacePrefixes?: Set<string> }): string {
+  const { hasDefaultNamespace, defaultNamespacePrefixes } = nsContext;
   return complex.items.map((item, idx) => {
     if (item.type === 'combinator') {
       if (item.value === ' ') return ' ';
@@ -902,13 +971,14 @@ function serializeComplexSelector(complex: ComplexSelector, hasDefaultNamespace 
     }
     const selectors = item.selectors.filter((s, sIdx) => {
       if (s.type === 'universal-selector' && item.selectors.length > 1 && sIdx === 0) {
-        if (s.namespace === undefined || (s.namespace === '' && !hasDefaultNamespace)) {
+        const isDefaultNs = s.namespace !== undefined && s.namespace !== '' && defaultNamespacePrefixes?.has(s.namespace);
+        if (s.namespace === undefined || isDefaultNs || (s.namespace === '*' && !hasDefaultNamespace)) {
           return false;
         }
       }
       return true;
     });
-    return selectors.map(s => serializeSimpleSelector(s, hasDefaultNamespace)).join('');
+    return selectors.map(s => serializeSimpleSelector(s, nsContext)).join('');
   }).join('');
 }
 
@@ -939,11 +1009,16 @@ function formatAnPlusB(tokens: ComponentValue[]): string {
   return serialize(tokens).trim();
 }
 
-function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = false): string {
+function serializeSimpleSelector(simple: SimpleSelector, nsContext: { hasDefaultNamespace: boolean; defaultNamespacePrefixes?: Set<string> }): string {
+  const { hasDefaultNamespace, defaultNamespacePrefixes } = nsContext;
   switch (simple.type) {
     case 'type-selector': {
       let name = serializeIdentifier(simple.name);
       if (simple.namespace !== undefined) {
+        const isDefaultNs = simple.namespace !== '' && defaultNamespacePrefixes?.has(simple.namespace);
+        if (isDefaultNs) {
+          return name;
+        }
         if (simple.namespace === '*') {
           if (hasDefaultNamespace) {
             name = '*|' + name;
@@ -956,10 +1031,17 @@ function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = f
       }
       return name;
     }
-    case 'universal-selector':
+    case 'universal-selector': {
       if (simple.namespace !== undefined) {
+        const isDefaultNs = simple.namespace !== '' && defaultNamespacePrefixes?.has(simple.namespace);
+        if (isDefaultNs) {
+          return '*';
+        }
         if (simple.namespace === '*') {
-          return '*|*';
+          if (hasDefaultNamespace) {
+            return '*|*';
+          }
+          return '*';
         } else if (simple.namespace === '') {
           return '|*';
         } else {
@@ -967,6 +1049,7 @@ function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = f
         }
       }
       return '*';
+    }
     case 'id-selector': return '#' + serializeIdentifier(simple.name);
     case 'class-selector': return '.' + serializeIdentifier(simple.name);
     case 'attribute-selector': {
@@ -989,16 +1072,16 @@ function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = f
       }
       return attr + ']';
     }
-    case 'pseudo-class-selector':
+    case 'pseudo-class-selector': {
       let pc = `:${simple.name}`;
       const lowerName = simple.name.toLowerCase();
       const isNth = ['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type'].includes(lowerName);
       if (simple.argument) {
         if ('type' in simple.argument && simple.argument.type === 'selector-list') {
           if (isNth && simple.nth) {
-            pc += `(${formatAnPlusB(simple.nth)} of ${serializeSelectorList(simple.argument, hasDefaultNamespace)})`;
+            pc += `(${formatAnPlusB(simple.nth)} of ${serializeSelectorList(simple.argument, nsContext)})`;
           } else {
-            pc += `(${serializeSelectorList(simple.argument, hasDefaultNamespace)})`;
+            pc += `(${serializeSelectorList(simple.argument, nsContext)})`;
           }
         } else {
           if (isNth) {
@@ -1009,16 +1092,18 @@ function serializeSimpleSelector(simple: SimpleSelector, hasDefaultNamespace = f
         }
       }
       return pc;
-    case 'pseudo-element-selector':
+    }
+    case 'pseudo-element-selector': {
       let pe = `::${simple.name}`;
       if (simple.argument) {
         if ('type' in simple.argument && simple.argument.type === 'selector-list') {
-          pe += `(${serializeSelectorList(simple.argument, hasDefaultNamespace)})`;
+          pe += `(${serializeSelectorList(simple.argument, nsContext)})`;
         } else {
           pe += `(${serialize(simple.argument as ComponentValue[]).trim()})`;
         }
       }
       return pe;
+    }
     case 'nesting-selector': return '&';
     default: return '';
   }

@@ -20,6 +20,7 @@ import { tokenize } from '../tokenizer.ts';
 import { serialize } from '../serializer.ts';
 import { isElement } from '../matcher.ts';
 import type { DOMElement } from '../matcher.ts';
+import type { Token } from '../types.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import {
   COLOR_PROPERTIES,
@@ -60,6 +61,104 @@ import {
   processStandardDeclarations,
 } from './value-processor.ts';
 
+export const KNOWN_PSEUDO_ELEMENTS = new Set([
+  'before',
+  'after',
+  'marker',
+  'placeholder',
+  'file-selector-button',
+  'backdrop',
+  'first-line',
+  'first-letter',
+  'grammar-error',
+  'spelling-error',
+  'view-transition',
+  'cue',
+  'selection',
+  'target-text',
+  'checkmark',
+  'picker-icon',
+]);
+
+export const KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS = new Set([
+  'highlight',
+  'picker',
+  'view-transition-group',
+  'view-transition-image-pair',
+  'view-transition-old',
+  'view-transition-new',
+  'part',
+  'slotted',
+]);
+
+export function normalizePseudoElement(pseudo: string): { valid: boolean; normalized: string; isKnown: boolean } | null {
+  if (!pseudo.startsWith(':')) {
+    return null;
+  }
+
+  const legacyAliases: Record<string, string> = {
+    ':before': '::before',
+    ':after': '::after',
+    ':first-line': '::first-line',
+    ':first-letter': '::first-letter',
+  };
+
+  const tokens = tokenize(pseudo);
+  const nonEofTokens = tokens.filter(t => t.type !== 'EOF');
+
+  const isColon = (t: Token | undefined) => t && (t.type === 'colon' || (t.type === 'delim' && t.value === ':'));
+
+  if (pseudo.startsWith('::')) {
+    if (nonEofTokens.length < 3) {
+      return { valid: false, normalized: '', isKnown: false };
+    }
+    if (!isColon(nonEofTokens[0]) || !isColon(nonEofTokens[1])) {
+      return { valid: false, normalized: '', isKnown: false };
+    }
+
+    const third = nonEofTokens[2];
+    if (third.type === 'ident') {
+      if (nonEofTokens.length !== 3) {
+        return { valid: false, normalized: '', isKnown: false };
+      }
+      const name = third.value.toLowerCase();
+      const isKnown = KNOWN_PSEUDO_ELEMENTS.has(name);
+      return { valid: true, normalized: `::${name}`, isKnown };
+    } else if (third.type === 'function') {
+      const fnName = third.value.toLowerCase();
+      const isKnown = KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS.has(fnName);
+      if (!isKnown) {
+        return { valid: true, normalized: `::${fnName}()`, isKnown: false };
+      }
+      const lastToken = nonEofTokens[nonEofTokens.length - 1];
+      const hasCloseParen = lastToken.type === ')';
+      const argTokens = (hasCloseParen ? nonEofTokens.slice(3, -1) : nonEofTokens.slice(3))
+        .filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+      if (argTokens.length !== 1 || argTokens[0].type !== 'ident') {
+        return { valid: false, normalized: '', isKnown: false };
+      }
+      const identVal = argTokens[0].value.toLowerCase();
+      if (fnName === 'picker' && identVal !== 'select') {
+        return { valid: false, normalized: '', isKnown: false };
+      }
+      return { valid: true, normalized: `::${fnName}(${identVal})`, isKnown: true };
+    }
+
+    return { valid: false, normalized: '', isKnown: false };
+  }
+
+  // Single colon
+  if (nonEofTokens.length === 2 && isColon(nonEofTokens[0]) && nonEofTokens[1].type === 'ident') {
+    const ident = nonEofTokens[1].value.toLowerCase();
+    const single = `:${ident}`;
+    if (single in legacyAliases) {
+      return { valid: true, normalized: legacyAliases[single], isKnown: true };
+    }
+  }
+
+  return { valid: false, normalized: '', isKnown: false };
+}
+
 /**
  * Resolves the cascaded style statically for a DOM element according to CSS Cascade 5 and CSS Variables 1.
  * css-cascade-5 § 3 #cascading
@@ -76,6 +175,20 @@ export function getCascadedStyle(
     return new CSSStyleDeclaration([], true);
   }
 
+  let normalizedPseudoStr: string | null = null;
+  if (typeof pseudoElement === 'string') {
+    const parsedPseudo = normalizePseudoElement(pseudoElement);
+    if (parsedPseudo === null) {
+      normalizedPseudoStr = null;
+    } else if (!parsedPseudo.valid || !parsedPseudo.isKnown) {
+      const emptyDecl = new CSSComputedStyleDeclaration([], true, null, element);
+      (emptyDecl as unknown as { _readonly: boolean })._readonly = true;
+      return emptyDecl;
+    } else {
+      normalizedPseudoStr = parsedPseudo.normalized;
+    }
+  }
+
   // 1. Collect rule lists and stylesheets
   const ruleList = collectStyleSheetsAndRules(element, rules);
   if (ruleList === null) {
@@ -90,16 +203,18 @@ export function getCascadedStyle(
     element,
     ruleList,
     layerDeclarationOrder,
-    pseudoElement
+    normalizedPseudoStr
   );
 
-  // 4. Collect SVG presentation attributes
-  const svgDecls = collectSvgPresentationAttributes(element, matchedDeclarations.length);
-  matchedDeclarations.push(...svgDecls);
+  if (!normalizedPseudoStr) {
+    // 4. Collect SVG presentation attributes
+    const svgDecls = collectSvgPresentationAttributes(element, matchedDeclarations.length);
+    matchedDeclarations.push(...svgDecls);
 
-  // 5. Collect inline styles
-  const { declarations: inlineDecls } = collectInlineDeclarations(element, sourceOrderCounter);
-  matchedDeclarations.push(...inlineDecls);
+    // 5. Collect inline styles
+    const { declarations: inlineDecls } = collectInlineDeclarations(element, sourceOrderCounter);
+    matchedDeclarations.push(...inlineDecls);
+  }
 
   // 6. Group declarations by property
   const declarationsByProperty = groupDeclarationsByProperty(matchedDeclarations);
@@ -237,6 +352,58 @@ export function getCascadedStyle(
   return resultStyle;
 }
 
+export function shouldPreserveAutoMinSize(element: unknown): boolean {
+  if (!element || typeof element !== 'object') return false;
+  const el = element as {
+    getAttribute?: (attr: string) => string | null;
+    parentElement?: unknown;
+    parentNode?: unknown;
+  };
+
+  // 1. Check if element or any ancestor is display: none (no box generated)
+  let curr: unknown = element;
+  while (curr && typeof curr === 'object') {
+    const currEl = curr as {
+      parentElement?: unknown;
+      parentNode?: unknown;
+      getAttribute?: (attr: string) => string | null;
+    };
+    const styleAttr = currEl.getAttribute ? currEl.getAttribute('style') : null;
+    if (styleAttr && /display\s*:\s*none\b/i.test(styleAttr)) {
+      return false;
+    }
+    curr = currEl.parentElement || currEl.parentNode;
+  }
+
+  // 2. Check if element has non-default aspect-ratio (not 'auto')
+  const styleAttr = el.getAttribute ? el.getAttribute('style') : null;
+  if (styleAttr && /aspect-ratio\s*:/i.test(styleAttr)) {
+    const match = styleAttr.match(/aspect-ratio\s*:\s*([^;]+)/i);
+    if (match) {
+      const val = match[1].trim().toLowerCase();
+      if (val !== 'auto' && val !== '') {
+        return true;
+      }
+    }
+  }
+
+  // 3. Check if parent is flex or grid container
+  const parent = el.parentElement || el.parentNode;
+  if (parent && typeof parent === 'object') {
+    const parentEl = parent as {
+      getAttribute?: (attr: string) => string | null;
+    };
+    const pStyle = parentEl.getAttribute ? parentEl.getAttribute('style') : null;
+    if (pStyle) {
+      if (/display\s*:\s*(?:inline-)?(?:flex|grid)\b/i.test(pStyle)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 /**
  * CSSComputedStyleDeclaration represents the resolved/computed style declaration of a DOM element.
  * cssom-1 § 6.8 #resolved-values
@@ -255,6 +422,10 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     super(declarations, readonlyFlag);
     this._parentStyle = parentStyle;
     this._element = element;
+  }
+
+  override get cssText(): string {
+    return '';
   }
 
   override getPropertyValue(property: string): string {
@@ -290,6 +461,15 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return `${color} ${image} ${repeat} ${attachment} ${position} / ${size} ${origin} ${clip}`;
     }
     const rawVal = super.getPropertyValue(dashed);
+
+    if (dashed === 'min-width' || dashed === 'min-height') {
+      if (rawVal === 'auto' || rawVal === '') {
+        if (shouldPreserveAutoMinSize(this._element)) {
+          return 'auto';
+        }
+        return '0px';
+      }
+    }
 
     if (rawVal) {
       const lowerRaw = rawVal.trim().toLowerCase();
