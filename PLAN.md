@@ -2707,7 +2707,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 112: `cssom` Shorthand Serialization, Page Rules & Font Normalization
+## Phase 111: `cssom` Shorthand Serialization, Page Rules & Font Normalization
 **Goal**: Resolve the next 4 major failure clusters in `css/cssom/` (+75 addressable assertions), pushing `cssom` normalized score from 78.25% past 90%.
 
 ### Tasks
@@ -2735,7 +2735,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 113: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
+## Phase 112: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
 **Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
 
 ### Tasks
@@ -2754,7 +2754,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 114: `:scope`, `@scope` & Complex Relative Selectors
+## Phase 113: `:scope`, `@scope` & Complex Relative Selectors
 **Goal**: Implement relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element and resolve `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
 
 ### Tasks
