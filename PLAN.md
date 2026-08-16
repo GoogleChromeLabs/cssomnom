@@ -2711,26 +2711,28 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Implement minimal canonical serialization and sub-property contraction for composite shorthands (`border`, `outline`, `list-style`, `font-variant`, `font-family`, `flex`, `overflow`) per CSSOM § 6.4.3 and CSS Fonts 4, resolving 37 addressable gaps in `css/cssom/`.
 
 ### Tasks
-- [ ] **Canonical Minimal Serialization of `border` & `outline` (CSSOM § 6.4.3)**:
+- [x] **Canonical Minimal Serialization of `border` & `outline` (CSSOM § 6.4.3)**:
   - In `src/shorthands.ts` and `src/serializer.ts`:
     - Omit initial default values (`none` for style, `currentcolor` for color, `medium` for width) when the shorthand is valid without them (`border: 1px;` or `border: 1px red;`).
     - Enforce `border-image` interference guard: `border` shorthand must serialize to `""` if any `border-image-*` longhand is non-initial.
     - Implement dedicated `contractOutline` omitting default `none`/`currentcolor`/`medium`.
-    - Target files: `shorthand-values.html` (11 gaps), `border-shorthand-serialization.html` (2 gaps).
-- [ ] **`font-variant` Sub-Property Expansion & Contraction (CSS Fonts 4 § 5)**:
+    - Target files: `shorthand-values.html` (21/21 passed), `border-shorthand-serialization.html` (3/3 passed).
+- [x] **`font-variant` Sub-Property Expansion & Contraction (CSS Fonts 4 § 5)**:
   - Decompose and serialize across all constituent sub-properties (`font-variant-ligatures`, `font-variant-caps`, `font-variant-numeric`, `font-variant-alternates`, `font-variant-east-asian`, `font-variant-position`).
-  - Target file: `font-variant-shorthand-serialization.html` (6 gaps).
-- [ ] **`font-family` Identifier Quoting & Unquoting Normalization (CSSOM § 6.4.3)**:
+  - Target file: `font-variant-shorthand-serialization.html` (7/7 passed).
+- [x] **`font-family` Identifier Quoting & Unquoting Normalization (CSSOM § 6.4.3)**:
   - Unquote identifiers that do not require quotes (`"Arial"` $\to$ `Arial`, `"Times New Roman"` $\to$ `Times New Roman`).
   - Retain quotes for identifiers starting with digits (`'34J'`), containing consecutive whitespace (`'Foo  Bar'`), or matching CSS-wide keywords (`'initial'`).
-  - Target files: `font-family-serialization-001.html` (6 gaps), `font-shorthand-serialization.html` (1 gap).
-- [ ] **`list-style`, `flex`, and `overflow` Multi-Value Serialization**:
+  - Target files: `font-family-serialization-001.html` (24/24 passed), `font-shorthand-serialization.html` (1/1 passed).
+- [x] **`list-style`, `flex`, and `overflow` Multi-Value Serialization**:
   - Implement `contractListStyle` for `list-style-type`, `list-style-position`, `list-style-image`.
   - Support asymmetric values in `overflow-x`/`overflow-y` (`overflow: scroll hidden`) and `flex` keyword mixing.
-  - Target files: `shorthand-serialization.html` (4 gaps), `flex-serialization.html` (3 gaps), `overflow-serialization.html` (3 gaps).
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add unit tests in `tests/cssom-shorthand-serialization.test.ts`.
-  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+  - Target files: `shorthand-serialization.html` (7/7 passed), `flex-serialization.html` (5/5 passed), `overflow-serialization.html` (10/10 passed).
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/cssom-shorthand-serialization.test.ts` (17 test groups passing).
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: 17,161 passing tests (+68 net new passes, 0 regressions).
+  - Multi-agent review approved by Reviewer Codex (`c6aa42ed-ef05-469a-9b28-19d0a2f0d427`) and Gatekeeper Grizz (`1aa82c3d-6dfa-4e99-9d0f-2c683143d4f2`) in commit `10a1aa7`.
 
 ---
 
