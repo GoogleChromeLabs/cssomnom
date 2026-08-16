@@ -2707,7 +2707,35 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 111: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
+## Phase 112: `cssom` Shorthand Serialization, Page Rules & Font Normalization
+**Goal**: Resolve the next 4 major failure clusters in `css/cssom/` (+75 addressable assertions), pushing `cssom` normalized score from 78.25% past 90%.
+
+### Tasks
+- [ ] **Composite Shorthand Canonical Contraction & Serialization (CSSOM § 6.4.3)**:
+  - In `src/serializer.ts` and `src/shorthands.ts`:
+    - Canonical 4-side contraction for `border` (`border: 1px red;` omitting initial values), `outline`, and `background`.
+    - `font-variant` shorthand contraction (`normal` vs `none` with constituent longhands `font-variant-ligatures`, `font-variant-caps`, `font-variant-numeric`).
+    - Computed property getters for `border-top`, `border-right`, `border-bottom`, `border-left` on computed style declarations.
+    - Target files: `shorthand-values.html`, `font-variant-shorthand-serialization.html`, `shorthand-serialization.html`, `getComputedStyle-getter-v-properties.tentative.html`.
+- [ ] **`font-family` Serialization Normalization (CSSOM § 6.4.3 & CSS Fonts 4)**:
+  - Unquote single-word and multi-word family identifiers that do not require quoting (`"Arial"` $\to$ `Arial`, `"Times New Roman"` $\to$ `Times New Roman`).
+  - Retain quotes for identifiers starting with digits (`"123Font"`) or matching CSS-wide keywords (`"initial"`).
+  - Target files: `font-family-serialization-001.html`, `font-family-serialization-002.html`.
+- [ ] **`CSSPageRule` & `MediaList` Normalization (CSSOM § 6.4.3 & § 6.5.5)**:
+  - In `src/CSSOM.ts`: `@page` case-insensitive pseudo-page selector parsing (`:first`, `:left`, `:right`, `:blank`) and whitespace rejection (`@page name :first` is invalid).
+  - `MediaList.mediaText` normalization handling duplicate commas, empty queries, and `disabled` attribute reflection on `CSSStyleSheet`.
+  - Target files: `cssom-pagerule.html`, `medialist-interfaces-001.html`, `style-sheet-interfaces-001.html`.
+- [ ] **`cssText` Case Normalization & Style Attribute Sync**:
+  - Lowercase property names/values on `cssText` assignments and retain prior valid state on syntax errors.
+  - Bidirectional synchronization between `element.style` and the HTML `style` attribute (queueing MutationObserver records).
+  - Target files: `cssstyledeclaration-csstext.html`, `css-style-attr-decl-block.html`.
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add unit tests in `tests/cssom-shorthand-serialization.test.ts` and `tests/cssom-pagerule.test.ts`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+
+---
+
+## Phase 113: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
 **Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
 
 ### Tasks
@@ -2726,17 +2754,15 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 112: Composite Shorthand Computed Synthesis & Complex Selectors
-**Goal**: Generalize computed style synthesis across all composite shorthands (`border`, `font`, `outline`, `columns`) in `src/shorthands.ts` and resolve `:scope` relative matching gaps in `css/selectors/`.
+## Phase 114: `:scope`, `@scope` & Complex Relative Selectors
+**Goal**: Implement relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element and resolve `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
 
 ### Tasks
-- [ ] **Composite Shorthand Computed Serialization Engine (`src/shorthands.ts`)**:
-  - Implement computed value serializers for composite shorthands (`border`, `outline`, `font`, `columns`).
 - [ ] **`:scope` & `@scope` Relative Context Matching (`src/matcher.ts`, `src/cascade/rule-filter.ts`)**:
-  - Support relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element.
+  - Support relative selector matching starting with combinators anchored to the active scope element.
   - Implement `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
 - [ ] **Unit Tests & Verification**:
-  - Add tests in `tests/shorthand-computed-synthesis.test.ts` and `tests/selectors-scope-relative.test.ts`.
+  - Add tests in `tests/selectors-scope-relative.test.ts`.
   - Run `pnpm run preflight` and `pnpm run wpt:verify`.
 
 
