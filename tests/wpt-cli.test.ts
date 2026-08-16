@@ -442,7 +442,7 @@ describe('WPT CLI Core Modules', () => {
       const table = formatBaselineSummaryTable(dataset);
       assert.ok(table.includes('### Feasibility & Cross-Engine Baseline Comparison'));
       assert.ok(table.includes('[`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json)'));
-      assert.ok(table.includes('| Spec Domain | Node.js (`cssomnom`) | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
+      assert.ok(table.includes('| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
       assert.ok(table.includes('| **`Typed OM`** | 11,509 / 12,219 (**94.2%**) |'));
       assert.ok(table.includes('| **`Nesting`** | 117 / 117 (**100.0%**) |'));
       assert.ok(table.includes('| **OVERALL** | **17,011 / 18,769 (90.6%)** |'));
@@ -494,7 +494,7 @@ describe('WPT CLI Core Modules', () => {
 
         updateBaselineSummaryTable(dataset, testProgressPath);
         const updated = fs.readFileSync(testProgressPath, 'utf-8');
-        assert.ok(updated.includes('| Spec Domain | Node.js (`cssomnom`) | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
+        assert.ok(updated.includes('| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
         assert.ok(updated.includes('### Historical Conformance Progress Log'));
         assert.ok(updated.includes('`abc1234`'));
       } finally {

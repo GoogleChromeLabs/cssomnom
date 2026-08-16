@@ -98,7 +98,7 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
   lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
   lines.push(`> - **Reference Engine**: Comparison numbers represent official unpolyfilled **${ref.browser}** test runs from [\`wpt.fyi\`](https://wpt.fyi) across the corresponding in-scope test suites.`);
   lines.push('');
-  lines.push(`| Spec Domain | Node.js (\`cssomnom\`) | Chrome ${ref.milestone} (\`wpt.fyi\`) | Parity vs Chrome |`);
+  lines.push(`| Spec Domain | **cssomnom** | Chrome ${ref.milestone} (\`wpt.fyi\`) | Parity vs Chrome |`);
   lines.push('| :--- | :---: | :---: | :---: |');
 
   let totalNodePass = 0;

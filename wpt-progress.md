@@ -8,7 +8,7 @@ This file tracks the conformance progress of the CSSOM / Typed OM implementation
 
 ### Feasibility & Cross-Engine Baseline Comparison
 
-| Spec Domain | Node.js (`cssomnom`) | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
+| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
 | :--- | :---: | :---: | :---: |
 | **`Typed OM`** | 11,509 / 12,219 (**94.2%**) | 10,690 / 11,230 (95.2%) | -1.0% |
 | **`Selectors`** | 3,521 / 4,147 (**84.9%**) | 3,865 / 4,156 (93.0%) | -8.1% |
