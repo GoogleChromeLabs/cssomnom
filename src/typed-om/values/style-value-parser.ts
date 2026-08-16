@@ -171,20 +171,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     return [new CSSStyleValue(css, privateToken)];
   }
 
-  const shorthand = SHORTHANDS[property];
-  if (shorthand && !hasVarFunction(trimmed)) {
-    const expanded = shorthand.expand(trimmed);
-    if (expanded === null) {
-      throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
-    }
-    for (const [longhand, longhandTokens] of Object.entries(expanded)) {
-      const longhandSyntax = STANDARD_PROPERTIES_SYNTAX[longhand.toLowerCase()];
-      if (longhandSyntax && !matchesSyntax(longhandTokens, longhandSyntax)) {
-        throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
-      }
-    }
-    return [new CSSStyleValue(css, privateToken)];
-  }
+  const propLower = property.toLowerCase();
 
   if (hasVarFunction(trimmed)) {
     return [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
@@ -197,12 +184,10 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     }
   }
 
-  const propLower = property.toLowerCase();
-
   if (POSITION_PROPERTIES.has(propLower)) {
     const posVal = tryParsePosition(trimmed, property);
     if (posVal) return [posVal];
-    return [new CSSStyleValue(css, privateToken)];
+    return [new CSSStyleValue(css.trim(), privateToken)];
   }
 
   if (propLower === 'transform') {
@@ -210,24 +195,6 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
       return [new CSSKeywordValue('none')];
     }
     return [CSSTransformValue.parse(css)];
-  }
-
-  if ((property in SHORTHANDS_DATA) && !hasVarFunction(trimmed)) {
-    if (LIST_PROPERTIES.has(propLower) && componentValues.some(t => t.type === 'comma')) {
-      const segments: ComponentValue[][] = [[]];
-      for (const t of componentValues) {
-        if (t.type === 'comma') {
-          segments.push([]);
-        } else {
-          segments[segments.length - 1].push(t);
-        }
-      }
-      return segments
-        .map(seg => seg.filter(v => v.type !== 'comment'))
-        .filter(seg => seg.some(v => v.type !== 'whitespace'))
-        .map(seg => createValueFromTokens(seg, property));
-    }
-    return [new CSSStyleValue(css, privateToken)];
   }
   if (propLower === 'translate') {
     const args = trimmed.filter(v => v.type !== 'comma');
@@ -249,6 +216,38 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
       throw new TypeError(`scale expects 1, 2, or 3 arguments, got ${args.length}`);
     }
     return [parseScale('scale', args)];
+  }
+
+  if (LIST_PROPERTIES.has(propLower) && componentValues.some(t => t.type === 'comma')) {
+    const segments: ComponentValue[][] = [[]];
+    for (const t of componentValues) {
+      if (t.type === 'comma') {
+        segments.push([]);
+      } else {
+        segments[segments.length - 1].push(t);
+      }
+    }
+    return segments
+      .map(seg => seg.filter(v => v.type !== 'comment'))
+      .filter(seg => seg.some(v => v.type !== 'whitespace'))
+      .map(seg => createValueFromTokens(seg, property));
+  }
+
+  const shorthand = SHORTHANDS[propLower];
+  if (shorthand && !hasVarFunction(trimmed)) {
+    const expanded = shorthand.expand(trimmed);
+    if (expanded === null) {
+      throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
+    }
+    return [new CSSStyleValue(css.trim(), privateToken)];
+  }
+
+  if (propLower in SHORTHANDS_DATA && !hasVarFunction(trimmed)) {
+    const parsed = ParseHooks.parseStyleAttribute(tokenize(`${property}: ${css}`));
+    if (parsed.declarations.length === 0) {
+      throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
+    }
+    return [new CSSStyleValue(css.trim(), privateToken)];
   }
 
   let syntax: string | undefined = STANDARD_PROPERTIES_SYNTAX[propLower];

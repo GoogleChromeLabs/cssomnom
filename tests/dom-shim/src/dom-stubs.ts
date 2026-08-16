@@ -8,12 +8,14 @@ import { CSSStyleSheet, MediaList } from '../../../src/CSSOM.ts';
 import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
 import { ParseHooks } from '../../../src/parse-hooks.ts';
 import { getCascadedStyle } from '../../../src/cascade.ts';
+import { getUaDefault, getInitialValue } from '../../../src/cascade/value-processor.ts';
 import { matches, querySelectorAll, querySelector } from '../../../src/matcher.ts';
 import { camelToDashed } from '../../../src/utils.ts';
 import { MediaParser } from '../../../src/MediaParser.ts';
 import { tokenize } from '../../../src/tokenizer.ts';
 import * as TypedOM from '../../../src/typed-om.ts';
 import { unitToPixels, unitToRadians } from '../../../src/data/gen/units.ts';
+import { privateToken } from '../../../src/typed-om/utils/validation.ts';
 import { setupIframePrototype } from './iframe-runner.ts';
 import type { MediaEnvironment, Rule } from '../../../src/types.ts';
 import type { WindowType } from './testharness-bridge.ts';
@@ -76,13 +78,17 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
     let rawVal: TypedOM.CSSStyleValue | undefined;
     if (this._element) {
       const cascaded = getCascadedStyle(this._element);
-      const cascadedVal = cascaded.getPropertyValue(property);
+      let cascadedVal = cascaded.getPropertyValue(property);
+      if (!cascadedVal) {
+        const dashed = camelToDashed(property).toLowerCase();
+        cascadedVal = getUaDefault(dashed, this._element) || getInitialValue(dashed, this._element);
+      }
       if (cascadedVal) {
         try {
           const parsed = TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
           if (parsed.length > 0) rawVal = parsed[0];
         } catch {
-          rawVal = new TypedOM.CSSStyleValue(cascadedVal);
+          rawVal = new TypedOM.CSSStyleValue(cascadedVal, privateToken);
         }
       }
     }
@@ -871,7 +877,7 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
             return val;
           },
           set(target, prop, value, receiver) {
-            if (typeof prop === 'string') {
+            if (typeof prop === 'string' && prop !== 'cssText') {
               if (value === '' || value === null || value === undefined) {
                 const dashed = camelToDashed(prop);
                 target.removeProperty(dashed);
@@ -923,22 +929,23 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
 
     Object.defineProperty(declProto, 'cssText', {
       get(this: unknown) {
+        const raw = origCssTextDesc?.get ? origCssTextDesc.get.call(this) : '';
         const sym = getPrivateSymbol(this);
+        const customEntries: string[] = [];
         if (sym && sym in (this as Record<symbol, unknown>)) {
           const map = (this as Record<symbol, unknown>)[sym] as Map<string | symbol, string>;
           if (map && typeof (map as { entries?: unknown }).entries === 'function') {
-            const entries: string[] = [];
             for (const [k, v] of map.entries()) {
-              if (typeof k === 'string' && typeof v === 'string') {
-                entries.push(`${k}: ${v}`);
+              if (typeof k === 'string' && typeof v === 'string' && k.startsWith('--')) {
+                customEntries.push(`${k}: ${v}`);
               }
-            }
-            if (entries.length > 0) {
-              return entries.join('; ') + ';';
             }
           }
         }
-        const raw = origCssTextDesc?.get ? origCssTextDesc.get.call(this) : '';
+        if (customEntries.length > 0) {
+          const trimmedRaw = raw ? raw.trim().replace(/;?$/, ';') : '';
+          return trimmedRaw ? `${trimmedRaw} ${customEntries.join('; ')};` : customEntries.join('; ') + ';';
+        }
         return raw;
       },
       set(this: unknown, val: string) {
@@ -1043,13 +1050,12 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
             }
             const el = styleToElement.get(this as object);
             if (el && typeof el.setAttribute === 'function') {
-              const entries: string[] = [];
-              for (const [k, v] of mapObj.entries()) {
-                if (typeof k === 'string' && typeof v === 'string' && k !== '-') {
-                  entries.push(`${k}: ${v}`);
-                }
+              const text = (this as { cssText?: string }).cssText;
+              if (text) {
+                el.setAttribute('style', text);
+              } else {
+                el.removeAttribute('style');
               }
-              el.setAttribute('style', entries.join('; '));
             }
             return;
           }
@@ -1076,13 +1082,12 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
             mapObj.delete(name);
             const el = styleToElement.get(this as object);
             if (el && typeof el.setAttribute === 'function') {
-              const entries: string[] = [];
-              for (const [k, v] of mapObj.entries()) {
-                if (typeof k === 'string' && typeof v === 'string' && k !== '-') {
-                  entries.push(`${k}: ${v}`);
-                }
+              const text = (this as { cssText?: string }).cssText;
+              if (text) {
+                el.setAttribute('style', text);
+              } else {
+                el.removeAttribute('style');
               }
-              el.setAttribute('style', entries.join('; '));
             }
             return hasProp ? name : '';
           }
@@ -1355,7 +1360,14 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
         if (typeof prop === 'string') {
           const getCascaded = () => getCascadedStyle(element, undefined, pseudoElt);
           if (prop === 'getPropertyValue') {
-            return (p: string) => getCascaded().getPropertyValue(p);
+            return (p: string) => {
+              const val = getCascaded().getPropertyValue(p);
+              if (val !== '') return val;
+              const dashed = camelToDashed(p).toLowerCase();
+              const ua = getUaDefault(dashed, element);
+              if (ua) return ua;
+              return getInitialValue(dashed, element);
+            };
           }
           if (prop === 'getPropertyPriority') {
             return (p: string) => getCascaded().getPropertyPriority(p);

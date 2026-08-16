@@ -2628,6 +2628,26 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Verified with `pnpm run preflight` (0 lint/type errors, all unit tests passing).
   - Verified with `pnpm run wpt:verify` (0 regressions across all 1,687 WPT test files).
 
+## Phase 108: Shorthand `CSSStyleValue` Decomposition & Custom Property Dynamic Mutation Invalidation
+**Goal**: Support shorthand properties in `CSSStyleValue.parse()` and `StylePropertyMapReadOnly.get()`, provide dynamic style mutation invalidation across live `element.style.cssText` mutations in the cascade, and handle `revert` in custom property fallbacks.
+
+### Tasks
+- [x] **Dynamic Style Mutation Invalidation in Cascade & DOM Stubs**:
+  - In `src/cascade/rule-filter.ts`: Prioritize `domEl.style.cssText` over `getAttribute('style')` in `collectInlineDeclarations` to ensure dynamic mutations via `.style.cssText` or `.style.setProperty()` are reflected live in cascade resolution.
+  - In `tests/dom-shim/src/dom-stubs.ts`:
+    - Updated `CSSStyleDeclaration.prototype.cssText` getter and setter to merge and serialize standard and custom `--*` declarations.
+    - Updated `style` proxy setter to preserve `cssText = ''` and not misinterpret it as `removeProperty('css-text')`.
+    - Synced element `style` attribute on custom property mutations.
+- [x] **`revert` Keyword Handling in Custom Property Fallbacks (CSS Variables 1 § 4 & CSS Cascading 5)**:
+  - In `src/cascade/value-processor.ts`: Evaluated `var(--unknown, revert)` in custom and standard properties, properly rolling back custom property declarations to parent values (or UA defaults for standard properties).
+- [x] **Shorthand `CSSStyleValue` Parsing & Reification**:
+  - In `src/typed-om/values/style-value-parser.ts`: Implemented validation and parsing for shorthand properties (`SHORTHANDS` / `SHORTHANDS_DATA`), returning `[new CSSStyleValue(css.trim(), privateToken)]`.
+  - In `src/cascade/index.ts` & `tests/dom-shim/src/dom-stubs.ts`: Reconstructed canonical computed shorthand serialization for `background` (`rgb(0, 0, 255) none repeat scroll 0% 0% / auto padding-box border-box`), achieving 100% pass rate in `cssStyleValue-cssom.html` and `cssStyleValue-string.html`.
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/dynamic-style-invalidation.test.ts` and `tests/typed-om-shorthand-stylevalue.test.ts` (7/7 tests passing).
+  - Ran `pnpm run preflight` (0 errors, 0 warnings).
+  - Verified 100% pass rate across target WPT test suites (`cssStyleValue-string.html`, `cssStyleValue-cssom.html`, `revert-in-fallback.html`, `css-variable-change-style-001.html`, `css-variable-change-style-002.html`).
+
 
 
 

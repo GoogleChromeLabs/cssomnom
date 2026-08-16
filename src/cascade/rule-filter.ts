@@ -462,7 +462,14 @@ export function collectInlineDeclarations(
   sourceOrderCounter: number
 ): { declarations: MatchedDeclaration[]; nextSourceOrder: number } {
   const domEl = element as { getAttribute?(n: string): string | null; style?: { cssText?: string } | string };
-  const styleAttrText = domEl?.getAttribute?.('style') || (typeof domEl?.style === 'string' ? domEl.style : domEl?.style?.cssText);
+  let styleAttrText: string | null | undefined;
+  if (domEl?.style && typeof domEl.style === 'object' && typeof domEl.style.cssText === 'string') {
+    styleAttrText = domEl.style.cssText;
+  } else if (typeof domEl?.style === 'string') {
+    styleAttrText = domEl.style;
+  } else if (domEl && typeof domEl.getAttribute === 'function') {
+    styleAttrText = domEl.getAttribute('style');
+  }
   const declarations: MatchedDeclaration[] = [];
 
   if (styleAttrText && styleAttrText.trim()) {

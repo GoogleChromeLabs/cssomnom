@@ -544,7 +544,6 @@ function contractBackground(longhands: Record<string, ComponentValue[]>): string
       parts.push('none');
     }
 
-    console.log('PARTS FOR LAYER:', i, JSON.stringify(parts));
     layerStrings.push(parts.join(' '));
   }
 
