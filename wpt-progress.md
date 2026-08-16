@@ -3,23 +3,21 @@
 This file tracks the conformance progress of the CSSOM / Typed OM implementations across 7 major W3C Web Platform Tests (WPT) spec suites in pure Node.js (`pnpm run wpt:node:progress`).
 
 > [!NOTE]
-> **Normalized Conformance & Feasibility Baseline (Node.js vs. Browser Engine)**:
-> - A 100% raw pass rate in pure Node.js is neither feasible nor desirable because ~17% of WPT tests explicitly assert 2D viewport geometry, coordinate hit-testing (`caretPositionFromPoint`), live WebDriver user input events (`:focus-visible`), or GPU layout rasterization.
-> - Following a 3-way Delphi consensus audit across all 38 failure clusters (9,524 assertion instances), we established our **Feasible Node Target ($M$)** by subtracting physically browser-dependent tests ($E$) from total tests ($N$).
-> - **Normalized Conformance ($P / M$)** measures our progress against 100% of achievable Node.js CSSOM/AST capabilities.
+> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across the corresponding in-scope test suites.
 
 ### Feasibility & Cross-Engine Baseline Comparison
 
-| Spec Domain | Total Tests ($N$) | Browser-Only ($E$) | Feasible Target ($M$) | Current Node ($P$) | Node Norm ($P/M$) | Upstream Chrome (`wpt.fyi`) | Upstream Pass Rate |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`css-typed-om`** | 12,219 | 0 | 12,219 | 11,509 | **94.19%** | 10,690 / 11,230 | 95.19% |
-| **`cssom`** | 941 | 18 | 923 | 643 | **69.66%** | 883 / 922 | 95.77% |
-| **`css-syntax`** | 414 | 16 | 398 | 412 | **100.00%** | 392 / 398 | 98.49% |
-| **`css-nesting`** | 117 | 0 | 117 | 117 | **100.00%** | 93 / 94 | 98.94% |
-| **`css-variables`** | 561 | 13 | 548 | 392 | **71.53%** | 465 / 534 | 87.08% |
-| **`selectors`** | 4,206 | 59 | 4,147 | 3,521 | **84.90%** | 3,865 / 4,156 | 93.00% |
-| **`mediaqueries`** | 417 | 0 | 417 | 417 | **100.00%** | 392 / 416 | 94.23% |
-| **OVERALL** | **18,875** | **106** | **18,769** | **17,011** | **90.63%** | **16,780 / 17,750** | **94.54%** |
+| Spec Domain | Node.js (`cssomnom`) | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
+| :--- | :---: | :---: | :---: |
+| **`Typed OM`** | 11,509 / 12,219 (**94.2%**) | 10,690 / 11,230 (95.2%) | -1.0% |
+| **`Selectors`** | 3,521 / 4,147 (**84.9%**) | 3,865 / 4,156 (93.0%) | -8.1% |
+| **`CSSOM`** | 643 / 923 (**69.7%**) | 883 / 922 (95.8%) | -26.1% |
+| **`Variables`** | 392 / 548 (**71.5%**) | 465 / 534 (87.1%) | -15.6% |
+| **`Media Queries`** | 417 / 417 (**100.0%**) | 392 / 416 (94.2%) | 🟢 **+5.8%** |
+| **`Syntax`** | 412 / 398 (**100.0%**) | 392 / 398 (98.5%) | 🟢 **+1.5%** |
+| **`Nesting`** | 117 / 117 (**100.0%**) | 93 / 94 (98.9%) | 🟢 **+1.1%** |
+| **OVERALL** | **17,011 / 18,769 (90.6%)** | **16,780 / 17,750 (94.5%)** | **-3.9%** |
 
 ---
 

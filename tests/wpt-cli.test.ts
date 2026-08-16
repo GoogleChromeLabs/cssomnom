@@ -39,6 +39,9 @@ import {
   updateProgressLog,
   syncProgressFromNotes,
   attachGitNote,
+  formatBaselineSummaryTable,
+  updateBaselineSummaryTable,
+  loadReferenceBaselineStats,
 } from '../scripts/wpt/node/core/progress.ts';
 
 import * as zlib from 'node:zlib';
@@ -414,6 +417,96 @@ describe('WPT CLI Core Modules', () => {
         attachGitNote('unknown', dataset);
         attachGitNote('', dataset);
       });
+    });
+
+    test('formats baseline summary table in Option A 4-column layout with reference Chrome', () => {
+      const dataset: TestRunDataset = {
+        timestamp: '2026-08-16 12:00:00',
+        commitHash: '1234567',
+        isDirty: false,
+        specSummaries: {
+          'css-typed-om': { passing: 11509, total: 12219, files: 348 },
+          'cssom': { passing: 643, total: 923, files: 224 },
+          'css-nesting': { passing: 117, total: 117, files: 53 },
+          'css-syntax': { passing: 412, total: 398, files: 45 },
+          'css-variables': { passing: 392, total: 548, files: 267 },
+          'selectors': { passing: 3521, total: 4147, files: 648 },
+          'mediaqueries': { passing: 417, total: 417, files: 102 },
+        },
+        totalPassing: 17011,
+        totalTests: 18769,
+        totalFiles: 1687,
+        fileResults: [],
+      };
+
+      const table = formatBaselineSummaryTable(dataset);
+      assert.ok(table.includes('### Feasibility & Cross-Engine Baseline Comparison'));
+      assert.ok(table.includes('[`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json)'));
+      assert.ok(table.includes('| Spec Domain | Node.js (`cssomnom`) | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
+      assert.ok(table.includes('| **`Typed OM`** | 11,509 / 12,219 (**94.2%**) |'));
+      assert.ok(table.includes('| **`Nesting`** | 117 / 117 (**100.0%**) |'));
+      assert.ok(table.includes('| **OVERALL** | **17,011 / 18,769 (90.6%)** |'));
+    });
+
+    test('updates baseline summary table in wpt-progress.md preserving historical log', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-summary-test-'));
+      const testProgressPath = path.join(tempDir, 'wpt-progress.md');
+
+      try {
+        const initialContent = [
+          '# WPT Progress',
+          '',
+          '### Feasibility & Cross-Engine Baseline Comparison',
+          '',
+          '| Old Table |',
+          '| :--- |',
+          '| old data |',
+          '',
+          '---',
+          '',
+          '### Historical Conformance Progress Log',
+          '',
+          '| Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Raw Pass Rate | Normalized |',
+          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |',
+          '| 2026-08-16 00:00:00 | `abc1234` | 11509/12219 | 643/923 | 117/117 | 412/398 | 392/548 | 3521/4147 | 417/417 | 17011/18769 | 90.04% | **90.63%** |',
+        ].join('\n');
+
+        fs.writeFileSync(testProgressPath, initialContent, 'utf-8');
+
+        const dataset: TestRunDataset = {
+          timestamp: '2026-08-16 12:00:00',
+          commitHash: 'def5678',
+          isDirty: false,
+          specSummaries: {
+            'css-typed-om': { passing: 11509, total: 12219, files: 348 },
+            'cssom': { passing: 643, total: 923, files: 224 },
+            'css-nesting': { passing: 117, total: 117, files: 53 },
+            'css-syntax': { passing: 412, total: 398, files: 45 },
+            'css-variables': { passing: 392, total: 548, files: 267 },
+            'selectors': { passing: 3521, total: 4147, files: 648 },
+            'mediaqueries': { passing: 417, total: 417, files: 102 },
+          },
+          totalPassing: 17011,
+          totalTests: 18769,
+          totalFiles: 1687,
+          fileResults: [],
+        };
+
+        updateBaselineSummaryTable(dataset, testProgressPath);
+        const updated = fs.readFileSync(testProgressPath, 'utf-8');
+        assert.ok(updated.includes('| Spec Domain | Node.js (`cssomnom`) | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
+        assert.ok(updated.includes('### Historical Conformance Progress Log'));
+        assert.ok(updated.includes('`abc1234`'));
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('loadReferenceBaselineStats falls back to default constants when file is missing', () => {
+      const stats = loadReferenceBaselineStats('/non/existent/path.json');
+      assert.strictEqual(stats.milestone, '153');
+      assert.strictEqual(stats.browser, 'Chrome 153.0.8008.0');
+      assert.ok(stats.specs['css-typed-om'].total > 0);
     });
   });
 
