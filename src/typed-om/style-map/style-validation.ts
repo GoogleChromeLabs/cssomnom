@@ -240,6 +240,7 @@ export function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, pr
   }
 
   if (value instanceof CSSNumericValue) {
+    if (propLower === 'background') return false;
     const t = value.type();
     const hasLengthPct = syntax.includes('<length-percentage>');
     const hasLength = syntax.includes('<length>') || hasLengthPct;

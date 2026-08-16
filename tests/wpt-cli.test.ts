@@ -39,7 +39,31 @@ import {
   updateProgressLog,
   syncProgressFromNotes,
   attachGitNote,
+  formatBaselineSummaryTable,
+  updateBaselineSummaryTable,
+  loadReferenceBaselineStats,
 } from '../scripts/wpt/node/core/progress.ts';
+
+import * as zlib from 'node:zlib';
+
+import {
+  compareParity,
+  formatParityMarkdown,
+  formatParityConsole,
+  normalizeWptPath,
+  resolveSpecFromPath,
+  type WptReportJson,
+} from '../scripts/wpt/browser/parity.ts';
+
+import {
+  buildWptFyiApiUrl,
+  decompressBuffer,
+  normalizeWptFyiData,
+  fetchWptFyiRun,
+} from '../scripts/wpt/browser/fetch-wptfyi.ts';
+
+import { parityCommand } from '../scripts/wpt/node/commands/parity.ts';
+import { fetchUpstreamCommand } from '../scripts/wpt/node/commands/fetch-upstream.ts';
 
 import type { TestRunDataset, ParsedFileResult } from '../scripts/wpt/node/core/types.ts';
 
@@ -394,6 +418,790 @@ describe('WPT CLI Core Modules', () => {
         attachGitNote('', dataset);
       });
     });
+
+    test('formats baseline summary table in Option A 4-column layout with reference Chrome', () => {
+      const dataset: TestRunDataset = {
+        timestamp: '2026-08-16 12:00:00',
+        commitHash: '1234567',
+        isDirty: false,
+        specSummaries: {
+          'css-typed-om': { passing: 11509, total: 12219, files: 348 },
+          'cssom': { passing: 643, total: 923, files: 224 },
+          'css-nesting': { passing: 117, total: 117, files: 53 },
+          'css-syntax': { passing: 412, total: 398, files: 45 },
+          'css-variables': { passing: 392, total: 548, files: 267 },
+          'selectors': { passing: 3521, total: 4147, files: 648 },
+          'mediaqueries': { passing: 417, total: 417, files: 102 },
+        },
+        totalPassing: 17011,
+        totalTests: 18769,
+        totalFiles: 1687,
+        fileResults: [],
+      };
+
+      const table = formatBaselineSummaryTable(dataset);
+      assert.ok(table.includes('### Feasibility & Cross-Engine Baseline Comparison'));
+      assert.ok(table.includes('[`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json)'));
+      assert.ok(table.includes('| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
+      assert.ok(table.includes('| **`Typed OM`** | 11,509 / 12,219 (**94.2%**) |'));
+      assert.ok(table.includes('| **`Nesting`** | 117 / 117 (**100.0%**) |'));
+      assert.ok(table.includes('| **OVERALL** | **17,011 / 18,769 (90.6%)** |'));
+    });
+
+    test('updates baseline summary table in wpt-progress.md preserving historical log', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-summary-test-'));
+      const testProgressPath = path.join(tempDir, 'wpt-progress.md');
+
+      try {
+        const initialContent = [
+          '# WPT Progress',
+          '',
+          '### Feasibility & Cross-Engine Baseline Comparison',
+          '',
+          '| Old Table |',
+          '| :--- |',
+          '| old data |',
+          '',
+          '---',
+          '',
+          '### Historical Conformance Progress Log',
+          '',
+          '| Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Raw Pass Rate | Normalized |',
+          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |',
+          '| 2026-08-16 00:00:00 | `abc1234` | 11509/12219 | 643/923 | 117/117 | 412/398 | 392/548 | 3521/4147 | 417/417 | 17011/18769 | 90.04% | **90.63%** |',
+        ].join('\n');
+
+        fs.writeFileSync(testProgressPath, initialContent, 'utf-8');
+
+        const dataset: TestRunDataset = {
+          timestamp: '2026-08-16 12:00:00',
+          commitHash: 'def5678',
+          isDirty: false,
+          specSummaries: {
+            'css-typed-om': { passing: 11509, total: 12219, files: 348 },
+            'cssom': { passing: 643, total: 923, files: 224 },
+            'css-nesting': { passing: 117, total: 117, files: 53 },
+            'css-syntax': { passing: 412, total: 398, files: 45 },
+            'css-variables': { passing: 392, total: 548, files: 267 },
+            'selectors': { passing: 3521, total: 4147, files: 648 },
+            'mediaqueries': { passing: 417, total: 417, files: 102 },
+          },
+          totalPassing: 17011,
+          totalTests: 18769,
+          totalFiles: 1687,
+          fileResults: [],
+        };
+
+        updateBaselineSummaryTable(dataset, testProgressPath);
+        const updated = fs.readFileSync(testProgressPath, 'utf-8');
+        assert.ok(updated.includes('| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
+        assert.ok(updated.includes('### Historical Conformance Progress Log'));
+        assert.ok(updated.includes('`abc1234`'));
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('loadReferenceBaselineStats falls back to default constants when file is missing', () => {
+      const stats = loadReferenceBaselineStats('/non/existent/path.json');
+      assert.strictEqual(stats.milestone, '153');
+      assert.strictEqual(stats.browser, 'Chrome 153.0.8008.0');
+      assert.ok(stats.specs['css-typed-om'].total > 0);
+    });
+  });
+
+  describe('browser/parity.ts & commands/parity.ts', () => {
+    test('normalizes paths and resolves spec domains accurately', () => {
+      assert.strictEqual(
+        normalizeWptPath('submodules/web-platform-tests/css/css-typed-om/test.html'),
+        'css/css-typed-om/test.html'
+      );
+      assert.strictEqual(
+        normalizeWptPath('/css/selectors/focus.html'),
+        'css/selectors/focus.html'
+      );
+      assert.strictEqual(
+        normalizeWptPath('\\css\\cssom\\style.html'),
+        'css/cssom/style.html'
+      );
+
+      assert.strictEqual(resolveSpecFromPath('css/css-typed-om/test.html'), 'css-typed-om');
+      assert.strictEqual(resolveSpecFromPath('css/selectors/test.html'), 'selectors');
+      assert.strictEqual(resolveSpecFromPath('css/cssom/test.html'), 'cssom');
+      assert.strictEqual(resolveSpecFromPath('css/css-variables/test.html'), 'css-variables');
+      assert.strictEqual(resolveSpecFromPath('css/mediaqueries/test.html'), 'mediaqueries');
+      assert.strictEqual(resolveSpecFromPath('css/css-syntax/test.html'), 'css-syntax');
+      assert.strictEqual(resolveSpecFromPath('css/css-nesting/test.html'), 'css-nesting');
+      assert.strictEqual(resolveSpecFromPath('custom/unknown/test.html'), 'custom');
+    });
+
+    test('categorizes all 4 truth matrix states correctly in compareParity', () => {
+      const mockNodeDataset: TestRunDataset = {
+        timestamp: '2026-08-14 00:00:00',
+        commitHash: 'abc1234',
+        isDirty: false,
+        specSummaries: {
+          'css-typed-om': { passing: 2, total: 4, files: 1 },
+          selectors: { passing: 1, total: 1, files: 1 },
+        },
+        totalPassing: 3,
+        totalTests: 5,
+        totalFiles: 2,
+        fileResults: [
+          {
+            file: 'submodules/web-platform-tests/css/css-typed-om/matrix-test.html',
+            spec: 'css-typed-om',
+            passing: 2,
+            total: 4,
+            passingSubtests: ['subtest-conformance', 'subtest-over-mock'],
+            failedSubtests: ['subtest-spec-gap', 'subtest-feasibility'],
+            subtests: [
+              { name: 'subtest-conformance', status: 'PASS' },
+              { name: 'subtest-spec-gap', status: 'FAIL', error: 'AssertionError: expected foo got bar' },
+              { name: 'subtest-feasibility', status: 'FAIL', error: 'Error: getClientRects not supported' },
+              { name: 'subtest-over-mock', status: 'PASS' },
+            ],
+            durationMs: 100,
+            peakRssMb: 40,
+            status: 'OK',
+          },
+          {
+            file: 'submodules/web-platform-tests/css/selectors/root-test.html',
+            spec: 'selectors',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['(root)'],
+            failedSubtests: [],
+            subtests: [],
+            durationMs: 50,
+            peakRssMb: 30,
+            status: 'OK',
+          },
+        ],
+      };
+
+      const mockBrowserReport: WptReportJson = {
+        browser: 'Headless Chrome 130',
+        results: [
+          {
+            test: '/css/css-typed-om/matrix-test.html',
+            status: 'OK',
+            subtests: [
+              { name: 'subtest-conformance', status: 'PASS' },
+              { name: 'subtest-spec-gap', status: 'PASS' },
+              { name: 'subtest-feasibility', status: 'FAIL', message: 'assert_equals: expected 10 got 0' },
+              { name: 'subtest-over-mock', status: 'FAIL', message: 'TypeError: failed in real blink' },
+            ],
+          },
+          {
+            test: '/css/selectors/root-test.html',
+            status: 'OK',
+            subtests: [],
+          },
+        ],
+      };
+
+      const report = compareParity({
+        nodeDataset: mockNodeDataset,
+        browserReportData: mockBrowserReport,
+        includeAllResults: true,
+      });
+
+      assert.strictEqual(report.browserName, 'Headless Chrome 130');
+      assert.strictEqual(report.nodeCommit, 'abc1234');
+      assert.strictEqual(report.totals.totalCompared, 5);
+
+      // Verified Conformance (Node: PASS, Browser: PASS) -> 2 (1 subtest + 1 root test)
+      assert.strictEqual(report.totals.verifiedConformance, 2);
+      // Verified Spec Gap (Node: FAIL, Browser: PASS) -> 1
+      assert.strictEqual(report.totals.verifiedSpecGaps, 1);
+      // Feasibility Boundary (Node: FAIL, Browser: FAIL) -> 1
+      assert.strictEqual(report.totals.feasibilityBoundaries, 1);
+      // Over-Mocking False Positive (Node: PASS, Browser: FAIL) -> 1
+      assert.strictEqual(report.totals.overMocking, 1);
+
+      assert.strictEqual(report.discrepancies.overMocking.length, 1);
+      assert.strictEqual(report.discrepancies.overMocking[0].subtest, 'subtest-over-mock');
+      assert.strictEqual(report.discrepancies.overMocking[0].category, 'OVER_MOCKING_FALSE_POSITIVE');
+
+      assert.strictEqual(report.discrepancies.specGaps.length, 1);
+      assert.strictEqual(report.discrepancies.specGaps[0].subtest, 'subtest-spec-gap');
+      assert.strictEqual(report.discrepancies.specGaps[0].category, 'VERIFIED_SPEC_GAP');
+
+      assert.strictEqual(report.discrepancies.feasibilityBoundaries.length, 1);
+      assert.strictEqual(report.discrepancies.feasibilityBoundaries[0].subtest, 'subtest-feasibility');
+      assert.strictEqual(report.discrepancies.feasibilityBoundaries[0].category, 'FEASIBILITY_BOUNDARY');
+
+      // Spec summary verification
+      assert.strictEqual(report.summaryBySpec['css-typed-om'].totalCompared, 4);
+      assert.strictEqual(report.summaryBySpec['css-typed-om'].verifiedConformance, 1);
+      assert.strictEqual(report.summaryBySpec['selectors'].totalCompared, 1);
+      assert.strictEqual(report.summaryBySpec['selectors'].verifiedConformance, 1);
+    });
+
+    test('supports --filter-by-spec in compareParity', () => {
+      const mockNodeDataset: TestRunDataset = {
+        timestamp: '2026-08-14 00:00:00',
+        commitHash: 'def5678',
+        isDirty: false,
+        specSummaries: {},
+        totalPassing: 2,
+        totalTests: 2,
+        totalFiles: 2,
+        fileResults: [
+          {
+            file: 'submodules/web-platform-tests/css/css-typed-om/test1.html',
+            spec: 'css-typed-om',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['sub1'],
+            failedSubtests: [],
+            subtests: [{ name: 'sub1', status: 'PASS' }],
+            durationMs: 10,
+            peakRssMb: 10,
+            status: 'OK',
+          },
+          {
+            file: 'submodules/web-platform-tests/css/selectors/test2.html',
+            spec: 'selectors',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['sub2'],
+            failedSubtests: [],
+            subtests: [{ name: 'sub2', status: 'PASS' }],
+            durationMs: 10,
+            peakRssMb: 10,
+            status: 'OK',
+          },
+        ],
+      };
+
+      const mockBrowserReport: WptReportJson = {
+        results: [
+          { test: '/css/css-typed-om/test1.html', status: 'OK', subtests: [{ name: 'sub1', status: 'PASS' }] },
+          { test: '/css/selectors/test2.html', status: 'OK', subtests: [{ name: 'sub2', status: 'PASS' }] },
+        ],
+      };
+
+      const filteredReport = compareParity({
+        nodeDataset: mockNodeDataset,
+        browserReportData: mockBrowserReport,
+        filterBySpec: 'css-typed-om',
+      });
+
+      assert.strictEqual(filteredReport.totals.totalCompared, 1);
+      assert.strictEqual(filteredReport.summaryBySpec['css-typed-om'].totalCompared, 1);
+      assert.strictEqual(filteredReport.summaryBySpec['selectors'].totalCompared, 0);
+
+      assert.throws(() => {
+        compareParity({
+          nodeDataset: mockNodeDataset,
+          browserReportData: mockBrowserReport,
+          filterBySpec: 'invalid-suite',
+        });
+      }, /Invalid spec filter/);
+    });
+
+    test('generates markdown table and console formatting', () => {
+      const mockNodeDataset: TestRunDataset = {
+        timestamp: '2026-08-14 00:00:00',
+        commitHash: 'test123',
+        isDirty: false,
+        specSummaries: {},
+        totalPassing: 1,
+        totalTests: 1,
+        totalFiles: 1,
+        fileResults: [
+          {
+            file: 'submodules/web-platform-tests/css/css-typed-om/sample.html',
+            spec: 'css-typed-om',
+            passing: 1,
+            total: 1,
+            passingSubtests: ['sample'],
+            failedSubtests: [],
+            subtests: [{ name: 'sample', status: 'PASS' }],
+            durationMs: 10,
+            peakRssMb: 10,
+            status: 'OK',
+          },
+        ],
+      };
+
+      const mockBrowserReport: WptReportJson = {
+        browser: 'Headless Chrome',
+        results: [
+          { test: '/css/css-typed-om/sample.html', status: 'OK', subtests: [{ name: 'sample', status: 'PASS' }] },
+        ],
+      };
+
+      const report = compareParity({
+        nodeDataset: mockNodeDataset,
+        browserReportData: mockBrowserReport,
+      });
+
+      const md = formatParityMarkdown(report, 5);
+      assert.ok(md.includes('# Cross-Browser Differential Parity Matrix'));
+      assert.ok(md.includes('| **Typed OM** | 1 | 0 | 0 | 0 | 1 |'));
+      assert.ok(md.includes('### ⚠️ Over-Mocking False Positives'));
+      assert.ok(md.includes('None detected'));
+
+      const consoleOutput = formatParityConsole(report, 5);
+      assert.ok(consoleOutput.includes('Cross-Browser Differential Parity Matrix'));
+      assert.ok(consoleOutput.includes('TOTAL'));
+    });
+
+    test('executes parityCommand with json and mock datasets', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-parity-cmd-test-'));
+      const mockNodePath = path.join(tempDir, 'last-run.json');
+      const mockBrowserPath = path.join(tempDir, 'report-chrome.json');
+
+      try {
+        const mockNodeDataset: TestRunDataset = {
+          timestamp: '2026-08-14 00:00:00',
+          commitHash: 'cmd1234',
+          isDirty: false,
+          specSummaries: {},
+          totalPassing: 1,
+          totalTests: 1,
+          totalFiles: 1,
+          fileResults: [
+            {
+              file: 'submodules/web-platform-tests/css/css-typed-om/test.html',
+              spec: 'css-typed-om',
+              passing: 1,
+              total: 1,
+              passingSubtests: ['subtest-1'],
+              failedSubtests: [],
+              subtests: [{ name: 'subtest-1', status: 'PASS' }],
+              durationMs: 10,
+              peakRssMb: 10,
+              status: 'OK',
+            },
+          ],
+        };
+        fs.writeFileSync(mockNodePath, JSON.stringify(mockNodeDataset), 'utf-8');
+
+        const mockBrowserReport: WptReportJson = {
+          browser: 'Headless Chrome',
+          results: [
+            { test: '/css/css-typed-om/test.html', status: 'OK', subtests: [{ name: 'subtest-1', status: 'PASS' }] },
+          ],
+        };
+        fs.writeFileSync(mockBrowserPath, JSON.stringify(mockBrowserReport), 'utf-8');
+
+        const report = await parityCommand({
+          nodeCache: mockNodePath,
+          browserReport: mockBrowserPath,
+          json: true,
+        });
+
+        assert.strictEqual(report.nodeCommit, 'cmd1234');
+        assert.strictEqual(report.totals.totalCompared, 1);
+        assert.strictEqual(report.totals.verifiedConformance, 1);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('throws when datasets are missing', () => {
+      assert.throws(() => {
+        compareParity({
+          nodeCachePath: '/non/existent/path/last-run.json',
+          browserReportPath: '/non/existent/path/report.json',
+        });
+      }, /not found/);
+    });
+
+    test('categorizes all 5 truth matrix states correctly in 3-Way compareParity', () => {
+      const mockNodeDataset: TestRunDataset = {
+        timestamp: '2026-08-14 12:00:00',
+        commitHash: '3way123',
+        isDirty: false,
+        specSummaries: {
+          'css-typed-om': { passing: 3, total: 5, files: 1 },
+        },
+        totalPassing: 3,
+        totalTests: 5,
+        totalFiles: 1,
+        fileResults: [
+          {
+            file: 'submodules/web-platform-tests/css/css-typed-om/3way-matrix.html',
+            spec: 'css-typed-om',
+            passing: 3,
+            total: 5,
+            passingSubtests: ['test-conformance', 'test-polyfill', 'test-over-mock'],
+            failedSubtests: ['test-spec-gap', 'test-feasibility'],
+            subtests: [
+              { name: 'test-conformance', status: 'PASS' },
+              { name: 'test-polyfill', status: 'PASS' },
+              { name: 'test-spec-gap', status: 'FAIL', error: 'Missing feature in cssomnom' },
+              { name: 'test-feasibility', status: 'FAIL', error: 'Browser layout dependency' },
+              { name: 'test-over-mock', status: 'PASS' },
+            ],
+            durationMs: 80,
+            peakRssMb: 35,
+            status: 'OK',
+          },
+        ],
+      };
+
+      const mockInjectedReport: WptReportJson = {
+        browser: 'Injected Chrome 130',
+        results: [
+          {
+            test: '/css/css-typed-om/3way-matrix.html',
+            status: 'OK',
+            subtests: [
+              { name: 'test-conformance', status: 'PASS' },
+              { name: 'test-polyfill', status: 'PASS' },
+              { name: 'test-spec-gap', status: 'FAIL', message: 'Fails in injected test' },
+              { name: 'test-feasibility', status: 'FAIL', message: 'Fails in injected test' },
+              { name: 'test-over-mock', status: 'FAIL', message: 'Strict browser throws' },
+            ],
+          },
+        ],
+      };
+
+      const mockUpstreamReport: WptReportJson = {
+        browser: 'Upstream Chrome 130',
+        results: [
+          {
+            test: '/css/css-typed-om/3way-matrix.html',
+            status: 'OK',
+            subtests: [
+              { name: 'test-conformance', status: 'PASS' },
+              { name: 'test-polyfill', status: 'FAIL', message: 'Native browser bug' },
+              { name: 'test-spec-gap', status: 'PASS' },
+              { name: 'test-feasibility', status: 'FAIL', message: 'Native browser also fails' },
+              { name: 'test-over-mock', status: 'FAIL', message: 'Native browser fails' },
+            ],
+          },
+        ],
+      };
+
+      const report = compareParity({
+        nodeDataset: mockNodeDataset,
+        browserReportData: mockInjectedReport,
+        upstreamReportData: mockUpstreamReport,
+        includeAllResults: true,
+      });
+
+      assert.strictEqual(report.isThreeWay, true);
+      assert.strictEqual(report.browserName, 'Injected Chrome 130');
+      assert.strictEqual(report.upstreamName, 'Upstream Chrome 130');
+      assert.strictEqual(report.totals.totalCompared, 5);
+
+      // 1. VERIFIED_CONFORMANCE (Node: PASS, Injected: PASS, Upstream: PASS)
+      assert.strictEqual(report.totals.verifiedConformance, 1);
+      // 2. POLYFILL_IMPROVEMENT (Node: PASS, Injected: PASS, Upstream: FAIL)
+      assert.strictEqual(report.totals.polyfillImprovements, 1);
+      // 3. VERIFIED_SPEC_GAP (Node: FAIL, Injected: FAIL, Upstream: PASS)
+      assert.strictEqual(report.totals.verifiedSpecGaps, 1);
+      // 4. FEASIBILITY_BOUNDARY (Node: FAIL, Injected: FAIL, Upstream: FAIL)
+      assert.strictEqual(report.totals.feasibilityBoundaries, 1);
+      // 5. OVER_MOCKING_FALSE_POSITIVE (Node: PASS, Injected: FAIL, Upstream: FAIL)
+      assert.strictEqual(report.totals.overMocking, 1);
+
+      assert.strictEqual(report.discrepancies.polyfillImprovements.length, 1);
+      assert.strictEqual(report.discrepancies.polyfillImprovements[0].subtest, 'test-polyfill');
+      assert.strictEqual(report.discrepancies.polyfillImprovements[0].category, 'POLYFILL_IMPROVEMENT');
+
+      // Spec summary verification
+      const specSummary = report.summaryBySpec['css-typed-om'];
+      assert.strictEqual(specSummary.totalCompared, 5);
+      assert.strictEqual(specSummary.verifiedConformance, 1);
+      assert.strictEqual(specSummary.polyfillImprovements, 1);
+      assert.strictEqual(specSummary.verifiedSpecGaps, 1);
+      assert.strictEqual(specSummary.feasibilityBoundaries, 1);
+      assert.strictEqual(specSummary.overMocking, 1);
+
+      // 3-Way Markdown table formatting verification
+      const md = formatParityMarkdown(report, 5);
+      assert.ok(md.includes('# 3-Way Cross-Browser Differential Parity Matrix'));
+      assert.ok(md.includes('| Spec Domain | Verified Conformance | Polyfill Improvements | Verified Spec Gaps | Feasibility Boundaries | Over-Mocking False Positives | Total Compared |'));
+      assert.ok(md.includes('| **Typed OM** | 1 | 1 | 1 | 1 | 1 | 5 |'));
+      assert.ok(md.includes('### 🚀 Polyfill Improvements (Node: PASS, Injected: PASS, Upstream: FAIL)'));
+      assert.ok(md.includes('`css/css-typed-om/3way-matrix.html` > "test-polyfill"'));
+
+      // 3-Way Console output formatting verification
+      const consoleOutput = formatParityConsole(report, 5);
+      assert.ok(consoleOutput.includes('3-Way Cross-Browser Differential Parity Matrix'));
+      assert.ok(consoleOutput.includes('Polyfill Imp'));
+      assert.ok(consoleOutput.includes('Polyfill Improvements (1 assertions)'));
+    });
+
+    test('executes parityCommand with 3-way upstream report', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-3way-cmd-test-'));
+      const mockNodePath = path.join(tempDir, 'last-run.json');
+      const mockBrowserPath = path.join(tempDir, 'report-chrome.json');
+      const mockUpstreamPath = path.join(tempDir, 'report-chrome-upstream.json');
+
+      try {
+        const mockNodeDataset: TestRunDataset = {
+          timestamp: '2026-08-14 12:00:00',
+          commitHash: 'cmd3way',
+          isDirty: false,
+          specSummaries: {},
+          totalPassing: 1,
+          totalTests: 1,
+          totalFiles: 1,
+          fileResults: [
+            {
+              file: 'submodules/web-platform-tests/css/css-typed-om/test.html',
+              spec: 'css-typed-om',
+              passing: 1,
+              total: 1,
+              passingSubtests: ['subtest-1'],
+              failedSubtests: [],
+              subtests: [{ name: 'subtest-1', status: 'PASS' }],
+              durationMs: 10,
+              peakRssMb: 10,
+              status: 'OK',
+            },
+          ],
+        };
+        fs.writeFileSync(mockNodePath, JSON.stringify(mockNodeDataset), 'utf-8');
+
+        const mockBrowserReport: WptReportJson = {
+          browser: 'Injected Chrome',
+          results: [
+            { test: '/css/css-typed-om/test.html', status: 'OK', subtests: [{ name: 'subtest-1', status: 'PASS' }] },
+          ],
+        };
+        fs.writeFileSync(mockBrowserPath, JSON.stringify(mockBrowserReport), 'utf-8');
+
+        const mockUpstreamReport: WptReportJson = {
+          browser: 'Upstream Chrome',
+          results: [
+            { test: '/css/css-typed-om/test.html', status: 'OK', subtests: [{ name: 'subtest-1', status: 'FAIL' }] },
+          ],
+        };
+        fs.writeFileSync(mockUpstreamPath, JSON.stringify(mockUpstreamReport), 'utf-8');
+
+        const report = await parityCommand({
+          nodeCache: mockNodePath,
+          browserReport: mockBrowserPath,
+          upstreamReport: mockUpstreamPath,
+          json: true,
+        });
+
+        assert.strictEqual(report.isThreeWay, true);
+        assert.strictEqual(report.totals.totalCompared, 1);
+        assert.strictEqual(report.totals.polyfillImprovements, 1);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('browser/fetch-wptfyi.ts & commands/fetch-upstream.ts', () => {
+    test('buildWptFyiApiUrl formats query parameters and endpoints accurately', () => {
+      assert.strictEqual(
+        buildWptFyiApiUrl(),
+        'https://wpt.fyi/api/runs?product=chrome&label=master&max-count=1'
+      );
+
+      assert.strictEqual(
+        buildWptFyiApiUrl({ product: 'firefox', label: 'experimental', maxCount: 5 }),
+        'https://wpt.fyi/api/runs?product=firefox&label=experimental&max-count=5'
+      );
+
+      assert.strictEqual(
+        buildWptFyiApiUrl({ revision: 'a1b2c3d4e5f6' }),
+        'https://wpt.fyi/api/runs?product=chrome&sha=a1b2c3d4e5f6&max-count=1'
+      );
+
+      assert.strictEqual(
+        buildWptFyiApiUrl({ runId: 123456789 }),
+        'https://wpt.fyi/api/runs/123456789'
+      );
+    });
+
+    test('decompressBuffer handles plain text and gzipped payloads', () => {
+      const text = JSON.stringify({ hello: 'wpt.fyi' });
+      const plainBuffer = Buffer.from(text, 'utf-8');
+      assert.strictEqual(decompressBuffer(plainBuffer), text);
+
+      const gzippedBuffer = zlib.gzipSync(plainBuffer);
+      assert.strictEqual(decompressBuffer(gzippedBuffer), text);
+    });
+
+    test('normalizeWptFyiData converts various data representations into uniform WptReportJson', () => {
+      // 1. Array of results
+      const arrayData = [
+        { test: '/css/cssom/test1.html', status: 'OK', subtests: [{ name: 'sub1', status: 'PASS' }] },
+      ];
+      const norm1 = normalizeWptFyiData(arrayData, 'Chrome Master');
+      assert.strictEqual(norm1.browser, 'Chrome Master');
+      assert.strictEqual(norm1.results.length, 1);
+      assert.strictEqual(norm1.results[0].test, '/css/cssom/test1.html');
+
+      // 2. Standard WptReportJson
+      const reportData = {
+        browser: 'Custom Chrome',
+        time: 123456,
+        results: [
+          { test: '/css/selectors/test2.html', status: 'OK' },
+        ],
+      };
+      const norm2 = normalizeWptFyiData(reportData, 'Default Browser');
+      assert.strictEqual(norm2.browser, 'Custom Chrome');
+      assert.strictEqual(norm2.time, 123456);
+      assert.strictEqual(norm2.results.length, 1);
+
+      // 3. Key-Value summary dictionary
+      const dictData = {
+        '/css/css-syntax/test3.html': [0, [1, 0]],
+        '/css/css-variables/test4.html': { status: 'FAIL' },
+      };
+      const norm3 = normalizeWptFyiData(dictData, 'Chrome Summary');
+      assert.strictEqual(norm3.browser, 'Chrome Summary');
+      assert.strictEqual(norm3.results.length, 2);
+      assert.strictEqual(norm3.results[0].test, '/css/css-syntax/test3.html');
+      assert.strictEqual(norm3.results[0].status, 'OK');
+      assert.strictEqual(norm3.results[1].test, '/css/css-variables/test4.html');
+      assert.strictEqual(norm3.results[1].status, 'FAIL');
+    });
+
+    test('fetchWptFyiRun ingests, filters by spec, and caches results accurately with mock fetch', async () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-fyi-fetch-test-'));
+      const testCachePath = path.join(tempDir, 'report-chrome-upstream.json');
+
+      try {
+        const mockRunItem = {
+          id: 778899,
+          browser_name: 'chrome',
+          browser_version: '130.0.6723.44',
+          os_name: 'linux',
+          os_version: 'ubuntu',
+          revision: 'feedbeef12',
+          full_revision_hash: 'feedbeef1234567890',
+          raw_results_url: 'https://storage.googleapis.com/mock-wptd/report.json.gz',
+        };
+
+        const mockReportData = {
+          browser: 'Chrome 130.0.6723.44',
+          results: [
+            {
+              test: '/css/css-typed-om/test-typed.html',
+              status: 'OK',
+              subtests: [
+                { name: 'sub-1', status: 'PASS' },
+                { name: 'sub-2', status: 'FAIL' },
+              ],
+            },
+            {
+              test: '/css/selectors/test-sel.html',
+              status: 'OK',
+              subtests: [{ name: 'sub-3', status: 'PASS' }],
+            },
+          ],
+        };
+
+        const gzippedPayload = zlib.gzipSync(Buffer.from(JSON.stringify(mockReportData), 'utf-8'));
+
+        const mockFetch: typeof fetch = async (input: RequestInfo | URL) => {
+          const urlStr = String(input);
+          if (urlStr.includes('https://wpt.fyi/api/runs')) {
+            return {
+              ok: true,
+              status: 200,
+              statusText: 'OK',
+              json: async () => [mockRunItem],
+            } as Response;
+          }
+          if (urlStr === 'https://storage.googleapis.com/mock-wptd/report.json.gz') {
+            return {
+              ok: true,
+              status: 200,
+              statusText: 'OK',
+              headers: new Headers({ 'content-encoding': 'gzip' }),
+              arrayBuffer: async () => gzippedPayload.buffer.slice(
+                gzippedPayload.byteOffset,
+                gzippedPayload.byteOffset + gzippedPayload.byteLength
+              ),
+            } as Response;
+          }
+          return { ok: false, status: 404, statusText: 'Not Found' } as Response;
+        };
+
+        // 1. Dry Run test without writing to disk
+        const dryResult = await fetchWptFyiRun({
+          customFetch: mockFetch,
+          cachePath: testCachePath,
+          dryRun: true,
+          quiet: true,
+        });
+
+        assert.strictEqual(dryResult.runId, 778899);
+        assert.strictEqual(dryResult.revision, 'feedbeef12');
+        assert.strictEqual(dryResult.totalTests, 2);
+        assert.strictEqual(dryResult.totalSubtests, 3);
+        assert.strictEqual(dryResult.cachedPath, undefined);
+        assert.strictEqual(fs.existsSync(testCachePath), false);
+
+        // 2. Real Run with Spec filter and disk caching
+        const filteredResult = await fetchWptFyiRun({
+          customFetch: mockFetch,
+          cachePath: testCachePath,
+          spec: 'css-typed-om',
+          quiet: true,
+        });
+
+        assert.strictEqual(filteredResult.runId, 778899);
+        assert.strictEqual(filteredResult.totalTests, 1);
+        assert.strictEqual(filteredResult.totalSubtests, 2);
+        assert.strictEqual(filteredResult.cachedPath, testCachePath);
+        assert.strictEqual(fs.existsSync(testCachePath), true);
+
+        const cachedContent = JSON.parse(fs.readFileSync(testCachePath, 'utf-8')) as WptReportJson;
+        assert.strictEqual(cachedContent.results.length, 1);
+        assert.strictEqual(cachedContent.results[0].test, '/css/css-typed-om/test-typed.html');
+
+        // 3. fetchUpstreamCommand wrapper execution
+        const cmdResult = await fetchUpstreamCommand({
+          customFetch: mockFetch,
+          spec: 'css-typed-om',
+          cachePath: testCachePath,
+          dryRun: true,
+          quiet: true,
+        });
+        assert.ok(cmdResult);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('fetchWptFyiRun handles errors and invalid filters cleanly', async () => {
+      // Invalid spec name
+      await assert.rejects(async () => {
+        await fetchWptFyiRun({ spec: 'invalid-spec-domain', quiet: true });
+      }, /Invalid spec filter/);
+
+      // 404 API error
+      const mock404Fetch: typeof fetch = async () => ({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      } as Response);
+
+      await assert.rejects(async () => {
+        await fetchWptFyiRun({ customFetch: mock404Fetch, quiet: true });
+      }, /Failed to query wpt.fyi API \(404 Not Found\)/);
+
+      // Empty runs list
+      const mockEmptyFetch: typeof fetch = async () => ({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => [],
+      } as Response);
+
+      await assert.rejects(async () => {
+        await fetchWptFyiRun({ customFetch: mockEmptyFetch, quiet: true });
+      }, /No WPT runs found on wpt.fyi/);
+    });
   });
 });
+
 

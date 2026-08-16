@@ -21,7 +21,7 @@ export const SPEC_DISPLAY_NAMES: Record<string, string> = {
   'css-syntax': 'Syntax',
   'css-variables': 'Variables',
   'selectors': 'Selectors',
-  'mediaqueries': 'MQ',
+  'mediaqueries': 'Media Queries',
 };
 
 export const SPEC_ORDER: readonly SpecName[] = [
@@ -45,6 +45,19 @@ export const CANONICAL_FEASIBLE_TARGETS: Record<string, number> = {
 };
 
 export const CANONICAL_FEASIBLE_TOTAL = 18769;
+
+export const DEFAULT_REFERENCE_STATS: Record<string, { pass: number; total: number }> = {
+  'css-typed-om': { pass: 10690, total: 11230 },
+  'cssom': { pass: 883, total: 922 },
+  'css-syntax': { pass: 392, total: 398 },
+  'css-nesting': { pass: 93, total: 94 },
+  'css-variables': { pass: 465, total: 534 },
+  'selectors': { pass: 3865, total: 4156 },
+  'mediaqueries': { pass: 392, total: 416 },
+};
+
+export const DEFAULT_REFERENCE_BROWSER = 'Chrome 153.0.8008.0';
+export const DEFAULT_REFERENCE_MILESTONE = '153';
 
 export function getConfigPath(cwd = process.cwd()): string {
   return path.resolve(cwd, 'tests/wpt-node-config.json');

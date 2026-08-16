@@ -544,11 +544,33 @@ function contractBackground(longhands: Record<string, ComponentValue[]>): string
       parts.push('none');
     }
 
-    console.log('PARTS FOR LAYER:', i, JSON.stringify(parts));
     layerStrings.push(parts.join(' '));
   }
 
   return layerStrings.join(', ');
+}
+
+const LENGTH_UNITS = new Set([
+  'px', 'em', 'rem', '%', 'vh', 'vw', 'ch', 'pt', 'cm', 'mm', 'in', 'pc', 'ex', 'cap', 'ic', 'lh',
+  'cqw', 'cqh', 'vmin', 'vmax', 'vi', 'vb', 'q', 'rlh', 'dvh', 'svh', 'lvh', 'dvw', 'svw', 'lvw',
+  'cqi', 'cqb', 'cqmin', 'cqmax'
+]);
+
+function isValidLengthOrPercentage(val: ComponentValue): boolean {
+  if (val.type === 'ident') {
+    const kw = (val.value ?? '').toString().toLowerCase();
+    return ['auto', 'initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(kw);
+  }
+  if (val.type === 'dimension') {
+    return LENGTH_UNITS.has((val.unit ?? '').toLowerCase());
+  }
+  if (val.type === 'percentage') return true;
+  if (val.type === 'number' && val.value === 0) return true;
+  if (val.type === 'function') {
+    const fnName = ('name' in val ? val.name : ('value' in val ? val.value : ''))?.toString().toLowerCase();
+    return ['calc', 'min', 'max', 'clamp', 'env'].includes(fnName);
+  }
+  return false;
 }
 
 const expandBox = (physical: readonly string[], logical: readonly string[]) => (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
@@ -564,6 +586,11 @@ const expandBox = (physical: readonly string[], logical: readonly string[]) => (
 
   const data = filtered.slice(offset);
   if (data.length < 1 || data.length > 4) return null;
+
+  const isLengthBox = physical[0].startsWith('margin') || physical[0].startsWith('padding') || physical[0] === 'top' || physical[0].startsWith('scroll-');
+  if (isLengthBox && !data.every(isValidLengthOrPercentage)) {
+    return null;
+  }
 
   const result: Record<string, ComponentValue[]> = {};
   if (isLogical) {
@@ -652,10 +679,20 @@ const expandBorderSide = (prefix: string) => (values: ComponentValue[]): Record<
   const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
   if (filtered.length === 0 || filtered.length > 3) return null;
 
-  const result: Record<string, ComponentValue[]> = {};
   const widthProp = `${prefix}-width`;
   const styleProp = `${prefix}-style`;
   const colorProp = `${prefix}-color`;
+  const result: Record<string, ComponentValue[]> = {};
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      result[widthProp] = [filtered[0]];
+      result[styleProp] = [filtered[0]];
+      result[colorProp] = [filtered[0]];
+      return result;
+    }
+  }
 
   result[widthProp] = [{ type: 'ident', value: 'medium' }];
   result[styleProp] = [{ type: 'ident', value: 'none' }];
@@ -691,12 +728,15 @@ const contractBorderSide = (prefix: string) => (values: Record<string, Component
   const w = values[widthProp];
   const s = values[styleProp];
   const c = values[colorProp];
-
   if (!w || !s || !c) return null;
 
   const sw = serialize(w).trim();
   const ss = serialize(s).trim();
   const sc = serialize(c).trim();
+
+  if (sw === ss && sw === sc) {
+    return sw;
+  }
 
   return `${sw} ${sw} ${ss} ${sc}`.includes('medium none currentcolor') ? `${sw} ${ss} ${sc}` : `${sw} ${ss} ${sc}`; // Simplified for now
 };
@@ -803,10 +843,19 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
     longhands: SHORTHANDS_DATA['border-block'],
     physicalLonghands: ['border-top-width', 'border-top-style', 'border-top-color', 'border-bottom-width', 'border-bottom-style', 'border-bottom-color'],
     logicalLonghands: ['border-block-start-width', 'border-block-start-style', 'border-block-start-color', 'border-block-end-width', 'border-block-end-style', 'border-block-end-color'],
-    expand: expandBorderSide('border-block'),
+    expand: (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
+      const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+      if (filtered.length === 0) return null;
+      return {
+        'border-block-start': values,
+        'border-block-end': values,
+      };
+    },
     contract: (values: Record<string, ComponentValue[]>): string | null => {
-      const start = contractBorderSide('border-block-start')(values);
-      const end = contractBorderSide('border-block-end')(values);
+      const sVal = values['border-block-start'];
+      const eVal = values['border-block-end'];
+      const start = sVal ? serialize(sVal).trim() : contractBorderSide('border-block-start')(values);
+      const end = eVal ? serialize(eVal).trim() : contractBorderSide('border-block-end')(values);
       if (start && end && start === end) return start;
       return null;
     },
@@ -861,10 +910,19 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
     longhands: SHORTHANDS_DATA['border-inline'],
     physicalLonghands: ['border-left-width', 'border-left-style', 'border-left-color', 'border-right-width', 'border-right-style', 'border-right-color'],
     logicalLonghands: ['border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color', 'border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color'],
-    expand: expandBorderSide('border-inline'),
+    expand: (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
+      const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+      if (filtered.length === 0) return null;
+      return {
+        'border-inline-start': values,
+        'border-inline-end': values,
+      };
+    },
     contract: (values: Record<string, ComponentValue[]>): string | null => {
-      const start = contractBorderSide('border-inline-start')(values);
-      const end = contractBorderSide('border-inline-end')(values);
+      const sVal = values['border-inline-start'];
+      const eVal = values['border-inline-end'];
+      const start = sVal ? serialize(sVal).trim() : contractBorderSide('border-inline-start')(values);
+      const end = eVal ? serialize(eVal).trim() : contractBorderSide('border-inline-end')(values);
       if (start && end && start === end) return start;
       return null;
     },

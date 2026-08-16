@@ -171,20 +171,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     return [new CSSStyleValue(css, privateToken)];
   }
 
-  const shorthand = SHORTHANDS[property];
-  if (shorthand && !hasVarFunction(trimmed)) {
-    const expanded = shorthand.expand(trimmed);
-    if (expanded === null) {
-      throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
-    }
-    for (const [longhand, longhandTokens] of Object.entries(expanded)) {
-      const longhandSyntax = STANDARD_PROPERTIES_SYNTAX[longhand.toLowerCase()];
-      if (longhandSyntax && !matchesSyntax(longhandTokens, longhandSyntax)) {
-        throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
-      }
-    }
-    return [new CSSStyleValue(css, privateToken)];
-  }
+  const propLower = property.toLowerCase();
 
   if (hasVarFunction(trimmed)) {
     return [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
@@ -197,12 +184,10 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     }
   }
 
-  const propLower = property.toLowerCase();
-
   if (POSITION_PROPERTIES.has(propLower)) {
     const posVal = tryParsePosition(trimmed, property);
     if (posVal) return [posVal];
-    return [new CSSStyleValue(css, privateToken)];
+    return [new CSSStyleValue(css.trim(), privateToken)];
   }
 
   if (propLower === 'transform') {
@@ -210,24 +195,6 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
       return [new CSSKeywordValue('none')];
     }
     return [CSSTransformValue.parse(css)];
-  }
-
-  if ((property in SHORTHANDS_DATA) && !hasVarFunction(trimmed)) {
-    if (LIST_PROPERTIES.has(propLower) && componentValues.some(t => t.type === 'comma')) {
-      const segments: ComponentValue[][] = [[]];
-      for (const t of componentValues) {
-        if (t.type === 'comma') {
-          segments.push([]);
-        } else {
-          segments[segments.length - 1].push(t);
-        }
-      }
-      return segments
-        .map(seg => seg.filter(v => v.type !== 'comment'))
-        .filter(seg => seg.some(v => v.type !== 'whitespace'))
-        .map(seg => createValueFromTokens(seg, property));
-    }
-    return [new CSSStyleValue(css, privateToken)];
   }
   if (propLower === 'translate') {
     const args = trimmed.filter(v => v.type !== 'comma');
@@ -251,9 +218,67 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     return [parseScale('scale', args)];
   }
 
+  if (LIST_PROPERTIES.has(propLower) && componentValues.some(t => t.type === 'comma')) {
+    const segments: ComponentValue[][] = [[]];
+    for (const t of componentValues) {
+      if (t.type === 'comma') {
+        segments.push([]);
+      } else {
+        segments[segments.length - 1].push(t);
+      }
+    }
+    return segments
+      .map(seg => seg.filter(v => v.type !== 'comment'))
+      .filter(seg => seg.some(v => v.type !== 'whitespace'))
+      .map(seg => createValueFromTokens(seg, property));
+  }
+
+  if (trimmed.length === 1 && trimmed[0].type === 'ident') {
+    const v = trimmed[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      return [new CSSKeywordValue(trimmed[0].value)];
+    }
+  }
+  if (trimmed.length === 1 && trimmed[0].type === 'function') {
+    const fnName = ('name' in trimmed[0] ? (trimmed[0] as { name?: string }).name : ('value' in trimmed[0] ? (trimmed[0] as { value?: string }).value : ''))?.toString().toLowerCase();
+    if (fnName === 'var') {
+      return [new CSSUnparsedValue(tokensToUnparsedSegments(trimmed))];
+    }
+  }
+
   let syntax: string | undefined = STANDARD_PROPERTIES_SYNTAX[propLower];
   if (!syntax && property.startsWith('--')) {
     syntax = PropertyRegistry.get(property)?.syntax;
+  }
+
+  const LOGICAL_2VAL_PROPERTIES = new Set([
+    'margin-block', 'margin-inline',
+    'padding-block', 'padding-inline',
+    'inset-block', 'inset-inline',
+    'border-block-width', 'border-inline-width',
+    'border-block-style', 'border-inline-style',
+    'border-block-color', 'border-inline-color'
+  ]);
+
+  const shorthand = SHORTHANDS[propLower];
+  if (shorthand && !hasVarFunction(trimmed)) {
+    const expanded = shorthand.expand(trimmed);
+    if (expanded === null) {
+      throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
+    }
+    if (!LOGICAL_2VAL_PROPERTIES.has(propLower)) {
+      return [new CSSStyleValue(css.trim(), privateToken)];
+    }
+  }
+
+  if (propLower in SHORTHANDS_DATA && !hasVarFunction(trimmed)) {
+    const parsed = ParseHooks.parseStyleAttribute(tokenize(`${property}: ${css}`));
+    if (parsed.declarations.length === 0) {
+      throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
+    }
+    if (!LOGICAL_2VAL_PROPERTIES.has(propLower)) {
+      return [new CSSStyleValue(css.trim(), privateToken)];
+    }
   }
 
   if (syntax && !hasVarFunction(trimmed)) {

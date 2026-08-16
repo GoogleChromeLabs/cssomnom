@@ -270,6 +270,25 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return ser === '' ? ' ' : ser;
     }
     const dashed = camelToDashed(property).toLowerCase();
+    if (dashed !== 'writing-mode' && dashed !== 'direction' && dashed in LOGICAL_MAPPING) {
+      const wm = super.getPropertyValue('writing-mode') || 'horizontal-tb';
+      const dir = super.getPropertyValue('direction') || 'ltr';
+      const resolvedPhysical = resolveLogicalProperty(dashed, wm, dir);
+      if (resolvedPhysical !== dashed) {
+        return this.getPropertyValue(resolvedPhysical);
+      }
+    }
+    if (dashed === 'background') {
+      const color = this.getPropertyValue('background-color') || 'rgba(0, 0, 0, 0)';
+      const image = this.getPropertyValue('background-image') || 'none';
+      const repeat = this.getPropertyValue('background-repeat') || 'repeat';
+      const attachment = this.getPropertyValue('background-attachment') || 'scroll';
+      const position = this.getPropertyValue('background-position') || '0% 0%';
+      const size = this.getPropertyValue('background-size') || 'auto';
+      const origin = this.getPropertyValue('background-origin') || 'padding-box';
+      const clip = this.getPropertyValue('background-clip') || 'border-box';
+      return `${color} ${image} ${repeat} ${attachment} ${position} / ${size} ${origin} ${clip}`;
+    }
     const rawVal = super.getPropertyValue(dashed);
 
     if (rawVal) {
@@ -334,6 +353,14 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       const parentVal = this._parentStyle.getPropertyValue(dashed);
       if (parentVal) {
         return parentVal;
+      }
+    }
+
+    if (this._element && (dashed === 'display' || dashed === 'margin')) {
+      const el = this._element as { tagName?: string; nodeName?: string };
+      const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
+      if (tag) {
+        return getUaDefault(dashed, this._element);
       }
     }
 

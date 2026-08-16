@@ -112,21 +112,21 @@ test('CSS Color compliance tasks (Phase 68 Task 10)', () => {
   assert.ok(CSSOKLCH.name === 'CSSOKLCH');
 
   // Backing properties & Validation
-  const rgb = new CSSRGB(1, 0, 0, 1);
+  const rgb = new CSSRGB(new CSSUnitValue(100, 'percent'), new CSSUnitValue(0, 'percent'), new CSSUnitValue(0, 'percent'), new CSSUnitValue(100, 'percent'));
   assert.throws(() => { rgb.r = 'invalid'; }, { name: 'SyntaxError' });
   assert.throws(() => { rgb.alpha = 'invalid'; }, { name: 'SyntaxError' });
   assert.throws(() => { rgb.alpha = new CSSUnitValue(2, 'px'); }, { name: 'SyntaxError' });
 
-  // Default alpha defaults to primitive double 1 (rectifies to 100%)
-  const rgbOmittedAlpha = new CSSRGB(1, 0, 0);
+  // Default alpha defaults to 100%
+  const rgbOmittedAlpha = new CSSRGB(new CSSUnitValue(100, 'percent'), new CSSUnitValue(0, 'percent'), new CSSUnitValue(0, 'percent'));
   assert.ok(rgbOmittedAlpha.alpha instanceof CSSUnitValue);
   assert.strictEqual((rgbOmittedAlpha.alpha as CSSUnitValue).value, 100);
   assert.strictEqual((rgbOmittedAlpha.alpha as CSSUnitValue).unit, 'percent');
 
   // CSSHWB.h type checks
-  const hwbOk = new CSSHWB(new CSSUnitValue(120, 'deg'), 10, 20);
+  const hwbOk = new CSSHWB(new CSSUnitValue(120, 'deg'), new CSSUnitValue(10, 'percent'), new CSSUnitValue(20, 'percent'));
   // @ts-expect-error - testing invalid parameter types
-  assert.throws(() => { new CSSHWB(new CSSKeywordValue('none'), 10, 20); }, TypeError);
+  assert.throws(() => { new CSSHWB(new CSSKeywordValue('none'), new CSSUnitValue(10, 'percent'), new CSSUnitValue(20, 'percent')); }, TypeError);
   // @ts-expect-error - testing invalid parameter types
   assert.throws(() => { hwbOk.h = new CSSKeywordValue('none'); }, TypeError);
 
@@ -156,7 +156,7 @@ test('CSS Color compliance tasks (Phase 68 Task 10)', () => {
 });
 
 test('rectifyColorAngle throws SyntaxError DOMException on invalid angles', () => {
-  const hsl = new CSSHSL(120, 50, 50);
+  const hsl = new CSSHSL(new CSSUnitValue(120, 'deg'), new CSSUnitValue(50, 'percent'), new CSSUnitValue(50, 'percent'));
   assert.throws(() => {
     hsl.h = 'invalid-angle';
   }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
@@ -186,28 +186,28 @@ test('color() function reification to CSSColor', () => {
 });
 
 test('CSSColor channels property has public setter', () => {
-  const c = new CSSColor('srgb', [0.1, 0.2, 0.3]);
-  c.channels = [1, 1, 1];
+  const c = new CSSColor('srgb', [new CSSUnitValue(0.1, 'number'), new CSSUnitValue(0.2, 'number'), new CSSUnitValue(0.3, 'number')]);
+  c.channels = [new CSSUnitValue(1, 'number'), new CSSUnitValue(1, 'number'), new CSSUnitValue(1, 'number')];
   assert.deepEqual(c.channels.map(x => x.toString()), ['1', '1', '1']);
 });
 
 test('Alpha is omitted when unity in modern colors serialization', () => {
-  const hsl1 = new CSSHSL(120, 1, 0.5, 1);
+  const hsl1 = new CSSHSL(new CSSUnitValue(120, 'deg'), new CSSUnitValue(100, 'percent'), new CSSUnitValue(50, 'percent'), new CSSUnitValue(100, 'percent'));
   assert.strictEqual(hsl1.toString(), 'hsl(120deg 100% 50%)');
-  const hsl2 = new CSSHSL(120, 1, 0.5, 0.5);
+  const hsl2 = new CSSHSL(new CSSUnitValue(120, 'deg'), new CSSUnitValue(100, 'percent'), new CSSUnitValue(50, 'percent'), new CSSUnitValue(50, 'percent'));
   assert.strictEqual(hsl2.toString(), 'hsl(120deg 100% 50% / 50%)');
 
-  const hwb1 = new CSSHWB(new CSSUnitValue(120, 'deg'), 0.1, 0.2, 1);
+  const hwb1 = new CSSHWB(new CSSUnitValue(120, 'deg'), new CSSUnitValue(10, 'percent'), new CSSUnitValue(20, 'percent'), new CSSUnitValue(100, 'percent'));
   assert.strictEqual(hwb1.toString(), 'hwb(120deg 10% 20%)');
-  const hwb2 = new CSSHWB(new CSSUnitValue(120, 'deg'), 0.1, 0.2, 0.8);
+  const hwb2 = new CSSHWB(new CSSUnitValue(120, 'deg'), new CSSUnitValue(10, 'percent'), new CSSUnitValue(20, 'percent'), new CSSUnitValue(80, 'percent'));
   assert.strictEqual(hwb2.toString(), 'hwb(120deg 10% 20% / 80%)');
 
-  const lab1 = new CSSLab(0.5, 10, 20, 1);
+  const lab1 = new CSSLab(new CSSUnitValue(50, 'percent'), new CSSUnitValue(10, 'number'), new CSSUnitValue(20, 'number'), new CSSUnitValue(100, 'percent'));
   assert.strictEqual(lab1.toString(), 'lab(50% 10 20)');
 
-  const oklch1 = new CSSOKLCH(0.6, 0.15, 120, 1);
+  const oklch1 = new CSSOKLCH(new CSSUnitValue(60, 'percent'), new CSSUnitValue(15, 'percent'), new CSSUnitValue(120, 'deg'), new CSSUnitValue(100, 'percent'));
   assert.strictEqual(oklch1.toString(), 'oklch(60% 15% 120deg)');
 
-  const c1 = new CSSColor('srgb', [0.1, 0.2, 0.3], 1);
+  const c1 = new CSSColor('srgb', [new CSSUnitValue(0.1, 'number'), new CSSUnitValue(0.2, 'number'), new CSSUnitValue(0.3, 'number')], new CSSUnitValue(1, 'number'));
   assert.strictEqual(c1.toString(), 'color(srgb 0.1 0.2 0.3)');
 });

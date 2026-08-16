@@ -2520,33 +2520,20 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Build an automated Differential Parity Oracle that executes WPT tests in Headless Chrome (`wpt run chrome`), compares the live browser results against Node.js `.wpt-cache/last-run.json`, and categorizes results into verified passes, feasibility boundaries, and potential over-mocking false positives.
 
 ### Tasks
-- [ ] **Headless Chrome Execution Integration**:
-  - Enhance `scripts/wpt/browser/run.ts` to export structured WPT JSON report artifacts (`dist/report-chrome.json`).
-- [ ] **Differential Parity Engine (`scripts/wpt/browser/parity.ts`)**:
-  - Build parity comparator matching test subtest assertions between `last-run.json` (Node) and `report-chrome.json` (Blink).
+- [x] **Headless Chrome Execution Integration**:
+  - Enhanced `scripts/wpt/browser/run.ts` with defensive machine protection (max 4 processes default), lifecycle signal traps (`SIGINT`, `SIGTERM`, `exit`), timeout watchdog, and report generation (`dist/report-chrome.json`).
+- [x] **Differential Parity Engine (`scripts/wpt/browser/parity.ts`)**:
+  - Built parity comparator matching test subtest assertions between `last-run.json` (Node) and `report-chrome.json` (Blink).
   - Output classified Parity Matrix:
     1. *Verified Conformance*: Pass in Node + Pass in Chrome.
     2. *Verified Specification Gaps*: Fail in Node + Pass in Chrome.
     3. *Feasibility Boundaries*: Fail in Node + Fail in Chrome (confirms browser-only / unsupported / contested WPT tests).
     4. *Over-Mocking False Positives*: Pass in Node + Fail in Chrome (flags overly lenient shims).
-- [ ] **CLI Wiring**:
-  - Add `wpt parity` subcommand and `pnpm run wpt:parity` in `package.json`.
-- [ ] **Verification**:
-  - Run `pnpm run wpt:parity` across `css-typed-om` and `selectors` suites.
-
----
-
-## Phase 103: Typed OM Failure Cluster #1: `CSSUnparsedValue` Roundtrip & Transform `is2D` Immutability
-**Goal**: Eliminate the largest remaining failure cluster (~1,036 failures across 211 files) by implementing strict `is2D` immutability in CSSTransformComponent subclasses and fixing `CSSUnparsedValue` token serialization roundtripping.
-
-### Tasks
-- [ ] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
-  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY`, `CSSRotate`, `CSSTranslate`, `CSSScale` is a no-op or correctly updates 2D/3D state without throwing unexpected exceptions.
-- [ ] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
-  - In `src/typed-om/values/CSSUnparsedValue.ts`: Fix `toString()` and token list iteration to accurately serialize mixed strings and `CSSVariableReferenceValue` instances.
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
-  - Run `pnpm run wpt:verify` to confirm 0 regressions and record newly passing assertions.
+- [x] **CLI Wiring**:
+  - Added `wpt parity` subcommand in `scripts/wpt/node/cli.ts`, `commands/parity.ts` (<150 LOC), and `"wpt:parity"` in `package.json`.
+- [x] **Verification & Unit Tests**:
+  - Added unit test suite in `tests/wpt-cli.test.ts` verifying all 4 truth matrix categories, filtering, formatting, and commands.
+  - Verified with `pnpm run preflight`.
 
 ---
 
@@ -2562,6 +2549,199 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - [x] **Unit Testing & Performance Benchmark**:
   - Added comprehensive unit tests in `tests/dom-shim/tests/virtual-clock.test.ts`.
   - Verified 0 regressions across 1,687 WPT test files (16,797 passing assertions).
+
+---
+
+## Phase 105: `wpt.fyi` Upstream Chrome Baseline Fetcher & 3-Way Differential Comparison
+**Goal**: Fetch and cache official upstream Chrome WPT baseline data directly from `wpt.fyi` API / Google Cloud Storage, enabling automated 3-way differential comparisons between Node.js (`cssomnom`), Injected Browser (`cssomnom` in Chrome), and Vanilla Upstream Chrome (reference unpolyfilled engine).
+
+### Tasks
+- [x] **`wpt.fyi` Data Ingestion Engine (`scripts/wpt/browser/fetch-wptfyi.ts`)**:
+  - Implemented `fetchWptFyiRun({ product, label, revision, runId })` querying `https://wpt.fyi/api/runs` and downloading/decompressing GCS baseline results.
+  - Added streaming/magic-byte decompression support (`node:zlib.gunzipSync`), spec domain filtering, and caching to `.wpt-cache/report-chrome-upstream.json`.
+- [x] **3-Way Differential Comparator (`scripts/wpt/browser/parity.ts`)**:
+  - Extended `compareParity` to support 3-way comparison (`Node` vs `Injected Chrome` vs `Vanilla Upstream Chrome`).
+  - Categorized all 5 Truth Matrix categories:
+    1. *`VERIFIED_CONFORMANCE`*: Node: PASS, Injected: PASS, Upstream: PASS.
+    2. *`POLYFILL_IMPROVEMENT`*: Node: PASS, Injected: PASS, Upstream: FAIL (identifies where cssomnom polyfills/fixes browser shortcomings).
+    3. *`VERIFIED_SPEC_GAP`*: Node: FAIL, Injected: FAIL, Upstream: PASS (genuine implementation gaps).
+    4. *`FEASIBILITY_BOUNDARY`*: Node: FAIL, Injected: FAIL, Upstream: FAIL (shared ecosystem limitations).
+    5. *`OVER_MOCKING_FALSE_POSITIVE`*: Node: PASS, Injected: FAIL, Upstream: FAIL (overly lenient shims).
+  - Formatted 3-way Markdown and console tables with dedicated Polyfill Improvements tracking.
+- [x] **CLI & Unit Testing**:
+  - Added `wpt fetch-upstream` subcommand to `scripts/wpt/node/cli.ts`, `commands/fetch-upstream.ts` (<50 LOC), and `"wpt:fetch-upstream"` in `package.json`.
+  - Added `-u, --upstream-report <path>` option to `scripts/wpt/node/commands/parity.ts` with default cache fallback.
+  - Added unit test suite in `tests/wpt-cli.test.ts` covering URL building, decompression, normalization, 3-way parity matrix, and commands.
+  - Verified with `pnpm run preflight`.
+
+---
+
+## Phase 106: Differential Parity Matrix Interpretation & Spec Gap Triage
+**Goal**: Run the Differential Parity Oracle across all 7 W3C CSS suites, interpret findings across the 4 truth quadrants, and construct an empirical roadmap of high-priority bugs vs tightened shims.
+
+### Tasks
+- [x] **Full-Suite Parity Matrix Execution**:
+  - Executed live parity comparison across all 7 W3C CSS suites against official Upstream Chrome (17,584 total compared assertions).
+- [x] **Truth Tier Analysis & Categorization**:
+  - *Verified Conformance*: 15,050 assertions (85.6%) confirmed matching Blink reference behavior.
+  - *Spec Gap Triage*: 1,771 assertions clustered into root causes (Transform `is2D` immutability, `CSSUnparsedValue` string serialization, style mutation invalidation, shorthand parsing).
+  - *Over-Mocking Audit*: 515 assertions identified where Node stubs were overly permissive (color constructor typechecks, whitespace serialization).
+  - *Feasibility Boundaries*: 248 assertions confirmed failing across both engines (retained in manifest).
+- [x] **Publish Conformance Parity Report**:
+  - Documented findings in `docs/conformance-parity-report.md`.
+
+---
+
+## Phase 103: Typed OM Failure Cluster #1: `CSSUnparsedValue` Roundtrip & Transform `is2D` Immutability
+**Goal**: Eliminate the largest remaining failure cluster (~1,036 failures across 211 files) by implementing strict `is2D` immutability in CSSTransformComponent subclasses and fixing `CSSUnparsedValue` token serialization roundtripping.
+
+### Tasks
+- [x] **Transform `is2D` Immutability (CSS Typed OM § 7.1)**:
+  - In `src/typed-om/transform/`: Ensure `is2D` property setter on `CSSPerspective`, `CSSSkew`, `CSSSkewX`, `CSSSkewY` is an immutable no-op per spec, and `CSSTranslate`, `CSSRotate`, `CSSScale` preserve inputs and handle normalization during `toString()` without mutating instance slots.
+- [x] **`CSSUnparsedValue` String Serialization Roundtrip (CSS Typed OM § 2.2)**:
+  - In `src/typed-om/values/CSSVariableReferenceValue.ts`: Added identifier serialization for escaped custom property names and arity validation.
+  - In `src/parser.ts`: Fixed dashed-ident validation to properly support escaped identifiers.
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/typed-om-unparsed-roundtrip.test.ts` and `tests/typed-om-transform-is2d.test.ts`.
+  - Ran `pnpm run preflight` (0 errors, 0 warnings).
+  - Ran `pnpm run wpt:verify` confirming 0 regressions and +36 newly passing assertions (16,805 / 18,892 total assertions, 100% on `cssPerspective.tentative.html`, `cssSkew.tentative.html`, `cssSkewX.tentative.html`, `cssSkewY.tentative.html`, and `cssUnparsedValue` suites).
+  - Updated `wpt-passing-set-baseline.json` and `wpt-progress.md`.
+
+---
+
+## Phase 107: Color Subclasses Strict WebIDL Validation & MathClamp Arity Checks
+**Goal**: Eliminate over-mocking false positives by strictly validating color subclass arguments according to CSS Typed OM WebIDL algorithms and enforcing $\ge 3$ arguments on `CSSMathClamp`.
+
+### Tasks
+- [x] **Color Subclass Argument Typechecks & Rectification**:
+  - Enforce spec-compliant rectification and WebIDL type checks in `src/typed-om/color/color-rectify.ts` and `src/typed-om/color/color-spaces.ts`:
+    - Strict `CSSNumericValue` validation for `CSSHWB.h` (throws `TypeError` on raw numbers/undefined, and `SyntaxError` DOMException on invalid dimensions).
+    - `CSSNumericValue` dimension checks across all subclasses throwing `DOMException` `SyntaxError`.
+    - Keyword validation (`none` / `undefined`) throwing `SyntaxError` DOMException on invalid strings/keywords.
+    - Arity validation across color constructors throwing `TypeError` for missing arguments.
+- [x] **`CSSMathClamp` Arity & Type Validation**:
+  - Enforce minimum 3 arguments (`lower`, `value`, `upper`) in `CSSMathClamp` constructor, throwing `TypeError` when fewer than 3 arguments are present.
+  - Enforce type compatibility across `lower`, `value`, and `upper` parameters in `CSSMathClamp`.
+  - Added arity checks on `CSSMathNegate` and `CSSMathInvert` constructors.
+- [x] **Unit Tests & Verification**:
+  - Added comprehensive unit tests in `tests/typed-om-constructors.test.ts`.
+  - Verified with `pnpm run preflight` (0 lint/type errors, all unit tests passing).
+  - Verified with `pnpm run wpt:verify` (0 regressions across all 1,687 WPT test files).
+
+## Phase 108: Shorthand `CSSStyleValue` Decomposition & Custom Property Dynamic Mutation Invalidation
+**Goal**: Support shorthand properties in `CSSStyleValue.parse()` and `StylePropertyMapReadOnly.get()`, provide dynamic style mutation invalidation across live `element.style.cssText` mutations in the cascade, and handle `revert` in custom property fallbacks.
+
+### Tasks
+- [x] **Dynamic Style Mutation Invalidation in Cascade & DOM Stubs**:
+  - In `src/cascade/rule-filter.ts`: Prioritize `domEl.style.cssText` over `getAttribute('style')` in `collectInlineDeclarations` to ensure dynamic mutations via `.style.cssText` or `.style.setProperty()` are reflected live in cascade resolution.
+  - In `tests/dom-shim/src/dom-stubs.ts`:
+    - Updated `CSSStyleDeclaration.prototype.cssText` getter and setter to merge and serialize standard and custom `--*` declarations.
+    - Updated `style` proxy setter to preserve `cssText = ''` and not misinterpret it as `removeProperty('css-text')`.
+    - Synced element `style` attribute on custom property mutations.
+- [x] **`revert` Keyword Handling in Custom Property Fallbacks (CSS Variables 1 § 4 & CSS Cascading 5)**:
+  - In `src/cascade/value-processor.ts`: Evaluated `var(--unknown, revert)` in custom and standard properties, properly rolling back custom property declarations to parent values (or UA defaults for standard properties).
+- [x] **Shorthand `CSSStyleValue` Parsing & Reification**:
+  - In `src/typed-om/values/style-value-parser.ts`: Implemented validation and parsing for shorthand properties (`SHORTHANDS` / `SHORTHANDS_DATA`), returning `[new CSSStyleValue(css.trim(), privateToken)]`.
+  - In `src/cascade/index.ts` & `tests/dom-shim/src/dom-stubs.ts`: Reconstructed canonical computed shorthand serialization for `background` (`rgb(0, 0, 255) none repeat scroll 0% 0% / auto padding-box border-box`), achieving 100% pass rate in `cssStyleValue-cssom.html` and `cssStyleValue-string.html`.
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/dynamic-style-invalidation.test.ts` and `tests/typed-om-shorthand-stylevalue.test.ts` (7/7 tests passing).
+  - Ran `pnpm run preflight` (0 errors, 0 warnings).
+  - Verified 100% pass rate across target WPT test suites (`cssStyleValue-string.html`, `cssStyleValue-cssom.html`, `revert-in-fallback.html`, `css-variable-change-style-001.html`, `css-variable-change-style-002.html`).
+
+---
+
+## Phase 109: Gatekeeper Zero-Regression & DOM Stubs Hardening
+**Goal**: Resolve all gatekeeper regressions from commit `bcbf591`, revert artificial HTML wrapping in WPT test runner, harden `CSSStyleDeclaration` property deletion and iteration in `dom-stubs.ts`, and achieve verified 0-regression baseline conformance.
+
+### Tasks
+- [x] **Revert Synthetic HTML Wrapping in WPT Runner**:
+  - Reverted the synthetic `<html>` / `<body>` wrapper in `scripts/wpt/node/run.ts` to preserve raw WPT test file DOM structure.
+  - Updated `tests/fixtures/baselines/wpt-passing-set-baseline.json` for `submodules/web-platform-tests/css/selectors/heading.html` to reflect authentic linkedom DOM node names (182/182 tests passing).
+- [x] **Harden `CSSStyleDeclaration` & Custom Property Handling in `dom-stubs.ts`**:
+  - Guarded shorthand expansion in `declProto.setProperty` with `typeof shorthand.expand === 'function'` and `!value.includes('var(')` to avoid TypeError on non-expandable shorthands.
+  - Implemented recursive shorthand leaf removal in `declProto.removeProperty` (`removeRecursive`) to ensure removing shorthands like `border` or `border-color` cleanly purges all descendant longhands (`border-top-color`, etc.).
+  - Added `try/catch` and fallback to `styleAttr` in `declProto.getPropertyValue` for `all` to prevent linkedom `getAttributeNode` crashes.
+  - Overrode `[Symbol.iterator]` on `CSSStyleDeclaration.prototype` to safely yield `item(i)` without triggering linkedom `updateKeys` crashes.
+- [x] **Typed OM Style Value Parsing & 2-Value Logical Properties**:
+  - In `src/typed-om/values/style-value-parser.ts`: Allowed 2-value logical properties (`margin-block`, `margin-inline`, `padding-block`, `padding-inline`, `inset-block`, `inset-inline`, `border-block-*`, `border-inline-*`) to produce typed `CSSUnitValue` / `CSSKeywordValue` objects while preserving base `CSSStyleValue` returns for classic shorthands (`margin`, `padding`, `border`, `border-radius`).
+  - In `src/PropertyRegistry.ts`: Supported `{1,2}`, `{1,4}`, `?`, `*` multipliers and parsed `{ ... }` blocks in `consumeSyntaxComponent`.
+  - In `scripts/wpt/node/safe-child-process.ts`: Increased default child process timeout to 30,000ms to allow large test suites (e.g. `logical.html` with 1,468 assertions) to finish under high concurrency.
+- [x] **Verification & Milestone Commit**:
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify` across all 1,687 WPT test files:
+    - Baseline: 16,805
+    - Current: 17,011 (+206 newly passing assertions)
+    - Regressions: **0** (100% of baseline passing tests continue to pass).
+
+---
+
+## Phase 110: `cssom` Conformance Sprint (Shorthand `all`, Pseudo-Element `getComputedStyle`, & Namespaced Selectors)
+**Goal**: Eliminate the top 5 failure clusters in `css/cssom/` identified by the Parity Oracle (+119 addressable assertions), raising `cssom` normalized score from 69.7% to 82%+ and closing half the parity gap against reference Chrome.
+
+### Tasks
+- [ ] **`all` Shorthand Property Expansion & Contraction (CSSOM § 6.4.3 & CSS Cascading 5 § 6.2)**:
+  - In `src/shorthands.ts`, `src/CSSStyleDeclaration.ts`, and `tests/dom-shim/src/dom-stubs.ts`:
+    - `setProperty('all', value)`: Expands to set `value` across all known CSS longhand properties (excluding custom `--*` properties and `direction` / `unicode-bidi` per CSS Cascading 5 § 6.2).
+    - `getPropertyValue('all')`: Returns empty string `""` whenever any longhand has a different value from the others.
+    - `removeProperty('all')`: Removes all declarations affected by `all`.
+    - Verify 100% pass on `css/cssom/cssstyledeclaration-all-shorthand.html` (21 subtest gaps resolved).
+- [ ] **`getComputedStyle` Pseudo-Element Resolution (CSSOM § 6.2 #dom-window-getcomputedstyle)**:
+  - In `src/cascade/index.ts` & `src/cascade/rule-filter.ts`:
+    - Support pseudo-element resolution when `pseudoElt` is specified (`::before`, `:before`, `::after`, `:after`, `::marker`, `::placeholder`, `::highlight(name)`).
+    - Collect only rules matching the target pseudo-element on `element`.
+    - If `pseudoElt` does not start with `:` (e.g. `getComputedStyle(el, "before")`), ignore it and treat as null per CSSOM § 6.2.
+    - Verify 100% pass on `css/cssom/getComputedStyle-pseudo.html` and `getComputedStyle-pseudo-with-argument.html` (25 subtest gaps resolved).
+- [ ] **Namespaced Type Selector Serialization (CSSOM § 6.4.3 #serialize-a-simple-selector)**:
+  - In `src/parser.ts` & `src/matcher.ts`:
+    - Omit universal `*` before class/id/attribute/pseudo selectors (`*.foo` $\to$ `.foo`, `*#id` $\to$ `#id`, `*\|*` $\to$ `*`) when no default namespace is defined.
+    - Preserve explicit namespace prefixes (`*\|a`, `ns\|*`, `\|*`).
+    - Verify 100% pass on `css/cssom/serialize-namespaced-type-selectors.html` (23 subtest gaps resolved).
+- [ ] **`CSSStyleDeclaration.cssText` Case Normalization & Sizing `auto` Keyword Resolution**:
+  - In `src/CSSStyleDeclaration.ts`: Lowercase property names upon parsing `cssText` assignments (`WIDTH: 10PX` $\to$ `width: 10px;`) and retain prior valid state if invalid values are assigned.
+  - In `src/cascade/index.ts`: Resolve `min-width: auto` and `min-height: auto` on standard block/inline elements to `0px` in `getComputedStyle`.
+  - Verify 100% pass on `css/cssom/cssstyledeclaration-csstext.html` and `getComputedStyle-resolved-min-size-auto.html`.
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/cssom-all-shorthand.test.ts` and `tests/cssom-computed-pseudo.test.ts`.
+  - Run `pnpm run preflight`.
+  - Run `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+
+---
+
+## Phase 111: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
+**Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
+
+### Tasks
+- [ ] **Homogeneous Unit Simplification in `CSSNumericValue.parse()` (CSS Values 4 § 10.7)**:
+  - In `src/math-parser.ts` & `src/typed-om/numeric/`:
+    - Simplify homogeneous terms inside `calc()` additions (e.g. `calc(10px + 20px)` $\to$ `new CSSUnitValue(30, 'px')`).
+    - Distribute subtraction into addition of negated terms (`calc(10px - 5px)` $\to$ `new CSSUnitValue(5, 'px')`, `calc(10px - 5em)` $\to$ `new CSSMathSum(10px, -5em)`).
+    - Simplify multiplications of `<percentage>` or `<length>` with raw numbers (e.g. `calc(100% * 2)` $\to$ `new CSSUnitValue(200, 'percent')`).
+- [ ] **Complex Math Expression Flattening (`CSSMathSum`, `CSSMathProduct`, `CSSMathMin`, `CSSMathMax`)**:
+  - Flatten nested single-child sums and products into their underlying unit or operation nodes.
+  - Simplify homogeneous terms inside `min()` and `max()` nodes (e.g. `min(10px, 20px, 100%)` $\to$ `min(10px, 100%)`).
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/typed-om-math-simplification.test.ts`.
+  - Verify 100% pass on `css/css-typed-om/stylevalue-subclasses/numeric-objects/parse.tentative.html`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+
+---
+
+## Phase 112: Composite Shorthand Computed Synthesis & Complex Selectors
+**Goal**: Generalize computed style synthesis across all composite shorthands (`border`, `font`, `outline`, `columns`) in `src/shorthands.ts` and resolve `:scope` relative matching gaps in `css/selectors/`.
+
+### Tasks
+- [ ] **Composite Shorthand Computed Serialization Engine (`src/shorthands.ts`)**:
+  - Implement computed value serializers for composite shorthands (`border`, `outline`, `font`, `columns`).
+- [ ] **`:scope` & `@scope` Relative Context Matching (`src/matcher.ts`, `src/cascade/rule-filter.ts`)**:
+  - Support relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element.
+  - Implement `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
+- [ ] **Unit Tests & Verification**:
+  - Add tests in `tests/shorthand-computed-synthesis.test.ts` and `tests/selectors-scope-relative.test.ts`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+
+
+
+
 
 
 

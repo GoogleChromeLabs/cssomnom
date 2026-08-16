@@ -186,20 +186,48 @@ export class StylePropertyMapReadOnly {
       if (!decl) {
         const shorthand = SHORTHANDS[propKey];
         if (shorthand) {
-          const longhandValues: Record<string, ComponentValue[]> = {};
-          let allSet = true;
-          for (const lh of shorthand.longhands) {
-            const d = declarations.find(decl => (decl.name.startsWith('--') ? decl.name : decl.name.toLowerCase()) === lh);
-            if (!d) {
-              allSet = false;
-              break;
+          const checkLonghandLists = [
+            shorthand.longhands,
+            shorthand.logicalLonghands,
+            shorthand.physicalLonghands,
+          ].filter(Boolean) as (readonly string[])[];
+
+          for (const lhList of checkLonghandLists) {
+            const longhandValues: Record<string, ComponentValue[]> = {};
+            let allSet = true;
+            for (const lh of lhList) {
+              const d = declarations.find(decl => (decl.name.startsWith('--') ? decl.name : decl.name.toLowerCase()) === lh);
+              if (!d) {
+                allSet = false;
+                break;
+              }
+              longhandValues[lh] = d.value;
             }
-            longhandValues[lh] = d.value;
-          }
-          if (allSet) {
-            const contracted = shorthand.contract(longhandValues);
-            if (contracted !== null) {
-              return [new CSSStyleValue(contracted, privateToken)];
+            if (allSet) {
+              const firstVal = serialize(longhandValues[lhList[0]]).trim().toLowerCase();
+              if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(firstVal)) {
+                if (lhList.every(lh => serialize(longhandValues[lh]).trim().toLowerCase() === firstVal)) {
+                  try {
+                    return CSSStyleValue.parseAll(propKey, firstVal);
+                  } catch {}
+                }
+              }
+              if (firstVal.startsWith('var(')) {
+                const rawFirst = serialize(longhandValues[lhList[0]]).trim();
+                if (lhList.every(lh => serialize(longhandValues[lh]).trim() === rawFirst)) {
+                  try {
+                    return CSSStyleValue.parseAll(propKey, rawFirst);
+                  } catch {}
+                }
+              }
+              const contracted = shorthand.contract(longhandValues);
+              if (contracted !== null) {
+                try {
+                  return CSSStyleValue.parseAll(propKey, contracted);
+                } catch {
+                  return [new CSSStyleValue(contracted, privateToken)];
+                }
+              }
             }
           }
         }
@@ -215,7 +243,28 @@ export class StylePropertyMapReadOnly {
         return [new CSSStyleValue(serialized, privateToken)];
       }
     } else {
-      const val = this._style.getPropertyValue(propKey);
+      let val = this._style.getPropertyValue(propKey);
+      if (val === '') {
+        const shorthand = SHORTHANDS[propKey];
+        if (shorthand) {
+          const firstVal = this._style.getPropertyValue(shorthand.longhands[0]).trim().toLowerCase();
+          if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(firstVal)) {
+            if (shorthand.longhands.every(lh => this._style.getPropertyValue(lh).trim().toLowerCase() === firstVal)) {
+              try {
+                return CSSStyleValue.parseAll(propKey, firstVal);
+              } catch {}
+            }
+          }
+          if (firstVal.startsWith('var(')) {
+            const rawFirst = this._style.getPropertyValue(shorthand.longhands[0]).trim();
+            if (shorthand.longhands.every(lh => this._style.getPropertyValue(lh).trim() === rawFirst)) {
+              try {
+                return CSSStyleValue.parseAll(propKey, rawFirst);
+              } catch {}
+            }
+          }
+        }
+      }
       if (val === '') return [];
       if (propKey.startsWith('--')) {
         const tokens = tokenize(val);

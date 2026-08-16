@@ -84,15 +84,6 @@ export class CSSTranslate extends CSSTransformComponent {
     this._z = val;
   }
 
-  override get is2D(): boolean {
-    return this._is2D;
-  }
-  override set is2D(value: boolean) {
-    this._is2D = value;
-    if (value) {
-      this._z = new CSSUnitValue(0, 'px');
-    }
-  }
 
   toString(): string {
     if (this.is2D) return `translate(${this.x}, ${this.y})`;
@@ -218,12 +209,13 @@ export class CSSRotate extends CSSTransformComponent {
     if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSRotate.angle must be an angle');
     }
-    this._angle = normalizeAngleUnits(val);
+    this._angle = val;
   }
 
   toString(): string {
-    if (this.is2D) return `rotate(${this.angle})`;
-    return `rotate3d(${this.x}, ${this.y}, ${this.z}, ${this.angle})`;
+    const normAngle = normalizeAngleUnits(this.angle);
+    if (this.is2D) return `rotate(${normAngle})`;
+    return `rotate3d(${this.x}, ${this.y}, ${this.z}, ${normAngle})`;
   }
 
   override toMatrix(): DOMMatrix {
@@ -286,25 +278,34 @@ export class CSSSkew extends CSSTransformComponent {
     super();
     this.ax = ax;
     this.ay = ay;
-    this.is2D = true;
+    this._is2D = true;
+  }
+  override get is2D(): boolean {
+    return true;
+  }
+  override set is2D(_val: boolean) {
+    // Spec: CSS Typed OM Level 1 § 5.5 #dom-cssskew-is2d
+    // "The is2D attribute of a CSSSkew, CSSSkewX, or CSSSkewY object must, on setting, do nothing."
   }
   get ax(): CSSNumericValue { return this._ax; }
   set ax(val: CSSNumericValue) {
     if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSSkew.ax must be an angle');
     }
-    this._ax = normalizeAngleUnits(val);
+    this._ax = val;
   }
   get ay(): CSSNumericValue { return this._ay; }
   set ay(val: CSSNumericValue) {
     if (!(val instanceof CSSNumericValue) || !matchesAngle(val.type())) {
       throw new TypeError('CSSSkew.ay must be an angle');
     }
-    this._ay = normalizeAngleUnits(val);
+    this._ay = val;
   }
   toString(): string {
-    if (this.ay instanceof CSSUnitValue && this.ay.value === 0) return `skew(${this.ax})`;
-    return `skew(${this.ax}, ${this.ay})`;
+    const normAx = normalizeAngleUnits(this.ax);
+    const normAy = normalizeAngleUnits(this.ay);
+    if (this.ay instanceof CSSUnitValue && this.ay.value === 0) return `skew(${normAx})`;
+    return `skew(${normAx}, ${normAy})`;
   }
   override toMatrix(): DOMMatrix {
     const axRad = this.ax.to('rad').value;
@@ -322,7 +323,14 @@ export class CSSSkewX extends CSSTransformComponent {
     }
     super();
     this.ax = ax;
-    this.is2D = true;
+    this._is2D = true;
+  }
+  override get is2D(): boolean {
+    return true;
+  }
+  override set is2D(_val: boolean) {
+    // Spec: CSS Typed OM Level 1 § 5.5 #dom-cssskew-is2d
+    // "The is2D attribute of a CSSSkew, CSSSkewX, or CSSSkewY object must, on setting, do nothing."
   }
   get ax(): CSSNumericValue { return this._ax; }
   set ax(val: CSSNumericValue) {
@@ -332,7 +340,7 @@ export class CSSSkewX extends CSSTransformComponent {
     this._ax = val;
   }
   toString(): string {
-    return `skewX(${this.ax})`;
+    return `skewX(${normalizeAngleUnits(this.ax)})`;
   }
   override toMatrix(): DOMMatrix {
     const axRad = this.ax.to('rad').value;
@@ -349,7 +357,14 @@ export class CSSSkewY extends CSSTransformComponent {
     }
     super();
     this.ay = ay;
-    this.is2D = true;
+    this._is2D = true;
+  }
+  override get is2D(): boolean {
+    return true;
+  }
+  override set is2D(_val: boolean) {
+    // Spec: CSS Typed OM Level 1 § 5.5 #dom-cssskew-is2d
+    // "The is2D attribute of a CSSSkew, CSSSkewX, or CSSSkewY object must, on setting, do nothing."
   }
   get ay(): CSSNumericValue { return this._ay; }
   set ay(val: CSSNumericValue) {
@@ -359,7 +374,7 @@ export class CSSSkewY extends CSSTransformComponent {
     this._ay = val;
   }
   toString(): string {
-    return `skewY(${this.ay})`;
+    return `skewY(${normalizeAngleUnits(this.ay)})`;
   }
   override toMatrix(): DOMMatrix {
     const ayRad = this.ay.to('rad').value;
@@ -375,8 +390,15 @@ export class CSSPerspective extends CSSTransformComponent {
       throw new TypeError("Failed to construct 'CSSPerspective': 1 argument required, but only 0 present.");
     }
     super();
+    this._is2D = false;
     this.length = length;
-    this.is2D = false;
+  }
+  override get is2D(): boolean {
+    return false;
+  }
+  override set is2D(_val: boolean) {
+    // Spec: CSS Typed OM Level 1 § 5.6 #dom-cssperspective-is2d
+    // "The is2D attribute of a CSSPerspective object must, on setting, do nothing."
   }
   get length(): CSSNumericValue | CSSKeywordValue { return this._length; }
   set length(val: CSSNumericValue | CSSKeywordValue | string) {

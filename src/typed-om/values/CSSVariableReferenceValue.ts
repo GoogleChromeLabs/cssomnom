@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+import { serializeIdentifier } from '../../serializer.ts';
 import type { CSSUnparsedValue } from './CSSUnparsedValue.ts';
 
 // Spec: CSS Typed OM Level 1 § 3.4 #variable-reference-value-objects
@@ -23,6 +24,9 @@ export class CSSVariableReferenceValue {
   private _fallback: CSSUnparsedValue | null = null;
 
   constructor(variable: string, fallback: CSSUnparsedValue | null = null) {
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to construct 'CSSVariableReferenceValue': 1 argument required, but only 0 present.");
+    }
     this.variable = variable;
     if (fallback !== null && fallback !== undefined) {
       if (!(fallback && typeof fallback === 'object' && 'constructor' in fallback && (fallback.constructor.name === 'CSSUnparsedValue' || (fallback as { [Symbol.iterator]?: unknown })[Symbol.iterator]))) {
@@ -50,9 +54,10 @@ export class CSSVariableReferenceValue {
   }
 
   toString(): string {
+    const varName = serializeIdentifier(this._variable);
     if (this._fallback !== null) {
-      return `var(${this._variable},${this._fallback.toString()})`;
+      return `var(${varName},${this._fallback.toString()})`;
     }
-    return `var(${this._variable})`;
+    return `var(${varName})`;
   }
 }

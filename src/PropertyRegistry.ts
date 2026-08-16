@@ -125,13 +125,27 @@ function consumeSyntaxComponent(stream: ArrayTokenStream): SyntaxComponent {
   if (next.type === 'whitespace') {
     stream.next();
     const afterWs = stream.peek();
-    if (afterWs.type === 'delim' && (afterWs.value === '+' || afterWs.value === '#')) {
+    if (afterWs.type === 'delim' && (afterWs.value === '+' || afterWs.value === '#' || afterWs.value === '?' || afterWs.value === '*')) {
       stream.next();
       multiplier = afterWs.value;
+    } else if (afterWs.type === '{') {
+      stream.next();
+      while (true) {
+        const t = stream.next();
+        if (t.type === '}' || t.type === 'EOF') break;
+      }
+      multiplier = '+';
     }
-  } else if (next.type === 'delim' && (next.value === '+' || next.value === '#')) {
+  } else if (next.type === 'delim' && (next.value === '+' || next.value === '#' || next.value === '?' || next.value === '*')) {
     stream.next();
     multiplier = next.value;
+  } else if (next.type === '{') {
+    stream.next();
+    while (true) {
+      const t = stream.next();
+      if (t.type === '}' || t.type === 'EOF') break;
+    }
+    multiplier = '+';
   }
 
   return { name, multiplier };

@@ -3,23 +3,21 @@
 This file tracks the conformance progress of the CSSOM / Typed OM implementations across 7 major W3C Web Platform Tests (WPT) spec suites in pure Node.js (`pnpm run wpt:node:progress`).
 
 > [!NOTE]
-> **Normalized Conformance & Feasibility Baseline (Node.js vs. Browser Engine)**:
-> - A 100% raw pass rate in pure Node.js is neither feasible nor desirable because ~17% of WPT tests explicitly assert 2D viewport geometry, coordinate hit-testing (`caretPositionFromPoint`), live WebDriver user input events (`:focus-visible`), or GPU layout rasterization.
-> - Following a 3-way Delphi consensus audit across all 38 failure clusters (9,524 assertion instances), we established our **Feasible Node Target ($M$)** by subtracting physically browser-dependent tests ($E$) from total tests ($N$).
-> - **Normalized Conformance ($P / M$)** measures our progress against 100% of achievable Node.js CSSOM/AST capabilities.
+> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across the corresponding in-scope test suites.
 
-### Feasibility & Normalized Conformance Baseline
+### Feasibility & Cross-Engine Baseline Comparison
 
-| Spec Domain | Total Tests ($N$) | Browser-Only ($E$) | Feasible Target ($M$) | Current Passing ($P$) | Raw Score ($P/N$) | Normalized Conformance ($P/M$) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`css-typed-om`** | 12,219 | 0 | 12,219 | 11,359 | 92.96% | **92.96%** |
-| **`cssom`** | 941 | 18 | 923 | 603 | 64.08% | **65.33%** |
-| **`css-syntax`** | 414 | 16 | 398 | 398 | 96.14% | **100.00%** |
-| **`css-nesting`** | 117 | 0 | 117 | 117 | 100.00% | **100.00%** |
-| **`css-variables`**| 561 | 13 | 548 | 335 | 59.71% | **61.13%** |
-| **`selectors`** | 4,206 | 59 | 4,147 | 3,495 | 83.10% | **84.28%** |
-| **`mediaqueries`** | 417 | 0 | 417 | 417 | 100.00% | **100.00%** |
-| **OVERALL** | **18,875** | **106** | **18,769** | **16,724** | **88.60%** | **89.10%** |
+| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
+| :--- | :---: | :---: | :---: |
+| **`Typed OM`** | 11,509 / 12,219 (**94.2%**) | 10,690 / 11,230 (95.2%) | -1.0% |
+| **`Selectors`** | 3,521 / 4,147 (**84.9%**) | 3,865 / 4,156 (93.0%) | -8.1% |
+| **`CSSOM`** | 643 / 923 (**69.7%**) | 883 / 922 (95.8%) | -26.1% |
+| **`Variables`** | 392 / 548 (**71.5%**) | 465 / 534 (87.1%) | -15.6% |
+| **`Media Queries`** | 417 / 417 (**100.0%**) | 392 / 416 (94.2%) | 🟢 **+5.8%** |
+| **`Syntax`** | 412 / 398 (**100.0%**) | 392 / 398 (98.5%) | 🟢 **+1.5%** |
+| **`Nesting`** | 117 / 117 (**100.0%**) | 93 / 94 (98.9%) | 🟢 **+1.1%** |
+| **OVERALL** | **17,011 / 18,769 (90.6%)** | **16,780 / 17,750 (94.5%)** | **-3.9%** |
 
 ---
 
@@ -27,6 +25,11 @@ This file tracks the conformance progress of the CSSOM / Typed OM implementation
 
 | Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Raw Pass Rate | Normalized |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 2026-08-16 03:23:58 | `bcbf591*` | 11509/12219 | 643/923 | 117/117 | 412/398 | 392/548 | 3521/4147 | 417/417 | 17011/18769 | 90.04% | **90.63%** |
+| 2026-08-16 02:15:07 | `eeafae6*` | 11431/12219 | 598/923 | 117/117 | 340/398 | 321/548 | 3521/4147 | 417/417 | 16745/18769 | 88.64% | **89.22%** |
+| 2026-08-15 20:20:07 | `14db331*` | 11401/12219 | 618/923 | 117/117 | 398/398 | 335/548 | 3520/4147 | 417/417 | 16806/18769 | 88.96% | **89.54%** |
+| 2026-08-15 07:06:32 | `46ddda2*` | 11103/12219 | 618/923 | 117/117 | 398/398 | 335/548 | 3233/4147 | 417/417 | 16221/18769 | 88.60% | **86.42%** |
+| 2026-08-15 07:04:25 | `46ddda2*` | 11400/12219 | 618/923 | 117/117 | 398/398 | 335/548 | 3520/4147 | 417/417 | 16805/18769 | 88.95% | **89.54%** |
 | 2026-08-13 20:20:51 | `37203fb` | 11392/12219 | 618/923 | 117/117 | 398/398 | 335/548 | 3520/4147 | 417/417 | 16797/18769 | 88.91% | **89.49%** |
 | 2026-08-13 20:13:39 | `f4a3bc8` | 11324/12219 | 618/923 | 117/117 | 398/398 | 335/548 | 3520/4147 | 417/417 | 16729/18769 | 88.87% | **89.13%** |
 | 2026-08-13 15:06:45 | `42c3b37` | 10057/12219 | 604/923 | 117/117 | 398/398 | 335/548 | 3517/4147 | 407/417 | 15435/18769 | 88.67% | **82.24%** |

@@ -148,12 +148,16 @@ export function serialize(nodes: ComponentValue[], preserveCase: boolean = false
   let prevLastToken: Token | null = null;
 
   for (const node of nodes) {
+    if (node.type === 'EOF') continue;
     const firstToken = getFirstToken(node);
     if (prevLastToken && firstToken && requiresTokenSeparator(prevLastToken, firstToken)) {
       result += '/**/';
     }
     result += serializeNode(node, preserveCase);
-    prevLastToken = getLastToken(node);
+    const last = getLastToken(node);
+    if (last) {
+      prevLastToken = last;
+    }
   }
   return result;
 }
@@ -871,8 +875,8 @@ export function serializeDeclarations(declarations: Declaration[]): string {
       result.push(combined);
     } else {
       const isCustom = d.name.startsWith('--');
-      let val = serialize(d.value, isCustom, d.name).trim();
-      result.push(`${d.name}: ${val}${d.important ? ' !important' : ''}`);
+      let val = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, isCustom, d.name).trim();
+      result.push(`${serializeIdentifier(d.name)}: ${val}${d.important ? ' !important' : ''}`);
       processed.add(d);
     }
   }

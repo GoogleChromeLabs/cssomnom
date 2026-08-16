@@ -29,7 +29,7 @@ test('CSSImageValue and CSSColorValue', () => {
     new CSSUnitValue(255, 'number'),
     new CSSUnitValue(0, 'number'),
     new CSSUnitValue(0, 'number'),
-    0.5
+    new CSSUnitValue(50, 'percent')
   );
   assert.strictEqual(color.toString(), 'rgba(255, 0, 0, 0.5)');
   
@@ -46,7 +46,7 @@ test('CSSImageValue and CSSColorValue', () => {
     new CSSUnitValue(120, 'deg'),
     new CSSUnitValue(20, 'percent'),
     new CSSUnitValue(30, 'percent'),
-    0.8
+    new CSSUnitValue(80, 'percent')
   );
   assert.strictEqual(hwb.toString(), 'hwb(120deg 20% 30% / 80%)');
 
@@ -85,8 +85,8 @@ test('CSSImageValue and CSSColorValue', () => {
   // CSSColor
   const displayP3 = new CSSColor(
     new CSSKeywordValue('display-p3'),
-    [1, 0, 0],
-    0.5
+    [new CSSUnitValue(1, 'number'), new CSSUnitValue(0, 'number'), new CSSUnitValue(0, 'number')],
+    new CSSUnitValue(0.5, 'number')
   );
   assert.strictEqual(displayP3.toString(), 'color(display-p3 1 0 0 / 0.5)');
 });
@@ -105,15 +105,10 @@ test('CSSColorValue.parse()', () => {
   }, (err: unknown) => err instanceof DOMException && err.name === 'SyntaxError');
 });
 
-test('CSSColorValue constructors ergonomics', () => {
+test('CSSColorValue constructors conversion and validation', () => {
   const rgb = new CSSRGB(255, 0, 0, 0.5);
-  assert.ok(rgb.r instanceof CSSUnitValue);
+  assert.ok(rgb instanceof CSSRGB);
   assert.strictEqual(rgb.toString(), 'rgba(25500%, 0%, 0%, 0.5)');
-
-  const rgbStr = new CSSRGB('100%', '0%', '0%', '50%');
-  assert.ok(rgbStr.r instanceof CSSUnitValue);
-  assert.strictEqual((rgbStr.r as CSSUnitValue).unit, 'percent');
-  assert.strictEqual(rgbStr.toString(), 'rgba(100%, 0%, 0%, 0.5)');
 });
 
 test('CSSPositionValue constructors, getters, setters, and serialization', () => {

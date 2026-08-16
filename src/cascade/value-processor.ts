@@ -160,7 +160,7 @@ export function processStandardDeclarations(
         continue;
       }
 
-      if (/^\s*-?\d+(?:\.\d+)?\s+(?:px|em|rem|%|vh|vw|ch|pt|cm|mm|in|pc|ex|cap|ic|lh|cqw|cqh)\s*$/i.test(subVal)) {
+      if (/^\s*-?\d+(?:\.\d+)?(?:\s+|\/\*\*\/)(?:px|em|rem|%|vh|vw|ch|pt|cm|mm|in|pc|ex|cap|ic|lh|cqw|cqh)\s*$/i.test(subVal)) {
         continue;
       }
 
@@ -209,7 +209,8 @@ export function processStandardDeclarations(
         break;
       }
 
-      winningDeclarations.set(prop, { ...decl, value: subVal });
+      const finalVal = !prop.startsWith('--') ? subVal.replace(/\/\*\*\//g, ' ') : subVal;
+      winningDeclarations.set(prop, { ...decl, value: finalVal });
       break;
     }
   }
