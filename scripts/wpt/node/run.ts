@@ -49,11 +49,7 @@ function getScriptContent(htmlDir: string, src: string): string {
 }
 
 export function runWptFile(filePath: string): WptFileResult {
-  let htmlContent = fs.readFileSync(filePath, 'utf-8');
-  if (!htmlContent.includes('<html') || !htmlContent.includes('<body')) {
-    const cleaned = htmlContent.replace(/<!DOCTYPE[^>]*>/i, '');
-    htmlContent = `<!DOCTYPE html><html><body>${cleaned}</body></html>`;
-  }
+  const htmlContent = fs.readFileSync(filePath, 'utf-8');
   const dom = parseHTML(htmlContent);
   const win = dom.window;
   patchWindowForTypedOM(win);

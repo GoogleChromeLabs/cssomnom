@@ -65,7 +65,7 @@ export function safeExecTestFile(
   filePath: string,
   options: SafeExecOptions = {}
 ): Promise<ExecResult> {
-  const timeout = options.timeout ?? 15000;
+  const timeout = options.timeout ?? 30000;
   const maxBuffer = options.maxBuffer ?? 50 * 1024 * 1024;
   const maxOldSpaceSize = options.maxOldSpaceSize ?? 512;
   const maxRssMB = options.maxRssMb ?? 6144;

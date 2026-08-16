@@ -61,15 +61,7 @@ export function substituteVariables(
   const resolveNodes = (nodes: ComponentValue[]): ComponentValue[] | null => {
     const result: ComponentValue[] = [];
     const pushTokens = (tokens: ComponentValue[]) => {
-      for (const tok of tokens) {
-        if (result.length > 0) {
-          const last = result[result.length - 1];
-          if (last && last.type !== 'whitespace' && tok.type !== 'whitespace') {
-            result.push({ type: 'whitespace', value: ' ' } as ComponentValue);
-          }
-        }
-        result.push(tok);
-      }
+      result.push(...tokens);
     };
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];

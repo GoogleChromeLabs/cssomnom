@@ -132,6 +132,22 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
   // cssom-1 § 6.4.1 #concept-declarations-specified-order
   private _addDeclaration(d: Declaration) {
+    const shorthand = SHORTHANDS[d.name];
+    if (shorthand) {
+      for (const lh of shorthand.longhands) {
+        if (this._declMap.has(lh)) {
+          const existing = this._declMap.get(lh)!;
+          if (existing.important && !d.important) {
+            continue;
+          }
+          const index = this._declarations.indexOf(existing);
+          if (index !== -1) {
+            this._declarations.splice(index, 1);
+          }
+          this._declMap.delete(lh);
+        }
+      }
+    }
     if (this._declMap.has(d.name)) {
       const existing = this._declMap.get(d.name)!;
       if (existing.important && !d.important) {

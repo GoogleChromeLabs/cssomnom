@@ -233,13 +233,42 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
       .map(seg => createValueFromTokens(seg, property));
   }
 
+  if (trimmed.length === 1 && trimmed[0].type === 'ident') {
+    const v = trimmed[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      return [new CSSKeywordValue(trimmed[0].value)];
+    }
+  }
+  if (trimmed.length === 1 && trimmed[0].type === 'function') {
+    const fnName = ('name' in trimmed[0] ? (trimmed[0] as { name?: string }).name : ('value' in trimmed[0] ? (trimmed[0] as { value?: string }).value : ''))?.toString().toLowerCase();
+    if (fnName === 'var') {
+      return [new CSSUnparsedValue(tokensToUnparsedSegments(trimmed))];
+    }
+  }
+
+  let syntax: string | undefined = STANDARD_PROPERTIES_SYNTAX[propLower];
+  if (!syntax && property.startsWith('--')) {
+    syntax = PropertyRegistry.get(property)?.syntax;
+  }
+
+  const LOGICAL_2VAL_PROPERTIES = new Set([
+    'margin-block', 'margin-inline',
+    'padding-block', 'padding-inline',
+    'inset-block', 'inset-inline',
+    'border-block-width', 'border-inline-width',
+    'border-block-style', 'border-inline-style',
+    'border-block-color', 'border-inline-color'
+  ]);
+
   const shorthand = SHORTHANDS[propLower];
   if (shorthand && !hasVarFunction(trimmed)) {
     const expanded = shorthand.expand(trimmed);
     if (expanded === null) {
       throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
     }
-    return [new CSSStyleValue(css.trim(), privateToken)];
+    if (!LOGICAL_2VAL_PROPERTIES.has(propLower)) {
+      return [new CSSStyleValue(css.trim(), privateToken)];
+    }
   }
 
   if (propLower in SHORTHANDS_DATA && !hasVarFunction(trimmed)) {
@@ -247,12 +276,9 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     if (parsed.declarations.length === 0) {
       throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
     }
-    return [new CSSStyleValue(css.trim(), privateToken)];
-  }
-
-  let syntax: string | undefined = STANDARD_PROPERTIES_SYNTAX[propLower];
-  if (!syntax && property.startsWith('--')) {
-    syntax = PropertyRegistry.get(property)?.syntax;
+    if (!LOGICAL_2VAL_PROPERTIES.has(propLower)) {
+      return [new CSSStyleValue(css.trim(), privateToken)];
+    }
   }
 
   if (syntax && !hasVarFunction(trimmed)) {

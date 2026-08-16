@@ -13,6 +13,9 @@ import { matches, querySelectorAll, querySelector } from '../../../src/matcher.t
 import { camelToDashed } from '../../../src/utils.ts';
 import { MediaParser } from '../../../src/MediaParser.ts';
 import { tokenize } from '../../../src/tokenizer.ts';
+import { serialize, serializeIdentifier } from '../../../src/serializer.ts';
+import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from '../../../src/shorthands.ts';
+import type { ComponentValue } from '../../../src/types.ts';
 import * as TypedOM from '../../../src/typed-om.ts';
 import { unitToPixels, unitToRadians } from '../../../src/data/gen/units.ts';
 import { privateToken } from '../../../src/typed-om/utils/validation.ts';
@@ -70,13 +73,41 @@ const adoptedStyleSheetsMap = new WeakMap<object, CSSStyleSheet[]>();
 const attributeStyleMapCache = new WeakMap<object, TypedOM.StylePropertyMap>();
 const computedStyleMapCache = new WeakMap<object, ComputedStylePropertyMap>();
 const styleProxyMap = new WeakMap<object, object>();
+const proxyToStyle = new WeakMap<object, object>();
 const styleToElement = new WeakMap<object, Element>();
 const documentFontsMap = new WeakMap<object, FontFaceSet>();
+const customPropsStore = new WeakMap<object, Map<string, string>>();
+function getCustomMap(obj: object): Map<string, string> {
+  const target = (obj && typeof obj === 'object' ? proxyToStyle.get(obj) : undefined) || obj;
+  let m = customPropsStore.get(target);
+  if (!m) {
+    m = new Map<string, string>();
+    customPropsStore.set(target, m);
+    const el = styleToElement.get(obj) || (target && typeof target === 'object' ? styleToElement.get(target) : undefined);
+    const styleAttr = el && typeof el.getAttribute === 'function' ? el.getAttribute('style') : null;
+    if (styleAttr && styleAttr.includes('--')) {
+      try {
+        const parsed = ParseHooks.parseStyleAttribute(tokenize(styleAttr));
+        for (const d of parsed.declarations) {
+          if (d.name.startsWith('--')) {
+            const valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, true).trim();
+            m.set(d.name, valStr || ' ');
+          }
+        }
+      } catch {}
+    }
+  }
+  return m;
+}
+let isDeclProtoPatched = false;
 
 export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
   override get(property: string): TypedOM.CSSStyleValue | undefined {
     let rawVal: TypedOM.CSSStyleValue | undefined;
     if (this._element) {
+      const el = this._element as { isConnected?: boolean; ownerDocument?: { contains?: (n: unknown) => boolean; documentElement?: unknown } };
+      const isConnected = el.isConnected ?? (el.ownerDocument?.documentElement && el.ownerDocument.contains ? el.ownerDocument.contains(el) : false);
+      if (!isConnected) return undefined;
       const cascaded = getCascadedStyle(this._element);
       let cascadedVal = cascaded.getPropertyValue(property);
       if (!cascadedVal) {
@@ -197,6 +228,24 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
     }
 
     return rawVal;
+  }
+
+  override getAll(property: string): TypedOM.CSSStyleValue[] {
+    if (this._element) {
+      const el = this._element as { isConnected?: boolean; ownerDocument?: { contains?: (n: unknown) => boolean; documentElement?: unknown } };
+      const isConnected = el.isConnected ?? (el.ownerDocument?.documentElement && el.ownerDocument.contains ? el.ownerDocument.contains(el) : false);
+      if (!isConnected) return [];
+      const cascaded = getCascadedStyle(this._element);
+      const cascadedVal = cascaded.getPropertyValue(property);
+      if (cascadedVal) {
+        try {
+          return TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
+        } catch {
+          return [new TypedOM.CSSStyleValue(cascadedVal, privateToken)];
+        }
+      }
+    }
+    return super.getAll(property);
   }
 }
 
@@ -498,20 +547,62 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     | {
         documentElement?: { tagName?: string };
         createElement(tag: string): Element;
+        childNodes?: unknown[];
         children?: Element[];
         appendChild(el: Element): void;
       }
     | undefined;
   if (winDoc && winDoc.documentElement && winDoc.documentElement.tagName !== 'HTML') {
     const htmlEl = winDoc.createElement('html');
-    const children = Array.from(winDoc.children || []);
-    for (const child of children) {
-      htmlEl.appendChild(child);
+    const headEl = winDoc.createElement('head');
+    const bodyEl = winDoc.createElement('body');
+    htmlEl.appendChild(headEl);
+    htmlEl.appendChild(bodyEl);
+
+    const allElements: Element[] = [];
+    const collectElements = (node: unknown) => {
+      const elNode = node as { childNodes?: ArrayLike<unknown> };
+      if (elNode && elNode.childNodes) {
+        for (const child of Array.from(elNode.childNodes)) {
+          const c = child as { nodeType?: number; tagName?: string };
+          if (c && c.nodeType === 1) {
+            const tag = c.tagName;
+            if (tag === 'HEAD' || tag === 'BODY') {
+              collectElements(child);
+            } else {
+              allElements.push(child as Element);
+            }
+          }
+        }
+      }
+    };
+    collectElements(winDoc);
+
+    for (const el of allElements) {
+      const tag = el.tagName;
+      if (tag === 'TITLE' || tag === 'META' || tag === 'LINK' || tag === 'STYLE' || tag === 'BASE') {
+        headEl.appendChild(el);
+      } else {
+        bodyEl.appendChild(el);
+      }
     }
+
     winDoc.appendChild(htmlEl);
     Object.defineProperty(winDoc, 'documentElement', {
       get() {
         return htmlEl;
+      },
+      configurable: true
+    });
+    Object.defineProperty(winDoc, 'head', {
+      get() {
+        return headEl;
+      },
+      configurable: true
+    });
+    Object.defineProperty(winDoc, 'body', {
+      get() {
+        return bodyEl;
       },
       configurable: true
     });
@@ -866,18 +957,45 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
         }
         const proxy = new Proxy(styleObj, {
           get(target, prop, receiver) {
+            if (prop === 'cssText') {
+              const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(styleObj), 'cssText');
+              return desc?.get ? desc.get.call(receiver) : '';
+            }
+            if (typeof prop === 'symbol') {
+              if (prop === Symbol.iterator) {
+                return (target as Record<symbol, unknown>)[Symbol.iterator];
+              }
+              if (prop === Symbol.toStringTag) {
+                return 'CSSStyleDeclaration';
+              }
+              return undefined;
+            }
             if (typeof prop === 'string' && /^\d+$/.test(prop)) {
               const idx = parseInt(prop, 10);
               return typeof target.item === 'function' ? target.item(idx) : target[idx];
             }
             const val = Reflect.get(target, prop, receiver);
-            if (typeof val === 'string' && val.startsWith('url(') && !val.endsWith(')')) {
+            if (val === undefined || val === '') {
+              if (typeof prop === 'string' && prop !== 'length' && typeof target.getPropertyValue === 'function') {
+                const dashed = camelToDashed(prop).toLowerCase();
+                const propVal = target.getPropertyValue(dashed);
+                if (propVal) return propVal;
+              }
+            }
+            if (typeof val === 'string' && val.startsWith('url(') && !val.includes(')')) {
               return val + ')';
             }
             return val;
           },
           set(target, prop, value, receiver) {
-            if (typeof prop === 'string' && prop !== 'cssText') {
+            if (prop === 'cssText') {
+              const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(styleObj), 'cssText');
+              if (desc?.set) {
+                desc.set.call(target, typeof value === 'string' ? value : String(value ?? ''));
+                return true;
+              }
+            }
+            if (typeof prop === 'string') {
               if (value === '' || value === null || value === undefined) {
                 const dashed = camelToDashed(prop);
                 target.removeProperty(dashed);
@@ -888,94 +1006,90 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
           }
         });
         styleProxyMap.set(styleObj, proxy);
+        proxyToStyle.set(proxy, styleObj);
         styleToElement.set(proxy, this);
         return proxy;
       },
       set(this: Element, value: string) {
-        const styleObj = styleDescriptor!.get!.call(this);
-        styleToElement.set(styleObj, this);
-        styleObj.cssText = value;
+        if (typeof value === 'string') {
+          if (value) {
+            this.setAttribute('style', value);
+          } else {
+            this.removeAttribute('style');
+          }
+        }
       },
       configurable: true
     });
   }
 
   // Patch CSSStyleDeclaration prototype to validate custom property names and preserve casing
-  const dummyEl = window.document.createElement('div');
-  const styleObj = styleDescriptor ? styleDescriptor.get!.call(dummyEl) : dummyEl.style;
-  const declProto = Object.getPrototypeOf(styleObj) as Record<string, unknown>;
-  if (declProto) {
-    let privateSymbol: symbol | undefined = undefined;
-    const getPrivateSymbol = (style: unknown) => {
-      if (privateSymbol) return privateSymbol;
-      if (!style || typeof style !== 'object') return undefined;
-      let p: object | null = style as object;
-      while (p) {
-        const symbols = Object.getOwnPropertySymbols(p);
-        const found = symbols.find(s => s.toString() === 'Symbol(private)');
-        if (found) {
-          privateSymbol = found;
-          return privateSymbol;
-        }
-        p = Object.getPrototypeOf(p);
-      }
-      return undefined;
-    };
-
-    const origGet = declProto.getPropertyValue as (name: string) => string;
-    const origSet = declProto.setProperty as (name: string, value: string | null, priority?: string) => void;
-    const origRemove = declProto.removeProperty as (name: string) => string;
-    const origCssTextDesc = Object.getOwnPropertyDescriptor(declProto, 'cssText');
+  if (!isDeclProtoPatched) {
+    const dummyEl = window.document.createElement('div');
+    const styleObj = styleDescriptor ? styleDescriptor.get!.call(dummyEl) : dummyEl.style;
+    const declProto = Object.getPrototypeOf(styleObj) as Record<string, unknown>;
+    if (declProto) {
+      isDeclProtoPatched = true;
+      const origGet = declProto.getPropertyValue as (name: string) => string;
+      const origSet = declProto.setProperty as (name: string, value: string | null, priority?: string) => void;
+      const origRemove = declProto.removeProperty as (name: string) => string;
+      const origCssTextDesc = Object.getOwnPropertyDescriptor(declProto, 'cssText');
 
     Object.defineProperty(declProto, 'cssText', {
       get(this: unknown) {
-        const raw = origCssTextDesc?.get ? origCssTextDesc.get.call(this) : '';
-        const sym = getPrivateSymbol(this);
-        const customEntries: string[] = [];
-        if (sym && sym in (this as Record<symbol, unknown>)) {
-          const map = (this as Record<symbol, unknown>)[sym] as Map<string | symbol, string>;
-          if (map && typeof (map as { entries?: unknown }).entries === 'function') {
-            for (const [k, v] of map.entries()) {
-              if (typeof k === 'string' && typeof v === 'string' && k.startsWith('--')) {
-                customEntries.push(`${k}: ${v}`);
-              }
-            }
+        if (!this || typeof this !== 'object') return '';
+        const target = (this && typeof this === 'object' ? proxyToStyle.get(this as object) : undefined) || this;
+        const el = styleToElement.get(this as object) || (target && typeof target === 'object' ? styleToElement.get(target as object) : undefined);
+        const styleAttr = el && typeof el.getAttribute === 'function' ? el.getAttribute('style') : null;
+        let text = styleAttr;
+        if (text === null || text === undefined) {
+          try {
+            text = origCssTextDesc?.get ? origCssTextDesc.get.call(target) : '';
+          } catch {
+            text = '';
           }
         }
-        if (customEntries.length > 0) {
-          const trimmedRaw = raw ? raw.trim().replace(/;?$/, ';') : '';
-          return trimmedRaw ? `${trimmedRaw} ${customEntries.join('; ')};` : customEntries.join('; ') + ';';
+        if (text) {
+          try {
+            const parsed = ParseHooks.parseStyleAttribute(tokenize(text));
+            const declStyle = new CSSStyleDeclaration(parsed.declarations);
+            const m = getCustomMap(this as object);
+            for (const [k, v] of m.entries()) {
+              declStyle.setProperty(k, v);
+            }
+            return declStyle.cssText;
+          } catch {}
         }
-        return raw;
+        const m = getCustomMap(this as object);
+        if (m.size > 0) {
+          const customEntries = Array.from(m.entries()).map(([k, v]) => `${serializeIdentifier(k)}: ${v};`);
+          return customEntries.join(' ');
+        }
+        return '';
       },
       set(this: unknown, val: string) {
-        if (origCssTextDesc?.set) {
-          origCssTextDesc.set.call(this, val);
-        }
-        const sym = getPrivateSymbol(this);
-        if (sym && sym in (this as Record<symbol, unknown>)) {
-          const map = (this as Record<symbol, unknown>)[sym] as Map<string | symbol, string>;
-          if (map && typeof map.clear === 'function') {
-            map.clear();
-            const d = new CSSStyleDeclaration();
-            d.cssText = val;
-            const seen = new Set<string>();
-            for (let i = 0; i < d.length; i++) {
-              const name = d.item(i);
-              if (seen.has(name)) continue;
-              seen.add(name);
-              const v = d.getPropertyValue(name);
-              const p = d.getPropertyPriority(name);
-              map.set(name, p === 'important' ? `${v} !important` : v);
-            }
+        if (this && typeof this === 'object') {
+          const m = getCustomMap(this as object);
+          m.clear();
+          if (val && val.includes('--')) {
+            try {
+              const parsed = ParseHooks.parseStyleAttribute(tokenize(val));
+              for (const d of parsed.declarations) {
+                if (d.name.startsWith('--')) {
+                  const valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, true).trim();
+                  m.set(d.name, valStr || ' ');
+                }
+              }
+            } catch {}
           }
-        }
-        const el = styleToElement.get(this as object);
-        if (el && typeof el.setAttribute === 'function') {
-          if (val) {
-            el.setAttribute('style', val);
-          } else {
-            el.removeAttribute('style');
+          const target = (this && typeof this === 'object' ? proxyToStyle.get(this as object) : undefined) || this;
+          const el = styleToElement.get(this as object) || (target && typeof target === 'object' ? styleToElement.get(target as object) : undefined);
+          if (el && typeof el.setAttribute === 'function') {
+            if (val) {
+              el.setAttribute('style', val);
+            } else {
+              el.removeAttribute('style');
+            }
           }
         }
       },
@@ -988,26 +1102,12 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
         if (!ParseHooks.isValidDashedIdent(name)) {
           return '';
         }
-        void (this as { cssText?: string }).cssText;
-        const sym = getPrivateSymbol(this);
-        if (sym && sym in (this as Record<symbol, unknown>)) {
-          const map = (this as Record<symbol, unknown>)[sym];
-          if (map && typeof (map as { get?: unknown }).get === 'function') {
-            const hasProp =
-              typeof (map as { has?: unknown }).has === 'function'
-                ? (map as { has: (k: string) => boolean }).has(name)
-                : false;
-            if (hasProp) {
-              const rawVal = (map as { get: (k: string) => unknown }).get(name);
-              if (typeof rawVal === 'string') {
-                const cleaned = rawVal.replace(/\s*!important\s*$/i, '').trim();
-                if (cleaned === '') {
-                  return ' ';
-                }
-                return cleaned;
-              }
-              return ' ';
-            }
+        if (this && typeof this === 'object') {
+          const m = getCustomMap(this as object);
+          const rawVal = m.get(name);
+          if (typeof rawVal === 'string') {
+            const cleaned = rawVal.replace(/\s*!important\s*$/i, '').trim();
+            return cleaned === '' ? ' ' : cleaned;
           }
         }
         return '';
@@ -1015,8 +1115,78 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       if (name.startsWith('-')) {
         return '';
       }
-      const val = origGet.call(this, name);
-      if (typeof val === 'string' && val.startsWith('url(') && !val.endsWith(')')) {
+      const normName = name.toLowerCase();
+      const target = (this && typeof this === 'object') ? (proxyToStyle.get(this) || this) : this;
+      const shorthand = SHORTHANDS[normName];
+      if (shorthand) {
+        const longhandValues: Record<string, ComponentValue[]> = {};
+        for (const lh of shorthand.longhands) {
+          const v = (this as { getPropertyValue: (p: string) => string }).getPropertyValue(lh);
+          if (v) {
+            longhandValues[lh] = tokenize(v);
+          }
+        }
+        if (shorthand.longhands.every(lh => longhandValues[lh])) {
+          const contracted = shorthand.contract(longhandValues);
+          if (contracted) return contracted;
+        }
+      }
+      let val = '';
+      try {
+        val = origGet.call(target, normName) || '';
+      } catch {}
+      if (!val && normName === 'all') {
+        const el = styleToElement.get(this as object) || (target && typeof target === 'object' ? styleToElement.get(target as object) : undefined);
+        const styleAttr = el && typeof el.getAttribute === 'function' ? el.getAttribute('style') : null;
+        if (styleAttr && styleAttr.includes('all:')) {
+          const match = styleAttr.match(/all:\s*([^;]+)/);
+          if (match) val = match[1].trim();
+        }
+      }
+      if (typeof val === 'string' && val.includes('!important')) {
+        val = val.replace(/\s*!important\s*$/i, '').trim();
+      }
+      if (LONGHAND_TO_SHORTHAND[normName]) {
+        for (const shName of LONGHAND_TO_SHORTHAND[normName]) {
+          let shVal = '';
+          try {
+            shVal = origGet.call(target, shName) || '';
+          } catch {}
+          if (shVal) {
+            const shPrio = (this as { getPropertyPriority?: (p: string) => string }).getPropertyPriority?.(shName) || '';
+            const myPrio = (this as { getPropertyPriority?: (p: string) => string }).getPropertyPriority?.(normName) || '';
+            if (shPrio === 'important' && myPrio !== 'important') {
+              return '';
+            }
+            if (!val && !shVal.includes('var(')) {
+              const sh = SHORTHANDS[shName];
+              if (sh) {
+                const expanded = sh.expand(ParseHooks.parseComponentValues(tokenize(shVal)));
+                if (expanded && expanded[normName]) {
+                  val = serialize(expanded[normName]).trim();
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+      if (shorthand && typeof val === 'string' && val.includes('var(')) {
+        const shPrio = (this as { getPropertyPriority?: (p: string) => string }).getPropertyPriority?.(normName) || '';
+        for (const lh of shorthand.longhands) {
+          let lhVal = '';
+          try {
+            lhVal = origGet.call(target, lh) || '';
+          } catch {}
+          if (lhVal) {
+            const lhPrio = (this as { getPropertyPriority?: (p: string) => string }).getPropertyPriority?.(lh) || '';
+            if (lhPrio === 'important' || shPrio !== 'important') {
+              return '';
+            }
+          }
+        }
+      }
+      if (typeof val === 'string' && val.startsWith('url(') && !val.includes(')')) {
         return val + ')';
       }
       return val;
@@ -1038,80 +1208,145 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
         if (!ParseHooks.isValidDashedIdent(name)) {
           return;
         }
-        const sym = getPrivateSymbol(this);
-        if (sym && sym in (this as Record<symbol, unknown>)) {
-          const map = (this as Record<symbol, unknown>)[sym];
-          if (map && typeof (map as { set?: unknown }).set === 'function') {
-            const mapObj = map as Map<string | symbol, string>;
-            if (value === null || value === undefined || value === '') {
-              mapObj.delete(name);
+        if (this && typeof this === 'object') {
+          const m = getCustomMap(this as object);
+          m.set(name, value);
+          const el = styleToElement.get(this as object) || (proxyToStyle.has(this) ? styleToElement.get(proxyToStyle.get(this)!) : undefined);
+          if (el && typeof el.setAttribute === 'function') {
+            const text = (this as { cssText?: string }).cssText;
+            if (text) {
+              el.setAttribute('style', text);
             } else {
-              mapObj.set(name, value);
+              el.removeAttribute('style');
             }
-            const el = styleToElement.get(this as object);
-            if (el && typeof el.setAttribute === 'function') {
-              const text = (this as { cssText?: string }).cssText;
-              if (text) {
-                el.setAttribute('style', text);
-              } else {
-                el.removeAttribute('style');
-              }
-            }
-            return;
           }
         }
+        return;
       }
-      origSet.call(this, name, value, priority);
-      const el = styleToElement.get(this as object);
-      if (el && typeof el.setAttribute === 'function') {
-        const text = (this as { cssText?: string }).cssText;
-        if (text) {
-          el.setAttribute('style', text);
+      const normName = name.startsWith('--') ? name : name.toLowerCase();
+      const target = (this && typeof this === 'object') ? (proxyToStyle.get(this) || this) : this;
+      const shorthand = SHORTHANDS[normName];
+      if (shorthand && typeof shorthand.expand === 'function' && typeof value === 'string' && !value.includes('var(')) {
+        const tokens = tokenize(value);
+        const comp = ParseHooks.parseComponentValues(tokens);
+        const expanded = shorthand.expand(comp);
+        if (expanded) {
+          for (const [lh, val] of Object.entries(expanded)) {
+            const valStr = serialize(val).trim();
+            (this as { setProperty: (p: string, v: string, pr?: string) => void }).setProperty(lh, valStr, priority);
+          }
+          return;
         }
       }
+      origSet.call(target, normName, value, priority);
     };
 
     declProto.removeProperty = function (this: unknown, name: string) {
       if (name.startsWith('--')) {
-        const sym = getPrivateSymbol(this);
-        if (sym && sym in (this as Record<symbol, unknown>)) {
-          const map = (this as Record<symbol, unknown>)[sym];
-          if (map && typeof (map as { delete?: unknown }).delete === 'function') {
-            const mapObj = map as Map<string | symbol, string>;
-            const hasProp = mapObj.has(name);
-            mapObj.delete(name);
-            const el = styleToElement.get(this as object);
-            if (el && typeof el.setAttribute === 'function') {
-              const text = (this as { cssText?: string }).cssText;
-              if (text) {
-                el.setAttribute('style', text);
-              } else {
-                el.removeAttribute('style');
+        if (this && typeof this === 'object') {
+          const m = getCustomMap(this as object);
+          const hasProp = m.has(name);
+          m.delete(name);
+          const el = styleToElement.get(this as object) || (proxyToStyle.has(this) ? styleToElement.get(proxyToStyle.get(this)!) : undefined);
+          if (el && typeof el.setAttribute === 'function') {
+            const text = (this as { cssText?: string }).cssText;
+            if (text) {
+              el.setAttribute('style', text);
+            } else {
+              el.removeAttribute('style');
+            }
+          }
+          return hasProp ? name : '';
+        }
+        return '';
+      }
+      const normName = name.startsWith('--') ? name : name.toLowerCase();
+      const target = (this && typeof this === 'object') ? (proxyToStyle.get(this) || this) : this;
+      const shorthand = SHORTHANDS[normName];
+      if (shorthand) {
+        const prevVal = (this as { getPropertyValue: (p: string) => string }).getPropertyValue(normName);
+        origRemove.call(target, normName);
+        const removeRecursive = (shName: string) => {
+          const sh = SHORTHANDS[shName];
+          if (sh) {
+            for (const lh of sh.longhands) {
+              origRemove.call(target, lh);
+              removeRecursive(lh);
+            }
+          }
+        };
+        removeRecursive(normName);
+        if (this && typeof this === 'object') {
+          const el = styleToElement.get(this as object) || (target && typeof target === 'object' ? styleToElement.get(target as object) : undefined);
+          if (el && typeof el.setAttribute === 'function') {
+            const text = (this as { cssText?: string }).cssText;
+            el.setAttribute('style', text || '');
+          }
+        }
+        return prevVal;
+      }
+      if (LONGHAND_TO_SHORTHAND[normName]) {
+        for (const shName of LONGHAND_TO_SHORTHAND[normName]) {
+          const shVal = origGet.call(target, shName);
+          if (shVal) {
+            origRemove.call(target, shName);
+            const sh = SHORTHANDS[shName];
+            if (sh) {
+              const expanded = sh.expand(ParseHooks.parseComponentValues(tokenize(shVal)));
+              if (expanded) {
+                for (const [lh, val] of Object.entries(expanded)) {
+                  if (lh !== normName) {
+                    origSet.call(target, lh, serialize(val).trim(), '');
+                  }
+                }
               }
             }
-            return hasProp ? name : '';
           }
         }
       }
-      const res = origRemove.call(this, name);
-      const el = styleToElement.get(this as object);
-      if (el && typeof el.setAttribute === 'function') {
-        const text = (this as { cssText?: string }).cssText;
-        el.setAttribute('style', text || '');
+      const res = origRemove.call(target, normName);
+      if (this && typeof this === 'object') {
+        const el = styleToElement.get(this as object) || (target && typeof target === 'object' ? styleToElement.get(target as object) : undefined);
+        if (el && typeof el.setAttribute === 'function') {
+          const text = (this as { cssText?: string }).cssText;
+          el.setAttribute('style', text || '');
+        }
       }
       return res;
     };
 
     const origGetPriority = declProto.getPropertyPriority as ((name: string) => string) | undefined;
     declProto.getPropertyPriority = function (this: unknown, name: string) {
+      const target = (this && typeof this === 'object' ? proxyToStyle.get(this as object) : undefined) || this;
+      const el = styleToElement.get(this as object) || (target && typeof target === 'object' ? styleToElement.get(target as object) : undefined);
+      const styleAttr = el && typeof el.getAttribute === 'function' ? el.getAttribute('style') : null;
+      if (styleAttr && styleAttr.toLowerCase().includes('important')) {
+        try {
+          const parsed = ParseHooks.parseStyleAttribute(tokenize(styleAttr));
+          const norm = name.toLowerCase();
+          for (let i = parsed.declarations.length - 1; i >= 0; i--) {
+            const d = parsed.declarations[i];
+            if (d.name.toLowerCase() === norm) {
+              return d.important ? 'important' : '';
+            }
+          }
+          const shorthand = SHORTHANDS[norm];
+          if (shorthand) {
+            const allImportant = shorthand.longhands.every(lh => {
+              for (let i = parsed.declarations.length - 1; i >= 0; i--) {
+                const d = parsed.declarations[i];
+                if (d.name.toLowerCase() === lh) {
+                  return d.important;
+                }
+              }
+              return false;
+            });
+            if (allImportant) return 'important';
+          }
+        } catch {}
+      }
       if (origGetPriority) {
         return origGetPriority.call(this, name);
-      }
-      const styleText = (this as { cssText?: string }).cssText || '';
-      if (styleText && styleText.toLowerCase().includes('important')) {
-        const decl = new CSSStyleDeclaration();
-        decl.cssText = styleText;
-        return decl.getPropertyPriority(name);
       }
       return '';
     };
@@ -1121,18 +1356,21 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     };
 
     const declProtoWithSymbols = declProto as Record<string | symbol, unknown>;
-    if (!declProtoWithSymbols[Symbol.iterator]) {
-      declProtoWithSymbols[Symbol.iterator] = function* (this: unknown) {
-        const len = (this as { length?: number }).length || 0;
-        const itemFn = (this as { item?: (i: number) => string }).item;
-        if (typeof itemFn === 'function') {
-          for (let i = 0; i < len; i++) {
-            yield itemFn.call(this, i);
-          }
+    declProtoWithSymbols[Symbol.iterator] = function* (this: unknown) {
+      const len = (this as { length?: number }).length || 0;
+      const itemFn = (this as { item?: (i: number) => string }).item;
+      if (typeof itemFn === 'function') {
+        for (let i = 0; i < len; i++) {
+          yield itemFn.call(this, i);
         }
-      };
-    }
+      } else {
+        for (let i = 0; i < len; i++) {
+          yield (this as Record<number, string>)[i];
+        }
+      }
+    };
   }
+}
 
   Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', {
     get(this: HTMLElement) {
