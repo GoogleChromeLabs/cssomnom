@@ -47,6 +47,18 @@ const knownSkips = new Map<string, string>([
   [
     'img:not(/*)*/[src]){background:url(data:image/png;base64,FooBar)}',
     'Fixture expects background shorthand to be preserved as-is, but we expand it to longhands.'
+  ],
+  [
+    'h2 {font: normal\n1.6em\r\nTimes New Roman,\tserif  ;}',
+    'Fixture expects font shorthand to be preserved as-is, but we expand it to longhands per CSSOM specification.'
+  ],
+  [
+    "h1 {font-family: 'Times New Roman', Helvetica Neue, sans-serif }",
+    'Fixture expects quoted "Times New Roman", but CSS Fonts 4 / CSSOM § 6.4.3 requires unquoted valid ident sequences.'
+  ],
+  [
+    "h3 {font-family: 'times new roman'} ",
+    'Fixture expects quoted "times new roman", but CSS Fonts 4 / CSSOM § 6.4.3 requires unquoted valid ident sequences.'
   ]
 ]);
 

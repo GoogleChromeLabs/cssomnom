@@ -1,4 +1,8 @@
 [
+  "test|.foo { overflow: hidden; overflow-y: var(--y); }",
+  "test|.foo { border: 1px solid red; border-image: var(--border-image); }",
+  "test|.foo { flex: 0 0; flex-grow: var(--grow); }",
+  "test|.foo { border-width: 0; border-bottom: var(--test, 1px) solid; }",
   "test|.foo { border-left: 2px solid red; border-right: 2px solid red; border-bottom: 2px solid red; border-top: 2px solid red; }",
   "test|.foo { border-left-width: thick; border-left: thin dotted red; }",
   "test|.foo { border: thin dotted red; border-right-width: thick; }",

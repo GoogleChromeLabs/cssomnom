@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 import { ParseHooks } from './parse-hooks.ts';
-import { serialize, serializeDeclarations } from './serializer.ts';
+import { serialize, serializeDeclarations, serializeFontFamily } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import type { Declaration, CSSRule, ComponentValue } from './types.ts';
 import { SHORTHANDS } from './shorthands.ts';
@@ -318,6 +318,12 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         }
         return serialized;
       }
+      if (winner.name === 'font-family') {
+        return serializeFontFamily(winner.value);
+      }
+      if (winner.name === 'flex-basis' && serialize(winner.value).trim() === '0') {
+        return '0px';
+      }
       return serialize(winner.value, isCustom);
     }
     return '';
@@ -452,14 +458,19 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
-      const expanded = shorthand.expand(ParseHooks.parseComponentValues(tokens));
+      const compVals = ParseHooks.parseComponentValues(tokens);
+      const expanded = shorthand.expand(compVals);
       if (expanded) {
         for (const [lh, val] of Object.entries(expanded)) {
           this.setProperty(lh, serialize(val), normalizedPriority);
         }
         return;
       }
-      if (!shorthand.stub) {
+      if (value.includes('var(') && ParseHooks.validateDeclarationValue(compVals)) {
+        for (const lh of shorthand.longhands) {
+          this.removeProperty(lh);
+        }
+      } else if (!shorthand.stub) {
         return;
       }
     }

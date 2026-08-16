@@ -29,6 +29,14 @@ export interface ShorthandDefinition {
   stub?: boolean;
 }
 
+function getFunctionName(token: ComponentValue): string {
+  if (token.type === 'function') {
+    if ('name' in token && typeof token.name === 'string') return token.name.toLowerCase();
+    if ('value' in token && typeof token.value === 'string') return token.value.toLowerCase();
+  }
+  return '';
+}
+
 function isRepeatKeyword(token: ComponentValue): boolean {
   return token.type === 'ident' && ['repeat', 'no-repeat', 'space', 'round', 'repeat-x', 'repeat-y'].includes(token.value.toLowerCase());
 }
@@ -281,6 +289,23 @@ function joinWithWhitespace(tokens: ComponentValue[]): ComponentValue[] {
 }
 
 function expandBackground(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      return {
+        'background-image': [filtered[0]],
+        'background-position': [filtered[0]],
+        'background-size': [filtered[0]],
+        'background-repeat': [filtered[0]],
+        'background-attachment': [filtered[0]],
+        'background-origin': [filtered[0]],
+        'background-clip': [filtered[0]],
+        'background-color': [filtered[0]],
+      };
+    }
+  }
+
   const layers: ComponentValue[][] = [];
   let currentLayer: ComponentValue[] = [];
   for (const val of values) {
@@ -692,6 +717,80 @@ const contractTwoValue = (longhands: readonly string[]) => (values: Record<strin
   return s1 === s2 ? s1 : `${s1} ${s2}`;
 };
 
+function formatBorderSideValue(widthVal: string, styleVal: string, colorVal: string): string | null {
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  const w = widthVal.trim();
+  const s = styleVal.trim();
+  const c = colorVal.trim();
+  const wLower = w.toLowerCase();
+  const sLower = s.toLowerCase();
+  const cLower = c.toLowerCase();
+
+  if (CSS_WIDE.includes(wLower) || CSS_WIDE.includes(sLower) || CSS_WIDE.includes(cLower)) {
+    if (wLower === sLower && wLower === cLower) {
+      return w;
+    }
+    return null;
+  }
+
+  const isInitialWidth = wLower === 'medium';
+  const isInitialStyle = sLower === 'none';
+  const isInitialColor = cLower === 'currentcolor';
+
+  if (isInitialWidth && isInitialStyle && isInitialColor) {
+    return 'none';
+  }
+
+  const parts: string[] = [];
+  if (!isInitialWidth) parts.push(w);
+  if (!isInitialStyle) parts.push(s);
+  if (!isInitialColor) parts.push(c);
+
+  if (parts.length === 0) {
+    return 'none';
+  }
+  return parts.join(' ');
+}
+
+export const BORDER_IMAGE_LONGHANDS = [
+  'border-image-source',
+  'border-image-slice',
+  'border-image-width',
+  'border-image-outset',
+  'border-image-repeat',
+] as const;
+
+export const BORDER_ALL_LONGHANDS = [
+  'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+  'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+  'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+  ...BORDER_IMAGE_LONGHANDS,
+] as const;
+
+export function isInitialBorderImage(values: Record<string, ComponentValue[]>): boolean {
+  const src = values['border-image-source'];
+  const slice = values['border-image-slice'];
+  const width = values['border-image-width'];
+  const outset = values['border-image-outset'];
+  const repeat = values['border-image-repeat'];
+
+  if (!src || !slice || !width || !outset || !repeat) return false;
+
+  const sSrc = serialize(src).trim().toLowerCase();
+  const sSlice = serialize(slice).trim().toLowerCase();
+  const sWidth = serialize(width).trim().toLowerCase();
+  const sOutset = serialize(outset).trim().toLowerCase();
+  const sRepeat = serialize(repeat).trim().toLowerCase();
+
+  const isSrcInit = sSrc === 'none' || sSrc === '';
+  const isSliceInit = sSlice === '100%' || sSlice === '100% 100% 100% 100%' || sSlice === '';
+  const isWidthInit = sWidth === '1' || sWidth === '1 1 1 1' || sWidth === '';
+  const isOutsetInit = sOutset === '0' || sOutset === '0px' || sOutset === '0s' || sOutset === '0 0 0 0' || sOutset === '';
+  const isRepeatInit = sRepeat === 'stretch' || sRepeat === 'stretch stretch' || sRepeat === '';
+
+  return isSrcInit && isSliceInit && isWidthInit && isOutsetInit && isRepeatInit;
+}
+
 const expandBorderSide = (prefix: string) => (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
   const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
   if (filtered.length === 0 || filtered.length > 3) return null;
@@ -738,7 +837,6 @@ const expandBorderSide = (prefix: string) => (values: ComponentValue[]): Record<
 };
 
 const contractBorderSide = (prefix: string) => (values: Record<string, ComponentValue[]>): string | null => {
-  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
   const widthProp = `${prefix}-width`;
   const styleProp = `${prefix}-style`;
   const colorProp = `${prefix}-color`;
@@ -752,19 +850,921 @@ const contractBorderSide = (prefix: string) => (values: Record<string, Component
   const ss = serialize(s).trim();
   const sc = serialize(c).trim();
 
-  if ([sw, ss, sc].some(str => CSS_WIDE.includes(str.toLowerCase()))) {
-    if (sw.toLowerCase() === ss.toLowerCase() && sw.toLowerCase() === sc.toLowerCase()) {
-      return sw;
+  return formatBorderSideValue(sw, ss, sc);
+};
+
+function expandBorder(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0 || filtered.length > 3) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      const res: Record<string, ComponentValue[]> = {};
+      for (const lh of BORDER_ALL_LONGHANDS) {
+        res[lh] = [filtered[0]];
+      }
+      return res;
+    }
+  }
+
+  let widthVal: ComponentValue[] = [{ type: 'ident', value: 'medium' }];
+  let styleVal: ComponentValue[] = [{ type: 'ident', value: 'none' }];
+  let colorVal: ComponentValue[] = [{ type: 'ident', value: 'currentcolor' }];
+
+  for (const val of filtered) {
+    if (val.type === 'ident') {
+      const v = val.value.toLowerCase();
+      if (['thin', 'medium', 'thick'].includes(v)) {
+        widthVal = [val];
+      } else if (['none', 'hidden', 'dotted', 'dashed', 'solid', 'double', 'groove', 'ridge', 'inset', 'outset'].includes(v)) {
+        styleVal = [val];
+      } else {
+        colorVal = [val];
+      }
+    } else if (val.type === 'dimension' || val.type === 'percentage' || val.type === 'number') {
+      widthVal = [val];
+    } else if (val.type === 'hash' || val.type === 'function') {
+      colorVal = [val];
+    } else {
+      colorVal = [val];
+    }
+  }
+
+  return {
+    'border-top-width': widthVal,
+    'border-right-width': widthVal,
+    'border-bottom-width': widthVal,
+    'border-left-width': widthVal,
+    'border-top-style': styleVal,
+    'border-right-style': styleVal,
+    'border-bottom-style': styleVal,
+    'border-left-style': styleVal,
+    'border-top-color': colorVal,
+    'border-right-color': colorVal,
+    'border-bottom-color': colorVal,
+    'border-left-color': colorVal,
+    'border-image-source': [{ type: 'ident', value: 'none' }],
+    'border-image-slice': [{ type: 'percentage', value: 100, sign: null }],
+    'border-image-width': [{ type: 'number', value: 1, sign: null, numberType: 'integer' }],
+    'border-image-outset': [{ type: 'number', value: 0, sign: null, numberType: 'integer' }],
+    'border-image-repeat': [{ type: 'ident', value: 'stretch' }],
+  };
+}
+
+function contractBorder(values: Record<string, ComponentValue[]>): string | null {
+  for (const lh of BORDER_ALL_LONGHANDS) {
+    if (!values[lh]) return null;
+  }
+
+  const allSerialized = BORDER_ALL_LONGHANDS.map(lh => serialize(values[lh]).trim());
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  if (allSerialized.some(s => CSS_WIDE.includes(s.toLowerCase()))) {
+    if (allSerialized.every(s => s.toLowerCase() === allSerialized[0].toLowerCase())) {
+      return allSerialized[0];
     }
     return null;
   }
 
-  if (sw === ss && sw === sc) {
-    return sw;
+  if (!isInitialBorderImage(values)) {
+    return null;
   }
 
-  return `${sw} ${sw} ${ss} ${sc}`.includes('medium none currentcolor') ? `${sw} ${ss} ${sc}` : `${sw} ${ss} ${sc}`; // Simplified for now
-};
+  const w0 = allSerialized[0];
+  const w1 = allSerialized[1];
+  const w2 = allSerialized[2];
+  const w3 = allSerialized[3];
+  if (w0 !== w1 || w0 !== w2 || w0 !== w3) return null;
+
+  const s0 = allSerialized[4];
+  const s1 = allSerialized[5];
+  const s2 = allSerialized[6];
+  const s3 = allSerialized[7];
+  if (s0 !== s1 || s0 !== s2 || s0 !== s3) return null;
+
+  const c0 = allSerialized[8];
+  const c1 = allSerialized[9];
+  const c2 = allSerialized[10];
+  const c3 = allSerialized[11];
+  if (c0 !== c1 || c0 !== c2 || c0 !== c3) return null;
+
+  return formatBorderSideValue(w0, s0, c0);
+}
+
+function expandBorderImage(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      const res: Record<string, ComponentValue[]> = {};
+      for (const lh of BORDER_IMAGE_LONGHANDS) {
+        res[lh] = [filtered[0]];
+      }
+      return res;
+    }
+    if (v === 'none') {
+      return {
+        'border-image-source': [{ type: 'ident', value: 'none' }],
+        'border-image-slice': [{ type: 'percentage', value: 100, sign: null }],
+        'border-image-width': [{ type: 'number', value: 1, sign: null, numberType: 'integer' }],
+        'border-image-outset': [{ type: 'number', value: 0, sign: null, numberType: 'integer' }],
+        'border-image-repeat': [{ type: 'ident', value: 'stretch' }],
+      };
+    }
+  }
+
+  if (filtered.some(t => t.type === 'function' && getFunctionName(t) === 'var')) {
+    const res: Record<string, ComponentValue[]> = {};
+    for (const lh of BORDER_IMAGE_LONGHANDS) {
+      res[lh] = values;
+    }
+    return res;
+  }
+
+  let source: ComponentValue[] = [{ type: 'ident', value: 'none' }];
+  for (const token of filtered) {
+    if (token.type === 'url' || (token.type === 'function' && ['linear-gradient', 'radial-gradient', 'conic-gradient', 'image', 'image-set'].includes(getFunctionName(token)))) {
+      source = [token];
+    }
+  }
+
+  return {
+    'border-image-source': source,
+    'border-image-slice': [{ type: 'percentage', value: 100, sign: null }],
+    'border-image-width': [{ type: 'number', value: 1, sign: null, numberType: 'integer' }],
+    'border-image-outset': [{ type: 'number', value: 0, sign: null, numberType: 'integer' }],
+    'border-image-repeat': [{ type: 'ident', value: 'stretch' }],
+  };
+}
+
+function contractBorderImage(values: Record<string, ComponentValue[]>): string | null {
+  for (const lh of BORDER_IMAGE_LONGHANDS) {
+    if (!values[lh]) return null;
+  }
+
+  const allVals = BORDER_IMAGE_LONGHANDS.map(lh => serialize(values[lh]).trim());
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+
+  if (allVals.some(v => CSS_WIDE.includes(v.toLowerCase()) || v.toLowerCase().startsWith('var('))) {
+    if (allVals.every(v => v.toLowerCase() === allVals[0].toLowerCase())) {
+      return allVals[0];
+    }
+    return null;
+  }
+
+  if (isInitialBorderImage(values)) {
+    return 'none';
+  }
+
+  const sSrc = allVals[0];
+  const sSlice = allVals[1];
+  const sWidth = allVals[2];
+  const sOutset = allVals[3];
+  const sRepeat = allVals[4];
+
+  const isSliceInit = sSlice === '100%' || sSlice === '100% 100% 100% 100%';
+  const isWidthInit = sWidth === '1' || sWidth === '1 1 1 1';
+  const isOutsetInit = sOutset === '0' || sOutset === '0px' || sOutset === '0s' || sOutset === '0 0 0 0';
+  const isRepeatInit = sRepeat === 'stretch' || sRepeat === 'stretch stretch';
+
+  if (isSliceInit && isWidthInit && isOutsetInit && isRepeatInit) {
+    return sSrc;
+  }
+
+  return null;
+}
+
+function expandOutline(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0 || filtered.length > 3) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      return {
+        'outline-color': [filtered[0]],
+        'outline-style': [filtered[0]],
+        'outline-width': [filtered[0]],
+      };
+    }
+  }
+
+  let widthVal: ComponentValue[] = [{ type: 'ident', value: 'medium' }];
+  let styleVal: ComponentValue[] = [{ type: 'ident', value: 'none' }];
+  let colorVal: ComponentValue[] = [{ type: 'ident', value: 'currentcolor' }];
+
+  for (const val of filtered) {
+    if (val.type === 'ident') {
+      const v = val.value.toLowerCase();
+      if (['thin', 'medium', 'thick'].includes(v)) {
+        widthVal = [val];
+      } else if (['none', 'hidden', 'dotted', 'dashed', 'solid', 'double', 'groove', 'ridge', 'inset', 'outset', 'auto'].includes(v)) {
+        styleVal = [val];
+      } else {
+        colorVal = [val];
+      }
+    } else if (val.type === 'dimension' || val.type === 'percentage' || val.type === 'number') {
+      widthVal = [val];
+    } else if (val.type === 'hash' || val.type === 'function') {
+      colorVal = [val];
+    } else {
+      colorVal = [val];
+    }
+  }
+
+  return {
+    'outline-color': colorVal,
+    'outline-style': styleVal,
+    'outline-width': widthVal,
+  };
+}
+
+function contractOutline(values: Record<string, ComponentValue[]>): string | null {
+  const c = values['outline-color'];
+  const s = values['outline-style'];
+  const w = values['outline-width'];
+  if (!c || !s || !w) return null;
+
+  const sc = serialize(c).trim();
+  const ss = serialize(s).trim();
+  const sw = serialize(w).trim();
+
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  if ([sc, ss, sw].some(str => CSS_WIDE.includes(str.toLowerCase()))) {
+    if (sc.toLowerCase() === ss.toLowerCase() && sc.toLowerCase() === sw.toLowerCase()) {
+      return sc;
+    }
+    return null;
+  }
+
+  const isInitialColor = sc.toLowerCase() === 'currentcolor';
+  const isInitialStyle = ss.toLowerCase() === 'none';
+  const isInitialWidth = sw.toLowerCase() === 'medium';
+
+  if (isInitialColor && isInitialStyle && isInitialWidth) {
+    return 'none';
+  }
+
+  // Canonical order: [color, style, width]
+  const parts: string[] = [];
+  if (!isInitialColor) parts.push(sc);
+  if (!isInitialStyle) parts.push(ss);
+  if (!isInitialWidth) parts.push(sw);
+
+  if (parts.length === 0) {
+    return 'none';
+  }
+  return parts.join(' ');
+}
+
+export const FONT_VARIANT_LONGHANDS = [
+  'font-variant-ligatures',
+  'font-variant-caps',
+  'font-variant-alternates',
+  'font-variant-numeric',
+  'font-variant-east-asian',
+  'font-variant-position',
+  'font-variant-emoji',
+] as const;
+
+const FONT_VARIANT_LIGATURES_KEYWORDS = new Set([
+  'common-ligatures', 'no-common-ligatures',
+  'discretionary-ligatures', 'no-discretionary-ligatures',
+  'historical-ligatures', 'no-historical-ligatures',
+  'contextual', 'no-contextual'
+]);
+
+const FONT_VARIANT_CAPS_KEYWORDS = new Set([
+  'small-caps', 'all-small-caps', 'petite-caps', 'all-petite-caps', 'unicase', 'titling-caps'
+]);
+
+const FONT_VARIANT_NUMERIC_KEYWORDS = new Set([
+  'lining-nums', 'oldstyle-nums', 'proportional-nums', 'tabular-nums',
+  'diagonal-fractions', 'stacked-fractions', 'ordinal', 'slashed-zero'
+]);
+
+const FONT_VARIANT_EAST_ASIAN_KEYWORDS = new Set([
+  'jis78', 'jis83', 'jis90', 'jis04', 'simplified', 'traditional',
+  'full-width', 'proportional-width', 'ruby'
+]);
+
+const FONT_VARIANT_POSITION_KEYWORDS = new Set(['sub', 'super']);
+const FONT_VARIANT_EMOJI_KEYWORDS = new Set(['text', 'emoji', 'unicode']);
+
+function expandFontVariant(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      const res: Record<string, ComponentValue[]> = {};
+      for (const lh of FONT_VARIANT_LONGHANDS) {
+        res[lh] = [filtered[0]];
+      }
+      return res;
+    }
+    if (v === 'normal') {
+      const res: Record<string, ComponentValue[]> = {};
+      for (const lh of FONT_VARIANT_LONGHANDS) {
+        res[lh] = [{ type: 'ident', value: 'normal' }];
+      }
+      return res;
+    }
+    if (v === 'none') {
+      const res: Record<string, ComponentValue[]> = {};
+      res['font-variant-ligatures'] = [{ type: 'ident', value: 'none' }];
+      for (const lh of FONT_VARIANT_LONGHANDS) {
+        if (lh !== 'font-variant-ligatures') {
+          res[lh] = [{ type: 'ident', value: 'normal' }];
+        }
+      }
+      return res;
+    }
+  }
+
+  const ligatures: ComponentValue[] = [];
+  const caps: ComponentValue[] = [];
+  const alternates: ComponentValue[] = [];
+  const numeric: ComponentValue[] = [];
+  const eastAsian: ComponentValue[] = [];
+  const position: ComponentValue[] = [];
+  const emoji: ComponentValue[] = [];
+
+  for (const token of filtered) {
+    if (token.type === 'ident') {
+      const val = token.value.toLowerCase();
+      if (val === 'normal') {
+        continue;
+      }
+      if (val === 'none') {
+        ligatures.push(token);
+      } else if (FONT_VARIANT_LIGATURES_KEYWORDS.has(val)) {
+        ligatures.push(token);
+      } else if (FONT_VARIANT_CAPS_KEYWORDS.has(val)) {
+        caps.push(token);
+      } else if (val === 'historical-forms') {
+        alternates.push(token);
+      } else if (FONT_VARIANT_NUMERIC_KEYWORDS.has(val)) {
+        numeric.push(token);
+      } else if (FONT_VARIANT_EAST_ASIAN_KEYWORDS.has(val)) {
+        eastAsian.push(token);
+      } else if (FONT_VARIANT_POSITION_KEYWORDS.has(val)) {
+        position.push(token);
+      } else if (FONT_VARIANT_EMOJI_KEYWORDS.has(val)) {
+        emoji.push(token);
+      } else {
+        return null;
+      }
+    } else if (token.type === 'function') {
+      const name = ('name' in token ? token.name : ('value' in token ? token.value : ''))?.toString().toLowerCase();
+      if (['stylistic', 'styleset', 'character-variant', 'swash', 'ornaments', 'annotation'].includes(name)) {
+        alternates.push(token);
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  const norm = [{ type: 'ident', value: 'normal' } as ComponentValue];
+  return {
+    'font-variant-ligatures': ligatures.length > 0 ? joinWithWhitespace(ligatures) : norm,
+    'font-variant-caps': caps.length > 0 ? joinWithWhitespace(caps) : norm,
+    'font-variant-alternates': alternates.length > 0 ? joinWithWhitespace(alternates) : norm,
+    'font-variant-numeric': numeric.length > 0 ? joinWithWhitespace(numeric) : norm,
+    'font-variant-east-asian': eastAsian.length > 0 ? joinWithWhitespace(eastAsian) : norm,
+    'font-variant-position': position.length > 0 ? joinWithWhitespace(position) : norm,
+    'font-variant-emoji': emoji.length > 0 ? joinWithWhitespace(emoji) : norm,
+  };
+}
+
+function contractFontVariant(values: Record<string, ComponentValue[]>): string | null {
+  for (const lh of FONT_VARIANT_LONGHANDS) {
+    if (!values[lh]) return null;
+  }
+
+  const sLig = serialize(values['font-variant-ligatures']).trim();
+  const sCaps = serialize(values['font-variant-caps']).trim();
+  const sAlt = serialize(values['font-variant-alternates']).trim();
+  const sNum = serialize(values['font-variant-numeric']).trim();
+  const sEast = serialize(values['font-variant-east-asian']).trim();
+  const sPos = serialize(values['font-variant-position']).trim();
+  const sEmoji = serialize(values['font-variant-emoji']).trim();
+
+  const allVals = [sLig, sCaps, sAlt, sNum, sEast, sPos, sEmoji];
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+
+  if (allVals.some(v => CSS_WIDE.includes(v.toLowerCase()))) {
+    if (allVals.every(v => v.toLowerCase() === allVals[0].toLowerCase())) {
+      return allVals[0];
+    }
+    return null;
+  }
+
+  if (allVals.every(v => v.toLowerCase() === 'normal')) {
+    return 'normal';
+  }
+
+  if (sLig.toLowerCase() === 'none') {
+    if (allVals.slice(1).every(v => v.toLowerCase() === 'normal')) {
+      return 'none';
+    }
+    return null;
+  }
+
+  const nonNormal: string[] = [];
+  for (const v of allVals) {
+    if (v.toLowerCase() !== 'normal') {
+      nonNormal.push(v);
+    }
+  }
+
+  if (nonNormal.length === 0) return 'normal';
+  return nonNormal.join(' ');
+}
+
+export const FONT_LONGHANDS = [
+  'font-style',
+  'font-variant-caps',
+  'font-variant-ligatures',
+  'font-variant-alternates',
+  'font-variant-numeric',
+  'font-variant-east-asian',
+  'font-variant-position',
+  'font-variant-emoji',
+  'font-weight',
+  'font-stretch',
+  'font-size',
+  'line-height',
+  'font-family',
+] as const;
+
+function expandFont(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'caption', 'icon', 'menu', 'message-box', 'small-caption', 'status-bar'].includes(v)) {
+      const res: Record<string, ComponentValue[]> = {};
+      for (const lh of FONT_LONGHANDS) {
+        res[lh] = [filtered[0]];
+      }
+      return res;
+    }
+  }
+
+  let styleVal: ComponentValue[] = [{ type: 'ident', value: 'normal' }];
+  let capsVal: ComponentValue[] = [{ type: 'ident', value: 'normal' }];
+  let weightVal: ComponentValue[] = [{ type: 'ident', value: 'normal' }];
+  let stretchVal: ComponentValue[] = [{ type: 'ident', value: 'normal' }];
+  let sizeVal: ComponentValue[] | null = null;
+  let lineHeightVal: ComponentValue[] = [{ type: 'ident', value: 'normal' }];
+  let familyVal: ComponentValue[] | null = null;
+
+  let i = 0;
+  while (i < filtered.length) {
+    const token = filtered[i];
+    if (token.type === 'ident') {
+      const v = token.value.toLowerCase();
+      if (['italic', 'oblique'].includes(v)) {
+        styleVal = [token];
+        i++;
+        continue;
+      }
+      if (v === 'small-caps') {
+        capsVal = [token];
+        i++;
+        continue;
+      }
+      if (['bold', 'bolder', 'lighter'].includes(v)) {
+        weightVal = [token];
+        i++;
+        continue;
+      }
+      if (['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'].includes(v)) {
+        stretchVal = [token];
+        i++;
+        continue;
+      }
+      if (v === 'normal') {
+        i++;
+        continue;
+      }
+    } else if (token.type === 'number' && typeof token.value === 'number' && token.value >= 1 && token.value <= 1000) {
+      weightVal = [token];
+      i++;
+      continue;
+    }
+    break;
+  }
+
+  if (i >= filtered.length) return null;
+  const sizeToken = filtered[i];
+  if (
+    sizeToken.type === 'dimension' ||
+    sizeToken.type === 'percentage' ||
+    (sizeToken.type === 'number' && sizeToken.value === 0) ||
+    (sizeToken.type === 'ident' && ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'xxx-large', 'smaller', 'larger'].includes(sizeToken.value.toLowerCase())) ||
+    (sizeToken.type === 'function' && ['calc', 'min', 'max', 'clamp'].includes(getFunctionName(sizeToken)))
+  ) {
+    sizeVal = [sizeToken];
+    i++;
+  } else {
+    return null;
+  }
+
+  if (i < filtered.length && filtered[i].type === 'delim' && filtered[i].value === '/') {
+    i++;
+    if (i >= filtered.length) return null;
+    const lhToken = filtered[i];
+    if (
+      lhToken.type === 'number' ||
+      lhToken.type === 'dimension' ||
+      lhToken.type === 'percentage' ||
+      (lhToken.type === 'ident' && lhToken.value.toLowerCase() === 'normal') ||
+      (lhToken.type === 'function' && ['calc', 'min', 'max', 'clamp'].includes(getFunctionName(lhToken)))
+    ) {
+      lineHeightVal = [lhToken];
+      i++;
+    } else {
+      return null;
+    }
+  }
+
+  if (i >= filtered.length) return null;
+  const lastConsumed = (lineHeightVal && lineHeightVal.length > 0) ? lineHeightVal[0] : sizeToken;
+  const lastIdx = values.indexOf(lastConsumed);
+  if (lastIdx !== -1) {
+    familyVal = values.slice(lastIdx + 1).filter(t => t.type !== 'EOF');
+    while (familyVal.length > 0 && (familyVal[0].type === 'whitespace' || familyVal[0].type === 'comment')) {
+      familyVal.shift();
+    }
+  } else {
+    familyVal = filtered.slice(i);
+  }
+
+  return {
+    'font-style': styleVal,
+    'font-variant-caps': capsVal,
+    'font-variant-ligatures': [{ type: 'ident', value: 'normal' }],
+    'font-variant-alternates': [{ type: 'ident', value: 'normal' }],
+    'font-variant-numeric': [{ type: 'ident', value: 'normal' }],
+    'font-variant-east-asian': [{ type: 'ident', value: 'normal' }],
+    'font-variant-position': [{ type: 'ident', value: 'normal' }],
+    'font-variant-emoji': [{ type: 'ident', value: 'normal' }],
+    'font-weight': weightVal,
+    'font-stretch': stretchVal,
+    'font-size': sizeVal,
+    'line-height': lineHeightVal,
+    'font-family': familyVal,
+  };
+}
+
+function contractFont(values: Record<string, ComponentValue[]>): string | null {
+  const primaryLonghands = [
+    'font-style',
+    'font-variant-caps',
+    'font-weight',
+    'font-stretch',
+    'font-size',
+    'line-height',
+    'font-family',
+  ];
+  for (const lh of primaryLonghands) {
+    if (!values[lh]) return null;
+  }
+
+  const otherVariants = [
+    'font-variant-ligatures',
+    'font-variant-alternates',
+    'font-variant-numeric',
+    'font-variant-east-asian',
+    'font-variant-position',
+    'font-variant-emoji',
+  ];
+  for (const lh of otherVariants) {
+    if (values[lh] && serialize(values[lh]).trim().toLowerCase() !== 'normal') {
+      return null;
+    }
+  }
+
+  const sStyle = serialize(values['font-style']).trim();
+  const sCaps = serialize(values['font-variant-caps']).trim();
+  const sWeight = serialize(values['font-weight']).trim();
+  const sStretch = serialize(values['font-stretch']).trim();
+  const sSize = serialize(values['font-size']).trim();
+  const sLineHeight = serialize(values['line-height']).trim();
+  const sFamily = serialize(values['font-family'], false, 'font-family').trim();
+
+  const allVals = [sStyle, sCaps, sWeight, sStretch, sSize, sLineHeight, sFamily];
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+
+  if (allVals.some(v => CSS_WIDE.includes(v.toLowerCase()))) {
+    if (allVals.every(v => v.toLowerCase() === allVals[0].toLowerCase())) {
+      return allVals[0];
+    }
+    return null;
+  }
+
+  if (!sSize || !sFamily) return null;
+
+  const parts: string[] = [];
+  if (sStyle.toLowerCase() !== 'normal') parts.push(sStyle);
+  if (sCaps.toLowerCase() !== 'normal') parts.push(sCaps);
+  if (sWeight.toLowerCase() !== 'normal' && sWeight !== '400') parts.push(sWeight);
+  if (sStretch.toLowerCase() !== 'normal') parts.push(sStretch);
+
+  if (sLineHeight.toLowerCase() !== 'normal') {
+    parts.push(`${sSize} / ${sLineHeight}`);
+  } else {
+    parts.push(sSize);
+  }
+
+  parts.push(sFamily);
+
+  return parts.join(' ');
+}
+
+export const LIST_STYLE_LONGHANDS = ['list-style-type', 'list-style-position', 'list-style-image'] as const;
+
+function expandListStyle(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0 || filtered.length > 3) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      return {
+        'list-style-type': [filtered[0]],
+        'list-style-position': [filtered[0]],
+        'list-style-image': [filtered[0]],
+      };
+    }
+  }
+
+  let typeVal: ComponentValue[] = [{ type: 'ident', value: 'disc' }];
+  let posVal: ComponentValue[] = [{ type: 'ident', value: 'outside' }];
+  let imgVal: ComponentValue[] = [{ type: 'ident', value: 'none' }];
+
+  let hasType = false;
+  let hasPos = false;
+  let hasImg = false;
+
+  for (const token of filtered) {
+    if (token.type === 'ident') {
+      const v = token.value.toLowerCase();
+      if (['inside', 'outside'].includes(v) && !hasPos) {
+        posVal = [token];
+        hasPos = true;
+      } else if (v === 'none') {
+        if (!hasImg && !hasType) {
+          imgVal = [token];
+          typeVal = [token];
+          hasImg = true;
+          hasType = true;
+        } else if (!hasImg) {
+          imgVal = [token];
+          hasImg = true;
+        } else if (!hasType) {
+          typeVal = [token];
+          hasType = true;
+        }
+      } else if (!hasType) {
+        typeVal = [token];
+        hasType = true;
+      } else {
+        return null;
+      }
+    } else if ((token.type === 'url' || (token.type === 'function' && ['linear-gradient', 'radial-gradient', 'conic-gradient', 'image', 'image-set'].includes(getFunctionName(token)))) && !hasImg) {
+      imgVal = [token];
+      hasImg = true;
+    } else {
+      return null;
+    }
+  }
+
+  return {
+    'list-style-type': typeVal,
+    'list-style-position': posVal,
+    'list-style-image': imgVal,
+  };
+}
+
+function contractListStyle(values: Record<string, ComponentValue[]>): string | null {
+  const t = values['list-style-type'];
+  const p = values['list-style-position'];
+  const i = values['list-style-image'];
+  if (!t || !p || !i) return null;
+
+  const st = serialize(t).trim();
+  const sp = serialize(p).trim();
+  const si = serialize(i).trim();
+
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  if ([st, sp, si].some(s => CSS_WIDE.includes(s.toLowerCase()))) {
+    if (st.toLowerCase() === sp.toLowerCase() && st.toLowerCase() === si.toLowerCase()) {
+      return st;
+    }
+    return null;
+  }
+
+  const isInitialType = st.toLowerCase() === 'disc';
+  const isInitialPos = sp.toLowerCase() === 'outside';
+  const isInitialImg = si.toLowerCase() === 'none';
+
+  if (isInitialType && isInitialPos && isInitialImg) {
+    return 'disc';
+  }
+
+  // Canonical order: [position, image, type]
+  const parts: string[] = [];
+  if (!isInitialPos) parts.push(sp);
+  if (!isInitialImg) parts.push(si);
+  if (!isInitialType) parts.push(st);
+
+  if (parts.length === 0) {
+    return 'disc';
+  }
+  return parts.join(' ');
+}
+
+export const FLEX_LONGHANDS = ['flex-grow', 'flex-shrink', 'flex-basis'] as const;
+
+function expandFlex(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0 || filtered.length > 3) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      return {
+        'flex-grow': [filtered[0]],
+        'flex-shrink': [filtered[0]],
+        'flex-basis': [filtered[0]],
+      };
+    }
+    if (v === 'none') {
+      return {
+        'flex-grow': [{ type: 'number', value: 0, sign: null, numberType: 'integer' }],
+        'flex-shrink': [{ type: 'number', value: 0, sign: null, numberType: 'integer' }],
+        'flex-basis': [{ type: 'ident', value: 'auto' }],
+      };
+    }
+    if (v === 'auto') {
+      return {
+        'flex-grow': [{ type: 'number', value: 1, sign: null, numberType: 'integer' }],
+        'flex-shrink': [{ type: 'number', value: 1, sign: null, numberType: 'integer' }],
+        'flex-basis': [{ type: 'ident', value: 'auto' }],
+      };
+    }
+  }
+
+  let grow: ComponentValue[] | null = null;
+  let shrink: ComponentValue[] | null = null;
+  let basis: ComponentValue[] | null = null;
+
+  for (const token of filtered) {
+    if (token.type === 'number') {
+      if (grow === null) {
+        grow = [token];
+      } else if (shrink === null) {
+        shrink = [token];
+      } else {
+        return null;
+      }
+    } else if (isValidLengthOrPercentage(token) || (token.type === 'ident' && ['auto', 'content', 'max-content', 'min-content', 'fit-content'].includes(token.value.toLowerCase()))) {
+      if (basis === null) {
+        basis = [token];
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+  }
+
+  if (grow === null && basis === null) return null;
+
+  const finalGrow = grow ?? [{ type: 'number', value: 1, sign: null, numberType: 'integer' } as ComponentValue];
+  const finalShrink = shrink ?? [{ type: 'number', value: 1, sign: null, numberType: 'integer' } as ComponentValue];
+  const finalBasis = basis ?? (grow !== null ? [{ type: 'dimension', value: 0, unit: 'px', sign: null, numberType: 'integer' } as ComponentValue] : [{ type: 'ident', value: 'auto' } as ComponentValue]);
+
+  return {
+    'flex-grow': finalGrow,
+    'flex-shrink': finalShrink,
+    'flex-basis': finalBasis,
+  };
+}
+
+function contractFlex(values: Record<string, ComponentValue[]>): string | null {
+  const g = values['flex-grow'];
+  const s = values['flex-shrink'];
+  const b = values['flex-basis'];
+  if (!g || !s || !b) return null;
+
+  const sg = serialize(g).trim();
+  const ss = serialize(s).trim();
+  const sb = serialize(b).trim();
+
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  if ([sg, ss, sb].some(str => CSS_WIDE.includes(str.toLowerCase()))) {
+    if (sg.toLowerCase() === ss.toLowerCase() && sg.toLowerCase() === sb.toLowerCase()) {
+      return sg;
+    }
+    return null;
+  }
+
+  if (sg.includes('var(') || ss.includes('var(') || sb.includes('var(')) {
+    if (sg === ss && sg === sb) return sg;
+    return null;
+  }
+
+  if (sg === '0' && ss === '1' && sb.toLowerCase() === 'auto') {
+    return 'initial';
+  }
+  if (sg === '1' && ss === '1' && sb.toLowerCase() === 'auto') {
+    return 'auto';
+  }
+  if (sg === '0' && ss === '0' && sb.toLowerCase() === 'auto') {
+    return 'none';
+  }
+
+  if (sb === '0px' || sb === '0%' || sb === '0') {
+    if (ss === '1') {
+      return `${sg} 1 0px`;
+    }
+    return `${sg} ${ss} ${sb}`;
+  }
+
+  return `${sg} ${ss} ${sb}`;
+}
+
+function contractOverflow(values: Record<string, ComponentValue[]>): string | null {
+  const x = values['overflow-x'];
+  const y = values['overflow-y'];
+  if (!x || !y) return null;
+
+  const sx = serialize(x).trim();
+  const sy = serialize(y).trim();
+
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  if (CSS_WIDE.includes(sx.toLowerCase()) || CSS_WIDE.includes(sy.toLowerCase())) {
+    return sx.toLowerCase() === sy.toLowerCase() ? sx : null;
+  }
+
+  if (sx.includes('var(') || sy.includes('var(')) {
+    return sx === sy ? sx : null;
+  }
+
+  if (sx === sy) {
+    return sx;
+  }
+  return `${sx} ${sy}`;
+}
+
+function expandLineClamp(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
+  const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
+  if (filtered.length === 0) return null;
+
+  if (filtered.length === 1 && filtered[0].type === 'ident') {
+    const v = filtered[0].value.toLowerCase();
+    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
+      return {
+        'max-lines': [filtered[0]],
+        'block-ellipsis': [filtered[0]],
+        'continue': [filtered[0]],
+      };
+    }
+    if (v === 'none') {
+      return {
+        'max-lines': [{ type: 'ident', value: 'none' }],
+        'block-ellipsis': [{ type: 'ident', value: 'auto' }],
+        'continue': [{ type: 'ident', value: 'auto' }],
+      };
+    }
+  }
+
+  return {
+    'max-lines': filtered,
+    'block-ellipsis': [{ type: 'ident', value: 'auto' }],
+    'continue': [{ type: 'ident', value: 'auto' }],
+  };
+}
+
+function contractLineClamp(values: Record<string, ComponentValue[]>): string | null {
+  const lines = values['max-lines'];
+  if (!lines) return null;
+  const sLines = serialize(lines).trim();
+  const CSS_WIDE = ['initial', 'inherit', 'unset', 'revert', 'revert-layer'];
+  if (CSS_WIDE.includes(sLines.toLowerCase())) return sLines;
+  if (sLines.toLowerCase() === 'none') return 'none';
+  return sLines;
+}
 
 const expandBorderRadius = (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
   const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
@@ -992,14 +1992,79 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
     contract: contractTwoValue(SHORTHANDS_DATA['border-block-width']),
   },
   'border': {
-    longhands: SHORTHANDS_DATA['border'],
-    expand: expandBorderSide('border'),
-    contract: contractBorderSide('border'),
+    longhands: BORDER_ALL_LONGHANDS,
+    expand: expandBorder,
+    contract: contractBorder,
+  },
+  'border-top': {
+    longhands: ['border-top-width', 'border-top-style', 'border-top-color'],
+    expand: expandBorderSide('border-top'),
+    contract: contractBorderSide('border-top'),
+  },
+  'border-right': {
+    longhands: ['border-right-width', 'border-right-style', 'border-right-color'],
+    expand: expandBorderSide('border-right'),
+    contract: contractBorderSide('border-right'),
+  },
+  'border-bottom': {
+    longhands: ['border-bottom-width', 'border-bottom-style', 'border-bottom-color'],
+    expand: expandBorderSide('border-bottom'),
+    contract: contractBorderSide('border-bottom'),
+  },
+  'border-left': {
+    longhands: ['border-left-width', 'border-left-style', 'border-left-color'],
+    expand: expandBorderSide('border-left'),
+    contract: contractBorderSide('border-left'),
+  },
+  'border-image': {
+    longhands: BORDER_IMAGE_LONGHANDS,
+    expand: expandBorderImage,
+    contract: contractBorderImage,
   },
   'outline': {
-    longhands: SHORTHANDS_DATA['outline'],
-    expand: expandBorderSide('outline'),
-    contract: contractBorderSide('outline'),
+    longhands: ['outline-color', 'outline-style', 'outline-width'],
+    expand: expandOutline,
+    contract: contractOutline,
+  },
+  'font-variant': {
+    longhands: FONT_VARIANT_LONGHANDS,
+    expand: expandFontVariant,
+    contract: contractFontVariant,
+  },
+  'font': {
+    longhands: FONT_LONGHANDS,
+    expand: expandFont,
+    contract: contractFont,
+  },
+  'list-style': {
+    longhands: LIST_STYLE_LONGHANDS,
+    expand: expandListStyle,
+    contract: contractListStyle,
+  },
+  'overflow': {
+    longhands: SHORTHANDS_DATA['overflow'],
+    expand: expandTwoValue(SHORTHANDS_DATA['overflow']),
+    contract: contractOverflow,
+  },
+  'flex': {
+    longhands: FLEX_LONGHANDS,
+    expand: expandFlex,
+    contract: contractFlex,
+  },
+  '-webkit-flex': {
+    longhands: FLEX_LONGHANDS,
+    expand: expandFlex,
+    contract: contractFlex,
+  },
+  'line-clamp': {
+    longhands: ['max-lines', 'block-ellipsis', 'continue'],
+    expand: expandLineClamp,
+    contract: contractLineClamp,
+  },
+  '-webkit-line-clamp': {
+    longhands: ['max-lines', 'block-ellipsis', 'continue'],
+    expand: expandLineClamp,
+    contract: contractLineClamp,
   },
   'border-color': {
     longhands: SHORTHANDS_DATA['border-color'],

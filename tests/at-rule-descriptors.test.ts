@@ -44,7 +44,7 @@ test('CSSFontFaceRule.style exposes descriptors as properties', () => {
   const sheet = new CSSStyleSheet();
   sheet.insertRule('@font-face { font-family: "Test"; src: url("test.woff"); }');
   const rule = sheet.cssRules[0] as CSSFontFaceRule;
-  assert.strictEqual(rule.style.fontFamily, '"Test"');
+  assert.strictEqual(rule.style.fontFamily, 'Test');
   assert.strictEqual(rule.style.src, 'url("test.woff")');
 });
 

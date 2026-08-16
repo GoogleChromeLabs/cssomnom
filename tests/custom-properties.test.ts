@@ -125,6 +125,9 @@ test('CSSOM: Recursive shorthand condensation (border)', () => {
   style.setProperty('border-left-style', 'solid');
   style.setProperty('border-left-color', 'black');
   
+  assert.strictEqual(style.cssText, 'border-width: 1px; border-style: solid; border-color: black;');
+  
+  style.setProperty('border-image', 'none');
   assert.strictEqual(style.cssText, 'border: 1px solid black;');
 });
 

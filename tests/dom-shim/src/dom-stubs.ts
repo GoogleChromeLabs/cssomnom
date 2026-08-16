@@ -984,14 +984,17 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
               const idx = parseInt(prop, 10);
               return typeof target.item === 'function' ? target.item(idx) : target[idx];
             }
-            const val = Reflect.get(target, prop, receiver);
-            if (val === undefined || val === '') {
-              if (typeof prop === 'string' && prop !== 'length' && typeof target.getPropertyValue === 'function') {
+            if (typeof prop === 'string') {
+              if (prop in target && typeof (target as Record<string, unknown>)[prop] === 'function') {
+                return (target as Record<string, unknown>)[prop];
+              }
+              if (typeof target.getPropertyValue === 'function' && !['item', 'getPropertyValue', 'getPropertyPriority', 'setProperty', 'removeProperty', 'parentRule', 'cssText', 'length', 'constructor'].includes(prop)) {
                 const dashed = camelToDashed(prop).toLowerCase();
                 const propVal = target.getPropertyValue(dashed);
-                if (propVal) return propVal;
+                if (propVal !== undefined && propVal !== null && propVal !== '') return propVal;
               }
             }
+            const val = Reflect.get(target, prop, receiver);
             if (typeof val === 'string' && val.startsWith('url(') && !val.includes(')')) {
               return val + ')';
             }
