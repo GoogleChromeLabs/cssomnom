@@ -2648,6 +2648,32 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Ran `pnpm run preflight` (0 errors, 0 warnings).
   - Verified 100% pass rate across target WPT test suites (`cssStyleValue-string.html`, `cssStyleValue-cssom.html`, `revert-in-fallback.html`, `css-variable-change-style-001.html`, `css-variable-change-style-002.html`).
 
+---
+
+## Phase 109: Gatekeeper Zero-Regression & DOM Stubs Hardening
+**Goal**: Resolve all gatekeeper regressions from commit `bcbf591`, revert artificial HTML wrapping in WPT test runner, harden `CSSStyleDeclaration` property deletion and iteration in `dom-stubs.ts`, and achieve verified 0-regression baseline conformance.
+
+### Tasks
+- [x] **Revert Synthetic HTML Wrapping in WPT Runner**:
+  - Reverted the synthetic `<html>` / `<body>` wrapper in `scripts/wpt/node/run.ts` to preserve raw WPT test file DOM structure.
+  - Updated `tests/fixtures/baselines/wpt-passing-set-baseline.json` for `submodules/web-platform-tests/css/selectors/heading.html` to reflect authentic linkedom DOM node names (182/182 tests passing).
+- [x] **Harden `CSSStyleDeclaration` & Custom Property Handling in `dom-stubs.ts`**:
+  - Guarded shorthand expansion in `declProto.setProperty` with `typeof shorthand.expand === 'function'` and `!value.includes('var(')` to avoid TypeError on non-expandable shorthands.
+  - Implemented recursive shorthand leaf removal in `declProto.removeProperty` (`removeRecursive`) to ensure removing shorthands like `border` or `border-color` cleanly purges all descendant longhands (`border-top-color`, etc.).
+  - Added `try/catch` and fallback to `styleAttr` in `declProto.getPropertyValue` for `all` to prevent linkedom `getAttributeNode` crashes.
+  - Overrode `[Symbol.iterator]` on `CSSStyleDeclaration.prototype` to safely yield `item(i)` without triggering linkedom `updateKeys` crashes.
+- [x] **Typed OM Style Value Parsing & 2-Value Logical Properties**:
+  - In `src/typed-om/values/style-value-parser.ts`: Allowed 2-value logical properties (`margin-block`, `margin-inline`, `padding-block`, `padding-inline`, `inset-block`, `inset-inline`, `border-block-*`, `border-inline-*`) to produce typed `CSSUnitValue` / `CSSKeywordValue` objects while preserving base `CSSStyleValue` returns for classic shorthands (`margin`, `padding`, `border`, `border-radius`).
+  - In `src/PropertyRegistry.ts`: Supported `{1,2}`, `{1,4}`, `?`, `*` multipliers and parsed `{ ... }` blocks in `consumeSyntaxComponent`.
+  - In `scripts/wpt/node/safe-child-process.ts`: Increased default child process timeout to 30,000ms to allow large test suites (e.g. `logical.html` with 1,468 assertions) to finish under high concurrency.
+- [x] **Verification & Milestone Commit**:
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify` across all 1,687 WPT test files:
+    - Baseline: 16,805
+    - Current: 17,011 (+206 newly passing assertions)
+    - Regressions: **0** (100% of baseline passing tests continue to pass).
+
+
 
 
 
