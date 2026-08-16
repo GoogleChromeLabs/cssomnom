@@ -8,18 +8,18 @@ This file tracks the conformance progress of the CSSOM / Typed OM implementation
 > - Following a 3-way Delphi consensus audit across all 38 failure clusters (9,524 assertion instances), we established our **Feasible Node Target ($M$)** by subtracting physically browser-dependent tests ($E$) from total tests ($N$).
 > - **Normalized Conformance ($P / M$)** measures our progress against 100% of achievable Node.js CSSOM/AST capabilities.
 
-### Feasibility & Normalized Conformance Baseline
+### Feasibility & Cross-Engine Baseline Comparison
 
-| Spec Domain | Total Tests ($N$) | Browser-Only ($E$) | Feasible Target ($M$) | Current Passing ($P$) | Raw Score ($P/N$) | Normalized Conformance ($P/M$) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **`css-typed-om`** | 12,219 | 0 | 12,219 | 11,359 | 92.96% | **92.96%** |
-| **`cssom`** | 941 | 18 | 923 | 603 | 64.08% | **65.33%** |
-| **`css-syntax`** | 414 | 16 | 398 | 398 | 96.14% | **100.00%** |
-| **`css-nesting`** | 117 | 0 | 117 | 117 | 100.00% | **100.00%** |
-| **`css-variables`**| 561 | 13 | 548 | 335 | 59.71% | **61.13%** |
-| **`selectors`** | 4,206 | 59 | 4,147 | 3,495 | 83.10% | **84.28%** |
-| **`mediaqueries`** | 417 | 0 | 417 | 417 | 100.00% | **100.00%** |
-| **OVERALL** | **18,875** | **106** | **18,769** | **16,724** | **88.60%** | **89.10%** |
+| Spec Domain | Total Tests ($N$) | Browser-Only ($E$) | Feasible Target ($M$) | Current Node ($P$) | Node Norm ($P/M$) | Upstream Chrome (`wpt.fyi`) | Upstream Pass Rate |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`css-typed-om`** | 12,219 | 0 | 12,219 | 11,509 | **94.19%** | 10,690 / 11,230 | 95.19% |
+| **`cssom`** | 941 | 18 | 923 | 643 | **69.66%** | 883 / 922 | 95.77% |
+| **`css-syntax`** | 414 | 16 | 398 | 412 | **100.00%** | 392 / 398 | 98.49% |
+| **`css-nesting`** | 117 | 0 | 117 | 117 | **100.00%** | 93 / 94 | 98.94% |
+| **`css-variables`** | 561 | 13 | 548 | 392 | **71.53%** | 465 / 534 | 87.08% |
+| **`selectors`** | 4,206 | 59 | 4,147 | 3,521 | **84.90%** | 3,865 / 4,156 | 93.00% |
+| **`mediaqueries`** | 417 | 0 | 417 | 417 | **100.00%** | 392 / 416 | 94.23% |
+| **OVERALL** | **18,875** | **106** | **18,769** | **17,011** | **90.63%** | **16,780 / 17,750** | **94.54%** |
 
 ---
 
