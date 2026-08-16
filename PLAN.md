@@ -2675,7 +2675,39 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 110: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
+## Phase 110: `cssom` Conformance Sprint (Shorthand `all`, Pseudo-Element `getComputedStyle`, & Namespaced Selectors)
+**Goal**: Eliminate the top 5 failure clusters in `css/cssom/` identified by the Parity Oracle (+119 addressable assertions), raising `cssom` normalized score from 69.7% to 82%+ and closing half the parity gap against reference Chrome.
+
+### Tasks
+- [ ] **`all` Shorthand Property Expansion & Contraction (CSSOM § 6.4.3 & CSS Cascading 5 § 6.2)**:
+  - In `src/shorthands.ts`, `src/CSSStyleDeclaration.ts`, and `tests/dom-shim/src/dom-stubs.ts`:
+    - `setProperty('all', value)`: Expands to set `value` across all known CSS longhand properties (excluding custom `--*` properties and `direction` / `unicode-bidi` per CSS Cascading 5 § 6.2).
+    - `getPropertyValue('all')`: Returns empty string `""` whenever any longhand has a different value from the others.
+    - `removeProperty('all')`: Removes all declarations affected by `all`.
+    - Verify 100% pass on `css/cssom/cssstyledeclaration-all-shorthand.html` (21 subtest gaps resolved).
+- [ ] **`getComputedStyle` Pseudo-Element Resolution (CSSOM § 6.2 #dom-window-getcomputedstyle)**:
+  - In `src/cascade/index.ts` & `src/cascade/rule-filter.ts`:
+    - Support pseudo-element resolution when `pseudoElt` is specified (`::before`, `:before`, `::after`, `:after`, `::marker`, `::placeholder`, `::highlight(name)`).
+    - Collect only rules matching the target pseudo-element on `element`.
+    - If `pseudoElt` does not start with `:` (e.g. `getComputedStyle(el, "before")`), ignore it and treat as null per CSSOM § 6.2.
+    - Verify 100% pass on `css/cssom/getComputedStyle-pseudo.html` and `getComputedStyle-pseudo-with-argument.html` (25 subtest gaps resolved).
+- [ ] **Namespaced Type Selector Serialization (CSSOM § 6.4.3 #serialize-a-simple-selector)**:
+  - In `src/parser.ts` & `src/matcher.ts`:
+    - Omit universal `*` before class/id/attribute/pseudo selectors (`*.foo` $\to$ `.foo`, `*#id` $\to$ `#id`, `*\|*` $\to$ `*`) when no default namespace is defined.
+    - Preserve explicit namespace prefixes (`*\|a`, `ns\|*`, `\|*`).
+    - Verify 100% pass on `css/cssom/serialize-namespaced-type-selectors.html` (23 subtest gaps resolved).
+- [ ] **`CSSStyleDeclaration.cssText` Case Normalization & Sizing `auto` Keyword Resolution**:
+  - In `src/CSSStyleDeclaration.ts`: Lowercase property names upon parsing `cssText` assignments (`WIDTH: 10PX` $\to$ `width: 10px;`) and retain prior valid state if invalid values are assigned.
+  - In `src/cascade/index.ts`: Resolve `min-width: auto` and `min-height: auto` on standard block/inline elements to `0px` in `getComputedStyle`.
+  - Verify 100% pass on `css/cssom/cssstyledeclaration-csstext.html` and `getComputedStyle-resolved-min-size-auto.html`.
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/cssom-all-shorthand.test.ts` and `tests/cssom-computed-pseudo.test.ts`.
+  - Run `pnpm run preflight`.
+  - Run `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+
+---
+
+## Phase 111: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
 **Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
 
 ### Tasks
@@ -2694,36 +2726,17 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 111: Composite Shorthand Computed Synthesis (`border`, `font`, `outline`, `columns`)
-**Goal**: Generalize computed style synthesis across all composite shorthands in `src/shorthands.ts`, `src/cascade/`, and `tests/dom-shim/`, resolving ~280 computed CSSOM serialization gaps.
+## Phase 112: Composite Shorthand Computed Synthesis & Complex Selectors
+**Goal**: Generalize computed style synthesis across all composite shorthands (`border`, `font`, `outline`, `columns`) in `src/shorthands.ts` and resolve `:scope` relative matching gaps in `css/selectors/`.
 
 ### Tasks
 - [ ] **Composite Shorthand Computed Serialization Engine (`src/shorthands.ts`)**:
-  - Implement computed value serializers for composite shorthands:
-    - `border`: Reconstruct from `border-top-*`, `border-right-*`, `border-bottom-*`, `border-left-*` into `<width> <style> <color>`.
-    - `outline`: Reconstruct from `outline-color`, `outline-style`, `outline-width`.
-    - `font`: Reconstruct from `font-style`, `font-variant`, `font-weight`, `font-size`, `line-height`, `font-family`.
-    - `columns`: Reconstruct from `column-width`, `column-count`.
-- [ ] **CSSOM & Typed OM Computed Map Integration**:
-  - In `CSSStyleDeclaration.getPropertyValue()` & `StylePropertyMapReadOnly.get()`: Use the computed shorthand serializers when querying composite shorthands from computed style maps.
-- [ ] **Unit Tests & Verification**:
-  - Add tests in `tests/shorthand-computed-synthesis.test.ts`.
-  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
-
----
-
-## Phase 112: Complex Selectors & Relative Scope Matching
-**Goal**: Resolve selector matching gaps identified by the Parity Oracle in `css/selectors/` (~644 gaps), focusing on `:scope` relative matching, structural `:has()` boundaries, and case-sensitive attribute namespaces.
-
-### Tasks
+  - Implement computed value serializers for composite shorthands (`border`, `outline`, `font`, `columns`).
 - [ ] **`:scope` & `@scope` Relative Context Matching (`src/matcher.ts`, `src/cascade/rule-filter.ts`)**:
   - Support relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element.
   - Implement `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
-- [ ] **Structural Pseudo-Class Boundary & Namespace Matching**:
-  - Support case-sensitive attribute matching for XML/HTML namespaces.
-  - Refine `:has()` sibling lookbehind boundary matching.
 - [ ] **Unit Tests & Verification**:
-  - Add tests in `tests/selectors-scope-relative.test.ts`.
+  - Add tests in `tests/shorthand-computed-synthesis.test.ts` and `tests/selectors-scope-relative.test.ts`.
   - Run `pnpm run preflight` and `pnpm run wpt:verify`.
 
 
