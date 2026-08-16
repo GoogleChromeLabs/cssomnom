@@ -2805,18 +2805,36 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 ---
 
 ## Phase 115: WPT Test Runner VM Cross-Realm Intrinsics & IDL Harness Interception
-**Goal**: Resolve the VM proxy intrinsic leak and relative IDL fetch interception in `scripts/wpt/node/run.ts`, unlocking **+1,127 potential passing assertions** across `serialize-values.html` and `idlharness.html`.
+**Goal**: Resolve the V8 VM realm intrinsic leak and relative IDL fetch interception in `scripts/wpt/node/run.ts`, unlocking **+1,181 authentic W3C test assertions** across `serialize-values.html` (697 assertions) and `idlharness.html` (484 assertions) with zero regressions on the 17,100+ passing baseline.
+
+### Architectural Root Causes & Analysis (Grizz Audit)
+- **LinkeDOM Host Aliasing vs Node VM Realms**:
+  - LinkeDOM initializes `dom.window` with references to Node's host intrinsics (`win.Array = Array`, `win.Object = Object`).
+  - When `scripts/wpt/node/run.ts` creates an isolated `vm.createContext()`, V8 creates a distinct VM realm with its own prototypes (`context.Array.prototype`).
+  - `run.ts`'s `windowProxy` contained a wildcard `if (prop in globalThis)` fallback that intercepted identifier lookups for `Array`, returning host `globalThis.Array`.
+  - Result: `[]` inside the VM receives `context.Array.prototype`, while the identifier `Array` resolves to `globalThis.Array`, causing `[] instanceof Array === false` and prematurely aborting `serialize-values.html` (697 tests).
+- **Relative WebIDL Fetch Failure**:
+  - `idlharness.js` executes `fetch('/interfaces/cssom.idl')`. Node's built-in `fetch` throws `ERR_INVALID_URL` on relative paths without a base server origin.
+  - In WPT, `wptserve` routes `/interfaces/` to the repo directory. In headless Node.js, `fetch` must resolve `/interfaces/*.idl` to `submodules/web-platform-tests/interfaces/` on disk.
+- **Missing WebIDL Harness Support in DOM Shim**:
+  - `idlharness.js` checks `'Window' in self` (requires `Window` interface constructor on `sandbox`) and calls `format_value()` for assertion failure formatting.
 
 ### Tasks
-- [ ] **VM Realm `Array` / `Object` Intrinsic Leak Fix**:
-  - In `scripts/wpt/node/run.ts`: Ensure `windowProxy` resolves `Array`, `Object`, and standard globals to the VM realm context rather than host `globalThis` (`[] instanceof Array === true`).
-  - Target file: `serialize-values.html` (687 assertions).
-- [ ] **WPT `/interfaces/` Relative IDL Fetch Interception**:
-  - In `scripts/wpt/node/run.ts`: Intercept relative `fetch('/interfaces/*.idl')` calls and serve the files from `submodules/web-platform-tests/interfaces/`.
-  - Target file: `idlharness.html` (440 assertions).
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Verify 0 regressions across all 1,687 test files.
-  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+- [ ] **VM Realm `JS_INTRINSICS` Isolation & Whitelist Bridge (`scripts/wpt/node/run.ts`)**:
+  - Filter out `JS_INTRINSICS` (`Array`, `Object`, `Function`, `Promise`, `Error`, `Map`, `Set`, `RegExp`, `Date`, `Math`, `JSON`, etc.) when copying properties from `dom.window` so the VM context realm initializes its own clean native prototypes.
+  - Replace wildcard `if (prop in globalThis)` in `windowProxy` with an explicit whitelist of safe host utility APIs: `console`, `crypto`, `performance`, `URL`, `URLSearchParams`, `TextEncoder`, `TextDecoder`, `queueMicrotask`, `structuredClone`, `btoa`, `atob`, `fetch`, `Response`, `Request`, `Headers`, `AbortController`, `AbortSignal`.
+  - Capture context realm (`vm.runInContext('this', context)`) and delegate standard identifier lookups to the VM realm context.
+  - Target file: `serialize-values.html` (697 assertions $\to$ expect 528+ passing).
+- [ ] **WPT `/interfaces/` Relative IDL Fetch Interception (`scripts/wpt/node/run.ts`)**:
+  - In `sandbox.fetch`: Intercept relative `fetch('/interfaces/*.idl')` calls and serve the files directly from `submodules/web-platform-tests/interfaces/` returning `{ ok: true, status: 200, text: async () => ... }`.
+  - Target file: `idlharness.html` (484 assertions $\to$ expect 199+ passing).
+- [ ] **IDL Harness Bridge Support (`tests/dom-shim/src/testharness-bridge.ts`)**:
+  - Expose `Window: window.Window || window.constructor` on `sandbox`.
+  - Export `format_value(val)` helper function to satisfy `idlharness.js` error formatting.
+- [ ] **Zero-Regression & Blast-Radius Verification**:
+  - Verify that child processes remain bounded within `--max-old-space-size=512` during WebIDL AST parsing (`webidl2.js`).
+  - Run `pnpm run preflight` (typecheck, lint, safe-exec, all unit tests).
+  - Run `pnpm run wpt:verify` to guarantee **0 regressions** across all 1,687 test files (17,100+ baseline).
 
 ---
 
