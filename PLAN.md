@@ -2673,6 +2673,60 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
     - Current: 17,011 (+206 newly passing assertions)
     - Regressions: **0** (100% of baseline passing tests continue to pass).
 
+---
+
+## Phase 110: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
+**Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
+
+### Tasks
+- [ ] **Homogeneous Unit Simplification in `CSSNumericValue.parse()` (CSS Values 4 § 10.7)**:
+  - In `src/math-parser.ts` & `src/typed-om/numeric/`:
+    - Simplify homogeneous terms inside `calc()` additions (e.g. `calc(10px + 20px)` $\to$ `new CSSUnitValue(30, 'px')`).
+    - Distribute subtraction into addition of negated terms (`calc(10px - 5px)` $\to$ `new CSSUnitValue(5, 'px')`, `calc(10px - 5em)` $\to$ `new CSSMathSum(10px, -5em)`).
+    - Simplify multiplications of `<percentage>` or `<length>` with raw numbers (e.g. `calc(100% * 2)` $\to$ `new CSSUnitValue(200, 'percent')`).
+- [ ] **Complex Math Expression Flattening (`CSSMathSum`, `CSSMathProduct`, `CSSMathMin`, `CSSMathMax`)**:
+  - Flatten nested single-child sums and products into their underlying unit or operation nodes.
+  - Simplify homogeneous terms inside `min()` and `max()` nodes (e.g. `min(10px, 20px, 100%)` $\to$ `min(10px, 100%)`).
+- [ ] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/typed-om-math-simplification.test.ts`.
+  - Verify 100% pass on `css/css-typed-om/stylevalue-subclasses/numeric-objects/parse.tentative.html`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+
+---
+
+## Phase 111: Composite Shorthand Computed Synthesis (`border`, `font`, `outline`, `columns`)
+**Goal**: Generalize computed style synthesis across all composite shorthands in `src/shorthands.ts`, `src/cascade/`, and `tests/dom-shim/`, resolving ~280 computed CSSOM serialization gaps.
+
+### Tasks
+- [ ] **Composite Shorthand Computed Serialization Engine (`src/shorthands.ts`)**:
+  - Implement computed value serializers for composite shorthands:
+    - `border`: Reconstruct from `border-top-*`, `border-right-*`, `border-bottom-*`, `border-left-*` into `<width> <style> <color>`.
+    - `outline`: Reconstruct from `outline-color`, `outline-style`, `outline-width`.
+    - `font`: Reconstruct from `font-style`, `font-variant`, `font-weight`, `font-size`, `line-height`, `font-family`.
+    - `columns`: Reconstruct from `column-width`, `column-count`.
+- [ ] **CSSOM & Typed OM Computed Map Integration**:
+  - In `CSSStyleDeclaration.getPropertyValue()` & `StylePropertyMapReadOnly.get()`: Use the computed shorthand serializers when querying composite shorthands from computed style maps.
+- [ ] **Unit Tests & Verification**:
+  - Add tests in `tests/shorthand-computed-synthesis.test.ts`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+
+---
+
+## Phase 112: Complex Selectors & Relative Scope Matching
+**Goal**: Resolve selector matching gaps identified by the Parity Oracle in `css/selectors/` (~644 gaps), focusing on `:scope` relative matching, structural `:has()` boundaries, and case-sensitive attribute namespaces.
+
+### Tasks
+- [ ] **`:scope` & `@scope` Relative Context Matching (`src/matcher.ts`, `src/cascade/rule-filter.ts`)**:
+  - Support relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element.
+  - Implement `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
+- [ ] **Structural Pseudo-Class Boundary & Namespace Matching**:
+  - Support case-sensitive attribute matching for XML/HTML namespaces.
+  - Refine `:has()` sibling lookbehind boundary matching.
+- [ ] **Unit Tests & Verification**:
+  - Add tests in `tests/selectors-scope-relative.test.ts`.
+  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+
+
 
 
 
