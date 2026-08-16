@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
-import { CSSStyleSheet } from '../src/CSSOM.ts';
+import { CSSStyleSheet, CSSStyleRule } from '../src/CSSOM.ts';
 import { SHORTHANDS } from '../src/shorthands.ts';
 
 describe('CSSOM: all Shorthand Property Expansion & Contraction (CSSOM § 6.4.3 & CSS Cascading 5 § 6.2)', () => {
@@ -67,7 +67,9 @@ describe('CSSOM: all Shorthand Property Expansion & Contraction (CSSOM § 6.4.3 
   it('handles all shorthand with CSSStyleSheet and insertRule', () => {
     const sheet = new CSSStyleSheet();
     sheet.insertRule('.foo { all: revert; width: 50px; }');
-    const style = (sheet.cssRules[0] as unknown as { style: CSSStyleDeclaration }).style;
+    const rule = sheet.cssRules[0];
+    assert.ok(rule instanceof CSSStyleRule);
+    const style = rule.style;
     assert.strictEqual(style.getPropertyValue('width'), '50px');
     assert.strictEqual(style.getPropertyValue('all'), '');
     assert.strictEqual(style.getPropertyValue('color'), 'revert');

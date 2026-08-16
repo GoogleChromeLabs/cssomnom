@@ -585,7 +585,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     this._declarations.length = 0;
     this._declMap.clear();
 
-    for (const d of (newStyle as unknown as { _declarations: Declaration[] })._declarations) {
+    for (const d of newStyle._declarations) {
       if (d.name === '--') continue;
       const normalizedName = d.name.startsWith('--') ? d.name : d.name.toLowerCase();
       if (!normalizedName.startsWith('--') && !this._isPropertySupported(normalizedName)) {

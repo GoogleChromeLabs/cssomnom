@@ -176,15 +176,15 @@ export function getCascadedStyle(
   }
 
   let normalizedPseudoStr: string | null = null;
-  if (typeof pseudoElement === 'string') {
-    const parsedPseudo = normalizePseudoElement(pseudoElement);
-    if (parsedPseudo === null) {
+  if (typeof pseudoElement === 'string' && pseudoElement !== '') {
+    if (!pseudoElement.startsWith(':')) {
+      // Per CSSOM & WPT getComputedStyle-pseudo.html: strings lacking leading ':' are ignored
       normalizedPseudoStr = null;
-    } else if (!parsedPseudo.valid || !parsedPseudo.isKnown) {
-      const emptyDecl = new CSSComputedStyleDeclaration([], true, null, element);
-      (emptyDecl as unknown as { _readonly: boolean })._readonly = true;
-      return emptyDecl;
     } else {
+      const parsedPseudo = normalizePseudoElement(pseudoElement);
+      if (!parsedPseudo || !parsedPseudo.valid || !parsedPseudo.isKnown) {
+        return new CSSComputedStyleDeclaration([], true, null, element);
+      }
       normalizedPseudoStr = parsedPseudo.normalized;
     }
   }

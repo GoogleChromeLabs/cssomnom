@@ -6,7 +6,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { CSSStyleSheet } from '../src/CSSOM.ts';
+import { CSSStyleSheet, CSSStyleRule } from '../src/CSSOM.ts';
 import { parseStyleSheet } from '../src/parser.ts';
 
 describe('CSSOM: Namespaced Type Selector Serialization (CSSOM § 6.4.3 #serialize-a-simple-selector)', () => {
@@ -14,7 +14,10 @@ describe('CSSOM: Namespaced Type Selector Serialization (CSSOM § 6.4.3 #seriali
     const parsed = parseStyleSheet(cssText);
     const sheet = CSSStyleSheet.createInternal(parsed, (text) => parseStyleSheet(text)[0]);
     const lastRule = sheet.cssRules[sheet.cssRules.length - 1];
-    return (lastRule as unknown as { selectorText?: string }).selectorText || '';
+    if (lastRule instanceof CSSStyleRule) {
+      return lastRule.selectorText;
+    }
+    return '';
   }
 
   it('omits universal selector before class, id, pseudo, attribute when no default namespace', () => {

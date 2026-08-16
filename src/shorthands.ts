@@ -886,8 +886,32 @@ export const ALL_SHORTHAND_LONGHANDS: readonly string[] = Object.freeze(
   })
 );
 
+const CSS_WIDE_KEYWORDS = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer']);
+
+function isCSSWideKeywordOrVar(tokens: ComponentValue[]): boolean {
+  const nonWs = tokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
+  if (nonWs.length === 1) {
+    const t = nonWs[0];
+    if (t.type === 'ident' && CSS_WIDE_KEYWORDS.has(t.value.toLowerCase())) {
+      return true;
+    }
+    if (t.type === 'function') {
+      const name = ('name' in t && typeof t.name === 'string') ? t.name : ('value' in t && typeof t.value === 'string') ? t.value : '';
+      if (name.toLowerCase() === 'var') {
+        return true;
+      }
+    }
+  }
+  return nonWs.some(t => {
+    if (t.type !== 'function') return false;
+    const name = ('name' in t && typeof t.name === 'string') ? t.name : ('value' in t && typeof t.value === 'string') ? t.value : '';
+    return name.toLowerCase() === 'var';
+  });
+}
+
 function expandAll(value: ComponentValue[]): Record<string, ComponentValue[]> | null {
   if (!value || value.length === 0) return null;
+  if (!isCSSWideKeywordOrVar(value)) return null;
   const result: Record<string, ComponentValue[]> = {};
   for (const lh of ALL_SHORTHAND_LONGHANDS) {
     result[lh] = value;
@@ -907,7 +931,12 @@ function contractAll(longhands: Record<string, ComponentValue[]>): string | null
       return null;
     }
   }
-  return firstVal;
+  if (!firstVal) return null;
+  const lower = firstVal.toLowerCase();
+  if (CSS_WIDE_KEYWORDS.has(lower) || lower.startsWith('var(')) {
+    return firstVal;
+  }
+  return null;
 }
 
 export const SHORTHANDS: Record<string, ShorthandDefinition> = {
