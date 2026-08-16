@@ -1131,9 +1131,9 @@ export class Parser {
     };
   }
   public static isValidDashedIdent(name: string): boolean {
-    if (!name.startsWith('--') || name === '--') return false;
-    const tokens = tokenize(name);
-    return tokens.length === 2 && tokens[0].type === 'ident' && tokens[1].type === 'EOF';
+    if (typeof name !== 'string' || !name.startsWith('--') || name === '--') return false;
+    if (/\s/.test(name)) return false;
+    return true;
   }
 
   public static isCustomPropertyDeclaration(prelude: ComponentValue[]): boolean {

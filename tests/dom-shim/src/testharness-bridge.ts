@@ -3,6 +3,7 @@
 import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
 import * as TypedOM from '../../../src/typed-om.ts';
+import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
 import { DOMMatrixReadOnly, DOMMatrix, DOMPointReadOnly, DOMPoint } from '../../../src/DOMMatrix.ts';
 import {
   HarnessError,
@@ -117,6 +118,7 @@ export function createWptContext(
     Element: window.Element,
     Node: window.Node,
     HTMLStyleElement: win.HTMLStyleElement,
+    CSSStyleDeclaration: win.CSSStyleDeclaration || CSSStyleDeclaration,
     DOMException: win.DOMException,
     Event: win.Event,
     CustomEvent: win.CustomEvent,

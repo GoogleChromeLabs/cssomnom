@@ -18,7 +18,7 @@ import { ParseHooks } from './parse-hooks.ts';
 import { serialize, serializeDeclarations, serializeFontFamily } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import type { Declaration, CSSRule, ComponentValue } from './types.ts';
-import { SHORTHANDS } from './shorthands.ts';
+import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty } from './data/gen/LogicalMapping.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
@@ -35,16 +35,24 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
           return decl ? decl.name : undefined;
         }
         
-        if (!(prop in t) || (typeof (t as unknown as Record<string, unknown>)[prop] === 'undefined' && !prop.startsWith('_'))) {
-          const isCustomProp = prop.startsWith('--');
-          let cssProp = prop;
-          if (!isCustomProp) {
-            if (prop === 'cssFloat') {
-              cssProp = 'float';
-            } else {
-              cssProp = camelToDashed(prop);
-            }
+        if (prop in t && (typeof (t as unknown as Record<string, unknown>)[prop] !== 'undefined' || prop.startsWith('_'))) {
+          return Reflect.get(t, prop, receiver);
+        }
+
+        if (prop.startsWith('--')) {
+          return t.getPropertyValue(prop);
+        }
+
+        const isCustomProp = prop.startsWith('--');
+        let cssProp = prop;
+        if (!isCustomProp) {
+          if (prop === 'cssFloat') {
+            cssProp = 'float';
+          } else {
+            cssProp = camelToDashed(prop);
           }
+        }
+        if (t._isPropertySupported(cssProp)) {
           return t.getPropertyValue(cssProp);
         }
       }
@@ -55,16 +63,22 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
         if (!isNaN(Number(prop))) {
           return false;
         }
-        if (!(prop in t) || (typeof (t as unknown as Record<string, unknown>)[prop] === 'undefined' && !prop.startsWith('_'))) {
-          const isCustomProp = prop.startsWith('--');
-          let cssProp = prop;
-          if (!isCustomProp) {
-            if (prop === 'cssFloat') {
-              cssProp = 'float';
-            } else {
-              cssProp = camelToDashed(prop);
-            }
-          }
+        if (prop in t && (typeof (t as unknown as Record<string, unknown>)[prop] !== 'undefined' || prop.startsWith('_'))) {
+          return Reflect.set(t, prop, value, receiver);
+        }
+
+        if (prop.startsWith('--')) {
+          t.setProperty(prop, value);
+          return true;
+        }
+
+        let cssProp = prop;
+        if (prop === 'cssFloat') {
+          cssProp = 'float';
+        } else {
+          cssProp = camelToDashed(prop);
+        }
+        if (t._isPropertySupported(cssProp)) {
           t.setProperty(cssProp, value);
           return true;
         }
@@ -79,7 +93,8 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
         }
         if (prop in t) return true;
         if (prop.startsWith('--')) return true;
-        if (camelToDashed(prop) !== prop) return true;
+        const dashed = camelToDashed(prop);
+        if (t._isPropertySupported(dashed)) return true;
         if (prop in SHORTHANDS) return true;
         for (const s of Object.values(SHORTHANDS)) {
           if (s.longhands.includes(prop)) return true;
@@ -97,6 +112,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   private _declMap: Map<string, Declaration>;
   private _readonly: boolean;
   public parentRule: CSSRule | null = null;
+  public _onChange: ((force?: boolean) => void) | null = null;
 
   constructor(declarations: Declaration[] = [], readonlyFlag: boolean = false) {
     super();
@@ -104,26 +120,31 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     this._declMap = new Map();
     this._readonly = readonlyFlag;
     const addDeclarationRecursive = (decl: Declaration) => {
+      if (decl.name === '--') return;
+      const normalizedName = decl.name.startsWith('--') ? decl.name : decl.name.toLowerCase();
+      decl.name = normalizedName;
       const shorthand = SHORTHANDS[decl.name];
       if (shorthand) {
-        const expanded = shorthand.expand(decl.value);
-        if (expanded) {
-          for (const [lh, val] of Object.entries(expanded)) {
-            addDeclarationRecursive({
-              type: 'declaration',
-              name: lh,
-              value: val,
-              important: decl.important
-            });
+        const hasVar = serialize(decl.value).includes('var(') || serialize(decl.value).includes('env(');
+        if (!hasVar) {
+          const expanded = shorthand.expand(decl.value);
+          if (expanded) {
+            for (const [lh, val] of Object.entries(expanded)) {
+              addDeclarationRecursive({
+                type: 'declaration',
+                name: lh,
+                value: val,
+                important: decl.important
+              });
+            }
+            return;
           }
-          return;
         }
       }
       this._addDeclaration(decl);
     };
 
     for (const d of declarations) {
-      if (d.name === '--') continue;
       addDeclarationRecursive(d);
     }
     
@@ -181,6 +202,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   // cssom-1 § 6.6.2 #dom-cssstyledeclaration-getpropertyvalue
   getPropertyValue(property: string): string {
     if (!property.startsWith('--')) property = property.toLowerCase();
+    else if (!ParseHooks.isValidDashedIdent(property)) return '';
     const shorthandLonghands = SHORTHANDS[property]?.longhands || (SHORTHANDS_DATA as Record<string, readonly string[]>)[property];
     if (shorthandLonghands && shorthandLonghands.length > 0) {
       let allCssWide: string | null = null;
@@ -297,6 +319,14 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
       const directDecl = this._getWinningDeclaration(property);
       if (directDecl) {
+        const directIdx = this._declarations.indexOf(directDecl);
+        const hasOverridingLonghand = this._declarations.some((d, idx) => {
+          if (!shorthand.longhands.includes(d.name)) return false;
+          if (d.important && !directDecl.important) return true;
+          if (d.important === directDecl.important && idx > directIdx) return true;
+          return false;
+        });
+        if (hasOverridingLonghand) return '';
         return serialize(directDecl.value).trim();
       }
       return '';
@@ -329,14 +359,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return '';
   }
 
-  /**
-   * Historical DOM Level 2 Style / CSSOM 1 member.
-   * @deprecated
-   */
-  getPropertyCSSValue(_property: string): null {
-    return null;
-  }
-
   private _getExactWinningDeclaration(property: string): Declaration | null {
     if (!property.startsWith('--')) property = property.toLowerCase();
     const isCustom = property.startsWith('--');
@@ -360,7 +382,26 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   }
 
   private _getWinningDeclaration(property: string): Declaration | null {
-    return this._getExactWinningDeclaration(property);
+    const exact = this._getExactWinningDeclaration(property);
+    const shorthands = LONGHAND_TO_SHORTHAND[property];
+    if (shorthands) {
+      for (const sh of shorthands) {
+        const shDecl = this._getExactWinningDeclaration(sh);
+        if (shDecl) {
+          if (shDecl.important && (!exact || !exact.important)) {
+            return null;
+          }
+          if (exact && !exact.important && !shDecl.important) {
+            const shIdx = this._declarations.indexOf(shDecl);
+            const exactIdx = this._declarations.indexOf(exact);
+            if (shIdx > exactIdx) {
+              return null;
+            }
+          }
+        }
+      }
+    }
+    return exact;
   }
 
   // cssom-1 § 6.6.2 #dom-cssstyledeclaration-getpropertypriority
@@ -421,7 +462,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   }
 
   // cssom-1 § 6.7.1 #the-cssstyledeclaration-interface
-  setProperty(property: string, value: string | null, priority: string = '') {
+  setProperty(property: string, value: string | null, priority: string = '', notify: boolean = true) {
     // 1. If the readonly flag is set, then throw a NoModificationAllowedError exception.
     if (this._readonly) {
       throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
@@ -446,6 +487,20 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       return;
     }
 
+    if (property.startsWith('--')) {
+      if (!ParseHooks.isValidDashedIdent(property)) {
+        return;
+      }
+      const tokens = tokenize(value);
+      if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
+        return;
+      }
+      const componentValues = ParseHooks.parseComponentValues(tokens);
+      if (!ParseHooks.validateCustomPropertyValue(componentValues)) {
+        return;
+      }
+    }
+
     const tokens = tokenize(value, property === 'unicode-range');
     if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
       return;
@@ -459,33 +514,33 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
       const compVals = ParseHooks.parseComponentValues(tokens);
-      const expanded = shorthand.expand(compVals);
-      if (expanded) {
-        for (const [lh, val] of Object.entries(expanded)) {
-          this.setProperty(lh, serialize(val), normalizedPriority);
+      const hasVar = value.includes('var(') || value.includes('env(');
+      if (!hasVar) {
+        const expanded = shorthand.expand(compVals);
+        if (expanded) {
+          for (const [lh, val] of Object.entries(expanded)) {
+            this.setProperty(lh, serialize(val), normalizedPriority, false);
+          }
+          if (notify) {
+            this._onChange?.();
+          }
+          return;
         }
-        return;
       }
-      if (value.includes('var(') && ParseHooks.validateDeclarationValue(compVals)) {
+      if (hasVar && ParseHooks.validateDeclarationValue(compVals)) {
         for (const lh of shorthand.longhands) {
           this.removeProperty(lh);
         }
       } else if (!shorthand.stub) {
         return;
       }
+    } else if (!property.startsWith('--')) {
+      if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, value)) {
+        return;
+      }
     }
 
     const existing = this._declMap.get(property);
-    
-    if (property.startsWith('--')) {
-      if (!ParseHooks.isValidDashedIdent(property)) {
-        return;
-      }
-      const componentValues = ParseHooks.parseComponentValues(tokens);
-      if (!ParseHooks.validateCustomPropertyValue(componentValues)) {
-        return;
-      }
-    }
 
     const componentValues = ParseHooks.parseComponentValues(tokens);
 
@@ -524,6 +579,10 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       this._declarations.push(decl);
       this._declMap.set(property, decl);
     }
+
+    if (notify) {
+      this._onChange?.();
+    }
   }
 
   removeProperty(property: string): string {
@@ -533,12 +592,17 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     if (!property.startsWith('--')) property = property.toLowerCase();
     if (property === 'all') {
       const value = this.getPropertyValue('all');
+      let changed = false;
       for (let i = this._declarations.length - 1; i >= 0; i--) {
         const d = this._declarations[i];
         if (d.name !== 'direction' && d.name !== 'unicode-bidi' && !d.name.startsWith('--')) {
           this._declarations.splice(i, 1);
           this._declMap.delete(d.name);
+          changed = true;
         }
+      }
+      if (changed) {
+        this._onChange?.();
       }
       return value;
     }
@@ -550,13 +614,25 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         ...shorthand.longhands,
         ...(shorthand.logicalLonghands || [])
       ]);
+      let changed = false;
       for (const lh of allLh) {
-        this.removeProperty(lh);
+        if (this._declMap.has(lh)) {
+          const index = this._declarations.findIndex(d => d.name === lh);
+          if (index !== -1) {
+            this._declarations.splice(index, 1);
+            this._declMap.delete(lh);
+            changed = true;
+          }
+        }
       }
       const index = this._declarations.findIndex(d => d.name === property);
       if (index !== -1) {
         this._declarations.splice(index, 1);
         this._declMap.delete(property);
+        changed = true;
+      }
+      if (changed) {
+        this._onChange?.();
       }
       return value;
     }
@@ -570,6 +646,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       if (property.startsWith('--') && decl.value.length === 0) {
         val = ' ';
       }
+      this._onChange?.();
       return val;
     }
     return '';
@@ -605,22 +682,28 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       d.name = normalizedName;
       const shorthand = SHORTHANDS[d.name];
       if (shorthand) {
-        const expanded = shorthand.expand(d.value);
-        if (expanded) {
-          for (const [lh, val] of Object.entries(expanded)) {
-            this._addDeclaration({
-              type: 'declaration',
-              name: lh,
-              value: val,
-              important: d.important
-            });
+        const hasVar = serialize(d.value).includes('var(') || serialize(d.value).includes('env(');
+        if (!hasVar) {
+          const expanded = shorthand.expand(d.value);
+          if (expanded) {
+            for (const [lh, val] of Object.entries(expanded)) {
+              this._addDeclaration({
+                type: 'declaration',
+                name: lh,
+                value: val,
+                important: d.important
+              });
+            }
+            continue;
           }
-          continue;
         }
       }
       this._addDeclaration(d);
     }
+
+    this._onChange?.(true);
   }
+
 
   _isPropertySupported(property: string): boolean {
     return SUPPORTED_PROPERTIES.has(property);

@@ -57,5 +57,8 @@ export const ParseHooks = {
   },
   isValidDashedIdent: (_name: string): boolean => {
     throw new Error('isValidDashedIdent not injected');
+  },
+  validatePropertyValue: (_property: string, _value: string): boolean => {
+    return true;
   }
 };

@@ -1669,11 +1669,14 @@
     "StylePropertyMap.append rejects appending to CSS-wide keywords"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/inline/attribute-changed-callback.html": [
+    "attributeStyleMap and style interleave correctly with attributeChangedCallback",
     "attributeStyleMap.append() triggers attributeChangedCallback",
     "attributeStyleMap.clear() triggers attributeChangedCallback",
     "attributeStyleMap.delete() triggers attributeChangedCallback",
     "attributeStyleMap.delete() with custom property triggers attributeChangedCallback",
     "attributeStyleMap.set() triggers MutationObserver without duplicates",
+    "attributeStyleMap.set() triggers attributeChangedCallback",
+    "attributeStyleMap.set() triggers attributeChangedCallback with correct old/new values",
     "attributeStyleMap.set() with custom property triggers attributeChangedCallback",
     "attributeStyleMap.set() with shorthand property triggers attributeChangedCallback"
   ],
@@ -3745,6 +3748,15 @@
     "Setting 'cy' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/clear.html": [
+    "Can set 'clear' to CSS-wide keywords: inherit",
+    "Can set 'clear' to CSS-wide keywords: initial",
+    "Can set 'clear' to CSS-wide keywords: revert",
+    "Can set 'clear' to CSS-wide keywords: unset",
+    "Can set 'clear' to the 'both' keyword: both",
+    "Can set 'clear' to the 'left' keyword: left",
+    "Can set 'clear' to the 'none' keyword: none",
+    "Can set 'clear' to the 'right' keyword: right",
+    "Can set 'clear' to var() references:  var(--A)",
     "Setting 'clear' to a flexible length: -3.14fr throws TypeError",
     "Setting 'clear' to a flexible length: 0fr throws TypeError",
     "Setting 'clear' to a flexible length: 1fr throws TypeError",
@@ -5139,9 +5151,6 @@
     "Setting 'flood-opacity' to an angle: 0deg throws TypeError",
     "Setting 'flood-opacity' to an angle: 3.14rad throws TypeError",
     "Setting 'flood-opacity' to an angle: calc(0deg + 0rad) throws TypeError"
-  ],
-  "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/font-family.html": [
-    "'font-family' does not support '\"Gill Sans\"'"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/font-feature-settings.html": [
     "Can set 'font-feature-settings' to CSS-wide keywords: inherit",
@@ -10067,6 +10076,21 @@
     "Setting 'scroll-margin-top' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/scroll-padding.html": [
+    "'scroll-padding' does not support '0%'",
+    "'scroll-padding' does not support '1px 2px'",
+    "'scroll-padding' does not support '3% 4px 5%'",
+    "'scroll-padding' does not support '6px 7% 8% 9px'",
+    "Can set 'scroll-padding-block-end' to CSS-wide keywords: inherit",
+    "Can set 'scroll-padding-block-end' to CSS-wide keywords: initial",
+    "Can set 'scroll-padding-block-end' to CSS-wide keywords: revert",
+    "Can set 'scroll-padding-block-end' to CSS-wide keywords: unset",
+    "Can set 'scroll-padding-block-end' to a length: 0px",
+    "Can set 'scroll-padding-block-end' to a length: 3.14cm",
+    "Can set 'scroll-padding-block-end' to a length: calc(0em + 0px)",
+    "Can set 'scroll-padding-block-end' to a percent: 0%",
+    "Can set 'scroll-padding-block-end' to a percent: 3.14%",
+    "Can set 'scroll-padding-block-end' to a percent: calc(0% + 0%)",
+    "Can set 'scroll-padding-block-end' to var() references:  var(--A)",
     "Can set 'scroll-padding-block-start' to CSS-wide keywords: inherit",
     "Can set 'scroll-padding-block-start' to CSS-wide keywords: initial",
     "Can set 'scroll-padding-block-start' to CSS-wide keywords: revert",
@@ -10089,6 +10113,17 @@
     "Can set 'scroll-padding-bottom' to a percent: 3.14%",
     "Can set 'scroll-padding-bottom' to a percent: calc(0% + 0%)",
     "Can set 'scroll-padding-bottom' to var() references:  var(--A)",
+    "Can set 'scroll-padding-inline-end' to CSS-wide keywords: inherit",
+    "Can set 'scroll-padding-inline-end' to CSS-wide keywords: initial",
+    "Can set 'scroll-padding-inline-end' to CSS-wide keywords: revert",
+    "Can set 'scroll-padding-inline-end' to CSS-wide keywords: unset",
+    "Can set 'scroll-padding-inline-end' to a length: 0px",
+    "Can set 'scroll-padding-inline-end' to a length: 3.14cm",
+    "Can set 'scroll-padding-inline-end' to a length: calc(0em + 0px)",
+    "Can set 'scroll-padding-inline-end' to a percent: 0%",
+    "Can set 'scroll-padding-inline-end' to a percent: 3.14%",
+    "Can set 'scroll-padding-inline-end' to a percent: calc(0% + 0%)",
+    "Can set 'scroll-padding-inline-end' to var() references:  var(--A)",
     "Can set 'scroll-padding-inline-start' to CSS-wide keywords: inherit",
     "Can set 'scroll-padding-inline-start' to CSS-wide keywords: initial",
     "Can set 'scroll-padding-inline-start' to CSS-wide keywords: revert",
@@ -10133,14 +10168,38 @@
     "Can set 'scroll-padding-top' to a percent: 3.14%",
     "Can set 'scroll-padding-top' to a percent: calc(0% + 0%)",
     "Can set 'scroll-padding-top' to var() references:  var(--A)",
+    "Setting 'scroll-padding-block-end' to a flexible length: -3.14fr throws TypeError",
+    "Setting 'scroll-padding-block-end' to a flexible length: 0fr throws TypeError",
+    "Setting 'scroll-padding-block-end' to a flexible length: 1fr throws TypeError",
+    "Setting 'scroll-padding-block-end' to a number: -3.14 throws TypeError",
+    "Setting 'scroll-padding-block-end' to a number: 0 throws TypeError",
+    "Setting 'scroll-padding-block-end' to a number: 3.14 throws TypeError",
+    "Setting 'scroll-padding-block-end' to a number: calc(2 + 3) throws TypeError",
+    "Setting 'scroll-padding-block-end' to a time: -3.14ms throws TypeError",
+    "Setting 'scroll-padding-block-end' to a time: 0s throws TypeError",
+    "Setting 'scroll-padding-block-end' to a time: 3.14s throws TypeError",
+    "Setting 'scroll-padding-block-end' to a time: calc(0ms + 0s) throws TypeError",
+    "Setting 'scroll-padding-block-end' to a transform: perspective(10em) throws TypeError",
+    "Setting 'scroll-padding-block-end' to a transform: translate(50%, 50%) throws TypeError",
+    "Setting 'scroll-padding-block-end' to a transform: translate3d(0px, 1px, 2px) translate(0px, 1px) rotate3d(1, 2, 3, 45deg) rotate(45deg) scale3d(1, 2, 3) scale(1, 2) skew(1deg, 1deg) skewX(1deg) skewY(45deg) perspective(1px) matrix3d(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16) matrix(1, 2, 3, 4, 5, 6) throws TypeError",
+    "Setting 'scroll-padding-block-end' to an angle: -3.14deg throws TypeError",
+    "Setting 'scroll-padding-block-end' to an angle: 0deg throws TypeError",
+    "Setting 'scroll-padding-block-end' to an angle: 3.14rad throws TypeError",
+    "Setting 'scroll-padding-block-end' to an angle: calc(0deg + 0rad) throws TypeError",
     "Setting 'scroll-padding-block-start' to a flexible length: -3.14fr throws TypeError",
     "Setting 'scroll-padding-block-start' to a flexible length: 0fr throws TypeError",
     "Setting 'scroll-padding-block-start' to a flexible length: 1fr throws TypeError",
+    "Setting 'scroll-padding-block-start' to a number: -3.14 throws TypeError",
     "Setting 'scroll-padding-block-start' to a number: 0 throws TypeError",
+    "Setting 'scroll-padding-block-start' to a number: 3.14 throws TypeError",
+    "Setting 'scroll-padding-block-start' to a number: calc(2 + 3) throws TypeError",
     "Setting 'scroll-padding-block-start' to a time: -3.14ms throws TypeError",
     "Setting 'scroll-padding-block-start' to a time: 0s throws TypeError",
     "Setting 'scroll-padding-block-start' to a time: 3.14s throws TypeError",
     "Setting 'scroll-padding-block-start' to a time: calc(0ms + 0s) throws TypeError",
+    "Setting 'scroll-padding-block-start' to a transform: perspective(10em) throws TypeError",
+    "Setting 'scroll-padding-block-start' to a transform: translate(50%, 50%) throws TypeError",
+    "Setting 'scroll-padding-block-start' to a transform: translate3d(0px, 1px, 2px) translate(0px, 1px) rotate3d(1, 2, 3, 45deg) rotate(45deg) scale3d(1, 2, 3) scale(1, 2) skew(1deg, 1deg) skewX(1deg) skewY(45deg) perspective(1px) matrix3d(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16) matrix(1, 2, 3, 4, 5, 6) throws TypeError",
     "Setting 'scroll-padding-block-start' to an angle: -3.14deg throws TypeError",
     "Setting 'scroll-padding-block-start' to an angle: 0deg throws TypeError",
     "Setting 'scroll-padding-block-start' to an angle: 3.14rad throws TypeError",
@@ -10163,6 +10222,24 @@
     "Setting 'scroll-padding-bottom' to an angle: 0deg throws TypeError",
     "Setting 'scroll-padding-bottom' to an angle: 3.14rad throws TypeError",
     "Setting 'scroll-padding-bottom' to an angle: calc(0deg + 0rad) throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a flexible length: -3.14fr throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a flexible length: 0fr throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a flexible length: 1fr throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a number: -3.14 throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a number: 0 throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a number: 3.14 throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a number: calc(2 + 3) throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a time: -3.14ms throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a time: 0s throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a time: 3.14s throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a time: calc(0ms + 0s) throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a transform: perspective(10em) throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a transform: translate(50%, 50%) throws TypeError",
+    "Setting 'scroll-padding-inline-end' to a transform: translate3d(0px, 1px, 2px) translate(0px, 1px) rotate3d(1, 2, 3, 45deg) rotate(45deg) scale3d(1, 2, 3) scale(1, 2) skew(1deg, 1deg) skewX(1deg) skewY(45deg) perspective(1px) matrix3d(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16) matrix(1, 2, 3, 4, 5, 6) throws TypeError",
+    "Setting 'scroll-padding-inline-end' to an angle: -3.14deg throws TypeError",
+    "Setting 'scroll-padding-inline-end' to an angle: 0deg throws TypeError",
+    "Setting 'scroll-padding-inline-end' to an angle: 3.14rad throws TypeError",
+    "Setting 'scroll-padding-inline-end' to an angle: calc(0deg + 0rad) throws TypeError",
     "Setting 'scroll-padding-inline-start' to a flexible length: -3.14fr throws TypeError",
     "Setting 'scroll-padding-inline-start' to a flexible length: 0fr throws TypeError",
     "Setting 'scroll-padding-inline-start' to a flexible length: 1fr throws TypeError",
@@ -12899,6 +12976,7 @@
   ],
   "submodules/web-platform-tests/css/css-variables/variable-cssText.html": [
     "target1",
+    "target10",
     "target2",
     "target3",
     "target4",
@@ -12992,6 +13070,7 @@
     "overwrite (Computed Style)",
     "parsing multiple dashes with one dash at start of variable",
     "parsing multiple dashes with one dash at start of variable (Cascading)",
+    "parsing multiple dashes with one dash at start of variable (Computed Style)",
     "parsing three dashes at start of variable",
     "parsing three dashes at start of variable (Cascading)",
     "parsing three dashes at start of variable (Computed Style)",
@@ -13037,7 +13116,9 @@
   ],
   "submodules/web-platform-tests/css/css-variables/variable-invalidation.html": [
     "css rule test",
-    "css rule test important"
+    "css rule test important",
+    "inline style test",
+    "inline style test important"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-presentation-attribute.html": [
     "Testing 'alignment-baseline'.",
@@ -13134,6 +13215,7 @@
     "anonymous-test-1"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference.html": [
+    "width: var();",
     "width: var(--prop 20px);",
     "width: var(--prop) !important;",
     "width: var(--prop);",
@@ -13207,7 +13289,33 @@
     "target4 margin-left",
     "target4 margin-right",
     "target4 margin-top",
+    "target5 border-bottom-color",
+    "target5 border-bottom-style",
+    "target5 border-bottom-width",
+    "target5 border-left-color",
+    "target5 border-left-style",
+    "target5 border-left-width",
+    "target5 border-right-color",
+    "target5 border-right-style",
+    "target5 border-right-width",
+    "target5 border-top-color",
+    "target5 border-top-style",
+    "target5 border-top-width",
+    "target6 border-bottom-color",
+    "target6 border-bottom-style",
+    "target6 border-bottom-width",
+    "target6 border-left-color",
+    "target6 border-left-style",
+    "target6 border-left-width",
+    "target6 border-right-color",
+    "target6 border-right-style",
+    "target6 border-right-width",
+    "target6 border-top-color",
+    "target6 border-top-style",
+    "target6 border-top-width",
     "target9 border-bottom-width",
+    "target9 border-left-color",
+    "target9 border-left-style",
     "target9 border-right-width",
     "target9 border-top-width"
   ],
@@ -13302,6 +13410,8 @@
     "Object.prototype.toString applied to the namespace object"
   ],
   "submodules/web-platform-tests/css/cssom/css-style-attr-decl-block.html": [
+    "Changes to CSS declaration block should queue mutation record for style attribute",
+    "Changes to CSS declaration block should reflect on style attribute",
     "Changes to style attribute should reflect on CSS declaration block",
     "Expansion of all:unset and all:revert treated identically",
     "Style attribute should create CSS declaration block based on its content"
@@ -13314,6 +13424,10 @@
     "Reading CSSStyleDeclaration initialized from a style element",
     "Setting CSSStyleDeclaration#cssText",
     "setProperty priority should be case-insensitive"
+  ],
+  "submodules/web-platform-tests/css/cssom/css-style-reparse.html": [
+    "style.innerHTML modification",
+    "style.textContent modification"
   ],
   "submodules/web-platform-tests/css/cssom/CSSContainerRule.tentative.html": [
     "@container (min-width: 100px) {}"
@@ -13532,6 +13646,9 @@
     "setProperty('all') overrides existing properties and earlier 'all'",
     "setProperty('all') sets all property values"
   ],
+  "submodules/web-platform-tests/css/cssom/cssstyledeclaration-cssfontrule.tentative.html": [
+    "a CSSStyleDeclaration for a CSSFontRule contains a unicode-range attribute"
+  ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-csstext-all-shorthand.html": [
     "'all' shorthand alone",
     "'all' shorthand with 'direction' and 'unicode-bidi'",
@@ -13545,10 +13662,15 @@
     "inline style - text - delimiters - two declarations",
     "inline style - text - delimiters - zero declarations"
   ],
+  "submodules/web-platform-tests/css/cssom/cssstyledeclaration-csstext-important.html": [
+    "padding-left should be taken from the !important property"
+  ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-csstext.html": [
     "another cssText order (non-alphabetical order)",
     "cssText on computed style declaration returns the empty string",
     "cssText order",
+    "invalid property does not appear",
+    "uppercase property",
     "use rgb",
     "whitespaces in value"
   ],
@@ -13581,12 +13703,22 @@
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-nested.html": [
     "anonymous-test-0"
   ],
+  "submodules/web-platform-tests/css/cssom/cssstyledeclaration-properties.html": [
+    "anonymous-test-0"
+  ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-removeProperty-all.html": [
     "anonymous-test-0",
     "anonymous-test-1"
   ],
+  "submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-attr.html": [
+    "Setting an invalid property via the declaration setter doesn't create a declaration",
+    "Setting an invalid value via the declaration setter doesn't create a declaration"
+  ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-declarations.html": [
-    "property setter should update only the declaration being set"
+    "longhand property setter should update only the decoarations being set",
+    "property setter should update only the declaration being set",
+    "setProperty with longhand should update only the declaration being set",
+    "setProperty with shorthand should update only the declarations being set"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-form-controls.html": [
     "button element",
@@ -13785,6 +13917,9 @@
     "Serialization of NonGenericFontFamilyName,-webkit-body,-webkit-standard,-webkit-pictograph,emoji,fangsong,BlinkMacSystemFont",
     "Serialization of prefixed -webkit-<generic-family>",
     "Serialization of quoted \"<generic-family>\"",
+    "Specified: digit-starting family name stays quoted",
+    "Specified: double-space family name stays quoted",
+    "Specified: mixed font-family list serialization",
     "Specified: multi-word family name serializes unquoted",
     "Specified: quoted 'default' stays quoted",
     "Specified: quoted 'inherit' stays quoted",
@@ -13792,6 +13927,9 @@
     "Specified: quoted 'sans-serif' stays quoted",
     "Specified: quoted 'serif' stays quoted",
     "Specified: quoted 'unset' stays quoted",
+    "Specified: quoted multi-word name normalizes to unquoted",
+    "Specified: quoted single-word name normalizes to unquoted",
+    "Specified: single-digit family name stays quoted",
     "Specified: single-word family name",
     "Specified: three-word family name serializes unquoted"
   ],
@@ -13799,7 +13937,9 @@
     "The font shorthand should be serialized just like any other shorthand."
   ],
   "submodules/web-platform-tests/css/cssom/font-variant-shorthand-serialization.html": [
+    "CSS-wide keyword in one longhand",
     "CSS-wide keyword in shorthand",
+    "font-variant-ligatures: none serialization with non-default value for another longhand",
     "font-variant: none serialization",
     "font-variant: normal serialization",
     "font-variant: normal with non-default longhands"
@@ -13967,6 +14107,7 @@
     "getComputedStyle() round-trips in presence of scrollbars"
   ],
   "submodules/web-platform-tests/css/cssom/historical.html": [
+    "Historical CSSStyleDeclaration member: getPropertyCSSValue",
     "Historical CSSStyleDeclaration member: setPropertyPriority",
     "Historical CSSStyleDeclaration member: setPropertyValue",
     "Historical Document member: enableStyleSheetsForSet",
@@ -14011,7 +14152,10 @@
   ],
   "submodules/web-platform-tests/css/cssom/inline-style-001.html": [
     "CSSStyleDeclaration_accessible",
-    "read"
+    "csstext_write",
+    "property_write",
+    "read",
+    "shorthand_properties"
   ],
   "submodules/web-platform-tests/css/cssom/insertRule-charset-no-index.html": [
     "insertRule with charset and omitted index argument",
@@ -14246,7 +14390,10 @@
   ],
   "submodules/web-platform-tests/css/cssom/shorthand-serialization.html": [
     "Shorthand serialization after setting",
+    "Shorthand serialization with 'initial' value, longhands set individually, one with important flag.",
+    "Shorthand serialization with 'initial' value, one longhand with important flag.",
     "Shorthand serialization with 'initial' value.",
+    "Shorthand serialization with just longhands.",
     "Shorthand serialization with shorthand and longhands mixed.",
     "Shorthand serialization with variable and variable from other shorthand."
   ],
@@ -14312,7 +14459,11 @@
   ],
   "submodules/web-platform-tests/css/cssom/variable-names.html": [
     "custom property '---'",
-    "custom property '--a'"
+    "custom property '--0'",
+    "custom property '--\\'",
+    "custom property '--a'",
+    "custom property '--a;b'",
+    "custom property '--ab'"
   ],
   "submodules/web-platform-tests/css/mediaqueries/aspect-ratio-serialization.html": [
     "<ratio> serializes with spaces around the integer."
