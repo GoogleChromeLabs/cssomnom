@@ -52,6 +52,8 @@ export function runWptFile(filePath: string): WptFileResult {
   const htmlContent = fs.readFileSync(filePath, 'utf-8');
   const dom = parseHTML(htmlContent);
   const win = dom.window;
+  (dom.document as unknown as { _htmlDir?: string })._htmlDir = path.dirname(path.resolve(filePath));
+  (win as unknown as { _htmlDir?: string })._htmlDir = path.dirname(path.resolve(filePath));
   patchWindowForTypedOM(win);
 
   const tests: WptSandboxTest[] = [];
@@ -191,6 +193,10 @@ export function runWptFile(filePath: string): WptFileResult {
     // @ts-expect-error - internal load event tracking property
     win.__loadEventFired = true;
     win.dispatchEvent(new win.Event('load'));
+    const onloadFn = (sandbox as { onload?: (e: unknown) => void }).onload || (win as unknown as { onload?: (e: unknown) => void }).onload;
+    if (typeof onloadFn === 'function') {
+      try { onloadFn(new win.Event('load')); } catch {}
+    }
   } catch (err) {
     console.error("Failed to dispatch load event:", err);
   }
@@ -199,11 +205,22 @@ export function runWptFile(filePath: string): WptFileResult {
   for (const t of tests) {
     if (t.executed) {
       const wrappedFn = async () => {
+        if ('promise' in t && t.promise) {
+          let timeoutId: NodeJS.Timeout | undefined;
+          const timeoutPromise = new Promise<void>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('Async test timed out')), 500);
+          });
+          try {
+            await Promise.race([t.promise, timeoutPromise]);
+          } finally {
+            if (timeoutId) clearTimeout(timeoutId);
+          }
+        }
         if ((t.status ?? 0) !== 0) {
           throw new Error(t.message || `Test failed with status ${t.status}`);
         }
       };
-      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
+      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: 'promise' in t && !!t.promise });
       continue;
     }
 

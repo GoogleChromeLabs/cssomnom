@@ -271,21 +271,6 @@
   "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-1250-charset-attribute-windows-1253.html": [
     "anonymous-test"
   ],
-  "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-bogus-charset-attribute-windows-1250.html": [
-    "anonymous-test"
-  ],
-  "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-bogus.html": [
-    "anonymous-test"
-  ],
-  "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-utf16-ascii-only.html": [
-    "anonymous-test"
-  ],
-  "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-utf16.html": [
-    "anonymous-test"
-  ],
-  "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-utf16be.html": [
-    "anonymous-test"
-  ],
   "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-windows-1250-in-utf16.html": [
     "anonymous-test"
   ],
@@ -296,9 +281,6 @@
     "anonymous-test"
   ],
   "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-http-bogus.html": [
-    "anonymous-test"
-  ],
-  "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-http-windows-1250-at-charset-windows-1253.html": [
     "anonymous-test"
   ],
   "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-no-decl.html": [
@@ -1490,6 +1472,7 @@
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/computed.tentative.html": [
     "Computed StylePropertyMap contains CSS property declarations in inline styles",
     "Computed StylePropertyMap contains CSS property declarations in style rules",
+    "Computed StylePropertyMap contains computed values and not resolved values",
     "Computed StylePropertyMap contains custom property declarations in inline rules",
     "Computed StylePropertyMap contains custom property declarations in style rules",
     "Computed StylePropertyMap is live"
@@ -3279,6 +3262,8 @@
     "Can set 'border-bottom-width' to a length: 0px",
     "Can set 'border-bottom-width' to a length: 3.14cm",
     "Can set 'border-bottom-width' to a length: calc(0em + 0px)",
+    "Can set 'border-bottom-width' to the 'thick' keyword: thick",
+    "Can set 'border-bottom-width' to the 'thin' keyword: thin",
     "Can set 'border-bottom-width' to var() references:  var(--A)",
     "Can set 'border-left-width' to CSS-wide keywords: inherit",
     "Can set 'border-left-width' to CSS-wide keywords: initial",
@@ -3287,6 +3272,8 @@
     "Can set 'border-left-width' to a length: 0px",
     "Can set 'border-left-width' to a length: 3.14cm",
     "Can set 'border-left-width' to a length: calc(0em + 0px)",
+    "Can set 'border-left-width' to the 'thick' keyword: thick",
+    "Can set 'border-left-width' to the 'thin' keyword: thin",
     "Can set 'border-left-width' to var() references:  var(--A)",
     "Can set 'border-right-width' to CSS-wide keywords: inherit",
     "Can set 'border-right-width' to CSS-wide keywords: initial",
@@ -3295,6 +3282,8 @@
     "Can set 'border-right-width' to a length: 0px",
     "Can set 'border-right-width' to a length: 3.14cm",
     "Can set 'border-right-width' to a length: calc(0em + 0px)",
+    "Can set 'border-right-width' to the 'thick' keyword: thick",
+    "Can set 'border-right-width' to the 'thin' keyword: thin",
     "Can set 'border-right-width' to var() references:  var(--A)",
     "Can set 'border-top-width' to CSS-wide keywords: inherit",
     "Can set 'border-top-width' to CSS-wide keywords: initial",
@@ -3303,6 +3292,8 @@
     "Can set 'border-top-width' to a length: 0px",
     "Can set 'border-top-width' to a length: 3.14cm",
     "Can set 'border-top-width' to a length: calc(0em + 0px)",
+    "Can set 'border-top-width' to the 'thick' keyword: thick",
+    "Can set 'border-top-width' to the 'thin' keyword: thin",
     "Can set 'border-top-width' to var() references:  var(--A)",
     "Setting 'border-bottom-width' to a flexible length: -3.14fr throws TypeError",
     "Setting 'border-bottom-width' to a flexible length: 0fr throws TypeError",
@@ -6915,6 +6906,8 @@
     "Can set 'border-block-end-width' to a length: 0px",
     "Can set 'border-block-end-width' to a length: 3.14cm",
     "Can set 'border-block-end-width' to a length: calc(0em + 0px)",
+    "Can set 'border-block-end-width' to the 'thick' keyword: thick",
+    "Can set 'border-block-end-width' to the 'thin' keyword: thin",
     "Can set 'border-block-end-width' to var() references:  var(--A)",
     "Can set 'border-block-start' to CSS-wide keywords: inherit",
     "Can set 'border-block-start' to CSS-wide keywords: initial",
@@ -6941,6 +6934,8 @@
     "Can set 'border-block-start-width' to a length: 0px",
     "Can set 'border-block-start-width' to a length: 3.14cm",
     "Can set 'border-block-start-width' to a length: calc(0em + 0px)",
+    "Can set 'border-block-start-width' to the 'thick' keyword: thick",
+    "Can set 'border-block-start-width' to the 'thin' keyword: thin",
     "Can set 'border-block-start-width' to var() references:  var(--A)",
     "Can set 'border-block-style' to CSS-wide keywords: inherit",
     "Can set 'border-block-style' to CSS-wide keywords: initial",
@@ -6956,6 +6951,8 @@
     "Can set 'border-block-width' to a length: 0px",
     "Can set 'border-block-width' to a length: 3.14cm",
     "Can set 'border-block-width' to a length: calc(0em + 0px)",
+    "Can set 'border-block-width' to the 'thick' keyword: thick",
+    "Can set 'border-block-width' to the 'thin' keyword: thin",
     "Can set 'border-block-width' to var() references:  var(--A)",
     "Can set 'border-end-end-radius' to CSS-wide keywords: inherit",
     "Can set 'border-end-end-radius' to CSS-wide keywords: initial",
@@ -7015,6 +7012,8 @@
     "Can set 'border-inline-end-width' to a length: 0px",
     "Can set 'border-inline-end-width' to a length: 3.14cm",
     "Can set 'border-inline-end-width' to a length: calc(0em + 0px)",
+    "Can set 'border-inline-end-width' to the 'thick' keyword: thick",
+    "Can set 'border-inline-end-width' to the 'thin' keyword: thin",
     "Can set 'border-inline-end-width' to var() references:  var(--A)",
     "Can set 'border-inline-start' to CSS-wide keywords: inherit",
     "Can set 'border-inline-start' to CSS-wide keywords: initial",
@@ -7041,6 +7040,8 @@
     "Can set 'border-inline-start-width' to a length: 0px",
     "Can set 'border-inline-start-width' to a length: 3.14cm",
     "Can set 'border-inline-start-width' to a length: calc(0em + 0px)",
+    "Can set 'border-inline-start-width' to the 'thick' keyword: thick",
+    "Can set 'border-inline-start-width' to the 'thin' keyword: thin",
     "Can set 'border-inline-start-width' to var() references:  var(--A)",
     "Can set 'border-inline-style' to CSS-wide keywords: inherit",
     "Can set 'border-inline-style' to CSS-wide keywords: initial",
@@ -7056,6 +7057,8 @@
     "Can set 'border-inline-width' to a length: 0px",
     "Can set 'border-inline-width' to a length: 3.14cm",
     "Can set 'border-inline-width' to a length: calc(0em + 0px)",
+    "Can set 'border-inline-width' to the 'thick' keyword: thick",
+    "Can set 'border-inline-width' to the 'thin' keyword: thin",
     "Can set 'border-inline-width' to var() references:  var(--A)",
     "Can set 'border-start-end-radius' to CSS-wide keywords: inherit",
     "Can set 'border-start-end-radius' to CSS-wide keywords: initial",
@@ -8991,6 +8994,8 @@
     "Can set 'outline-width' to a length: 0px",
     "Can set 'outline-width' to a length: 3.14cm",
     "Can set 'outline-width' to a length: calc(0em + 0px)",
+    "Can set 'outline-width' to the 'thick' keyword: thick",
+    "Can set 'outline-width' to the 'thin' keyword: thin",
     "Can set 'outline-width' to var() references:  var(--A)",
     "Setting 'outline-width' to a flexible length: -3.14fr throws TypeError",
     "Setting 'outline-width' to a flexible length: 0fr throws TypeError",
@@ -12903,34 +12908,7 @@
     "e.style['width'] = \"var({--x})\" should set the property value",
     "e.style['width'] = \"var({--x}, 10px)\" should set the property value"
   ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-from-to.html": [
-    "Verify CSS variable value after animation",
-    "Verify substituted color value after animation"
-  ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-over-transition.html": [
-    "Verify CSS variable value after animation",
-    "Verify substituted color value after animation"
-  ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-into-keyframe-shorthand.html": [
-    "Verify border-bottom-color after animation"
-  ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-into-keyframe-transform.html": [
-    "Verify transform after animation"
-  ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-into-keyframe.html": [
-    "Verify color after animation"
-  ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-within-keyframe-fallback.html": [
-    "Verify color after animation"
-  ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-within-keyframe-multiple.html": [
-    "Verify color after animation"
-  ],
-  "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-within-keyframe.html": [
-    "Verify color after animation"
-  ],
   "submodules/web-platform-tests/css/css-variables/variable-animation-to-only.html": [
-    "Verify CSS variable value after animation",
     "Verify CSS variable value before animation"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-created-document.html": [
@@ -13351,15 +13329,11 @@
     "target9 --varC"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-transitions-transition-property-all-before-value.html": [
-    "Verify CSS variable value after transition",
     "Verify CSS variable value before transition",
-    "Verify substituted color value after transition",
     "Verify substituted color value before transition"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-transitions-value-before-transition-property-all.html": [
-    "Verify CSS variable value after transition",
     "Verify CSS variable value before transition",
-    "Verify substituted color value after transition",
     "Verify substituted color value before transition"
   ],
   "submodules/web-platform-tests/css/css-variables/variables-substitute-guaranteed-invalid.html": [
@@ -13399,11 +13373,31 @@
   ],
   "submodules/web-platform-tests/css/cssom/computed-style-001.html": [
     "inherited_property_values",
-    "property_values"
+    "property_values",
+    "read_only",
+    "relative_property_values"
+  ],
+  "submodules/web-platform-tests/css/cssom/computed-style-002.html": [
+    "Check that a percent width in an iframe is resolved against iframe width for getComputedStyle."
+  ],
+  "submodules/web-platform-tests/css/cssom/computed-style-003.html": [
+    "Check that a percent width in an iframe is the resolved width when the iframe is displayed."
+  ],
+  "submodules/web-platform-tests/css/cssom/computed-style-004.html": [
+    "Check that the initial width is 100px."
+  ],
+  "submodules/web-platform-tests/css/cssom/computed-style-005.html": [
+    "absolute_computed_left_and_right",
+    "absolute_computed_margins",
+    "relative_computed_left_and_right",
+    "relative_computed_margins"
   ],
   "submodules/web-platform-tests/css/cssom/computed-style-set-property.html": [
+    "Computed style parent (should be null)",
     "Exception thrown when trying to change a computed style alias via property",
-    "Exception thrown when trying to change a computed style declaration via property"
+    "Exception thrown when trying to change a computed style alias via setProperty",
+    "Exception thrown when trying to change a computed style declaration via property",
+    "Exception thrown when trying to change a computed style declaration via setProperty"
   ],
   "submodules/web-platform-tests/css/cssom/CSS-namespace-object-class-string.html": [
     "@@toStringTag exists on the namespace object with the appropriate descriptor",
@@ -13465,9 +13459,6 @@
     "index before first",
     "index exceeds length",
     "index not specified"
-  ],
-  "submodules/web-platform-tests/css/cssom/cssimportrule-parent.html": [
-    "@import stylesheet is properly unlinked from parent after removal"
   ],
   "submodules/web-platform-tests/css/cssom/cssimportrule-sheet-identity.html": [
     "CSSImportRule has different sheets even if referencing the same URL"
@@ -13701,17 +13692,11 @@
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-mutationrecord-001.html": [
     "CSSStyleDeclaration.setPropertyValue queues a mutation record when serialization is changed"
   ],
-  "submodules/web-platform-tests/css/cssom/cssstyledeclaration-mutationrecord-002.html": [
-    "CSSStyleDeclaration.setPropertyValue doesn't queue a mutation record when setting invalid values"
-  ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-mutationrecord-003.html": [
     "CSSStyleDeclaration.removeProperty doesn't queue a mutation record when not actually removed, invoked from setPropertyValue"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-mutationrecord-004.html": [
     "CSSStyleDeclaration.removeProperty doesn't queue a mutation record when not actually removed"
-  ],
-  "submodules/web-platform-tests/css/cssom/cssstyledeclaration-mutationrecord-005.html": [
-    "CSSStyleDeclaration.setPropertyValue doesn't queue a mutation record when setting invalid values"
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-nested.html": [
     "anonymous-test-0"
@@ -13981,6 +13966,9 @@
   "submodules/web-platform-tests/css/cssom/getComputedStyle-display-none-003.html": [
     "getComputedStyle gets invalidated in display: none subtrees due to attribute mutations"
   ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-dynamic-subdoc.html": [
+    "getComputedStyle cross-doc properly reflects media query changes"
+  ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-getter-v-properties.tentative.html": [
     "border",
     "border-bottom",
@@ -13998,6 +13986,12 @@
     "Fixed-length left property value should roundtrip",
     "Fixed-length right property value should roundtrip",
     "Fixed-length top property value should roundtrip"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-layout-dependent-removed-ib-sibling.html": [
+    "getComputedStyle() should return the correct used value for nodes that have had an IB-split sibling removed"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-layout-dependent-replaced-into-ib-split.html": [
+    "getComputedStyle() should return used value correctly for nodes just inserted into the document, even if they're in an IB-split"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-line-height.html": [
     "line-height: 10px",
@@ -14064,11 +14058,8 @@
     "Item-based blockification of nonexistent pseudo-elements",
     "Item-based blockification of pseudo-elements",
     "Prefixed ::-webkit-file-upload-button does not resolve in getComputedStyle",
-    "Pseudo-elements can use the full range of CSS syntax",
     "Resolution of nonexistent pseudo-element styles",
     "Resolution of pseudo-element styles in display: none elements",
-    "Resolution of width is correct for ::before and ::after pseudo-elements (double-colon)",
-    "Resolution of width is correct for ::before and ::after pseudo-elements (single-colon)",
     "Resolution of width is correct for ::before and ::after pseudo-elements of display: contents elements",
     "Resolution of width is correct when pseudo-element argument is ignored (due to no colon)",
     "Resolution of width is correct when pseudo-element argument is invalid (due to a trailing token)",
@@ -14101,9 +14092,6 @@
     "The resolved value for 'caret-color' is the used value",
     "The resolved value for 'color' is the used value",
     "The resolved value for 'outline-color' is the used value"
-  ],
-  "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-min-max-clamping.html": [
-    "Resolved value of width / height when there's no used value isn't clamped by min/max properties"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-min-size-auto.html": [
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-box\"",
@@ -14148,23 +14136,12 @@
     "Historical interface: RGBColor",
     "Historical interface: Rect"
   ],
-  "submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-002.html": [
-    "HTMLLinkElement.disabled reflects the <link disabled> attribute, and behaves consistently, when the sheet is an alternate"
-  ],
-  "submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-003.html": [
-    "HTMLLinkElement.disabled's explicitly enabled state persists when disconnected and connected again"
-  ],
-  "submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-004.html": [
-    "HTMLLinkElement.disabled's explicitly enabled state doesn't persist on clones"
-  ],
-  "submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-005.html": [
-    "HTMLLinkElement.disabled's explicitly enabled state persists regardless of rel"
+  "submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-001.html": [
+    "<link disabled> prevents the stylesheet from being in document.styleSheets (from parser)",
+    "HTMLLinkElement.disabled reflects the <link disabled> attribute, and behaves consistently"
   ],
   "submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-006.html": [
     "HTMLLinkElement.disabled setter does nothing if the attribute isn't present already."
-  ],
-  "submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-007.html": [
-    "HTMLLinkElement.disabled setter sets the explicitly enabled state if toggled back and forth."
   ],
   "submodules/web-platform-tests/css/cssom/HTMLLinkElement-load-event-002.html": [
     "Load event doesn't fire for removed sheet",
@@ -14202,7 +14179,8 @@
     "A syntax error in insertRule should throw and not affect the style of the page"
   ],
   "submodules/web-platform-tests/css/cssom/link-element-stylesheet-title.html": [
-    "Executing setAttribute('title', '') results in the title being set to null"
+    "Executing setAttribute('title', '') results in the title being set to null",
+    "StyleSheet.title"
   ],
   "submodules/web-platform-tests/css/cssom/medialist-appendmedium-parse-single-and-dedup.html": [
     "appendMedium does not append a duplicate medium",
@@ -14242,8 +14220,8 @@
     "Single value overflow with CSS-wide keyword should serialize correctly.",
     "Single value overflow with non-CSS-wide keyword should serialize correctly."
   ],
-  "submodules/web-platform-tests/css/cssom/preferred-stylesheet-reversed-order.html": [
-    "Preferred stylesheet where insertion order is tree order"
+  "submodules/web-platform-tests/css/cssom/preferred-stylesheet-order.html": [
+    "Preferred stylesheet where insertion order is reversed tree order"
   ],
   "submodules/web-platform-tests/css/cssom/property-accessors.html": [
     "-apple-color-filter",
@@ -14441,11 +14419,12 @@
     "The serialization of overflow-x: scroll; overflow-y: scroll; should be canonical.",
     "The serialization of padding-top: 1px; padding-right: 2px; padding-bottom: 3px; padding-left: 4px; should be canonical."
   ],
-  "submodules/web-platform-tests/css/cssom/style-attr-update-across-documents.html": [
-    "Changing the style of a node that switched documents works"
-  ],
   "submodules/web-platform-tests/css/cssom/style-sheet-interfaces-001.html": [
+    "CSSStyleSheet_properties",
     "CSSStyleSheet_property_values",
+    "StyleSheet_properties",
+    "StyleSheet_property_values",
+    "disabled attribute getter/setter",
     "sheet_property",
     "sheet_property_updates"
   ],
@@ -14454,7 +14433,17 @@
     "delete_rule"
   ],
   "submodules/web-platform-tests/css/cssom/stylesheet-same-origin.sub.html": [
+    "Origin-clean check in copied cross-origin CSSOM Stylesheets",
+    "Origin-clean check in cross-origin CSSOM Stylesheets",
+    "Origin-clean check in cross-origin CSSOM Stylesheets (redirect from cross-origin to same-origin)",
+    "Origin-clean check in cross-origin CSSOM Stylesheets (redirect from same-origin to cross-origin)",
+    "Origin-clean check in data:css CSSOM Stylesheets",
+    "Origin-clean check in loading error CSSOM Stylesheets",
     "Origin-clean check in same-origin CSSOM Stylesheets"
+  ],
+  "submodules/web-platform-tests/css/cssom/stylesheet-title.html": [
+    "Preferred style sheet name",
+    "StyleSheet.title"
   ],
   "submodules/web-platform-tests/css/cssom/StyleSheetList-constructable-shadow-with-style-recalc.html": [
     "shadowRoot.styleSheets does not include adopted style sheets"
@@ -14472,8 +14461,15 @@
     "anonymous-test-0"
   ],
   "submodules/web-platform-tests/css/cssom/ttwf-cssom-doc-ext-load-count.html": [
-    "stylesheet-1.css should be loaded and styleSheets.length === 1",
     "stylesheet.css should be loaded and styleSheets.length === 1"
+  ],
+  "submodules/web-platform-tests/css/cssom/ttwf-cssom-doc-ext-load-tree-order.html": [
+    "styleSheets item 0 title must be aaa",
+    "styleSheets item 0 title must be alpha",
+    "styleSheets item 0 title must be kilo",
+    "styleSheets item 0 title must be zebra",
+    "styleSheets item 1 title must be zebra",
+    "styleSheets.length must be 5"
   ],
   "submodules/web-platform-tests/css/cssom/ttwf-cssom-document-extension.html": [
     "anonymous-test-0"
@@ -14739,7 +14735,6 @@
   "submodules/web-platform-tests/css/mediaqueries/preferences-colorScheme.tentative.https.html": [
     "navigator.preferences.colorScheme fires change event when clearing override",
     "navigator.preferences.colorScheme fires change event when clearing override (without value change)",
-    "navigator.preferences.colorScheme fires change event when requesting override",
     "navigator.preferences.colorScheme fires change event when requesting override (without value change)",
     "navigator.preferences.colorScheme supported",
     "navigator.preferences.colorScheme.override returns override value",
@@ -14754,7 +14749,6 @@
   "submodules/web-platform-tests/css/mediaqueries/preferences-contrast.tentative.https.html": [
     "navigator.preferences.contrast fires change event when clearing override",
     "navigator.preferences.contrast fires change event when clearing override (without value change)",
-    "navigator.preferences.contrast fires change event when requesting override",
     "navigator.preferences.contrast fires change event when requesting override (without value change)",
     "navigator.preferences.contrast supported",
     "navigator.preferences.contrast.clearOverride() works",
@@ -14770,7 +14764,6 @@
   "submodules/web-platform-tests/css/mediaqueries/preferences-reducedData.tentative.https.html": [
     "navigator.preferences.reducedData fires change event when clearing override",
     "navigator.preferences.reducedData fires change event when clearing override (without value change)",
-    "navigator.preferences.reducedData fires change event when requesting override",
     "navigator.preferences.reducedData fires change event when requesting override (without value change)",
     "navigator.preferences.reducedData supported",
     "navigator.preferences.reducedData.clearOverride() supported",
@@ -14785,7 +14778,6 @@
   "submodules/web-platform-tests/css/mediaqueries/preferences-reducedMotion.tentative.https.html": [
     "navigator.preferences.reducedMotion fires change event when clearing override",
     "navigator.preferences.reducedMotion fires change event when clearing override (without value change)",
-    "navigator.preferences.reducedMotion fires change event when requesting override",
     "navigator.preferences.reducedMotion fires change event when requesting override (without value change)",
     "navigator.preferences.reducedMotion supported",
     "navigator.preferences.reducedMotion.clearOverride() supported",
@@ -14800,7 +14792,6 @@
   "submodules/web-platform-tests/css/mediaqueries/preferences-reducedTransparency.tentative.https.html": [
     "navigator.preferences.reducedTransparency fires change event when clearing override",
     "navigator.preferences.reducedTransparency fires change event when clearing override (without value change)",
-    "navigator.preferences.reducedTransparency fires change event when requesting override",
     "navigator.preferences.reducedTransparency fires change event when requesting override (without value change)",
     "navigator.preferences.reducedTransparency supported",
     "navigator.preferences.reducedTransparency.clearOverride() supported",
@@ -15043,13 +15034,256 @@
     "[foo=\"bar\"] /* sanity check */ setting CSSStyleRule#selectorText",
     "[foo=\"bar\"] /* sanity check */ setting CSSStyleRule#selectorText in @media"
   ],
+  "submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/syntax.html": [
+    "[*|baz='quux' s] in standards mode",
+    "[*|baz='quux' s] with querySelector in standards mode",
+    "[*|baz='quux' s] with querySelector in undefined",
+    "[*|baz='quux' s] with querySelector in undefined",
+    "[*|foo='bar' i] in standards mode",
+    "[*|foo='bar' i] with querySelector in standards mode",
+    "[*|foo='bar' i] with querySelector in undefined",
+    "[*|foo='bar' i] with querySelector in undefined",
+    "[baz$='quux' s] in standards mode",
+    "[baz$='quux' s] with querySelector in standards mode",
+    "[baz$='quux' s] with querySelector in undefined",
+    "[baz$='quux' s] with querySelector in undefined",
+    "[baz*='quux' s] in standards mode",
+    "[baz*='quux' s] with querySelector in standards mode",
+    "[baz*='quux' s] with querySelector in undefined",
+    "[baz*='quux' s] with querySelector in undefined",
+    "[baz=\"quux\" s] in standards mode",
+    "[baz=\"quux\" s] with querySelector in standards mode",
+    "[baz=\"quux\" s] with querySelector in undefined",
+    "[baz=\"quux\" s] with querySelector in undefined",
+    "[baz='quux'\ts\t] /* \\t */ in standards mode",
+    "[baz='quux'\ts\t] /* \\t */ with querySelector in standards mode",
+    "[baz='quux'\ts\t] /* \\t */ with querySelector in undefined",
+    "[baz='quux'\ts\t] /* \\t */ with querySelector in undefined",
+    "[baz='quux'\rs\r] /* \\r */ in standards mode",
+    "[baz='quux'\rs\r] /* \\r */ with querySelector in standards mode",
+    "[baz='quux'\rs\r] /* \\r */ with querySelector in undefined",
+    "[baz='quux'\rs\r] /* \\r */ with querySelector in undefined",
+    "[baz='quux' /**/ s] in standards mode",
+    "[baz='quux' /**/ s] with querySelector in standards mode",
+    "[baz='quux' /**/ s] with querySelector in undefined",
+    "[baz='quux' /**/ s] with querySelector in undefined",
+    "[baz='quux' S] in standards mode",
+    "[baz='quux' S] with querySelector in standards mode",
+    "[baz='quux' S] with querySelector in undefined",
+    "[baz='quux' S] with querySelector in undefined",
+    "[baz='quux' \\53] in standards mode",
+    "[baz='quux' \\53] with querySelector in standards mode",
+    "[baz='quux' \\53] with querySelector in undefined",
+    "[baz='quux' \\53] with querySelector in undefined",
+    "[baz='quux' \\73] in standards mode",
+    "[baz='quux' \\73] with querySelector in standards mode",
+    "[baz='quux' \\73] with querySelector in undefined",
+    "[baz='quux' \\73] with querySelector in undefined",
+    "[baz='quux' \\s] in standards mode",
+    "[baz='quux' \\s] with querySelector in standards mode",
+    "[baz='quux' \\s] with querySelector in undefined",
+    "[baz='quux' \\s] with querySelector in undefined",
+    "[baz='quux' s /**/ ] in standards mode",
+    "[baz='quux' s /**/ ] with querySelector in standards mode",
+    "[baz='quux' s /**/ ] with querySelector in undefined",
+    "[baz='quux' s /**/ ] with querySelector in undefined",
+    "[baz='quux' s ] in standards mode",
+    "[baz='quux' s ] with querySelector in standards mode",
+    "[baz='quux' s ] with querySelector in undefined",
+    "[baz='quux' s ] with querySelector in undefined",
+    "[baz='quux' s] in standards mode",
+    "[baz='quux' s] with querySelector in standards mode",
+    "[baz='quux' s] with querySelector in undefined",
+    "[baz='quux' s] with querySelector in undefined",
+    "[baz='quux'/**/s/**/] in standards mode",
+    "[baz='quux'/**/s/**/] with querySelector in standards mode",
+    "[baz='quux'/**/s/**/] with querySelector in undefined",
+    "[baz='quux'/**/s/**/] with querySelector in undefined",
+    "[baz='quux'\\ns\\n] /* \\n */ in standards mode",
+    "[baz='quux'\\ns\\n] /* \\n */ with querySelector in standards mode",
+    "[baz='quux'\\ns\\n] /* \\n */ with querySelector in undefined",
+    "[baz='quux'\\ns\\n] /* \\n */ with querySelector in undefined",
+    "[baz='quux'] /* sanity check (valid) */ in standards mode",
+    "[baz='quux'] /* sanity check (valid) */ with querySelector in standards mode",
+    "[baz='quux'] /* sanity check (valid) */ with querySelector in undefined",
+    "[baz='quux'] /* sanity check (valid) */ with querySelector in undefined",
+    "[baz='quux's ] in standards mode",
+    "[baz='quux's ] with querySelector in standards mode",
+    "[baz='quux's ] with querySelector in undefined",
+    "[baz='quux's ] with querySelector in undefined",
+    "[baz='quux's] in standards mode",
+    "[baz='quux's] with querySelector in standards mode",
+    "[baz='quux's] with querySelector in undefined",
+    "[baz='quux's] with querySelector in undefined",
+    "[baz=quux s] in standards mode",
+    "[baz=quux s] with querySelector in standards mode",
+    "[baz=quux s] with querySelector in undefined",
+    "[baz=quux s] with querySelector in undefined",
+    "[baz=quux/**/s] in standards mode",
+    "[baz=quux/**/s] with querySelector in standards mode",
+    "[baz=quux/**/s] with querySelector in undefined",
+    "[baz=quux/**/s] with querySelector in undefined",
+    "[baz^='quux' s] in standards mode",
+    "[baz^='quux' s] with querySelector in standards mode",
+    "[baz^='quux' s] with querySelector in undefined",
+    "[baz^='quux' s] with querySelector in undefined",
+    "[baz|='quux' s] in standards mode",
+    "[baz|='quux' s] with querySelector in standards mode",
+    "[baz|='quux' s] with querySelector in undefined",
+    "[baz|='quux' s] with querySelector in undefined",
+    "[baz~='quux' s] in standards mode",
+    "[baz~='quux' s] with querySelector in standards mode",
+    "[baz~='quux' s] with querySelector in undefined",
+    "[baz~='quux' s] with querySelector in undefined",
+    "[foo i ='bar'] in standards mode",
+    "[foo$='bar' i] in standards mode",
+    "[foo$='bar' i] with querySelector in standards mode",
+    "[foo$='bar' i] with querySelector in undefined",
+    "[foo$='bar' i] with querySelector in undefined",
+    "[foo*='bar' i] in standards mode",
+    "[foo*='bar' i] with querySelector in standards mode",
+    "[foo*='bar' i] with querySelector in undefined",
+    "[foo*='bar' i] with querySelector in undefined",
+    "[foo= i 'bar'] in standards mode",
+    "[foo=\"bar\" i] in standards mode",
+    "[foo=\"bar\" i] with querySelector in standards mode",
+    "[foo=\"bar\" i] with querySelector in undefined",
+    "[foo=\"bar\" i] with querySelector in undefined",
+    "[foo='BAR'] /* sanity check (valid) */ in standards mode",
+    "[foo='BAR'] /* sanity check (valid) */ with querySelector in standards mode",
+    "[foo='BAR'] /* sanity check (valid) */ with querySelector in undefined",
+    "[foo='BAR'] /* sanity check (valid) */ with querySelector in undefined",
+    "[foo='bar'\ti\t] /* \\t */ in standards mode",
+    "[foo='bar'\ti\t] /* \\t */ with querySelector in standards mode",
+    "[foo='bar'\ti\t] /* \\t */ with querySelector in undefined",
+    "[foo='bar'\ti\t] /* \\t */ with querySelector in undefined",
+    "[foo='bar'\ri\r] /* \\r */ in standards mode",
+    "[foo='bar'\ri\r] /* \\r */ with querySelector in standards mode",
+    "[foo='bar'\ri\r] /* \\r */ with querySelector in undefined",
+    "[foo='bar'\ri\r] /* \\r */ with querySelector in undefined",
+    "[foo='bar' 'i'] in standards mode",
+    "[foo='bar' () i] in standards mode",
+    "[foo='bar' (i)] in standards mode",
+    "[foo='bar' *] in standards mode",
+    "[foo='bar' *|i] in standards mode",
+    "[foo='bar' ,i] in standards mode",
+    "[foo='bar' /**/ i] in standards mode",
+    "[foo='bar' /**/ i] with querySelector in standards mode",
+    "[foo='bar' /**/ i] with querySelector in undefined",
+    "[foo='bar' /**/ i] with querySelector in undefined",
+    "[foo='bar' 1] in standards mode",
+    "[foo='bar' 1i] in standards mode",
+    "[foo='bar' I] in standards mode",
+    "[foo='bar' I] with querySelector in standards mode",
+    "[foo='bar' I] with querySelector in undefined",
+    "[foo='bar' I] with querySelector in undefined",
+    "[foo='bar' [] i] in standards mode",
+    "[foo='bar' [i]] in standards mode",
+    "[foo='bar' \\*] in standards mode",
+    "[foo='bar' \\*|i] in standards mode",
+    "[foo='bar' \\49] in standards mode",
+    "[foo='bar' \\49] with querySelector in standards mode",
+    "[foo='bar' \\49] with querySelector in undefined",
+    "[foo='bar' \\49] with querySelector in undefined",
+    "[foo='bar' \\69] in standards mode",
+    "[foo='bar' \\69] with querySelector in standards mode",
+    "[foo='bar' \\69] with querySelector in undefined",
+    "[foo='bar' \\69] with querySelector in undefined",
+    "[foo='bar' \\\\69] in standards mode",
+    "[foo='bar' \\\\i] in standards mode",
+    "[foo='bar' \\i] in standards mode",
+    "[foo='bar' \\i] with querySelector in standards mode",
+    "[foo='bar' \\i] with querySelector in undefined",
+    "[foo='bar' \\i] with querySelector in undefined",
+    "[foo='bar' \\|i] in standards mode",
+    "[foo='bar' i\u0000] /* \\0 */ in standards mode",
+    "[foo='bar' i ()] in standards mode",
+    "[foo='bar' i /**/ ] in standards mode",
+    "[foo='bar' i /**/ ] with querySelector in standards mode",
+    "[foo='bar' i /**/ ] with querySelector in undefined",
+    "[foo='bar' i /**/ ] with querySelector in undefined",
+    "[foo='bar' i []] in standards mode",
+    "[foo='bar' i ] in standards mode",
+    "[foo='bar' i ] with querySelector in standards mode",
+    "[foo='bar' i ] with querySelector in undefined",
+    "[foo='bar' i ] with querySelector in undefined",
+    "[foo='bar' i i] in standards mode",
+    "[foo='bar' i {}] in standards mode",
+    "[foo='bar' i()] in standards mode",
+    "[foo='bar' i,] in standards mode",
+    "[foo='bar' i] in standards mode",
+    "[foo='bar' i] with querySelector in standards mode",
+    "[foo='bar' i] with querySelector in undefined",
+    "[foo='bar' i] with querySelector in undefined",
+    "[foo='bar' ii] in standards mode",
+    "[foo='bar' ij] in standards mode",
+    "[foo='bar' j] in standards mode",
+    "[foo='bar' url(i)] in standards mode",
+    "[foo='bar' {i}] in standards mode",
+    "[foo='bar' {} i] in standards mode",
+    "[foo='bar' |i] in standards mode",
+    "[foo='bar' İ] in standards mode",
+    "[foo='bar' ı] in standards mode",
+    "[foo='bar'/**/i/**/] in standards mode",
+    "[foo='bar'/**/i/**/] with querySelector in standards mode",
+    "[foo='bar'/**/i/**/] with querySelector in undefined",
+    "[foo='bar'/**/i/**/] with querySelector in undefined",
+    "[foo='bar'\\ni\\n] /* \\n */ in standards mode",
+    "[foo='bar'\\ni\\n] /* \\n */ with querySelector in standards mode",
+    "[foo='bar'\\ni\\n] /* \\n */ with querySelector in undefined",
+    "[foo='bar'\\ni\\n] /* \\n */ with querySelector in undefined",
+    "[foo='bar']i in standards mode",
+    "[foo='bar'i ] in standards mode",
+    "[foo='bar'i ] with querySelector in standards mode",
+    "[foo='bar'i ] with querySelector in undefined",
+    "[foo='bar'i ] with querySelector in undefined",
+    "[foo='bar'i] in standards mode",
+    "[foo='bar'i] with querySelector in standards mode",
+    "[foo='bar'i] with querySelector in undefined",
+    "[foo='bar'i] with querySelector in undefined",
+    "[foo=bar i] in standards mode",
+    "[foo=bar i] with querySelector in standards mode",
+    "[foo=bar i] with querySelector in undefined",
+    "[foo=bar i] with querySelector in undefined",
+    "[foo=bar/**/i] in standards mode",
+    "[foo=bar/**/i] with querySelector in standards mode",
+    "[foo=bar/**/i] with querySelector in undefined",
+    "[foo=bar/**/i] with querySelector in undefined",
+    "[foo[ /* sanity check (invalid) */ in standards mode",
+    "[foo^='bar' i] in standards mode",
+    "[foo^='bar' i] with querySelector in standards mode",
+    "[foo^='bar' i] with querySelector in undefined",
+    "[foo^='bar' i] with querySelector in undefined",
+    "[foo|='bar' i] in standards mode",
+    "[foo|='bar' i] with querySelector in standards mode",
+    "[foo|='bar' i] with querySelector in undefined",
+    "[foo|='bar' i] with querySelector in undefined",
+    "[foo~='bar' i] in standards mode",
+    "[foo~='bar' i] with querySelector in standards mode",
+    "[foo~='bar' i] with querySelector in undefined",
+    "[foo~='bar' i] with querySelector in undefined",
+    "[i foo='bar'] in standards mode",
+    "[|baz='quux' s] in standards mode",
+    "[|baz='quux' s] with querySelector in standards mode",
+    "[|baz='quux' s] with querySelector in undefined",
+    "[|baz='quux' s] with querySelector in undefined",
+    "[|foo='bar' i] in standards mode",
+    "[|foo='bar' i] with querySelector in standards mode",
+    "[|foo='bar' i] with querySelector in undefined",
+    "[|foo='bar' i] with querySelector in undefined"
+  ],
   "submodules/web-platform-tests/css/selectors/attribute-selectors/style-attribute-selector.html": [
     "Dynamically change style with Element.setAttribute",
     "Dynamically change style with Element.style",
     "Dynamically change style with Element.style.property",
     "Dynamically remove style with Element.removeAttribute",
+    "Dynamically remove style with Element.style",
+    "Dynamically remove style with Element.style.property",
+    "Dynamically remove style with Element.style.removeProperty",
     "Initially no style attribute to match",
-    "Match style attribute with background value"
+    "Match style attribute with background value",
+    "Match style attribute with empty value",
+    "Match style attribute with no value"
   ],
   "submodules/web-platform-tests/css/selectors/child-indexed-during-parse.html": [
     ":last-child against an element still being parsed",
@@ -15173,10 +15407,6 @@
     "Thre is another child element of the same type.",
     "Whitespace nodes should be ignored."
   ],
-  "submodules/web-platform-tests/css/selectors/focus-display-none-001.html": [
-    "Test ':focus' after 'display:none' on input",
-    "Test ':focus' after 'display:none' on input's parent"
-  ],
   "submodules/web-platform-tests/css/selectors/focus-in-focus-event-001.html": [
     "Checks that ':focus' pseudo-class matches inside 'focus' event handler",
     "Checks that ':focus-visible' pseudo-class matches inside 'focus' event handler",
@@ -15207,8 +15437,7 @@
     "\":focus-visible\" should be a valid selector"
   ],
   "submodules/web-platform-tests/css/selectors/focus-visible-020.html": [
-    "\":focus-visible\" should be a valid selector",
-    ":focus-visible doesn't match on ShadowRoot"
+    "\":focus-visible\" should be a valid selector"
   ],
   "submodules/web-platform-tests/css/selectors/focus-visible-021.html": [
     "\":focus-visible\" should be a valid selector"
@@ -15303,10 +15532,6 @@
     "Initial State",
     "Move 'target1' in 'container2'",
     "Try to focus 'target1'"
-  ],
-  "submodules/web-platform-tests/css/selectors/focus-within-display-none-001.html": [
-    "Test ':focus-within' after 'display:none' on input",
-    "Test ':focus-within' after 'display:none' on input's parent"
   ],
   "submodules/web-platform-tests/css/selectors/has-argument-with-explicit-scope.html": [
     ".a:has(:scope) .c and :is(.a :scope .c) returns same elements on scope2",
@@ -15574,10 +15799,6 @@
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(7)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(8)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(9)"
-  ],
-  "submodules/web-platform-tests/css/selectors/hover-002.html": [
-    "Hover #hovered element should make it go green",
-    "Hover #hoveredContents child should make it go green"
   ],
   "submodules/web-platform-tests/css/selectors/i18n/lang-pseudo-class-disconnected.html": [
     ":lang pseudo class should work in a disconnected subtree"

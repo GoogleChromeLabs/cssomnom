@@ -22,13 +22,7 @@ import { isElement } from '../matcher.ts';
 import type { DOMElement } from '../matcher.ts';
 import type { Token } from '../types.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
-import {
-  COLOR_PROPERTIES,
-  SVG_PRESENTATION_ATTRIBUTES,
-  DEFAULT_PROPERTY_VALUES,
-} from '../data/gen/cascade-data.ts';
-import { NAMED_COLORS } from '../data/gen/colors.ts';
-import { camelToDashed } from '../utils.ts';
+import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
 import type { Rule, CSSRuleList, Declaration } from '../types.ts';
 
 // Domain Modules
@@ -39,8 +33,8 @@ export * from './cascade-sorter.ts';
 export * from './variable-resolver.ts';
 export * from './color-resolver.ts';
 export * from './value-processor.ts';
+export * from './computed-style.ts';
 
-import { INHERITED_PROPERTIES } from './types.ts';
 import { getLayerDeclarationOrder } from './layer-manager.ts';
 import {
   collectStyleSheetsAndRules,
@@ -50,16 +44,9 @@ import {
 } from './rule-filter.ts';
 import { groupDeclarationsByProperty } from './cascade-sorter.ts';
 import { resolveCustomProperties } from './variable-resolver.ts';
-import {
-  SYSTEM_COLORS,
-  normalizeComputedColor,
-  formatAlpha,
-} from './color-resolver.ts';
-import {
-  getUaDefault,
-  getInitialValue,
-  processStandardDeclarations,
-} from './value-processor.ts';
+import { normalizeComputedColor } from './color-resolver.ts';
+import { processStandardDeclarations } from './value-processor.ts';
+import { CSSComputedStyleDeclaration } from './computed-style.ts';
 
 export const KNOWN_PSEUDO_ELEMENTS = new Set([
   'before',
@@ -334,222 +321,27 @@ export function getCascadedStyle(
     }
   }
 
-  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, false, parentCascaded, element);
-
   // Sync logical properties
   if (finalDeclarations.length > 0) {
     for (const logical in LOGICAL_MAPPING) {
       const mapped = resolveLogicalProperty(logical, writingMode, direction);
       const decl = finalDeclarations.find(d => d.name === mapped);
-      if (decl && !resultStyle.getPropertyValue(logical)) {
-        resultStyle.setProperty(logical, decl.value.length ? serialize(decl.value) : decl.raw || '');
+      if (decl && !finalDeclarations.some(d => d.name === logical)) {
+        finalDeclarations.push({
+          type: 'declaration',
+          name: logical,
+          value: decl.value,
+          important: decl.important,
+          raw: decl.raw,
+        });
       }
     }
   }
+
+  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, false, parentCascaded, element);
 
   (resultStyle as unknown as { _readonly: boolean })._readonly = true;
 
   return resultStyle;
 }
 
-export function shouldPreserveAutoMinSize(element: unknown): boolean {
-  if (!element || typeof element !== 'object') return false;
-  const el = element as {
-    getAttribute?: (attr: string) => string | null;
-    parentElement?: unknown;
-    parentNode?: unknown;
-  };
-
-  // 1. Check if element or any ancestor is display: none (no box generated)
-  let curr: unknown = element;
-  while (curr && typeof curr === 'object') {
-    const currEl = curr as {
-      parentElement?: unknown;
-      parentNode?: unknown;
-      getAttribute?: (attr: string) => string | null;
-    };
-    const styleAttr = currEl.getAttribute ? currEl.getAttribute('style') : null;
-    if (styleAttr && /display\s*:\s*none\b/i.test(styleAttr)) {
-      return false;
-    }
-    curr = currEl.parentElement || currEl.parentNode;
-  }
-
-  // 2. Check if element has non-default aspect-ratio (not 'auto')
-  const styleAttr = el.getAttribute ? el.getAttribute('style') : null;
-  if (styleAttr && /aspect-ratio\s*:/i.test(styleAttr)) {
-    const match = styleAttr.match(/aspect-ratio\s*:\s*([^;]+)/i);
-    if (match) {
-      const val = match[1].trim().toLowerCase();
-      if (val !== 'auto' && val !== '') {
-        return true;
-      }
-    }
-  }
-
-  // 3. Check if parent is flex or grid container
-  const parent = el.parentElement || el.parentNode;
-  if (parent && typeof parent === 'object') {
-    const parentEl = parent as {
-      getAttribute?: (attr: string) => string | null;
-    };
-    const pStyle = parentEl.getAttribute ? parentEl.getAttribute('style') : null;
-    if (pStyle) {
-      if (/display\s*:\s*(?:inline-)?(?:flex|grid)\b/i.test(pStyle)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-/**
- * CSSComputedStyleDeclaration represents the resolved/computed style declaration of a DOM element.
- * cssom-1 § 6.8 #resolved-values
- * css-cascade-5 § 7.2 #computed-values
- */
-export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
-  private _parentStyle: CSSStyleDeclaration | null;
-  private _element: unknown;
-
-  constructor(
-    declarations: Declaration[] = [],
-    readonlyFlag: boolean = false,
-    parentStyle: CSSStyleDeclaration | null = null,
-    element: unknown = null
-  ) {
-    super(declarations, readonlyFlag);
-    this._parentStyle = parentStyle;
-    this._element = element;
-  }
-
-  override get cssText(): string {
-    return '';
-  }
-
-  override getPropertyValue(property: string): string {
-    const isCustom = property.startsWith('--');
-    if (isCustom) {
-      const decl = this._declarations.find(d => d.name === property);
-      if (!decl) return '';
-      if (decl.raw !== undefined) {
-        const trimmed = decl.raw.trim();
-        return trimmed === '' ? ' ' : trimmed;
-      }
-      const ser = serialize(decl.value, true).trim();
-      return ser === '' ? ' ' : ser;
-    }
-    const dashed = camelToDashed(property).toLowerCase();
-    if (dashed !== 'writing-mode' && dashed !== 'direction' && dashed in LOGICAL_MAPPING) {
-      const wm = super.getPropertyValue('writing-mode') || 'horizontal-tb';
-      const dir = super.getPropertyValue('direction') || 'ltr';
-      const resolvedPhysical = resolveLogicalProperty(dashed, wm, dir);
-      if (resolvedPhysical !== dashed) {
-        return this.getPropertyValue(resolvedPhysical);
-      }
-    }
-    if (dashed === 'background') {
-      const color = this.getPropertyValue('background-color') || 'rgba(0, 0, 0, 0)';
-      const image = this.getPropertyValue('background-image') || 'none';
-      const repeat = this.getPropertyValue('background-repeat') || 'repeat';
-      const attachment = this.getPropertyValue('background-attachment') || 'scroll';
-      const position = this.getPropertyValue('background-position') || '0% 0%';
-      const size = this.getPropertyValue('background-size') || 'auto';
-      const origin = this.getPropertyValue('background-origin') || 'padding-box';
-      const clip = this.getPropertyValue('background-clip') || 'border-box';
-      return `${color} ${image} ${repeat} ${attachment} ${position} / ${size} ${origin} ${clip}`;
-    }
-    const rawVal = super.getPropertyValue(dashed);
-
-    if (dashed === 'min-width' || dashed === 'min-height') {
-      if (rawVal === 'auto' || rawVal === '') {
-        if (shouldPreserveAutoMinSize(this._element)) {
-          return 'auto';
-        }
-        return '0px';
-      }
-    }
-
-    if (rawVal) {
-      const lowerRaw = rawVal.trim().toLowerCase();
-      // css-cascade-5 § 7.3.2 #inherit
-      if (lowerRaw === 'inherit') {
-        if (this._parentStyle) {
-          const parentVal = this._parentStyle.getPropertyValue(dashed);
-          if (parentVal) return parentVal;
-        }
-        return getInitialValue(dashed, this._element);
-      }
-      // css-cascade-5 § 7.3.1 #initial
-      if (lowerRaw === 'initial') {
-        return getInitialValue(dashed, this._element);
-      }
-      // css-cascade-5 § 7.3.3 #unset
-      if (lowerRaw === 'unset') {
-        if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
-          const parentVal = this._parentStyle.getPropertyValue(dashed);
-          if (parentVal) return parentVal;
-        }
-        return getInitialValue(dashed, this._element);
-      }
-      // css-cascade-5 § 6.2 #default
-      if (lowerRaw === 'revert' || lowerRaw === 'revert-layer' || lowerRaw === 'revert-rule') {
-        if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
-          const parentVal = this._parentStyle.getPropertyValue(dashed);
-          if (parentVal) return parentVal;
-        }
-        return getUaDefault(dashed, this._element);
-      }
-      if (dashed === 'box-shadow') {
-        const tokens = rawVal.split(/\s+/);
-        const normalizedTokens = tokens.map(t => {
-          const lower = t.toLowerCase();
-          if (lower in SYSTEM_COLORS) {
-            const [r, g, b] = SYSTEM_COLORS[lower];
-            return `rgb(${r}, ${g}, ${b})`;
-          }
-          if (lower in NAMED_COLORS) {
-            const [r, g, b, a] = NAMED_COLORS[lower];
-            if (a !== undefined && a < 1) return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
-            return `rgb(${r}, ${g}, ${b})`;
-          }
-          return t;
-        });
-        const colorToken = normalizedTokens.find(t => t.startsWith('rgb'));
-        const otherTokens = normalizedTokens.filter(t => !t.startsWith('rgb'));
-        if (colorToken) {
-          return `${colorToken} ${otherTokens.join(' ')}`;
-        }
-        return normalizedTokens.join(' ');
-      }
-      if (COLOR_PROPERTIES.has(dashed)) {
-        return normalizeComputedColor(rawVal);
-      }
-      return rawVal;
-    }
-
-    if (this._parentStyle && INHERITED_PROPERTIES.has(dashed)) {
-      const parentVal = this._parentStyle.getPropertyValue(dashed);
-      if (parentVal) {
-        return parentVal;
-      }
-    }
-
-    if (this._element && (dashed === 'display' || dashed === 'margin')) {
-      const el = this._element as { tagName?: string; nodeName?: string };
-      const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
-      if (tag) {
-        return getUaDefault(dashed, this._element);
-      }
-    }
-
-    if (dashed === 'color') return 'rgb(0, 0, 0)';
-    if (dashed === 'background-color') return 'rgba(0, 0, 0, 0)';
-    if (SVG_PRESENTATION_ATTRIBUTES.has(dashed)) {
-      return DEFAULT_PROPERTY_VALUES[dashed] ?? '';
-    }
-
-    return '';
-  }
-}

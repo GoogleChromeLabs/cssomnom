@@ -153,13 +153,37 @@ export class MediaList {
 }
 
 export class StyleSheet {
-  readonly type: string = 'text/css';
-  readonly href: string | null = null;
-  readonly ownerNode: unknown | null = null;
-  readonly parentStyleSheet: StyleSheet | null = null;
-  readonly title: string | null = null;
+  protected _type: string = 'text/css';
+  protected _href: string | null = null;
+  protected _ownerNode: unknown | null = null;
+  protected _parentStyleSheet: StyleSheet | null = null;
+  protected _titleVal: string | null = null;
   private _media: MediaList;
   private _disabledFlag = false;
+
+  get type(): string {
+    return this._type;
+  }
+
+  get href(): string | null {
+    return this._href;
+  }
+
+  get ownerNode(): unknown | null {
+    return this._ownerNode;
+  }
+
+  get parentStyleSheet(): StyleSheet | null {
+    return this._parentStyleSheet;
+  }
+
+  get title(): string | null {
+    if (this.ownerNode && typeof (this.ownerNode as Element).getAttribute === 'function') {
+      const t = (this.ownerNode as Element).getAttribute('title');
+      return t === null || t === '' ? null : t;
+    }
+    return this._titleVal ?? null;
+  }
 
   constructor(mediaText = '') {
     this._media = new MediaList(mediaText);
@@ -189,12 +213,27 @@ export class StyleSheet {
 }
 
 export class CSSStyleSheet extends StyleSheet {
-  readonly parentStyleSheet: CSSStyleSheet | null = null;
-  readonly ownerRule: CSSRule | null = null;
-  readonly cssRules: CSSRuleList;
+  protected override _parentStyleSheet: CSSStyleSheet | null = null;
+  protected _ownerRule: CSSRule | null = null;
+  private _cssRules: CSSRuleList;
   private _rules: Rule[];
   private _parseRule: (text: string) => Rule;
   private _registeredProperties: string[] = [];
+
+  get ownerRule(): CSSRule | null {
+    return this._ownerRule;
+  }
+
+  override get parentStyleSheet(): CSSStyleSheet | null {
+    return this._parentStyleSheet;
+  }
+
+  get cssRules(): CSSRuleList {
+    if (!this._originCleanFlag) {
+      throw new DOMException('The stylesheet is not origin-clean', 'SecurityError');
+    }
+    return this._cssRules;
+  }
 
   private _registerRuleProperties(rule: Rule) {
     if (rule instanceof CSSPropertyRule) {
@@ -267,15 +306,16 @@ export class CSSStyleSheet extends StyleSheet {
       const tokens = tokenize(text);
       return ParseHooks.consumeRule(tokens) as unknown as Rule;
     };
-    this.cssRules = new CSSRuleList(() => this._rules);
+    this._cssRules = new CSSRuleList(() => this._rules);
   }
 
   /** @internal */
-  static createInternal(rules: Rule[], parseRule: (text: string) => Rule): CSSStyleSheet {
+  static createInternal(rules: Rule[], parseRule: (text: string) => Rule, originClean: boolean = true): CSSStyleSheet {
     const sheet = new CSSStyleSheet();
     sheet._rules.push(...rules);
     sheet._parseRule = parseRule;
     sheet._constructedFlag = false;
+    sheet._originCleanFlag = originClean;
     for (const rule of rules) {
       if (rule instanceof CSSRule) {
         rule.parentStyleSheet = sheet;
@@ -1450,8 +1490,9 @@ export class CSSImportRule extends CSSRule {
         const tokens = tokenize(text);
         return ParseHooks.consumeRule(tokens) as unknown as Rule;
       });
-      Object.defineProperty(this._styleSheet, 'ownerRule', { value: this, configurable: true });
-      Object.defineProperty(this._styleSheet, 'parentStyleSheet', { value: this.parentStyleSheet, configurable: true });
+      (this._styleSheet as unknown as { _ownerRule: CSSRule | null })._ownerRule = this;
+      (this._styleSheet as unknown as { _parentStyleSheet: StyleSheet | null })._parentStyleSheet = this.parentStyleSheet;
+      (this._styleSheet as unknown as { _href: string | null })._href = this._href;
     }
     return this._styleSheet;
   }

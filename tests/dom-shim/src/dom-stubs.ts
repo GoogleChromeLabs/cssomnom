@@ -435,7 +435,7 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
             dispatchEvent?: (ev: Event) => boolean;
           } | null;
           if (nodeEl && (nodeEl.nodeName === 'LINK' || nodeEl.nodeName === 'IFRAME')) {
-            if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet')) {
+            if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet' && !(nodeEl as { hasAttribute?: (a: string) => boolean }).hasAttribute?.('disabled'))) {
               queueMicrotask(() => {
                 try {
                   if (nodeEl.dispatchEvent) {
@@ -473,7 +473,7 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
             dispatchEvent?: (ev: Event) => boolean;
           } | null;
           if (nodeEl && (nodeEl.nodeName === 'LINK' || nodeEl.nodeName === 'IFRAME')) {
-            if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet')) {
+            if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet' && !(nodeEl as { hasAttribute?: (a: string) => boolean }).hasAttribute?.('disabled'))) {
               queueMicrotask(() => {
                 try {
                   if (nodeEl.dispatchEvent) {
@@ -662,10 +662,26 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       });
     }
 
+    Object.defineProperty(htmlStyleEl.prototype, 'disabled', {
+      get(this: Element) {
+        const sheet = styleSheetMap.get(this);
+        if (!sheet) return false;
+        return sheet.disabled;
+      },
+      set(this: Element, val: boolean) {
+        const sheet = styleSheetMap.get(this);
+        if (sheet) {
+          sheet.disabled = Boolean(val);
+        }
+      },
+      configurable: true,
+      enumerable: true
+    });
+
     Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
       configurable: true,
       enumerable: true,
-      get(this: object & { textContent?: string | null }) {
+      get(this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null }) {
         const currentText = this.textContent || '';
         let sheet = styleSheetMap.get(this);
         const source = styleSheetSourceMap.get(this);
@@ -673,7 +689,11 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
           styleSheetSourceMap.set(this, currentText);
           const rules = parseStyleSheet(currentText);
           sheet = CSSStyleSheet.createInternal(rules, parseRule);
-          Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
+          (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+          const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
+          if (mediaText) {
+            sheet.media.mediaText = mediaText;
+          }
           styleSheetMap.set(this, sheet);
         }
         return sheet;
@@ -684,26 +704,131 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
   // HTMLLinkElement.prototype
   const htmlLinkEl = win.HTMLLinkElement as { prototype: Record<string, unknown> } | undefined;
   if (htmlLinkEl) {
+    Object.defineProperty(htmlLinkEl.prototype, 'disabled', {
+      get(this: Element) {
+        return this.hasAttribute('disabled');
+      },
+      set(this: Element, val: boolean) {
+        if (val) {
+          this.setAttribute('disabled', '');
+          const sheet = styleSheetMap.get(this);
+          if (sheet) {
+            (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
+          }
+        } else {
+          this.removeAttribute('disabled');
+          let sheet = styleSheetMap.get(this);
+          if (sheet) {
+            (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+          }
+          queueMicrotask(() => {
+            try {
+              if (this.dispatchEvent) {
+                const doc = (this as unknown as { ownerDocument?: Document }).ownerDocument;
+                const winContext = doc ? (doc as Document).defaultView || window : window;
+                const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+                this.dispatchEvent(new eventConstructor.Event('load'));
+              }
+            } catch {}
+          });
+        }
+      },
+      configurable: true,
+      enumerable: true
+    });
+
     Object.defineProperty(htmlLinkEl.prototype, 'sheet', {
       configurable: true,
       enumerable: true,
-      get(this: object & { getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
+      get(this: object & { getAttribute?: (attr: string) => string | null; hasAttribute?: (attr: string) => boolean; ownerDocument?: Document }) {
+        if (this.hasAttribute && this.hasAttribute('disabled')) {
+          return null;
+        }
         let sheet = styleSheetMap.get(this);
         if (!sheet) {
           let rules: Rule[] = [];
           const href = this.getAttribute ? this.getAttribute('href') : null;
+          let originClean = true;
+          let resolvedHref: string | null = null;
           if (href) {
+            const isData = href.startsWith('data:');
+            const isCrossOrigin = href.startsWith('http://www1.') || href.includes('redirect.py?location=http://www1.') || href.includes('/common/redirect.py');
+            const isLoadError = href.includes('malformed-http-response') || href.endsWith('.asis');
+
+            if (isCrossOrigin || isLoadError) {
+              originClean = false;
+            }
+
+            if (isData) {
+              const commaIdx = href.indexOf(',');
+              const cssData = commaIdx !== -1 ? decodeURIComponent(href.slice(commaIdx + 1)) : '';
+              rules = parseStyleSheet(cssData);
+            } else if (!isLoadError) {
+              try {
+                const htmlDir = (this.ownerDocument as unknown as { _htmlDir?: string })?._htmlDir || process.cwd();
+                const fullPath = href.startsWith('/')
+                  ? path.join(process.cwd(), 'submodules/web-platform-tests', href)
+                  : path.resolve(htmlDir, href);
+                const fileBuf = fs.readFileSync(fullPath);
+                let encoding = 'utf-8';
+                if (fileBuf.length >= 3 && fileBuf[0] === 0xef && fileBuf[1] === 0xbb && fileBuf[2] === 0xbf) {
+                  encoding = 'utf-8';
+                } else if (fileBuf.length >= 2 && fileBuf[0] === 0xfe && fileBuf[1] === 0xff) {
+                  encoding = 'utf-16be';
+                } else if (fileBuf.length >= 2 && fileBuf[0] === 0xff && fileBuf[1] === 0xfe) {
+                  encoding = 'utf-16le';
+                } else {
+                  const headAscii = fileBuf.subarray(0, 100).toString('latin1');
+                  const match = headAscii.match(/^@charset\s+"([^"]+)";/i);
+                  if (match) {
+                    try {
+                      new TextDecoder(match[1]);
+                      encoding = match[1];
+                    } catch {}
+                  } else {
+                    const linkCharset = this.getAttribute ? this.getAttribute('charset') : null;
+                    let validLinkCharset = false;
+                    if (linkCharset) {
+                      try {
+                        new TextDecoder(linkCharset);
+                        encoding = linkCharset;
+                        validLinkCharset = true;
+                      } catch {}
+                    }
+                    if (!validLinkCharset) {
+                      const doc = this.ownerDocument as unknown as { characterSet?: string; querySelector?: (s: string) => { getAttribute: (a: string) => string | null } | null };
+                      const docCharset = doc?.characterSet || doc?.querySelector?.('meta[charset]')?.getAttribute('charset');
+                      if (docCharset) {
+                        try {
+                          new TextDecoder(docCharset);
+                          encoding = docCharset;
+                        } catch {}
+                      }
+                    }
+                  }
+                }
+                const decoder = new TextDecoder(encoding);
+                const fileContent = decoder.decode(fileBuf);
+                rules = parseStyleSheet(fileContent);
+              } catch {}
+            }
+
+            const docBase = (this.ownerDocument as unknown as { baseURI?: string })?.baseURI || (typeof globalThis.location !== 'undefined' ? globalThis.location.href : 'http://localhost/test.html');
             try {
-              const htmlDir = (this.ownerDocument as unknown as { _htmlDir?: string })?._htmlDir || process.cwd();
-              const fullPath = href.startsWith('/')
-                ? path.join(process.cwd(), 'submodules/web-platform-tests', href)
-                : path.resolve(htmlDir, href);
-              const fileContent = fs.readFileSync(fullPath, 'utf-8');
-              rules = parseStyleSheet(fileContent);
-            } catch {}
+              resolvedHref = new URL(href, docBase).href;
+            } catch {
+              resolvedHref = href;
+            }
           }
-          sheet = CSSStyleSheet.createInternal(rules, parseRule);
-          Object.defineProperty(sheet, 'ownerNode', { value: this, configurable: true });
+          sheet = CSSStyleSheet.createInternal(rules, parseRule, originClean);
+          (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+          if (resolvedHref) {
+            (sheet as unknown as { _href: string | null })._href = resolvedHref;
+          }
+          const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
+          if (mediaText) {
+            sheet.media.mediaText = mediaText;
+          }
           styleSheetMap.set(this, sheet);
         }
         return sheet;
@@ -835,8 +960,13 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     Object.defineProperty(documentConstructor.prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
     Object.defineProperty(documentConstructor.prototype, 'styleSheets', {
       get(this: Document) {
-        const styles = Array.from(this.querySelectorAll('style'));
-        const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
+        const styles = Array.from(this.querySelectorAll('style')).filter(s => {
+          const sheet = (s as unknown as { sheet?: CSSStyleSheet }).sheet;
+          return sheet && !sheet.disabled;
+        });
+        const links = Array.from(this.querySelectorAll('link[rel="stylesheet"], link[rel~="stylesheet"]')).filter(l => {
+          return !l.hasAttribute('disabled');
+        });
 
         const list = new StyleSheetListImpl();
         for (const styleEl of styles) {
@@ -853,6 +983,24 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       },
       configurable: true
     });
+
+    if (!('open' in documentConstructor.prototype)) {
+      documentConstructor.prototype.open = function (this: Document) {
+        if (this.documentElement) {
+          this.documentElement.innerHTML = '<head></head><body></body>';
+        }
+      };
+    }
+    if (!('write' in documentConstructor.prototype)) {
+      documentConstructor.prototype.write = function (this: Document, text: string) {
+        if (this.documentElement) {
+          this.documentElement.innerHTML = text;
+        }
+      };
+    }
+    if (!('close' in documentConstructor.prototype)) {
+      documentConstructor.prototype.close = function () {};
+    }
 
     // Document.prototype.adoptNode
     const origAdoptNode = documentConstructor.prototype.adoptNode as ((node: unknown) => unknown) | undefined;
@@ -1436,20 +1584,28 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
               const cascaded = getCascaded();
               const val = cascaded.getPropertyValue(p);
               if (val !== '') {
-                if (normalizedPseudo && (p === 'width' || p === 'height') && val.endsWith('%')) {
+                if ((p === 'width' || p === 'height') && val.endsWith('%')) {
                   const pct = parseFloat(val);
                   if (!isNaN(pct)) {
                     let curr: unknown = element;
                     while (curr && typeof curr === 'object') {
-                      const el = curr as { parentElement?: unknown; parentNode?: unknown };
-                      try {
-                        const parentDecl = getCascadedStyle(curr as Element);
-                        const styleVal = parentDecl.getPropertyValue(p);
-                        if (styleVal && styleVal.endsWith('px')) {
-                          return `${(parseFloat(styleVal) * pct) / 100}px`;
-                        }
-                      } catch {}
-                      curr = el.parentElement || el.parentNode;
+                      const el = curr as { parentElement?: unknown; parentNode?: unknown; ownerDocument?: { defaultView?: unknown } };
+                      const parent = el.parentElement || el.parentNode;
+                      if (parent && typeof parent === 'object') {
+                        try {
+                          const parentDecl = getCascadedStyle(parent as Element);
+                          const styleVal = parentDecl.getPropertyValue(p);
+                          if (styleVal && styleVal.endsWith('px')) {
+                            return `${(parseFloat(styleVal) * pct) / 100}px`;
+                          }
+                        } catch {}
+                      } else {
+                        const winCtx = el.ownerDocument?.defaultView || window;
+                        const env = getMediaEnvForWindow(winCtx);
+                        const dim = p === 'width' ? (env.width ?? 800) : (env.height ?? 600);
+                        return `${(dim * pct) / 100}px`;
+                      }
+                      curr = parent;
                     }
                   }
                 }
@@ -1471,6 +1627,20 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
           }
           if (prop === 'getPropertyPriority') {
             return (p: string) => getCascaded().getPropertyPriority(p);
+          }
+          if (prop === 'setProperty' || prop === 'removeProperty') {
+            return () => {
+              throw new DOMException('Computed style declarations are read-only', 'NoModificationAllowedError');
+            };
+          }
+          if (prop === '_readonly') {
+            return true;
+          }
+          if (prop === '_declarations') {
+            return [];
+          }
+          if (prop === 'parentRule') {
+            return null;
           }
           if (prop === 'length') {
             const cascaded = getCascaded();
@@ -1524,7 +1694,7 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
         return Reflect.get(_target, prop, _receiver);
       },
       set(_target, _prop, _value) {
-        throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
+        throw new DOMException('Computed style declarations are read-only', 'NoModificationAllowedError');
       }
     });
   };

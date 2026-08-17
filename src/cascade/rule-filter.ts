@@ -94,10 +94,67 @@ export function collectStyleSheetsAndRules(
     ? elObj.getRootNode()
     : (elObj.ownerDocument || (elObj.nodeType === 9 ? (element as unknown as Document) : null));
 
+  const getSheetTitle = (sheet: unknown): string | null => {
+    const s = sheet as { title?: string | null; ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
+    if (s.title) return s.title;
+    if (s.ownerNode && typeof s.ownerNode.getAttribute === 'function') {
+      const t = s.ownerNode.getAttribute('title');
+      if (t) return t;
+    }
+    if (typeof s.getAttribute === 'function') {
+      const t = s.getAttribute('title');
+      if (t) return t;
+    }
+    return null;
+  };
+
+  const getSheetRel = (sheet: unknown): string | null => {
+    const s = sheet as { ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
+    if (s.ownerNode && typeof s.ownerNode.getAttribute === 'function') {
+      return s.ownerNode.getAttribute('rel');
+    }
+    if (typeof s.getAttribute === 'function') {
+      return s.getAttribute('rel');
+    }
+    return null;
+  };
+
+  let preferredTitle: string | null = null;
+  let preferredTitleFound = false;
+
+  const determinePreferredTitle = (sheetsOrTags: ArrayLike<unknown>) => {
+    if (preferredTitleFound) return;
+    for (let i = 0; i < sheetsOrTags.length; i++) {
+      const item = sheetsOrTags[i];
+      const title = getSheetTitle(item);
+      const rel = getSheetRel(item) || '';
+      const isAlternate = rel.toLowerCase().includes('alternate');
+      if (title && !isAlternate) {
+        preferredTitle = title;
+        preferredTitleFound = true;
+        break;
+      }
+    }
+  };
+
+  const isSheetEnabledForSet = (sheet: unknown): boolean => {
+    const title = getSheetTitle(sheet);
+    const rel = getSheetRel(sheet) || '';
+    const isAlternate = rel.toLowerCase().includes('alternate');
+    if (!title && !isAlternate) {
+      return true;
+    }
+    if (preferredTitleFound && preferredTitle !== null) {
+      return title === preferredTitle;
+    }
+    return !isAlternate;
+  };
+
   const addSheetRules = (sheet: unknown) => {
     if (!sheet) return;
     const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
     if (s.disabled) return;
+    if (!isSheetEnabledForSet(sheet)) return;
     try {
       if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
         addSheetRules(s.sheet);
@@ -136,6 +193,7 @@ export function collectStyleSheetsAndRules(
     // 1. Regular non-adopted stylesheets
     let addedFromStyleSheets = false;
     if ('styleSheets' in rootObj && rootObj.styleSheets && rootObj.styleSheets.length > 0) {
+      determinePreferredTitle(rootObj.styleSheets);
       for (let i = 0; i < rootObj.styleSheets.length; i++) {
         addSheetRules(rootObj.styleSheets[i]);
         addedFromStyleSheets = true;
@@ -143,6 +201,7 @@ export function collectStyleSheetsAndRules(
     }
     if (!addedFromStyleSheets && typeof rootObj.querySelectorAll === 'function') {
       const styleTags = rootObj.querySelectorAll('style');
+      determinePreferredTitle(styleTags);
       for (let i = 0; i < styleTags.length; i++) {
         addSheetRules(styleTags[i]);
       }

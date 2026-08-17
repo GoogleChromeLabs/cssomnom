@@ -497,20 +497,20 @@ export function createWptContext(
             testObj.resolve();
           }
         },
-        step_func: (stepFn?: Function) => {
+        step_func: (stepFn?: Function, this_obj?: unknown) => {
           return function(this: unknown, ...args: unknown[]) {
-            tObj.step(() => {
+            return tObj.step(() => {
               if (typeof stepFn === 'function') {
-                stepFn.apply(this, args);
+                return stepFn.apply(this_obj !== undefined ? this_obj : (this !== undefined && this !== null && this !== globalThis ? this : tObj), args);
               }
             });
           };
         },
-        step_func_done: (stepFn?: Function) => {
+        step_func_done: (stepFn?: Function, this_obj?: unknown) => {
           return function(this: unknown, ...args: unknown[]) {
             tObj.step(() => {
               if (typeof stepFn === 'function') {
-                stepFn.apply(this, args);
+                stepFn.apply(this_obj !== undefined ? this_obj : (this !== undefined && this !== null && this !== globalThis ? this : tObj), args);
               }
             });
             tObj.done();
