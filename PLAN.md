@@ -2811,25 +2811,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 115: Safe Child Process Watchdog Kills & Runaway Memory Investigation
-**Goal**: Investigate and eliminate the root causes of child process RSS ballooning (>6,144MB) and watchdog `SIGKILL` terminations observed across 4 specific WPT test files (`cssimportrule-parent.html`, `semantics.html`, `focus-within-focus-move.html`, `focus-within-removal.html`).
-
-### Tasks
-- [ ] **Isolate & Fix Runaway Memory / Infinite Loops across Failing Files**:
-  - In `src/CSSOM.ts` & `src/cascade/`: Investigate circular `@import` stylesheet parent/child recursion and unparented sheet references in `css/cssom/cssimportrule-parent.html`.
-  - In `src/matcher.ts`: Investigate catastrophic backtracking or unbounded string allocation during case-insensitive attribute selector matching in `css/selectors/attribute-selectors/attribute-case/semantics.html`.
-  - In `tests/dom-shim/src/dom-stubs.ts`: Investigate DOM node tree traversal recursion and event dispatch loops in `css/selectors/focus-within-focus-move.html` and `css/selectors/focus-within-removal.html`.
-- [ ] **Subprocess Memory Containment & Watchdog Guardrails (`scripts/wpt/node/safe-child-process.ts`)**:
-  - Investigate why `--max-old-space-size=512` permits non-V8 JS heap memory (LinkeDOM C++ bindings, buffers, strings) to scale to >6GB RSS.
-  - Tighten default watchdog `maxRssMb` limit from 6,144MB to 1,536MB (1.5GB) to catch runaway processes before host swap thrashing occurs.
-  - Add per-file peak RSS telemetry to log warning flags for any file exceeding 256MB RSS.
-- [ ] **Verification & Zero Watchdog Kills**:
-  - Verify that `cssimportrule-parent.html`, `semantics.html`, and `focus-within-*.html` execute under 128MB RSS without timeouts.
-  - Run full suite `pnpm run wpt:verify` to confirm **zero `WATCHDOG_KILLED` and zero `TIMEOUT` statuses** across all 1,687 test files.
-
----
-
-## Phase 116: WPT Test Runner VM Cross-Realm Intrinsics & IDL Harness Interception
+## Phase 115: WPT Test Runner VM Cross-Realm Intrinsics & IDL Harness Interception
 **Goal**: Resolve the V8 VM realm intrinsic leak and relative IDL fetch interception in `scripts/wpt/node/run.ts`, unlocking **+1,181 authentic W3C test assertions** across `serialize-values.html` (697 assertions) and `idlharness.html` (484 assertions) with zero regressions on the 17,100+ passing baseline.
 
 ### Architectural Root Causes & Analysis (Grizz Audit)
@@ -2860,6 +2842,24 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Verify that child processes remain bounded within `--max-old-space-size=512` during WebIDL AST parsing (`webidl2.js`).
   - Run `pnpm run preflight` (typecheck, lint, safe-exec, all unit tests).
   - Run `pnpm run wpt:verify` to guarantee **0 regressions** across all 1,687 test files (17,100+ baseline).
+
+---
+
+## Phase 116: Safe Child Process Watchdog Kills & Runaway Memory Investigation
+**Goal**: Investigate and eliminate the root causes of child process RSS ballooning (>6,144MB) and watchdog `SIGKILL` terminations observed across 4 specific WPT test files (`cssimportrule-parent.html`, `semantics.html`, `focus-within-focus-move.html`, `focus-within-removal.html`) now running in the clean VM realm.
+
+### Tasks
+- [ ] **Isolate & Fix Runaway Memory / Infinite Loops across Failing Files**:
+  - In `src/CSSOM.ts` & `src/cascade/`: Investigate circular `@import` stylesheet parent/child recursion and unparented sheet references in `css/cssom/cssimportrule-parent.html`.
+  - In `src/matcher.ts`: Investigate catastrophic backtracking or unbounded string allocation during case-insensitive attribute selector matching in `css/selectors/attribute-selectors/attribute-case/semantics.html`.
+  - In `tests/dom-shim/src/dom-stubs.ts`: Investigate DOM node tree traversal recursion and event dispatch loops in `css/selectors/focus-within-focus-move.html` and `css/selectors/focus-within-removal.html`.
+- [ ] **Subprocess Memory Containment & Watchdog Guardrails (`scripts/wpt/node/safe-child-process.ts`)**:
+  - Investigate why `--max-old-space-size=512` permits non-V8 JS heap memory (LinkeDOM C++ bindings, buffers, strings) to scale to >6GB RSS.
+  - Tighten default watchdog `maxRssMb` limit from 6,144MB to 1,536MB (1.5GB) to catch runaway processes before host swap thrashing occurs.
+  - Add per-file peak RSS telemetry to log warning flags for any file exceeding 256MB RSS.
+- [ ] **Verification & Zero Watchdog Kills**:
+  - Verify that `cssimportrule-parent.html`, `semantics.html`, and `focus-within-*.html` execute under 128MB RSS without timeouts.
+  - Run full suite `pnpm run wpt:verify` to confirm **zero `WATCHDOG_KILLED` and zero `TIMEOUT` statuses** across all 1,687 test files.
 
 ---
 
