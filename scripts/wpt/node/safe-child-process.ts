@@ -176,7 +176,7 @@ export function safeExecTestFile(
             if (rssMB > maxRssMB) {
               isWatchdogKilled = true;
               console.warn(
-                `[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > ${maxRssMB}MB). Terminating with SIGKILL.`
+                `[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > ${maxRssMB}MB) while running ${filePath}. Terminating with SIGKILL.`
               );
               try {
                 child.kill('SIGKILL');

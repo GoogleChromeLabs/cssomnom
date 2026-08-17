@@ -29,6 +29,22 @@ const VENDOR_PROPS = ALL_SHORTHAND_LONGHANDS.filter(p => p.startsWith('-')).sort
 
 const ALL_COMPUTED_PROPS = [...STANDARD_PROPS, ...VENDOR_PROPS];
 
+const PROTECTED_HARNESS_NAMES = new Set([
+  'test', 'async_test', 'promise_test', 'done', 'setup', 'generate_tests',
+  'assert_true', 'assert_false', 'assert_equals', 'assert_not_equals',
+  'assert_array_equals', 'assert_approx_equals', 'assert_less_than',
+  'assert_greater_than', 'assert_between_exclusive', 'assert_between_inclusive',
+  'assert_less_than_equal', 'assert_greater_than_equal', 'assert_class_string',
+  'assert_own_property', 'assert_not_own_property', 'assert_inherits',
+  'assert_idl_attribute', 'assert_readonly', 'assert_throws_dom', 'assert_throws_js',
+  'assert_throws_exactly', 'assert_unreached', 'assert_any', 'assert_object_equals',
+  'assert_regexp_match', 'format_value', 'window', 'document', 'location',
+  'navigator', 'console', 'fetch', 'self', 'globalThis', 'top', 'parent',
+  'Array', 'Object', 'Function', 'Promise', 'Error', 'TypeError', 'RangeError',
+  'SyntaxError', 'ReferenceError', 'URIError', 'EvalError', 'Map', 'Set',
+  'WeakMap', 'WeakSet', 'RegExp', 'Date', 'Math', 'JSON', 'Symbol', 'BigInt'
+]);
+
 export class FallbackRange {
   startContainer: unknown = null;
   startOffset = 0;
@@ -1222,6 +1238,9 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
   }
 
   const patchElementStyle = (targetProto: Record<string, unknown>) => {
+    if (targetProto.__isStylePatched) return;
+    targetProto.__isStylePatched = true;
+
     Object.defineProperty(targetProto, 'style', {
       get(this: Element) {
         return getOrCreateElementStyle(this);
@@ -1238,6 +1257,17 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     const origSetAttribute = targetProto.setAttribute as ((name: string, value: string) => void) | undefined;
     if (origSetAttribute) {
       targetProto.setAttribute = function (this: Element, name: string, value: string) {
+        if (name === 'id' && typeof value === 'string' && !PROTECTED_HARNESS_NAMES.has(value)) {
+          const win = this.ownerDocument?.defaultView || window;
+          const sb = (win as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
+                     (this.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
+          if (sb) {
+            try { sb[value] = this; } catch {}
+          }
+          if (win) {
+            try { (win as unknown as Record<string, unknown>)[value] = this; } catch {}
+          }
+        }
         if (name === 'style' && !isSyncingStyle) {
           isSyncingStyle = true;
           try {
@@ -1275,6 +1305,68 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
   }
   if (window.Element && window.Element.prototype) {
     patchElementStyle(window.Element.prototype as unknown as Record<string, unknown>);
+
+    const elemProto = window.Element.prototype as unknown as Record<string, unknown>;
+    if (!elemProto.__isIdPatched) {
+      elemProto.__isIdPatched = true;
+      const origIdDesc = Object.getOwnPropertyDescriptor(window.Element.prototype, 'id');
+      Object.defineProperty(window.Element.prototype, 'id', {
+        get(this: Element) {
+          return origIdDesc?.get ? origIdDesc.get.call(this) : (this.getAttribute('id') || '');
+        },
+        set(this: Element, value: string) {
+          if (origIdDesc?.set) {
+            origIdDesc.set.call(this, value);
+          } else {
+            this.setAttribute('id', value);
+          }
+          if (typeof value === 'string' && !PROTECTED_HARNESS_NAMES.has(value)) {
+            const win = this.ownerDocument?.defaultView || window;
+            const sb = (win as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
+                       (this.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
+            if (sb) {
+              try { sb[value] = this; } catch {}
+            }
+            if (win) {
+              try { (win as unknown as Record<string, unknown>)[value] = this; } catch {}
+            }
+          }
+        },
+        configurable: true
+      });
+    }
+
+    if (!elemProto.__isInnerHTMLPatched) {
+      elemProto.__isInnerHTMLPatched = true;
+      const origInnerHTMLDesc = Object.getOwnPropertyDescriptor(window.Element.prototype, 'innerHTML') ||
+                                (window.HTMLElement ? Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerHTML') : undefined);
+      if (origInnerHTMLDesc && origInnerHTMLDesc.set) {
+        const origSet = origInnerHTMLDesc.set;
+        Object.defineProperty(window.Element.prototype, 'innerHTML', {
+          get: origInnerHTMLDesc.get,
+          set(this: Element, html: string) {
+            origSet.call(this, html);
+            const win = this.ownerDocument?.defaultView || window;
+            const sb = (win as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
+                       (this.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
+            if (typeof this.querySelectorAll === 'function') {
+              try {
+                const elementsWithId = this.querySelectorAll('[id]');
+                for (let i = 0; i < elementsWithId.length; i++) {
+                  const el = elementsWithId[i];
+                  const id = el.getAttribute('id');
+                  if (id && !PROTECTED_HARNESS_NAMES.has(id)) {
+                    if (sb) { sb[id] = el; }
+                    if (win) { (win as unknown as Record<string, unknown>)[id] = el; }
+                  }
+                }
+              } catch {}
+            }
+          },
+          configurable: true
+        });
+      }
+    }
   }
 
 

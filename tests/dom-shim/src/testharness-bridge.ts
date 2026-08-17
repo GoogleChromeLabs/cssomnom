@@ -12,6 +12,7 @@ import {
   messageOf,
   sanitize_unpaired_surrogates,
   get_test_name,
+  format_value,
   WPT_ASSERTIONS
 } from './wpt-assertions.ts';
 import {
@@ -108,7 +109,9 @@ export function createWptContext(
     }, {}) : {}),
 
     window,
+    Window: win.Window || (win as unknown as { constructor: unknown }).constructor || (globalThis as { Window?: unknown }).Window,
     document,
+    format_value,
     addEventListener: window.addEventListener.bind(window),
     removeEventListener: window.removeEventListener.bind(window),
     dispatchEvent: window.dispatchEvent.bind(window),
@@ -572,6 +575,11 @@ export function createWptContext(
     // Assertions
     ...WPT_ASSERTIONS
   };
+
+  (win as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = ctx;
+  if (document) {
+    (document as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = ctx;
+  }
 
   return ctx;
 }

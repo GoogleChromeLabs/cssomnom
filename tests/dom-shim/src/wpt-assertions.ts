@@ -51,6 +51,63 @@ export function sanitize_unpaired_surrogates(str: string): string {
   );
 }
 
+export function format_value(val: unknown, seen?: unknown[]): string {
+  if (!seen) {
+    seen = [];
+  }
+  if (typeof val === 'object' && val !== null) {
+    if (seen.includes(val)) {
+      return '[...]';
+    }
+    seen.push(val);
+  }
+  if (Array.isArray(val)) {
+    let output = '[';
+    output += val.map(x => format_value(x, seen)).join(', ');
+    return output + ']';
+  }
+
+  switch (typeof val) {
+    case 'string':
+      return JSON.stringify(val);
+    case 'boolean':
+    case 'undefined':
+      return String(val);
+    case 'number':
+      if (val === 0 && 1 / val === -Infinity) {
+        return '-0';
+      }
+      return String(val);
+    case 'bigint':
+      return String(val) + 'n';
+    case 'symbol':
+      return String(val);
+    case 'function':
+      return `function ${(val as Function).name || 'anonymous'}() { [native code] }`;
+    case 'object':
+      if (val === null) {
+        return 'null';
+      }
+      if (val && typeof (val as { nodeType?: number }).nodeType === 'number') {
+        const node = val as { nodeType: number; localName?: string; nodeName?: string; data?: string };
+        if (node.nodeType === 1) {
+          return `<${node.localName || node.nodeName || 'element'}>`;
+        }
+        if (node.nodeType === 3) {
+          return `Text node "${node.data || ''}"`;
+        }
+        return `Node object of type ${node.nodeType}`;
+      }
+      try {
+        return typeof val + ' "' + String(val) + '"';
+      } catch (e) {
+        return `[stringifying object threw ${String(e)}]`;
+      }
+    default:
+      return String(val);
+  }
+}
+
 export function get_test_name(func: Function, name: string | undefined, defaultName: string, tests: Array<{ name: string }>): string {
   if (name) {
     return name;
