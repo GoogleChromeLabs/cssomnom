@@ -13377,7 +13377,9 @@
   ],
   "submodules/web-platform-tests/css/cssom/adoptedstylesheets-observablearray.html": [
     "adoptedStyleSheets should not expose its backing object via prototype",
-    "adoptedStyleSheets should return true for isArray()"
+    "adoptedStyleSheets should return true for isArray()",
+    "document.adoptedStyleSheets should allow mutation in-place",
+    "shadowRoot.adoptedStyleSheets should allow mutation in-place"
   ],
   "submodules/web-platform-tests/css/cssom/at-namespace.html": [
     "anonymous-test-0"
@@ -13429,8 +13431,12 @@
     "style.innerHTML modification",
     "style.textContent modification"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSConditionRule-conditionText.html": [
+    "anonymous-test-0"
+  ],
   "submodules/web-platform-tests/css/cssom/CSSContainerRule.tentative.html": [
-    "@container (min-width: 100px) {}"
+    "@container (min-width: 100px) {}",
+    "@container name (min-width: 100px) {}"
   ],
   "submodules/web-platform-tests/css/cssom/CSSCounterStyleRule.html": [
     "CSSCounterStyleRule.cssText doesn't serialize with newlines"
@@ -13476,6 +13482,7 @@
     "StyleSheet : MediaList mediaText attribute should be updated due to [PutForwards]",
     "Type of CSSRule#type and constant values",
     "Value of CSSImportRule supportsText attribute",
+    "Values of CSSImportRule attributes",
     "Values of CSSRule attributes"
   ],
   "submodules/web-platform-tests/css/cssom/CSSKeyframeRule.html": [
@@ -13511,19 +13518,25 @@
   ],
   "submodules/web-platform-tests/css/cssom/cssom-pagerule.html": [
     "Cannot set cssText to invalid pseudo page - return default @page { }",
+    "Cannot set cssText to named page with pseudo, whitespace between - return default @page { }",
+    "Cannot set cssText to two pseudos, whitespace between - return default @page { }",
     "Cannot set selectorText to invalid pseudo page",
+    "Cannot set selectorText to named page with pseudo, whitespace between",
+    "Cannot set selectorText to two pseudos, whitespace between",
     "Page selector 'cssText' is initially the @page { }",
     "Page selector is initially the empty string",
     "Sanity checks",
     "Set cssText to :left pseudo page",
     "Set cssText to named page",
     "Set cssText to named page with :first pseudo page",
+    "Set cssText to named page with case insensitive :first pseudo page",
     "Set cssText to named page with pseudo pages of :first, :left, :right, :first in order.",
     "Set cssText to named page with two :first pseudo page",
     "Set selectorText to :left pseudo page",
     "Set selectorText to named page",
     "Set selectorText to named page after rule was removed",
     "Set selectorText to named page with :first pseudo page",
+    "Set selectorText to named page with case insensitive :first pseudo page",
     "Set selectorText to named page with pseudo pages of :first, :left, :right, :first in order.",
     "Set selectorText to named page with two :first pseudo page"
   ],
@@ -13829,6 +13842,10 @@
     "Values of CSSStyleRule attributes",
     "Writability of CSSRule attributes"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-baseURL.html": [
+    "Constructing sheet with custom base URL ueses that URL for CSS rules",
+    "Constructing sheet with invalid base URL throws a NotAllowedError"
+  ],
   "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-cssRules.html": [
     "cssRules doesn't change on replace / replaceSync"
   ],
@@ -13843,6 +13860,9 @@
   ],
   "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-invalidation.html": [
     "mutating constructed CSSStyleSheet applied to root invalidates styles"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-replace-on-regular-sheet.html": [
+    "CSSStyleSheet.replaceSync throws NotAllowedError for non-constructed sheets"
   ],
   "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-replace-thenable.html": [
     "anonymous-test-0"
@@ -14194,6 +14214,7 @@
     "deleteMedium removes every matching query, not only the first"
   ],
   "submodules/web-platform-tests/css/cssom/medialist-interfaces-002.html": [
+    "deleteMedium_called_without_argument",
     "deleteMedium_no_matching_medium_to_remove",
     "deleteMedium_removes_correct_medium"
   ],

@@ -223,6 +223,36 @@ function splitSelectorList(selectorText: string): string[] {
   return result.length > 0 ? result : [selectorText];
 }
 
+function getRuleBaseURL(rule: unknown, element?: unknown): string | null {
+  const r = rule as { parentStyleSheet?: { _baseURL?: string | null; href?: string | null } } | null;
+  if (r?.parentStyleSheet?._baseURL) return r.parentStyleSheet._baseURL;
+  if (r?.parentStyleSheet?.href) return r.parentStyleSheet.href;
+  if (element && typeof element === 'object') {
+    const el = element as { ownerDocument?: { baseURI?: string; defaultView?: { location?: { href?: string } } } };
+    if (el.ownerDocument?.baseURI) return el.ownerDocument.baseURI;
+    if (el.ownerDocument?.defaultView?.location?.href) return el.ownerDocument.defaultView.location.href;
+  }
+  if (typeof globalThis.document !== 'undefined' && globalThis.document.baseURI) return globalThis.document.baseURI;
+  if (typeof globalThis.location !== 'undefined' && globalThis.location.href) return globalThis.location.href;
+  return null;
+}
+
+function resolveUrlsInValue(val: string, baseURL: string | null): string {
+  if (!baseURL || !val.includes('url(')) return val;
+  return val.replace(/url\(\s*(['"]?)(.*?)\1\s*\)/gi, (match, _quote, rawUrl) => {
+    try {
+      const trimmed = rawUrl.trim();
+      if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.startsWith('#')) {
+        return `url("${trimmed}")`;
+      }
+      const resolved = new URL(trimmed, baseURL).href;
+      return `url("${resolved}")`;
+    } catch {
+      return match;
+    }
+  });
+}
+
 /**
  * Traverses rule list, evaluates conditional at-rules and selectors, and collects matched declarations.
  * css-cascade-5 § 2 #filtering
@@ -299,6 +329,7 @@ export function collectMatchedDeclarations(
           const spec = maxSpecificity;
           const style = (rule as CSSStyleRule).style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
+          const ruleBase = getRuleBaseURL(rule, element);
 
           if (style) {
             if (typeof (style as { length?: number }).length === 'number' && (style as { length: number }).length >= 0) {
@@ -314,9 +345,10 @@ export function collectMatchedDeclarations(
                 const priority = typeof (style as { getPropertyPriority?: (p: string) => string }).getPropertyPriority === 'function'
                   ? (style as { getPropertyPriority: (p: string) => string }).getPropertyPriority(name)
                   : '';
+                const rawValStr = typeof value === 'string' ? value : serialize(value as unknown as ComponentValue[]);
                 matchedDeclarations.push({
                   name,
-                  value: typeof value === 'string' ? value : serialize(value as unknown as ComponentValue[]),
+                  value: resolveUrlsInValue(rawValStr, ruleBase),
                   important: priority === 'important',
                   isInline: false,
                   layerOrder,
@@ -326,9 +358,10 @@ export function collectMatchedDeclarations(
               }
             } else if (Array.isArray((style as { declarations?: unknown[] }).declarations)) {
               for (const d of (style as { declarations: Declaration[] }).declarations) {
+                const rawValStr = serialize(d.value);
                 matchedDeclarations.push({
                   name: d.name,
-                  value: serialize(d.value),
+                  value: resolveUrlsInValue(rawValStr, ruleBase),
                   important: d.important,
                   isInline: false,
                   layerOrder,
@@ -341,9 +374,10 @@ export function collectMatchedDeclarations(
             const blockVal = (rule as { block?: { value?: ComponentValue[] } }).block!.value || [];
             const decls = ParseHooks.parseStyleAttribute(tokenize(serialize(blockVal)));
             for (const d of decls.declarations) {
+              const rawValStr = serialize(d.value);
               matchedDeclarations.push({
                 name: d.name,
-                value: serialize(d.value),
+                value: resolveUrlsInValue(rawValStr, ruleBase),
                 important: d.important,
                 isInline: false,
                 layerOrder,
@@ -465,13 +499,14 @@ export function collectMatchedDeclarations(
           const spec = (scopeNode ? [0, 0, 0] : getMatchingSpecificity(element, selectorToMatch)) as Specificity;
           const style = rule.style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
+          const ruleBase = getRuleBaseURL(rule, element);
           for (let k = 0; k < style.length; k++) {
             const name = style.item(k);
             const value = style.getPropertyValue(name);
             const priority = style.getPropertyPriority(name);
             matchedDeclarations.push({
               name,
-              value,
+              value: resolveUrlsInValue(value, ruleBase),
               important: priority === 'important',
               isInline: false,
               layerOrder,

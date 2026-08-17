@@ -75,7 +75,6 @@ export class StyleSheetListImpl extends Array<CSSStyleSheet> {
 // State WeakMaps to eliminate instance monkey-patching
 const styleSheetMap = new WeakMap<object, CSSStyleSheet | null>();
 const styleSheetSourceMap = new WeakMap<object, string | null>();
-const adoptedStyleSheetsMap = new WeakMap<object, CSSStyleSheet[]>();
 const attributeStyleMapCache = new WeakMap<object, TypedOM.StylePropertyMap>();
 const computedStyleMapCache = new WeakMap<object, ComputedStylePropertyMap>();
 const documentFontsMap = new WeakMap<object, FontFaceSet>();
@@ -712,51 +711,120 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     });
   }
 
+  interface ObservableAdoptedStyleSheetsHolder {
+    rawArray: CSSStyleSheet[];
+    proxy: CSSStyleSheet[];
+    validateSheet: (s: unknown) => void;
+  }
+  const adoptedStyleSheetsHolderMap = new WeakMap<object, ObservableAdoptedStyleSheetsHolder>();
+
+  const getOrCreateAdoptedHolder = (owner: object & { ownerDocument?: Document }): ObservableAdoptedStyleSheetsHolder => {
+    let holder = adoptedStyleSheetsHolderMap.get(owner);
+    if (!holder) {
+      const rawArray: CSSStyleSheet[] = [];
+
+      const validateSheet = (s: unknown) => {
+        const sObj = s as {
+          constructor?: { name?: string };
+          cssRules?: unknown;
+          _constructedFlag?: boolean;
+          _constructed?: boolean;
+          _isConstructed?: boolean;
+          isConstructed?: boolean;
+          ownerNode?: unknown;
+          ownerRule?: unknown;
+          _constructorDocument?: Document;
+        } | null;
+
+        const isSheet =
+          s instanceof CSSStyleSheet ||
+          (sObj !== null && typeof sObj === 'object' && (sObj.constructor?.name === 'CSSStyleSheet' || 'cssRules' in sObj));
+        if (!isSheet || !sObj) {
+          throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
+        }
+        const isConstructed = (sObj._constructedFlag ?? sObj._constructed ?? sObj._isConstructed ?? sObj.isConstructed) ?? false;
+        if (!isConstructed || sObj.ownerNode || sObj.ownerRule) {
+          throw new DOMException('Failed to set adoptedStyleSheets: member of list is not a constructed stylesheet', 'NotAllowedError');
+        }
+        const sheetDoc = sObj._constructorDocument;
+        const targetDoc = (owner instanceof (win.Document as unknown as { new (): Document })
+          ? owner
+          : owner.ownerDocument) as Document | undefined;
+        if (
+          (sheetDoc && targetDoc && sheetDoc !== targetDoc) ||
+          (win.CSSStyleSheet && sObj.constructor !== win.CSSStyleSheet && sObj.constructor?.name === 'CSSStyleSheet' && sObj.constructor !== CSSStyleSheet)
+        ) {
+          throw new DOMException('Failed to set adoptedStyleSheets: stylesheet was constructed in a different document', 'NotAllowedError');
+        }
+      };
+
+      const proxy = new Proxy(rawArray, {
+        get(target, prop, receiver) {
+          if (prop === 'push') {
+            return function (...items: unknown[]) {
+              for (const item of items) {
+                validateSheet(item);
+              }
+              return target.push(...(items as CSSStyleSheet[]));
+            };
+          }
+          if (prop === 'unshift') {
+            return function (...items: unknown[]) {
+              for (const item of items) {
+                validateSheet(item);
+              }
+              return target.unshift(...(items as CSSStyleSheet[]));
+            };
+          }
+          if (prop === 'splice') {
+            return function (start: number, deleteCount?: number, ...items: unknown[]) {
+              for (const item of items) {
+                validateSheet(item);
+              }
+              if (deleteCount === undefined) {
+                return target.splice(start);
+              }
+              return target.splice(start, deleteCount, ...(items as CSSStyleSheet[]));
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+        set(target, prop, value, receiver) {
+          if (typeof prop === 'string' && !isNaN(Number(prop)) && Number(prop) >= 0) {
+            validateSheet(value);
+          }
+          return Reflect.set(target, prop, value, receiver);
+        }
+      });
+
+      holder = { rawArray, proxy, validateSheet };
+      adoptedStyleSheetsHolderMap.set(owner, holder);
+    }
+    return holder;
+  };
+
   const createAdoptedStyleSheetsAccessor = () => ({
-    get(this: object) {
-      let sheets = adoptedStyleSheetsMap.get(this);
-      if (!sheets) {
-        sheets = [];
-        adoptedStyleSheetsMap.set(this, sheets);
-      }
-      return sheets;
+    get(this: object & { ownerDocument?: Document }) {
+      return getOrCreateAdoptedHolder(this).proxy;
     },
     set(this: object & { ownerDocument?: Document }, sheets: CSSStyleSheet[]) {
       if (!sheets || typeof (sheets as unknown as Iterable<unknown>)[Symbol.iterator] !== 'function') {
         throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
       }
       const arr = Array.from(sheets);
+      const holder = getOrCreateAdoptedHolder(this);
       for (const s of arr) {
-        const sObj = s as unknown as {
-          constructor?: { name?: string };
-          cssRules?: unknown;
-          _isConstructed?: boolean;
-          isConstructed?: boolean;
-          ownerNode?: unknown;
-          ownerRule?: unknown;
-          _constructorDocument?: Document;
-        };
-        const isSheet =
-          s instanceof CSSStyleSheet ||
-          (sObj && typeof sObj === 'object' && (sObj.constructor?.name === 'CSSStyleSheet' || 'cssRules' in sObj));
-        if (!isSheet) {
-          throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
-        }
-        if (!sObj._isConstructed && !sObj.isConstructed && (sObj.ownerNode || sObj.ownerRule)) {
-          throw new DOMException('Failed to set adoptedStyleSheets: member of list is not a constructed stylesheet', 'NotAllowedError');
-        }
-        const sheetDoc = sObj._constructorDocument;
-        const targetDoc = (this instanceof (win.Document as unknown as { new (): Document })
-          ? this
-          : this.ownerDocument) as Document | undefined;
-        if (
-          (sheetDoc && targetDoc && sheetDoc !== targetDoc) ||
-          (win.CSSStyleSheet && sObj.constructor !== win.CSSStyleSheet && sObj.constructor?.name === 'CSSStyleSheet')
-        ) {
-          throw new DOMException('Failed to set adoptedStyleSheets: stylesheet was constructed in a different document', 'NotAllowedError');
-        }
+        holder.validateSheet(s);
       }
-      adoptedStyleSheetsMap.set(this, arr);
+      holder.rawArray.length = 0;
+      for (let i = 0; i < arr.length; i++) {
+        Object.defineProperty(holder.rawArray, i, {
+          value: arr[i],
+          writable: true,
+          enumerable: true,
+          configurable: true
+        });
+      }
     },
     configurable: true,
     enumerable: true
@@ -840,7 +908,6 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     | { prototype: Record<string, unknown> }
     | undefined;
   if (shadowRootConstructor) {
-    Object.defineProperty(shadowRootConstructor.prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
     Object.defineProperty(shadowRootConstructor.prototype, 'styleSheets', {
       get(this: DocumentFragment) {
         const styles = Array.from(this.querySelectorAll('style'));
@@ -861,6 +928,12 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       },
       configurable: true
     });
+  }
+  if (win.ShadowRoot) {
+    Object.defineProperty((win.ShadowRoot as { prototype: Record<string, unknown> }).prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
+  }
+  if (win.DocumentFragment) {
+    Object.defineProperty((win.DocumentFragment as { prototype: Record<string, unknown> }).prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
   }
 
   if (window.Element && window.Element.prototype) {

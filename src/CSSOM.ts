@@ -124,9 +124,12 @@ export class MediaList {
   }
 
   deleteMedium(medium: string): void {
+    if (arguments.length === 0) {
+      throw new TypeError("Failed to execute 'deleteMedium' on 'MediaList': 1 argument required, but only 0 present.");
+    }
     const parsed = MediaParser.parse(medium);
     if (parsed.length !== 1) {
-      return;
+      throw new DOMException(`The medium '${medium}' does not exist in the MediaList.`, 'NotFoundError');
     }
     const mText = serializeMediaQuery(parsed[0]);
     let i = this._mediaQueries.length;
@@ -222,7 +225,23 @@ export class CSSStyleSheet extends StyleSheet {
   private _constructedFlag = false;
   private _disallowModificationFlag = false;
   private _constructorDocument: unknown = null;
-  private _baseURL: string | null = null;
+  private _baseURLVal: string | null = null;
+
+  get _baseURL(): string | null {
+    return this._baseURLVal;
+  }
+
+  get _constructed(): boolean {
+    return this._constructedFlag;
+  }
+
+  get _isConstructed(): boolean {
+    return this._constructedFlag;
+  }
+
+  get isConstructed(): boolean {
+    return this._constructedFlag;
+  }
 
   constructor(options: CSSStyleSheetInit = {}) {
     const mediaText = options.media instanceof MediaList ? options.media.mediaText : (options.media || '');
@@ -231,7 +250,17 @@ export class CSSStyleSheet extends StyleSheet {
     this._constructedFlag = true;
     this._originCleanFlag = true;
     this.disabled = !!options.disabled;
-    this._baseURL = options.baseURL || null;
+    if (options.baseURL !== undefined && options.baseURL !== null) {
+      const baseURI = (typeof globalThis.document !== 'undefined' && globalThis.document.baseURI) || (typeof globalThis.location !== 'undefined' && globalThis.location.href) || 'about:blank';
+      try {
+        const url = new URL(options.baseURL, baseURI);
+        this._baseURLVal = url.href;
+      } catch {
+        throw new DOMException("Invalid baseURL", "NotAllowedError");
+      }
+    } else {
+      this._baseURLVal = null;
+    }
 
     // Default parseRule for constructed stylesheets
     this._parseRule = (text: string) => {
@@ -261,7 +290,7 @@ export class CSSStyleSheet extends StyleSheet {
     // 1. Let promise be a promise.
     // 2. If the constructed flag is not set, or the disallow modification flag is set, reject promise with a NotAllowedError DOMException and return promise.
     if (!this._constructedFlag || this._disallowModificationFlag) {
-      return Promise.reject(new DOMException("Not allowed on non-constructed stylesheets or modification is disallowed", "NotAllowedError"));
+      return Promise.reject(new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError"));
     }
     // 3. Set the disallow modification flag.
     this._disallowModificationFlag = true;
@@ -320,7 +349,7 @@ export class CSSStyleSheet extends StyleSheet {
   replaceSync(text: string): void {
     // 1. If the constructed flag is not set, or the disallow modification flag is set, throw a NotAllowedError DOMException.
     if (!this._constructedFlag) {
-      throw new DOMException("Not allowed on non-constructed stylesheets", "NotAllowedError");
+      throw new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError");
     }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
@@ -895,10 +924,6 @@ export class CSSMediaRule extends CSSConditionRule {
     return this.media.mediaText;
   }
 
-  set conditionText(value: string) {
-    this.media.mediaText = value;
-  }
-
   get type() { return 4; }
 
   // 6.17 The CSSMediaRule Interface
@@ -963,13 +988,35 @@ export class CSSContainerRule extends CSSConditionRule {
 
   constructor(containerQuery: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule, containerName: string = '') {
     super(rules, parseRuleInBlock);
-    this.containerName = containerName;
-    this.containerQuery = containerQuery;
+    if (!containerName && containerQuery) {
+      const trimmed = containerQuery.trim();
+      const firstSpace = trimmed.indexOf(' ');
+      if (firstSpace > 0) {
+        const potentialName = trimmed.slice(0, firstSpace);
+        const lower = potentialName.toLowerCase();
+        if (!['not', 'and', 'or', 'none'].includes(lower) && !potentialName.startsWith('(')) {
+          this.containerName = potentialName;
+          this.containerQuery = trimmed.slice(firstSpace + 1).trim();
+        } else {
+          this.containerName = '';
+          this.containerQuery = trimmed;
+        }
+      } else if (!['not', 'and', 'or', 'none'].includes(trimmed.toLowerCase()) && !trimmed.startsWith('(')) {
+        this.containerName = trimmed;
+        this.containerQuery = '';
+      } else {
+        this.containerName = '';
+        this.containerQuery = trimmed;
+      }
+    } else {
+      this.containerName = containerName;
+      this.containerQuery = containerQuery;
+    }
   }
 
   override get conditionText(): string {
     if (this.containerName) {
-      return `${this.containerName} ${this.containerQuery}`;
+      return this.containerQuery ? `${this.containerName} ${this.containerQuery}` : this.containerName;
     }
     return this.containerQuery;
   }
@@ -1398,6 +1445,14 @@ export class CSSImportRule extends CSSRule {
 
   // cssom-1 § 6.4.3 #dom-cssimportrule-stylesheet
   get styleSheet(): CSSStyleSheet | null {
+    if (!this._styleSheet) {
+      this._styleSheet = CSSStyleSheet.createInternal([], (text: string) => {
+        const tokens = tokenize(text);
+        return ParseHooks.consumeRule(tokens) as unknown as Rule;
+      });
+      Object.defineProperty(this._styleSheet, 'ownerRule', { value: this, configurable: true });
+      Object.defineProperty(this._styleSheet, 'parentStyleSheet', { value: this.parentStyleSheet, configurable: true });
+    }
     return this._styleSheet;
   }
 
@@ -1474,7 +1529,7 @@ export class CSSNamespaceRule extends CSSRule {
 
 function parsePageSelectorList(text: string): string[] | null {
   const trimmed = text.trim();
-  if (trimmed === '') return [];
+  if (trimmed === '') return [''];
 
   const tokens = tokenize(text);
   const values = ParseHooks.parseComponentValues(tokens);
@@ -1494,24 +1549,36 @@ function parsePageSelectorList(text: string): string[] | null {
   const results: string[] = [];
 
   for (const selTokens of selectorTokensList) {
-    const filtered = selTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
-    if (filtered.length === 0) {
+    let start = 0;
+    while (start < selTokens.length && (selTokens[start].type === 'whitespace' || selTokens[start].type === 'comment')) {
+      start++;
+    }
+    let end = selTokens.length;
+    while (end > start && (selTokens[end - 1].type === 'whitespace' || selTokens[end - 1].type === 'comment')) {
+      end--;
+    }
+    const trimmedTokens = selTokens.slice(start, end);
+    if (trimmedTokens.length === 0) {
+      return null;
+    }
+
+    if (trimmedTokens.some(t => t.type === 'whitespace' || t.type === 'comment')) {
       return null;
     }
 
     let hasIdent = false;
     let pos = 0;
     
-    if (filtered[0].type === 'ident') {
+    if (trimmedTokens[0].type === 'ident') {
       hasIdent = true;
       pos = 1;
     }
     
-    while (pos < filtered.length) {
-      const colon = filtered[pos];
-      const ident = filtered[pos + 1];
+    while (pos < trimmedTokens.length) {
+      const colon = trimmedTokens[pos];
+      const ident = trimmedTokens[pos + 1];
       if (colon && colon.type === 'colon' && ident && ident.type === 'ident') {
-        const pseudoName = ident.value.toLowerCase();
+        const pseudoName = (ident.value as string).toLowerCase();
         if (['left', 'right', 'first', 'blank'].includes(pseudoName)) {
           pos += 2;
           continue;
@@ -1522,11 +1589,11 @@ function parsePageSelectorList(text: string): string[] | null {
     
     let serialized = '';
     if (hasIdent) {
-      serialized += serializeIdentifier(filtered[0].value as string);
+      serialized += serializeIdentifier(trimmedTokens[0].value as string);
     }
     let p = hasIdent ? 1 : 0;
-    while (p < filtered.length) {
-      serialized += ':' + serializeIdentifier(filtered[p + 1].value as string);
+    while (p < trimmedTokens.length) {
+      serialized += ':' + serializeIdentifier((trimmedTokens[p + 1].value as string).toLowerCase());
       p += 2;
     }
     results.push(serialized);
@@ -1542,7 +1609,7 @@ export class CSSPageRule extends CSSGroupingRule {
   constructor(selectorText: string, declarations: import('./types.ts').Declaration[], rules: import('./types.ts').Rule[], parseRuleInBlock: (text: string) => import('./types.ts').Rule) {
     super(rules, parseRuleInBlock);
     const parsed = parsePageSelectorList(selectorText);
-    this._selectorText = parsed ? parsed.join(', ') : selectorText;
+    this._selectorText = parsed ? (parsed.length === 1 && parsed[0] === '' ? '' : parsed.join(', ')) : selectorText;
     this._style = new CSSPageDescriptors(declarations);
     this._style.parentRule = this;
   }
@@ -1554,7 +1621,7 @@ export class CSSPageRule extends CSSGroupingRule {
   set selectorText(value: string) {
     const parsed = parsePageSelectorList(value);
     if (parsed !== null) {
-      this._selectorText = parsed.join(', ');
+      this._selectorText = (parsed.length === 1 && parsed[0] === '') ? '' : parsed.join(', ');
     }
   }
 

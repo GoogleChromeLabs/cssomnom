@@ -2766,25 +2766,26 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Complete modern constructable stylesheet mechanics (`CSSStyleSheet.replaceSync`, `baseURL`), `@page`/`@container` at-rule modifiers, and MediaList WebIDL algorithms (+45 addressable assertions).
 
 ### Tasks
-- [ ] **Constructable Stylesheet Inheritance & `adoptedStyleSheets` Guards**:
+- [x] **Constructable Stylesheet Inheritance & `adoptedStyleSheets` Guards**:
   - In `src/CSSOM.ts` and `tests/dom-shim/src/dom-stubs.ts`:
     - Throw `NotAllowedError` (DOMException) when `replaceSync()` or `replace()` is called on non-constructed sheets.
     - Resolve relative URLs against `options.baseURL` in `new CSSStyleSheet({ baseURL })` and throw `NotAllowedError` on invalid URLs.
     - Enforce `NotAllowedError` in `adoptedStyleSheets` proxy mutators when foreign or non-constructed sheets are added.
     - Invalidate cascade caches on shadow roots upon adopted sheet mutations.
-  - Target files: `CSSStyleSheet-constructable.html` (6 gaps), `CSSStyleSheet-constructable-baseURL.html` (3 gaps), `CSSStyleSheet-constructable-replace-on-regular-sheet.html` (3 gaps), `adoptedstylesheets-observablearray.html` (2 gaps).
-- [ ] **`CSSPageRule` & `CSSContainerRule` Descriptors**:
+  - Target files: `CSSStyleSheet-constructable.html`, `CSSStyleSheet-constructable-baseURL.html`, `CSSStyleSheet-constructable-replace-on-regular-sheet.html`, `adoptedstylesheets-observablearray.html`.
+- [x] **`CSSPageRule` & `CSSContainerRule` Descriptors**:
   - In `src/CSSOM.ts`: Lowercase pseudo-page names (`:first`, `:left`, `:right`, `:blank`) and reject whitespace in `@page name :first`.
-  - Expose `containerName` getter on `CSSContainerRule`.
-  - Target files: `cssom-pagerule.html` (6 gaps), `CSSContainerRule.tentative.html` (1 gap).
-- [ ] **MediaList WebIDL Algorithms & `CSSConditionRule`**:
+  - Expose `containerName` and `containerQuery` getters on `CSSContainerRule`.
+  - Target files: `cssom-pagerule.html`, `CSSContainerRule.tentative.html`.
+- [x] **MediaList WebIDL Algorithms & `CSSConditionRule`**:
   - Enforce WebIDL arity check on `deleteMedium()` (throws `TypeError` on 0 arguments).
   - Preserve explicit `all` tokens in `mediaText` comma lists (`all, screen`).
   - Make `CSSConditionRule.conditionText` a readonly attribute per spec.
-  - Target files: `medialist-interfaces-001.html` (4 gaps), `medialist-interfaces-002.html` (1 gap), `CSSConditionRule-conditionText.html` (1 gap).
-- [ ] **Unit Tests & Verification**:
+  - Target files: `medialist-interfaces-001.html`, `medialist-interfaces-002.html`, `CSSConditionRule-conditionText.html`.
+- [x] **Unit Tests & Verification**:
   - Add unit tests in `tests/cssom-constructable-atrules.test.ts`.
   - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+  - Conformance: 17,251 passing tests (+15 net new passes, 0 regressions).
 
 ---
 
