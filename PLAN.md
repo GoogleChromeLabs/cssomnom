@@ -2740,22 +2740,25 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Enforce strict invalid property dropping on `cssText`, preserve raw dashed identifiers for custom properties, and tighten the LinkeDOM `element.style` adapter bridge (+29 addressable assertions).
 
 ### Tasks
-- [ ] **`CSSStyleDeclaration.cssText` Invalid Property Dropping & Case Normalization**:
+- [x] **`CSSStyleDeclaration.cssText` Invalid Property Dropping & Case Normalization**:
   - In `src/CSSStyleDeclaration.ts`: Drop unrecognized non-dashed properties when setting `cssText` and lowercase property names.
-  - Target files: `cssstyledeclaration-csstext.html` (5 gaps), `cssstyledeclaration-csstext-important.html` (1 gap).
-- [ ] **Custom Property Name Raw Indexing & Escaping**:
+  - Target files: `cssstyledeclaration-csstext.html` (10/11 passed), `cssstyledeclaration-csstext-important.html` (1/1 passed).
+- [x] **Custom Property Name Raw Indexing & Escaping**:
   - In `src/parser.ts` and `src/CSSStyleDeclaration.ts`: Preserve raw identifier forms (`--a;b`, `--\61 b`, `--0`) for `style[i]` and `style.item(i)`.
-  - Target file: `variable-names.html` (4 gaps).
-- [ ] **DOM `style` Attribute Formatting & Reparsing Synchronization**:
+  - Target file: `variable-names.html` (6/6 passed).
+- [x] **DOM `style` Attribute Formatting & Reparsing Synchronization**:
   - In `tests/dom-shim/src/dom-stubs.ts`:
-    - Format serialized declarations on the DOM `style` attribute with canonical `; ` spacing.
-    - Implement `item(index)` indexed access on `element.style`.
-    - Add mutation listeners on `<style>` `textContent` and `innerHTML` setters to trigger dynamic stylesheet reparsing.
-    - Remove obsolete `getPropertyCSSValue` from prototype per CSSOM 1.
-  - Target files: `css-style-attr-decl-block.html` (4 gaps), `inline-style-001.html` (3 gaps), `css-style-reparse.html` (2 gaps), `historical.html` (1 gap).
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add unit tests in `tests/cssom-style-declaration-bridge.test.ts`.
-  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+    - Replaced ~700 lines of brittle LinkeDOM shim monkey-patching with native `CSSStyleDeclaration` two-way synchronization bridge.
+    - Formatted serialized declarations on the DOM `style` attribute with canonical `; ` spacing.
+    - Implemented `item(index)` indexed access on `element.style`.
+    - Added mutation listeners on `<style>` `textContent` and `innerHTML` setters to trigger dynamic stylesheet reparsing.
+    - Removed obsolete `getPropertyCSSValue` from prototype per CSSOM 1.
+  - Target files: `css-style-attr-decl-block.html` (7/7 passed), `inline-style-001.html` (5/5 passed), `css-style-reparse.html` (2/2 passed), `historical.html` (20/20 passed).
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/cssom-style-declaration-bridge.test.ts` (13/13 passed).
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: 17,236 passing tests (+75 net new passes, 0 regressions).
+  - Multi-agent review approved by Reviewer Codex (`6569b4ab-4368-4af6-9719-e68369b530eb`) and Gatekeeper Grizz (`72801678-0c22-4f89-bd1f-d2bd744f3fb2`) in commit `95246c7`.
 
 ---
 
