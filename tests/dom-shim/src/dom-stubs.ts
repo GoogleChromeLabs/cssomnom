@@ -2,6 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import * as vm from 'node:vm';
 import { parseHTML } from 'linkedom';
 import { parseStyleSheet, parseRule } from '../../../src/parser.ts';
 import { CSSStyleSheet, MediaList } from '../../../src/CSSOM.ts';
@@ -1128,28 +1129,91 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       focus?: () => void;
       blur?: () => void;
     };
+    const dispatchFocusEvent = (
+      target: HTMLElement,
+      eventType: string,
+      options: { bubbles?: boolean; cancelable?: boolean; composed?: boolean }
+    ) => {
+      const doc = (target.ownerDocument || window.document) as (Document & { __sandbox?: Record<string, unknown> }) | null;
+      const winCtx = (doc?.defaultView || window) as unknown as Record<string, unknown>;
+      const FocusEv = (winCtx.FocusEvent || winCtx.Event || Event) as new (type: string, opts?: unknown) => Event;
+      const ev = new FocusEv(eventType, options);
+
+      const handlerProp = `on${eventType}`;
+      const onAttr = target.getAttribute ? target.getAttribute(handlerProp) : null;
+      const fn = (target as unknown as Record<string, unknown>)[handlerProp];
+
+      if (typeof fn === 'function') {
+        try {
+          fn.call(target, ev);
+        } catch {}
+      } else if (typeof onAttr === 'string' && onAttr.trim()) {
+        try {
+          const sandbox = ((winCtx.__sandbox || doc?.__sandbox || winCtx) as Record<string, unknown>);
+          if (vm.isContext(sandbox)) {
+            vm.runInContext(onAttr, sandbox);
+          } else {
+            const scriptFn = new Function('event', `with (this.ownerDocument?.defaultView || window) { with (this.ownerDocument || document) { with (this) { ${onAttr} } } }`);
+            scriptFn.call(target, ev);
+          }
+        } catch {
+          try {
+            const evalFn = winCtx.eval as ((code: string) => unknown) | undefined;
+            if (typeof evalFn === 'function') {
+              evalFn(onAttr);
+            }
+          } catch {}
+        }
+      }
+
+      if (typeof target.dispatchEvent === 'function') {
+        try {
+          target.dispatchEvent(ev);
+        } catch {}
+      }
+    };
+
     htmlProto.focus = function (this: HTMLElement) {
-      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown; contains?: (n: unknown) => boolean }) | null;
-      if (doc && typeof doc.contains === 'function' && !doc.contains(this)) {
+      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown; contains?: (n: unknown) => boolean; body?: unknown }) | null;
+      if (!doc) return;
+      if (typeof doc.contains === 'function' && !doc.contains(this)) {
         return;
       }
-      if (doc) {
-        doc.activeElement = this;
+      const prevActive = doc.activeElement as HTMLElement | null;
+      if (prevActive === this) {
+        return;
       }
-      const winCtx = doc?.defaultView || window;
-      const FocusEv = (winCtx as unknown as { FocusEvent?: typeof Event }).FocusEvent || winCtx.Event || Event;
-      const ev = new FocusEv('focus', { bubbles: false, cancelable: false });
-      this.dispatchEvent(ev);
-    };
-    htmlProto.blur = function (this: HTMLElement) {
-      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown }) | null;
-      if (doc && doc.activeElement === this) {
+
+      if (prevActive && prevActive !== this) {
         doc.activeElement = null;
+        dispatchFocusEvent(prevActive, 'blur', { bubbles: false, cancelable: false });
+        dispatchFocusEvent(prevActive, 'focusout', { bubbles: true, cancelable: false, composed: true });
+
+        // If focus shifted to another element during blur/focusout handlers (e.g. outside.focus()),
+        // respect the new activeElement and do not override it
+        if (doc.activeElement && doc.activeElement !== null && doc.activeElement !== this) {
+          return;
+        }
       }
-      const winCtx = doc?.defaultView || window;
-      const FocusEv = (winCtx as unknown as { FocusEvent?: typeof Event }).FocusEvent || winCtx.Event || Event;
-      const ev = new FocusEv('blur', { bubbles: false, cancelable: false });
-      this.dispatchEvent(ev);
+
+      if (typeof doc.contains === 'function' && !doc.contains(this)) {
+        doc.activeElement = (doc.body as HTMLElement) || null;
+        return;
+      }
+
+      doc.activeElement = this;
+      dispatchFocusEvent(this, 'focus', { bubbles: false, cancelable: false });
+      dispatchFocusEvent(this, 'focusin', { bubbles: true, cancelable: false, composed: true });
+    };
+
+    htmlProto.blur = function (this: HTMLElement) {
+      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown; contains?: (n: unknown) => boolean; body?: unknown }) | null;
+      if (!doc) return;
+      if (doc.activeElement === this) {
+        doc.activeElement = null;
+        dispatchFocusEvent(this, 'blur', { bubbles: false, cancelable: false });
+        dispatchFocusEvent(this, 'focusout', { bubbles: true, cancelable: false, composed: true });
+      }
     };
   }
 

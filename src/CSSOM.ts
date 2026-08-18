@@ -225,6 +225,10 @@ export class CSSStyleSheet extends StyleSheet {
   }
 
   override get parentStyleSheet(): CSSStyleSheet | null {
+    // cssom-1 § 6.4.3: parentStyleSheet of child stylesheet is ownerRule's parentStyleSheet
+    if (this._ownerRule) {
+      return this._ownerRule.parentStyleSheet;
+    }
     return this._parentStyleSheet;
   }
 
