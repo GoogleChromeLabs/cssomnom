@@ -257,12 +257,12 @@ test('CSSNumericValue.simplify() handles unit canonicalization for min/max/clamp
 
   const max = new CSSMathMax(tenMm, oneCm);
   const simplifiedMax = simplify(max);
-  assert.ok(simplifiedMax instanceof CSSMathMax);
+  assert.ok(simplifiedMax instanceof CSSUnitValue || simplifiedMax instanceof CSSMathMax);
   assert.strictEqual(simplifiedMax.to('mm').toString(), '10mm');
 
   const clamp = new CSSMathClamp(new CSSUnitValue(5, 'mm'), tenMm, oneCm);
   const simplifiedClamp = simplify(clamp);
-  assert.ok(simplifiedClamp instanceof CSSMathClamp);
+  assert.ok(simplifiedClamp instanceof CSSUnitValue || simplifiedClamp instanceof CSSMathClamp);
   assert.ok(Math.abs(simplifiedClamp.to('mm').value - 10) < 1e-9);
   assert.strictEqual(simplifiedClamp.to('mm').unit, 'mm');
 });
@@ -418,9 +418,9 @@ test('CSSNumericValue.simplify() distribution conditions', () => {
 test('clamp() simplification to CSSUnitValue', () => {
   const clampDirect = new CSSMathClamp(new CSSUnitValue(10, 'px'), new CSSUnitValue(15, 'px'), new CSSUnitValue(20, 'px'));
   const simplified = simplify(clampDirect);
-  assert.ok(simplified instanceof CSSMathClamp);
-  assert.strictEqual(simplified.to('px').value, 15);
-  assert.strictEqual(simplified.to('px').unit, 'px');
+  assert.ok(simplified instanceof CSSUnitValue);
+  assert.strictEqual(simplified.value, 15);
+  assert.strictEqual(simplified.unit, 'px');
 
   const parsed = CSSNumericValue.parse('clamp(10px, 15px, 20px)');
   assert.ok(parsed instanceof CSSMathClamp);

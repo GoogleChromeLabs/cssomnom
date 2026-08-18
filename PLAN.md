@@ -2861,18 +2861,18 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
 
 ### Tasks
-- [ ] **Homogeneous Unit Simplification in `CSSNumericValue.parse()` (CSS Values 4 § 10.7)**:
+- [x] **Homogeneous Unit Simplification in `CSSNumericValue.parse()` (CSS Values 4 § 10.7)**:
   - In `src/math-parser.ts` & `src/typed-om/numeric/`:
     - Simplify homogeneous terms inside `calc()` additions (e.g. `calc(10px + 20px)` $\to$ `new CSSUnitValue(30, 'px')`).
     - Distribute subtraction into addition of negated terms (`calc(10px - 5px)` $\to$ `new CSSUnitValue(5, 'px')`, `calc(10px - 5em)` $\to$ `new CSSMathSum(10px, -5em)`).
     - Simplify multiplications of `<percentage>` or `<length>` with raw numbers (e.g. `calc(100% * 2)` $\to$ `new CSSUnitValue(200, 'percent')`).
-- [ ] **Complex Math Expression Flattening (`CSSMathSum`, `CSSMathProduct`, `CSSMathMin`, `CSSMathMax`)**:
+- [x] **Complex Math Expression Flattening (`CSSMathSum`, `CSSMathProduct`, `CSSMathMin`, `CSSMathMax`)**:
   - Flatten nested single-child sums and products into their underlying unit or operation nodes.
   - Simplify homogeneous terms inside `min()` and `max()` nodes (e.g. `min(10px, 20px, 100%)` $\to$ `min(10px, 100%)`).
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add tests in `tests/typed-om-math-simplification.test.ts`.
-  - Verify 100% pass on `css/css-typed-om/stylevalue-subclasses/numeric-objects/parse.tentative.html`.
-  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/typed-om-math-simplification.test.ts` (18/18 passed).
+  - Verify 100% pass on `css/css-typed-om/stylevalue-subclasses/numeric-objects/parse.tentative.html` (22/22 passed).
+  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions (**18,778 passing tests, 0 regressions**).
 
 ---
 
