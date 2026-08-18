@@ -9,7 +9,7 @@ import {
   CANONICAL_FEASIBLE_TARGETS,
   CANONICAL_FEASIBLE_TOTAL,
 } from './config.ts';
-import { addGitNote, getGitNotesLog } from '../safe-child-process.ts';
+import { addGitNote, getGitNotesLog, execGit } from '../safe-child-process.ts';
 import type { TestRunDataset } from './types.ts';
 
 export interface ReferenceBaselineStats {
@@ -204,33 +204,76 @@ export function syncProgressFromNotes(progressPath = getProgressPath()): void {
   }
   if (delimIdx === -1 || delimIdx + 1 >= lines.length) return;
 
-  const topRow = lines[delimIdx + 1];
-  if (!topRow || !topRow.includes('|')) return;
-
-  const cells = topRow.split('|').map(s => s.trim());
-  if (cells.length < 12) return;
-
-  const commitCell = cells[2];
-  if (!/pending|unknown/i.test(commitCell)) return;
-
-  const overallCell = cells[10];
-  const passingInCell = overallCell ? parseInt(overallCell.split('/')[0], 10) : NaN;
-
-  const notesLog = getGitNotesLog(5, 'wpt');
+  const notesLog = getGitNotesLog(50, 'wpt');
+  const notesMap = new Map<number, string>();
   for (const entry of notesLog) {
     if (!entry.note || !entry.commitHash) continue;
     try {
       const parsed = JSON.parse(entry.note) as { totalPassing?: number };
-      if (typeof parsed.totalPassing === 'number' && parsed.totalPassing === passingInCell) {
-        cells[2] = `\`${entry.commitHash}\``;
-        lines[delimIdx + 1] = `| ${cells.slice(1, -1).join(' | ')} |`;
-        fs.writeFileSync(progressPath, lines.join('\n'), 'utf-8');
-        console.log(`[WPT Progress] Reconciled pending commit to ${entry.commitHash} from git notes.`);
-        break;
+      if (typeof parsed.totalPassing === 'number') {
+        notesMap.set(parsed.totalPassing, entry.commitHash);
       }
     } catch {
       // Ignore invalid json notes
     }
+  }
+
+  let gitCommits: { hash: string; time: number; msg: string }[] | null = null;
+  function getRecentGitCommits() {
+    if (gitCommits) return gitCommits;
+    try {
+      const raw = execGit(['log', '-n', '50', '--format=%h|%ad|%s', '--date=iso-strict']);
+      gitCommits = raw.trim().split('\n').filter(Boolean).map(l => {
+        const [hash, date, msg] = l.split('|');
+        return { hash: hash.trim(), time: new Date(date).getTime(), msg: (msg || '').trim() };
+      });
+    } catch {
+      gitCommits = [];
+    }
+    return gitCommits;
+  }
+
+  let modified = false;
+  for (let i = delimIdx + 1; i < lines.length; i++) {
+    const row = lines[i];
+    if (!row || !row.includes('|')) break;
+
+    const cells = row.split('|').map(s => s.trim());
+    if (cells.length < 12) continue;
+
+    const dateStr = cells[1];
+    const commitCell = cells[2];
+    if (!/pending|unknown|\*/i.test(commitCell)) continue;
+
+    const overallCell = cells[10];
+    const passingInCell = overallCell ? parseInt(overallCell.split('/')[0], 10) : NaN;
+
+    let matchedHash: string | null = null;
+    if (notesMap.has(passingInCell)) {
+      matchedHash = notesMap.get(passingInCell)!;
+    } else {
+      const rowTime = new Date(dateStr.replace(' ', 'T') + 'Z').getTime();
+      const commits = getRecentGitCommits();
+      let minDiff = Infinity;
+      for (const c of commits) {
+        const diff = Math.abs(c.time - rowTime);
+        if (diff < minDiff && diff < 30 * 60 * 1000) {
+          minDiff = diff;
+          matchedHash = c.hash;
+        }
+      }
+    }
+
+    if (matchedHash) {
+      cells[2] = `\`${matchedHash}\``;
+      lines[i] = `| ${cells.slice(1, -1).join(' | ')} |`;
+      modified = true;
+    }
+  }
+
+  if (modified) {
+    fs.writeFileSync(progressPath, lines.join('\n'), 'utf-8');
+    console.log(`[WPT Progress] Reconciled unfinalized progress rows in ${progressPath}`);
   }
 }
 
