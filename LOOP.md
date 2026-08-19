@@ -26,7 +26,10 @@ graph TD
 
 1.  **The Orchestrator**:
     *   *Role*: Plans roadmaps (`PLAN.md`), updates progress logs (`wpt-progress.md`), and delegates tasks.
-    *   *Constraint*: The Orchestrator **never writes code or runs manual fixes**. It coordinates subagents and enforces the gate transitions.
+    *   *Constraints & Directives*:
+        *   **Pure Orchestration**: The Orchestrator **never writes code, runs manual fixes, or executes heavy diagnostic scripts**. It coordinates subagents and enforces gate transitions.
+        *   **Conversational Responsiveness**: The Orchestrator MUST provide prompt conversational feedback to the user before launching tool chains or background subagents.
+        *   **Root-Cause Phase Ordering**: Prioritize fundamental runtime isolation (e.g. VM cross-realm intrinsics, IDL harness interception) before investigating downstream symptoms (e.g. memory watchdog limits).
 2.  **The Developer (`champ`)**:
     *   *Role*: Implements features, writes tests, runs `pnpm run preflight`, and commits changes to git following the [champ skill](file:///usr/local/google/home/paulirish/code/cssom/.agents/skills/champ/SKILL.md).
     *   *Standards*:
