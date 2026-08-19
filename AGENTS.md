@@ -47,22 +47,14 @@ To prevent unmonitored child process spawning, worker process memory ballooning,
 - **Exceptions**: Only the centralized safe kernel (`scripts/wpt/node/safe-child-process.ts`) and synchronous codegen build scripts (`scripts/codegen/generate_all.ts`, `scripts/external_suites/extract_all.ts`, `scripts/wpt/browser/run.ts`) may import `child_process`.
 - **Solution**: Always import `safeExecTestFile` and `safeWorkerPool` from `scripts/wpt/node/safe-child-process.ts`. Every child process spawned via `safeExecTestFile` is constrained with `--max-old-space-size=512`, guarded by a 250ms `/proc/[pid]/stat` RSS (>2048MB) and state 'D' watchdog (`SIGKILL`), and tracked for cleanup upon parent termination.
 
-### DOM Node & Cyclic Object Assertion Safety (`node:assert/strict` Hazard)
-Direct comparison of DOM nodes or cyclic object graphs with `assert.equal(nodeA, nodeB)` or `assert.deepStrictEqual(nodeA, nodeB)` under Node's `node:assert/strict` triggers recursive structural diff traversal, allocating gigabytes of RAM in seconds and causing process hangs or host crashes.
-- **Rule**: NEVER pass DOM nodes or cyclic objects directly to `assert.equal` or `assert.deepStrictEqual`.
-- **Solution**: Compare scalar properties (e.g. `assert.equal(nodeA?.id, 'expected')`), test reference equality via booleans (`assert.equal(nodeA === nodeB, true)`), or use `assert.ok(nodeA === nodeB)`. In test harnesses, use cycle-safe formatters (`format_value(val, seen)`) with `AssertionErrorProxy`.
+### DOM & Cyclic Object Assertion Safety
+`node:assert/strict` structural diffs on cyclic DOM nodes explode heap memory (>8GB) and crash the host.
+- **Rule**: Never pass DOM nodes or cyclic objects directly to `assert.equal` / `assert.deepStrictEqual`. Compare scalars (`assert.equal(a?.id, '...')`), booleans (`assert.ok(a === b)`), or use cycle-safe formatters (`format_value(val)`).
 
-### Pure In-Memory Unit Tests (`tests/**/*.test.ts`)
-Unit tests run via `pnpm test:node` (`node --test 'tests/**/*.test.ts'`) must remain 100% pure, synchronous or lightweight in-memory async tests.
-- **Rule**: Never spawn child processes or execute runner pools inside `tests/**/*.test.ts`. Subprocess execution is strictly reserved for the WPT runner pool in `scripts/wpt/node/`.
-
-### Event-Loop Keepalive Prevention in Watchdogs
-Active `setInterval` timers in background monitoring loops will pin the Node.js event loop alive after test completion.
-- **Rule**: All background watchdog and polling timers must call `timer.unref()` immediately upon instantiation and be explicitly cleared upon child exit.
-
-### Git Progress Hash Reconciliation & Notes Lifecycle
-Commit hashes recorded during pre-commit execution or preflight are preliminary parent references (`*`).
-- **Rule**: Historical conformance logs in `wpt-progress.md` must be reconciled via `scripts/wpt/node/core/progress.ts` (`syncProgressFromNotes`), leveraging Git Notes (`git notes --ref=wpt`) and `git log` metadata.
+### Test Isolation & Event Loop Safety
+- **Pure Unit Tests**: Tests in `tests/**/*.test.ts` (`pnpm test:node`) must remain 100% in-memory without spawning child processes.
+- **Watchdog Unref**: All background watchdog/polling intervals must call `timer.unref()` immediately so timers do not keep the Node event loop alive.
+- **Progress Hash Reconciliation**: Reconcile unfinalized pre-commit hashes (`*`) in `wpt-progress.md` via `syncProgressFromNotes()` using `git notes` and `git log`.
 
 ## Spec Evolution & Maintainability
 
