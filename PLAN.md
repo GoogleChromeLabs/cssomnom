@@ -2888,15 +2888,3 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Add tests in `tests/selectors-scope-relative.test.ts`.
   - Run `pnpm run preflight` and `pnpm run wpt:verify`.
 
-
-
-
-
-
-
-
-
-
-
-
-
