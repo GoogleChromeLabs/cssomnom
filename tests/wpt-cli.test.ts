@@ -559,7 +559,7 @@ describe('WPT CLI Core Modules', () => {
         fileResults: [],
       };
       const table = formatBaselineSummaryTable(dataset, '/non/existent/report.json');
-      assert.ok(table.includes('### Feasibility & Normalized Conformance Baseline'));
+      assert.ok(table.includes('### Feasibility & Baseline Conformance'));
       assert.ok(table.includes('pnpm run wpt fetch-upstream'));
       assert.ok(table.includes('| Spec Domain | Target Tests | **cssomnom** | Pass Rate |'));
     });

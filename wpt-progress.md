@@ -2,15 +2,11 @@
 
 This file tracks the conformance progress of the CSSOM / Typed OM implementations across 7 major W3C Web Platform Tests (WPT) spec suites in pure Node.js (`pnpm run wpt:node:progress`).
 
-> [!NOTE]
-> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
-> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across the corresponding in-scope test suites.
-
 ### Feasibility & Cross-Engine Baseline Comparison
 
 > [!NOTE]
-> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all 1,687 in-scope W3C test files (21,580 assertions).
-> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Upstream chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across the corresponding in-scope test suites.
+> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent tests requiring GPU rasterization or 2D window layout are cataloged in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across matching test suites.
 
 | Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
 | :--- | :---: | :---: | :---: |
