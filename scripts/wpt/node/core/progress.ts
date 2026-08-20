@@ -6,7 +6,6 @@ import {
   getProgressPath,
   SPEC_ORDER,
   SPEC_DISPLAY_NAMES,
-  CANONICAL_FEASIBLE_TARGETS,
 } from './config.ts';
 import { addGitNote, getGitNotesLog, execGit } from '../safe-child-process.ts';
 import type { TestRunDataset } from './types.ts';
@@ -97,7 +96,7 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     for (const spec of SPEC_ORDER) {
       const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
       const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = summary.total > 0 ? summary.total : (CANONICAL_FEASIBLE_TARGETS[spec] ?? 0);
+      const target = summary.total;
       const nodePassing = summary.passing;
       totalNodePass += nodePassing;
       totalNodeTarget += target;
@@ -136,7 +135,7 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     lines.push('### Feasibility & Normalized Conformance Baseline');
     lines.push('');
     lines.push('> [!NOTE]');
-    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all 1,687 in-scope W3C test files (21,580 assertions).');
+    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites.');
     lines.push('> - To populate cross-engine reference metrics from `wpt.fyi`, run `pnpm run wpt fetch-upstream`.');
     lines.push('');
     lines.push('| Spec Domain | Target Tests | **cssomnom** | Pass Rate |');
@@ -148,7 +147,7 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     for (const spec of SPEC_ORDER) {
       const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
       const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = summary.total > 0 ? summary.total : (CANONICAL_FEASIBLE_TARGETS[spec] ?? 0);
+      const target = summary.total;
       const nodePassing = summary.passing;
       totalNodePass += nodePassing;
       totalNodeTarget += target;
@@ -170,7 +169,7 @@ export function formatProgressRow(dataset: TestRunDataset, commitStr: string): s
   let rowTotalTarget = 0;
   for (const key of SPEC_ORDER) {
     const summary = dataset.specSummaries[key] ?? { passing: 0, total: 0 };
-    const target = summary.total > 0 ? summary.total : (CANONICAL_FEASIBLE_TARGETS[key] ?? 0);
+    const target = summary.total;
     rowTotalPass += summary.passing;
     rowTotalTarget += target;
     rowParts.push(`${summary.passing}/${target}`);

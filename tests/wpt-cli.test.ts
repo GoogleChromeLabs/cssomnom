@@ -10,8 +10,9 @@ import {
   VALID_SPECS,
   SPEC_DISPLAY_NAMES,
   SPEC_ORDER,
-  CANONICAL_FEASIBLE_TARGETS,
-  CANONICAL_FEASIBLE_TOTAL,
+  loadBrowserOnlyManifest,
+  getBrowserOnlyFileCount,
+  isBrowserOnlyFile,
   loadWptConfig,
   validateSpecName,
 } from '../scripts/wpt/node/core/config.ts';
@@ -79,9 +80,16 @@ describe('WPT CLI Core Modules', () => {
       assert.strictEqual(SPEC_ORDER.length, 7);
       for (const spec of SPEC_ORDER) {
         assert.ok(SPEC_DISPLAY_NAMES[spec], `Display name missing for ${spec}`);
-        assert.ok(CANONICAL_FEASIBLE_TARGETS[spec] > 0, `Target missing for ${spec}`);
       }
-      assert.strictEqual(CANONICAL_FEASIBLE_TOTAL, 21580);
+    });
+
+    test('loads browser-only manifest dynamically', () => {
+      const manifest = loadBrowserOnlyManifest();
+      assert.ok(typeof manifest === 'object' && manifest !== null);
+      assert.ok(manifest['cssom']);
+      assert.ok(getBrowserOnlyFileCount('cssom') > 0);
+      assert.strictEqual(getBrowserOnlyFileCount('non-existent-spec'), 0);
+      assert.ok(isBrowserOnlyFile('cssom', 'css/cssom/getComputedStyle-insets-absolute.html'));
     });
 
     test('loads wpt-node-config.json accurately', () => {
