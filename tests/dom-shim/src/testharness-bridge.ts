@@ -3,6 +3,7 @@
 import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
 import * as TypedOM from '../../../src/typed-om.ts';
+import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
 import { DOMMatrixReadOnly, DOMMatrix, DOMPointReadOnly, DOMPoint } from '../../../src/DOMMatrix.ts';
 import {
   HarnessError,
@@ -11,6 +12,7 @@ import {
   messageOf,
   sanitize_unpaired_surrogates,
   get_test_name,
+  format_value,
   WPT_ASSERTIONS
 } from './wpt-assertions.ts';
 import {
@@ -107,7 +109,9 @@ export function createWptContext(
     }, {}) : {}),
 
     window,
+    Window: win.Window || (win as unknown as { constructor: unknown }).constructor || (globalThis as { Window?: unknown }).Window,
     document,
+    format_value,
     addEventListener: window.addEventListener.bind(window),
     removeEventListener: window.removeEventListener.bind(window),
     dispatchEvent: window.dispatchEvent.bind(window),
@@ -117,6 +121,7 @@ export function createWptContext(
     Element: window.Element,
     Node: window.Node,
     HTMLStyleElement: win.HTMLStyleElement,
+    CSSStyleDeclaration: win.CSSStyleDeclaration || CSSStyleDeclaration,
     DOMException: win.DOMException,
     Event: win.Event,
     CustomEvent: win.CustomEvent,
@@ -495,20 +500,20 @@ export function createWptContext(
             testObj.resolve();
           }
         },
-        step_func: (stepFn?: Function) => {
+        step_func: (stepFn?: Function, this_obj?: unknown) => {
           return function(this: unknown, ...args: unknown[]) {
-            tObj.step(() => {
+            return tObj.step(() => {
               if (typeof stepFn === 'function') {
-                stepFn.apply(this, args);
+                return stepFn.apply(this_obj !== undefined ? this_obj : (this !== undefined && this !== null && this !== globalThis ? this : tObj), args);
               }
             });
           };
         },
-        step_func_done: (stepFn?: Function) => {
+        step_func_done: (stepFn?: Function, this_obj?: unknown) => {
           return function(this: unknown, ...args: unknown[]) {
             tObj.step(() => {
               if (typeof stepFn === 'function') {
-                stepFn.apply(this, args);
+                stepFn.apply(this_obj !== undefined ? this_obj : (this !== undefined && this !== null && this !== globalThis ? this : tObj), args);
               }
             });
             tObj.done();
@@ -570,6 +575,11 @@ export function createWptContext(
     // Assertions
     ...WPT_ASSERTIONS
   };
+
+  (win as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = ctx;
+  if (document) {
+    (document as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = ctx;
+  }
 
   return ctx;
 }

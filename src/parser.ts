@@ -794,36 +794,35 @@ export class Parser {
   }
 
   private handleNamespaceRule(rule: ASTAtRule): Rule {
+    const prelude = rule.prelude;
+    const tokens = prelude.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
     let prefix = '';
     let namespaceURI = '';
-    const prelude = rule.prelude;
-    let i = 0;
-    while(i < prelude.length && prelude[i].type === 'whitespace') i++;
-    
-    const val = prelude[i];
-    if (val && val.type === 'ident') {
-      prefix = val.value;
-      i++;
-    }
 
+    const extractUri = (token: ComponentValue): string => {
+      if (token.type === 'string' || token.type === 'url') {
+        return token.value;
+      }
+      if (token.type === 'function' && (token as CSSFunction).name === 'url') {
+        const urlArg = (token as CSSFunction).value.find(v => v.type === 'string');
+        if (urlArg) return (urlArg as StringToken).value;
+        const raw = (token as CSSFunction).value.map(v => serialize([v])).join('');
+        return raw.trim();
+      }
+      return '';
+    };
 
-    
-    while(i < prelude.length && prelude[i].type === 'whitespace') i++;
-    
-    if (i < prelude.length) {
-      const val = prelude[i];
-      if (val.type === 'string') {
-        namespaceURI = val.value;
-      } else if (val.type === 'function' && (val as CSSFunction).name === 'url') {
-         const urlArg = (val as CSSFunction).value.find(v => v.type === 'string');
-         if (urlArg) namespaceURI = (urlArg as StringToken).value;
-
-         else {
-            const raw = (val as CSSFunction).value.map(v => serialize([v])).join('');
-            namespaceURI = raw.trim();
-         }
+    if (tokens.length === 1) {
+      namespaceURI = extractUri(tokens[0]);
+    } else if (tokens.length >= 2) {
+      if (tokens[0].type === 'ident') {
+        prefix = tokens[0].value;
+        namespaceURI = extractUri(tokens[1]);
+      } else {
+        namespaceURI = extractUri(tokens[0]);
       }
     }
+
     const nsRule = new CSSNamespaceRule(prefix, namespaceURI);
     this.declaredNamespaces.add(nsRule.prefix);
     return nsRule;
@@ -1132,9 +1131,9 @@ export class Parser {
     };
   }
   public static isValidDashedIdent(name: string): boolean {
-    if (!name.startsWith('--') || name === '--') return false;
-    const tokens = tokenize(name);
-    return tokens.length === 2 && tokens[0].type === 'ident' && tokens[1].type === 'EOF';
+    if (typeof name !== 'string' || !name.startsWith('--') || name === '--') return false;
+    if (/\s/.test(name)) return false;
+    return true;
   }
 
   public static isCustomPropertyDeclaration(prelude: ComponentValue[]): boolean {

@@ -301,7 +301,8 @@ export const PropertyRegistry = {
       throw new TypeError('The inherits flag is required.');
     }
     const nameStr = definition.name.toString();
-    if (!Parser.isValidDashedIdent(nameStr)) {
+    const nameTokens = tokenize(nameStr);
+    if (nameTokens.length !== 2 || nameTokens[0].type !== 'ident' || !nameTokens[0].value.startsWith('--') || nameTokens[0].value === '--' || nameTokens[1].type !== 'EOF') {
       throw new DOMException('Property name must be a valid <dashed-ident>', 'SyntaxError');
     }
     

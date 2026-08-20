@@ -190,12 +190,6 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     }
 
     setPropertySafe(this._style, this._element, property, newValue);
-    if (this._element && typeof this._element === 'object' && 'setAttribute' in this._element && typeof (this._element as { setAttribute: unknown }).setAttribute === 'function') {
-      const text = (this._style as { cssText?: string }).cssText;
-      if (text) {
-        (this._element as { setAttribute: (k: string, v: string) => void }).setAttribute('style', text);
-      }
-    }
     try {
       const parsed = CSSStyleValue.parseAll(property, newValue);
       getStyleCache(this._style).set(propKey, parsed);

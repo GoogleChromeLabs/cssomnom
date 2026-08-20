@@ -92,15 +92,15 @@
     },
     {
       "file": "css/cssom/caretPositionFromPoint-audioVideo.html",
-      "category": "DOM_SPEC_API",
-      "clusterId": "set-html-unsafe-missing",
-      "description": "container.setHTMLUnsafe HTML sanitizer helper"
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "caret-screen-point-hit-testing",
+      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
     },
     {
       "file": "css/cssom/caretPositionFromPoint.html",
-      "category": "DOM_SPEC_API",
-      "clusterId": "set-html-unsafe-missing",
-      "description": "container.setHTMLUnsafe HTML sanitizer helper"
+      "category": "VIEWPORT_HIT_TESTING",
+      "clusterId": "caret-screen-point-hit-testing",
+      "description": "caretPositionFromPoint / caretRangeFromPoint screen coordinate hit-testing"
     },
     {
       "file": "css/cssom/HTMLLinkElement-load-event-002.html",

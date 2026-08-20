@@ -124,9 +124,12 @@ export class MediaList {
   }
 
   deleteMedium(medium: string): void {
+    if (arguments.length === 0) {
+      throw new TypeError("Failed to execute 'deleteMedium' on 'MediaList': 1 argument required, but only 0 present.");
+    }
     const parsed = MediaParser.parse(medium);
     if (parsed.length !== 1) {
-      return;
+      throw new DOMException(`The medium '${medium}' does not exist in the MediaList.`, 'NotFoundError');
     }
     const mText = serializeMediaQuery(parsed[0]);
     let i = this._mediaQueries.length;
@@ -150,13 +153,37 @@ export class MediaList {
 }
 
 export class StyleSheet {
-  readonly type: string = 'text/css';
-  readonly href: string | null = null;
-  readonly ownerNode: unknown | null = null;
-  readonly parentStyleSheet: StyleSheet | null = null;
-  readonly title: string | null = null;
+  protected _type: string = 'text/css';
+  protected _href: string | null = null;
+  protected _ownerNode: unknown | null = null;
+  protected _parentStyleSheet: StyleSheet | null = null;
+  protected _titleVal: string | null = null;
   private _media: MediaList;
   private _disabledFlag = false;
+
+  get type(): string {
+    return this._type;
+  }
+
+  get href(): string | null {
+    return this._href;
+  }
+
+  get ownerNode(): unknown | null {
+    return this._ownerNode;
+  }
+
+  get parentStyleSheet(): StyleSheet | null {
+    return this._parentStyleSheet;
+  }
+
+  get title(): string | null {
+    if (this.ownerNode && typeof (this.ownerNode as Element).getAttribute === 'function') {
+      const t = (this.ownerNode as Element).getAttribute('title');
+      return t === null || t === '' ? null : t;
+    }
+    return this._titleVal ?? null;
+  }
 
   constructor(mediaText = '') {
     this._media = new MediaList(mediaText);
@@ -186,12 +213,31 @@ export class StyleSheet {
 }
 
 export class CSSStyleSheet extends StyleSheet {
-  readonly parentStyleSheet: CSSStyleSheet | null = null;
-  readonly ownerRule: CSSRule | null = null;
-  readonly cssRules: CSSRuleList;
+  protected override _parentStyleSheet: CSSStyleSheet | null = null;
+  protected _ownerRule: CSSRule | null = null;
+  private _cssRules: CSSRuleList;
   private _rules: Rule[];
   private _parseRule: (text: string) => Rule;
   private _registeredProperties: string[] = [];
+
+  get ownerRule(): CSSRule | null {
+    return this._ownerRule;
+  }
+
+  override get parentStyleSheet(): CSSStyleSheet | null {
+    // cssom-1 § 6.4.3: parentStyleSheet of child stylesheet is ownerRule's parentStyleSheet
+    if (this._ownerRule) {
+      return this._ownerRule.parentStyleSheet;
+    }
+    return this._parentStyleSheet;
+  }
+
+  get cssRules(): CSSRuleList {
+    if (!this._originCleanFlag) {
+      throw new DOMException('The stylesheet is not origin-clean', 'SecurityError');
+    }
+    return this._cssRules;
+  }
 
   private _registerRuleProperties(rule: Rule) {
     if (rule instanceof CSSPropertyRule) {
@@ -222,7 +268,23 @@ export class CSSStyleSheet extends StyleSheet {
   private _constructedFlag = false;
   private _disallowModificationFlag = false;
   private _constructorDocument: unknown = null;
-  private _baseURL: string | null = null;
+  private _baseURLVal: string | null = null;
+
+  get _baseURL(): string | null {
+    return this._baseURLVal;
+  }
+
+  get _constructed(): boolean {
+    return this._constructedFlag;
+  }
+
+  get _isConstructed(): boolean {
+    return this._constructedFlag;
+  }
+
+  get isConstructed(): boolean {
+    return this._constructedFlag;
+  }
 
   constructor(options: CSSStyleSheetInit = {}) {
     const mediaText = options.media instanceof MediaList ? options.media.mediaText : (options.media || '');
@@ -231,22 +293,33 @@ export class CSSStyleSheet extends StyleSheet {
     this._constructedFlag = true;
     this._originCleanFlag = true;
     this.disabled = !!options.disabled;
-    this._baseURL = options.baseURL || null;
+    if (options.baseURL !== undefined && options.baseURL !== null) {
+      const baseURI = (typeof globalThis.document !== 'undefined' && globalThis.document.baseURI) || (typeof globalThis.location !== 'undefined' && globalThis.location.href) || 'about:blank';
+      try {
+        const url = new URL(options.baseURL, baseURI);
+        this._baseURLVal = url.href;
+      } catch {
+        throw new DOMException("Invalid baseURL", "NotAllowedError");
+      }
+    } else {
+      this._baseURLVal = null;
+    }
 
     // Default parseRule for constructed stylesheets
     this._parseRule = (text: string) => {
       const tokens = tokenize(text);
       return ParseHooks.consumeRule(tokens) as unknown as Rule;
     };
-    this.cssRules = new CSSRuleList(() => this._rules);
+    this._cssRules = new CSSRuleList(() => this._rules);
   }
 
   /** @internal */
-  static createInternal(rules: Rule[], parseRule: (text: string) => Rule): CSSStyleSheet {
+  static createInternal(rules: Rule[], parseRule: (text: string) => Rule, originClean: boolean = true): CSSStyleSheet {
     const sheet = new CSSStyleSheet();
     sheet._rules.push(...rules);
     sheet._parseRule = parseRule;
     sheet._constructedFlag = false;
+    sheet._originCleanFlag = originClean;
     for (const rule of rules) {
       if (rule instanceof CSSRule) {
         rule.parentStyleSheet = sheet;
@@ -261,7 +334,7 @@ export class CSSStyleSheet extends StyleSheet {
     // 1. Let promise be a promise.
     // 2. If the constructed flag is not set, or the disallow modification flag is set, reject promise with a NotAllowedError DOMException and return promise.
     if (!this._constructedFlag || this._disallowModificationFlag) {
-      return Promise.reject(new DOMException("Not allowed on non-constructed stylesheets or modification is disallowed", "NotAllowedError"));
+      return Promise.reject(new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError"));
     }
     // 3. Set the disallow modification flag.
     this._disallowModificationFlag = true;
@@ -320,7 +393,7 @@ export class CSSStyleSheet extends StyleSheet {
   replaceSync(text: string): void {
     // 1. If the constructed flag is not set, or the disallow modification flag is set, throw a NotAllowedError DOMException.
     if (!this._constructedFlag) {
-      throw new DOMException("Not allowed on non-constructed stylesheets", "NotAllowedError");
+      throw new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError");
     }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
@@ -709,6 +782,16 @@ export class CSSGroupingRule extends CSSRule {
   }
 }
 
+function findParentStyleSheet(rule: CSSRule): CSSStyleSheet | null {
+  let sheet: CSSStyleSheet | null = rule.parentStyleSheet;
+  let curr: CSSRule | null = rule.parentRule;
+  while (!sheet && curr) {
+    sheet = curr.parentStyleSheet;
+    curr = curr.parentRule;
+  }
+  return sheet;
+}
+
 export class CSSStyleRule extends CSSGroupingRule {
   private _selectorText: string;
   private _selectorAST: import('./types.ts').SelectorList | null = null;
@@ -732,34 +815,55 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._style.cssText = value;
   }
 
-  get selectorText(): string {
-    if (this._selectorAST) {
-      let hasDefaultNamespace = false;
-      if (this.parentStyleSheet) {
-        for (const rule of this.parentStyleSheet.cssRules) {
-          if (rule.type === 10 && (rule as CSSNamespaceRule).prefix === '') {
+  private _getNamespaceContext(): { hasDefaultNamespace: boolean; defaultNamespacePrefixes: Set<string> } {
+    let hasDefaultNamespace = false;
+    const defaultNamespacePrefixes = new Set<string>();
+    const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
+    if (sheet) {
+      let defaultUri: string | null = null;
+      for (const rule of sheet.cssRules) {
+        if (rule.type === 10) {
+          const ns = rule as CSSNamespaceRule;
+          if (ns.prefix === '') {
             hasDefaultNamespace = true;
-            break;
+            defaultUri = ns.namespaceURI;
           }
         }
       }
-      return serializeSelectorList(this._selectorAST, hasDefaultNamespace);
+      if (defaultUri !== null) {
+        for (const rule of sheet.cssRules) {
+          if (rule.type === 10) {
+            const ns = rule as CSSNamespaceRule;
+            if (ns.namespaceURI === defaultUri && ns.prefix !== '') {
+              defaultNamespacePrefixes.add(ns.prefix);
+            }
+          }
+        }
+      }
+    }
+    return { hasDefaultNamespace, defaultNamespacePrefixes };
+  }
+
+  get selectorText(): string {
+    if (this._selectorAST) {
+      const nsContext = this._getNamespaceContext();
+      return serializeSelectorList(this._selectorAST, nsContext);
     }
     return this._selectorText;
   }
 
   set selectorText(value: string) {
     const declaredNamespaces = new Set<string>();
-    let hasDefaultNamespace = false;
-    if (this.parentStyleSheet) {
-      for (const rule of this.parentStyleSheet.cssRules) {
+    const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
+    if (sheet) {
+      for (const rule of sheet.cssRules) {
         if (rule.type === 10) {
           const prefix = (rule as CSSNamespaceRule).prefix;
           declaredNamespaces.add(prefix);
-          if (prefix === '') hasDefaultNamespace = true;
         }
       }
     }
+    const nsContext = this._getNamespaceContext();
     let isNested = false;
     let currParent: CSSRule | null = this.parentRule;
     while (currParent !== null) {
@@ -802,7 +906,7 @@ export class CSSStyleRule extends CSSGroupingRule {
         }
       }
       this._selectorAST = selectorAST;
-      this._selectorText = serializeSelectorList(selectorAST, hasDefaultNamespace);
+      this._selectorText = serializeSelectorList(selectorAST, nsContext);
     }
   }
 
@@ -862,10 +966,6 @@ export class CSSMediaRule extends CSSConditionRule {
 
   override get conditionText(): string {
     return this.media.mediaText;
-  }
-
-  set conditionText(value: string) {
-    this.media.mediaText = value;
   }
 
   get type() { return 4; }
@@ -932,13 +1032,35 @@ export class CSSContainerRule extends CSSConditionRule {
 
   constructor(containerQuery: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule, containerName: string = '') {
     super(rules, parseRuleInBlock);
-    this.containerName = containerName;
-    this.containerQuery = containerQuery;
+    if (!containerName && containerQuery) {
+      const trimmed = containerQuery.trim();
+      const firstSpace = trimmed.indexOf(' ');
+      if (firstSpace > 0) {
+        const potentialName = trimmed.slice(0, firstSpace);
+        const lower = potentialName.toLowerCase();
+        if (!['not', 'and', 'or', 'none'].includes(lower) && !potentialName.startsWith('(')) {
+          this.containerName = potentialName;
+          this.containerQuery = trimmed.slice(firstSpace + 1).trim();
+        } else {
+          this.containerName = '';
+          this.containerQuery = trimmed;
+        }
+      } else if (!['not', 'and', 'or', 'none'].includes(trimmed.toLowerCase()) && !trimmed.startsWith('(')) {
+        this.containerName = trimmed;
+        this.containerQuery = '';
+      } else {
+        this.containerName = '';
+        this.containerQuery = trimmed;
+      }
+    } else {
+      this.containerName = containerName;
+      this.containerQuery = containerQuery;
+    }
   }
 
   override get conditionText(): string {
     if (this.containerName) {
-      return `${this.containerName} ${this.containerQuery}`;
+      return this.containerQuery ? `${this.containerName} ${this.containerQuery}` : this.containerName;
     }
     return this.containerQuery;
   }
@@ -1367,6 +1489,15 @@ export class CSSImportRule extends CSSRule {
 
   // cssom-1 § 6.4.3 #dom-cssimportrule-stylesheet
   get styleSheet(): CSSStyleSheet | null {
+    if (!this._styleSheet) {
+      this._styleSheet = CSSStyleSheet.createInternal([], (text: string) => {
+        const tokens = tokenize(text);
+        return ParseHooks.consumeRule(tokens) as unknown as Rule;
+      });
+      (this._styleSheet as unknown as { _ownerRule: CSSRule | null })._ownerRule = this;
+      (this._styleSheet as unknown as { _parentStyleSheet: StyleSheet | null })._parentStyleSheet = this.parentStyleSheet;
+      (this._styleSheet as unknown as { _href: string | null })._href = this._href;
+    }
     return this._styleSheet;
   }
 
@@ -1443,7 +1574,7 @@ export class CSSNamespaceRule extends CSSRule {
 
 function parsePageSelectorList(text: string): string[] | null {
   const trimmed = text.trim();
-  if (trimmed === '') return [];
+  if (trimmed === '') return [''];
 
   const tokens = tokenize(text);
   const values = ParseHooks.parseComponentValues(tokens);
@@ -1463,24 +1594,36 @@ function parsePageSelectorList(text: string): string[] | null {
   const results: string[] = [];
 
   for (const selTokens of selectorTokensList) {
-    const filtered = selTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
-    if (filtered.length === 0) {
+    let start = 0;
+    while (start < selTokens.length && (selTokens[start].type === 'whitespace' || selTokens[start].type === 'comment')) {
+      start++;
+    }
+    let end = selTokens.length;
+    while (end > start && (selTokens[end - 1].type === 'whitespace' || selTokens[end - 1].type === 'comment')) {
+      end--;
+    }
+    const trimmedTokens = selTokens.slice(start, end);
+    if (trimmedTokens.length === 0) {
+      return null;
+    }
+
+    if (trimmedTokens.some(t => t.type === 'whitespace' || t.type === 'comment')) {
       return null;
     }
 
     let hasIdent = false;
     let pos = 0;
     
-    if (filtered[0].type === 'ident') {
+    if (trimmedTokens[0].type === 'ident') {
       hasIdent = true;
       pos = 1;
     }
     
-    while (pos < filtered.length) {
-      const colon = filtered[pos];
-      const ident = filtered[pos + 1];
+    while (pos < trimmedTokens.length) {
+      const colon = trimmedTokens[pos];
+      const ident = trimmedTokens[pos + 1];
       if (colon && colon.type === 'colon' && ident && ident.type === 'ident') {
-        const pseudoName = ident.value.toLowerCase();
+        const pseudoName = (ident.value as string).toLowerCase();
         if (['left', 'right', 'first', 'blank'].includes(pseudoName)) {
           pos += 2;
           continue;
@@ -1491,11 +1634,11 @@ function parsePageSelectorList(text: string): string[] | null {
     
     let serialized = '';
     if (hasIdent) {
-      serialized += serializeIdentifier(filtered[0].value as string);
+      serialized += serializeIdentifier(trimmedTokens[0].value as string);
     }
     let p = hasIdent ? 1 : 0;
-    while (p < filtered.length) {
-      serialized += ':' + serializeIdentifier(filtered[p + 1].value as string);
+    while (p < trimmedTokens.length) {
+      serialized += ':' + serializeIdentifier((trimmedTokens[p + 1].value as string).toLowerCase());
       p += 2;
     }
     results.push(serialized);
@@ -1511,7 +1654,7 @@ export class CSSPageRule extends CSSGroupingRule {
   constructor(selectorText: string, declarations: import('./types.ts').Declaration[], rules: import('./types.ts').Rule[], parseRuleInBlock: (text: string) => import('./types.ts').Rule) {
     super(rules, parseRuleInBlock);
     const parsed = parsePageSelectorList(selectorText);
-    this._selectorText = parsed ? parsed.join(', ') : selectorText;
+    this._selectorText = parsed ? (parsed.length === 1 && parsed[0] === '' ? '' : parsed.join(', ')) : selectorText;
     this._style = new CSSPageDescriptors(declarations);
     this._style.parentRule = this;
   }
@@ -1523,7 +1666,7 @@ export class CSSPageRule extends CSSGroupingRule {
   set selectorText(value: string) {
     const parsed = parsePageSelectorList(value);
     if (parsed !== null) {
-      this._selectorText = parsed.join(', ');
+      this._selectorText = (parsed.length === 1 && parsed[0] === '') ? '' : parsed.join(', ');
     }
   }
 

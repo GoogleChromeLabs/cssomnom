@@ -8,11 +8,8 @@ import {
   SPEC_DISPLAY_NAMES,
   CANONICAL_FEASIBLE_TARGETS,
   CANONICAL_FEASIBLE_TOTAL,
-  DEFAULT_REFERENCE_STATS,
-  DEFAULT_REFERENCE_BROWSER,
-  DEFAULT_REFERENCE_MILESTONE,
 } from './config.ts';
-import { addGitNote, getGitNotesLog } from '../safe-child-process.ts';
+import { addGitNote, getGitNotesLog, execGit } from '../safe-child-process.ts';
 import type { TestRunDataset } from './types.ts';
 
 export interface ReferenceBaselineStats {
@@ -21,128 +18,148 @@ export interface ReferenceBaselineStats {
   specs: Record<string, { pass: number; total: number }>;
 }
 
-export function loadReferenceBaselineStats(reportPath?: string): ReferenceBaselineStats {
+export function loadReferenceBaselineStats(reportPath?: string): ReferenceBaselineStats | null {
   const resolvedPath = reportPath ?? path.resolve(process.cwd(), '.wpt-cache/report-chrome-upstream.json');
-  if (fs.existsSync(resolvedPath)) {
-    try {
-      const data = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
-      const browserStr = typeof data.browser === 'string' ? data.browser : DEFAULT_REFERENCE_BROWSER;
-      const milestoneMatch = browserStr.match(/(?:chrome|chromium)\s+(\d+)/i);
-      const milestone = milestoneMatch ? milestoneMatch[1] : DEFAULT_REFERENCE_MILESTONE;
-
-      const specs: Record<string, { pass: number; total: number }> = {};
-      for (const s of SPEC_ORDER) {
-        specs[s] = { pass: 0, total: 0 };
-      }
-
-      const upstreamMap = new Map<string, boolean>();
-      if (Array.isArray(data.results)) {
-        for (const r of data.results) {
-          const testPath = r.test ? r.test.replace(/^\//, '') : '';
-          if (Array.isArray(r.subtests)) {
-            for (const st of r.subtests) {
-              if (st && st.name) {
-                upstreamMap.set(`${testPath}::${st.name}`, st.status === 'PASS');
-              }
-            }
-          }
-        }
-      }
-
-      const lastRunPath = path.resolve(process.cwd(), '.wpt-cache/last-run.json');
-      if (fs.existsSync(lastRunPath)) {
-        const lastRun = JSON.parse(fs.readFileSync(lastRunPath, 'utf-8'));
-        if (Array.isArray(lastRun.fileResults)) {
-          for (const f of lastRun.fileResults) {
-            const spec = f.spec;
-            if (!specs[spec]) specs[spec] = { pass: 0, total: 0 };
-            const normPath = f.file ? f.file.replace(/^\/?(submodules\/web-platform-tests\/)?/, '') : '';
-            if (Array.isArray(f.subtests)) {
-              for (const st of f.subtests) {
-                const key = `${normPath}::${st.name}`;
-                if (upstreamMap.has(key)) {
-                  specs[spec].total++;
-                  if (upstreamMap.get(key)) {
-                    specs[spec].pass++;
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-
-      const hasData = Object.values(specs).some(s => s.total > 0);
-      if (hasData) {
-        return { browser: browserStr, milestone, specs };
-      }
-    } catch {
-      // Fall through to default
-    }
+  if (!fs.existsSync(resolvedPath)) {
+    return null;
   }
 
-  return {
-    browser: DEFAULT_REFERENCE_BROWSER,
-    milestone: DEFAULT_REFERENCE_MILESTONE,
-    specs: DEFAULT_REFERENCE_STATS,
-  };
+  try {
+    const data = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
+    const browserStr = typeof data.browser === 'string' ? data.browser : 'Chrome';
+    const milestoneMatch = browserStr.match(/(?:chrome|chromium)\s+(\d+)/i);
+    const milestone = milestoneMatch ? milestoneMatch[1] : '';
+
+    const specs: Record<string, { pass: number; total: number }> = {};
+    for (const s of SPEC_ORDER) {
+      specs[s] = { pass: 0, total: 0 };
+    }
+
+    if (Array.isArray(data.results)) {
+      for (const r of data.results) {
+        const testPath = r.test ? r.test.replace(/^\//, '') : '';
+        const clean = testPath.replace(/^css\//, '');
+        let matchedSpec: string | null = null;
+        for (const spec of SPEC_ORDER) {
+          if (clean.startsWith(spec) || testPath.startsWith(spec)) {
+            matchedSpec = spec;
+            break;
+          }
+        }
+        if (matchedSpec && specs[matchedSpec]) {
+          if (Array.isArray(r.subtests) && r.subtests.length > 0) {
+            for (const st of r.subtests) {
+              specs[matchedSpec].total++;
+              if (st && st.status === 'PASS') {
+                specs[matchedSpec].pass++;
+              }
+            }
+          } else {
+            specs[matchedSpec].total++;
+            if (r.status === 'OK' || r.status === 'PASS') {
+              specs[matchedSpec].pass++;
+            }
+          }
+        }
+      }
+    }
+
+    const hasData = Object.values(specs).some(s => s.total > 0);
+    if (hasData) {
+      return { browser: browserStr, milestone, specs };
+    }
+  } catch {
+    // Return null on read/parse failure
+  }
+
+  return null;
 }
 
 export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceReportPath?: string): string {
   const ref = loadReferenceBaselineStats(referenceReportPath);
   const lines: string[] = [];
 
-  lines.push('### Feasibility & Cross-Engine Baseline Comparison');
-  lines.push('');
-  lines.push('> [!NOTE]');
-  lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
-  lines.push(`> - **Reference Engine**: Comparison numbers represent official unpolyfilled **${ref.browser}** test runs from [\`wpt.fyi\`](https://wpt.fyi) across the corresponding in-scope test suites.`);
-  lines.push('');
-  lines.push(`| Spec Domain | **cssomnom** | Chrome ${ref.milestone} (\`wpt.fyi\`) | Parity vs Chrome |`);
-  lines.push('| :--- | :---: | :---: | :---: |');
+  if (ref) {
+    const chromeLabel = ref.milestone ? `Chrome ${ref.milestone}` : 'Chrome';
+    lines.push('### Feasibility & Cross-Engine Baseline Comparison');
+    lines.push('');
+    lines.push('> [!NOTE]');
+    lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push(`> - **Reference Engine**: Comparison numbers represent official unpolyfilled **${ref.browser}** test runs from [\`wpt.fyi\`](https://wpt.fyi) across the corresponding in-scope test suites.`);
+    lines.push('');
+    lines.push(`| Spec Domain | **cssomnom** | ${chromeLabel} (\`wpt.fyi\`) | Parity vs Chrome |`);
+    lines.push('| :--- | :---: | :---: | :---: |');
 
-  let totalNodePass = 0;
-  const totalNodeTarget = CANONICAL_FEASIBLE_TOTAL;
-  let totalRefPass = 0;
-  let totalRefTotal = 0;
+    let totalNodePass = 0;
+    const totalNodeTarget = CANONICAL_FEASIBLE_TOTAL;
+    let totalRefPass = 0;
+    let totalRefTotal = 0;
 
-  for (const spec of SPEC_ORDER) {
-    const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
-    const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-    const target = CANONICAL_FEASIBLE_TARGETS[spec] ?? summary.total;
-    const nodePassing = summary.passing;
-    totalNodePass += nodePassing;
+    for (const spec of SPEC_ORDER) {
+      const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
+      const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
+      const target = CANONICAL_FEASIBLE_TARGETS[spec] ?? summary.total;
+      const nodePassing = summary.passing;
+      totalNodePass += nodePassing;
 
-    const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
-    const nodeCell = `${nodePassing.toLocaleString()} / ${target.toLocaleString()} (**${nodeRate.toFixed(1)}%**)`;
+      const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
+      const nodeCell = `${nodePassing.toLocaleString()} / ${target.toLocaleString()} (**${nodeRate.toFixed(1)}%**)`;
 
-    const refSpec = ref.specs[spec] ?? { pass: 0, total: 0 };
-    totalRefPass += refSpec.pass;
-    totalRefTotal += refSpec.total;
+      const refSpec = ref.specs[spec] ?? { pass: 0, total: 0 };
+      totalRefPass += refSpec.pass;
+      totalRefTotal += refSpec.total;
 
-    const refRate = refSpec.total > 0 ? (refSpec.pass / refSpec.total) * 100 : 0;
-    const refCell = refSpec.total > 0 ? `${refSpec.pass.toLocaleString()} / ${refSpec.total.toLocaleString()} (${refRate.toFixed(1)}%)` : 'N/A';
+      const refRate = refSpec.total > 0 ? (refSpec.pass / refSpec.total) * 100 : 0;
+      const refCell = refSpec.total > 0 ? `${refSpec.pass.toLocaleString()} / ${refSpec.total.toLocaleString()} (${refRate.toFixed(1)}%)` : 'N/A';
 
-    const delta = nodeRate - refRate;
-    const deltaCell = delta >= 0
-      ? `🟢 **+${delta.toFixed(1)}%**`
-      : `${delta.toFixed(1)}%`;
+      const delta = nodeRate - refRate;
+      const deltaCell = delta >= 0
+        ? `🟢 **+${delta.toFixed(1)}%**`
+        : `${delta.toFixed(1)}%`;
 
-    lines.push(`| **\`${displayName}\`** | ${nodeCell} | ${refCell} | ${deltaCell} |`);
+      lines.push(`| **\`${displayName}\`** | ${nodeCell} | ${refCell} | ${deltaCell} |`);
+    }
+
+    const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
+    const overallNodeCell = `**${totalNodePass.toLocaleString()} / ${totalNodeTarget.toLocaleString()} (${overallNodeRate.toFixed(1)}%)**`;
+
+    const overallRefRate = totalRefTotal > 0 ? (totalRefPass / totalRefTotal) * 100 : 0;
+    const overallRefCell = `**${totalRefPass.toLocaleString()} / ${totalRefTotal.toLocaleString()} (${overallRefRate.toFixed(1)}%)**`;
+
+    const overallDelta = overallNodeRate - overallRefRate;
+    const overallDeltaCell = overallDelta >= 0
+      ? `🟢 **+${overallDelta.toFixed(1)}%**`
+      : `**${overallDelta.toFixed(1)}%**`;
+
+    lines.push(`| **OVERALL** | ${overallNodeCell} | ${overallRefCell} | ${overallDeltaCell} |`);
+  } else {
+    lines.push('### Feasibility & Normalized Conformance Baseline');
+    lines.push('');
+    lines.push('> [!NOTE]');
+    lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push('> - To populate cross-engine reference metrics from `wpt.fyi`, run `pnpm run wpt fetch-upstream`.');
+    lines.push('');
+    lines.push('| Spec Domain | Feasible Target ($M$) | **cssomnom** | Normalized ($P/M$) |');
+    lines.push('| :--- | :---: | :---: | :---: |');
+
+    let totalNodePass = 0;
+    const totalNodeTarget = CANONICAL_FEASIBLE_TOTAL;
+
+    for (const spec of SPEC_ORDER) {
+      const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
+      const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
+      const target = CANONICAL_FEASIBLE_TARGETS[spec] ?? summary.total;
+      const nodePassing = summary.passing;
+      totalNodePass += nodePassing;
+
+      const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
+      lines.push(`| **\`${displayName}\`** | ${target.toLocaleString()} | ${nodePassing.toLocaleString()} | **${nodeRate.toFixed(1)}%** |`);
+    }
+
+    const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
+    lines.push(`| **OVERALL** | **${totalNodeTarget.toLocaleString()}** | **${totalNodePass.toLocaleString()}** | **${overallNodeRate.toFixed(1)}%** |`);
   }
 
-  const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
-  const overallNodeCell = `**${totalNodePass.toLocaleString()} / ${totalNodeTarget.toLocaleString()} (${overallNodeRate.toFixed(1)}%)**`;
-
-  const overallRefRate = totalRefTotal > 0 ? (totalRefPass / totalRefTotal) * 100 : 0;
-  const overallRefCell = `**${totalRefPass.toLocaleString()} / ${totalRefTotal.toLocaleString()} (${overallRefRate.toFixed(1)}%)**`;
-
-  const overallDelta = overallNodeRate - overallRefRate;
-  const overallDeltaCell = overallDelta >= 0
-    ? `🟢 **+${overallDelta.toFixed(1)}%**`
-    : `**${overallDelta.toFixed(1)}%**`;
-
-  lines.push(`| **OVERALL** | ${overallNodeCell} | ${overallRefCell} | ${overallDeltaCell} |`);
   return lines.join('\n');
 }
 
@@ -187,33 +204,76 @@ export function syncProgressFromNotes(progressPath = getProgressPath()): void {
   }
   if (delimIdx === -1 || delimIdx + 1 >= lines.length) return;
 
-  const topRow = lines[delimIdx + 1];
-  if (!topRow || !topRow.includes('|')) return;
-
-  const cells = topRow.split('|').map(s => s.trim());
-  if (cells.length < 12) return;
-
-  const commitCell = cells[2];
-  if (!/pending|unknown/i.test(commitCell)) return;
-
-  const overallCell = cells[10];
-  const passingInCell = overallCell ? parseInt(overallCell.split('/')[0], 10) : NaN;
-
-  const notesLog = getGitNotesLog(5, 'wpt');
+  const notesLog = getGitNotesLog(50, 'wpt');
+  const notesMap = new Map<number, string>();
   for (const entry of notesLog) {
     if (!entry.note || !entry.commitHash) continue;
     try {
       const parsed = JSON.parse(entry.note) as { totalPassing?: number };
-      if (typeof parsed.totalPassing === 'number' && parsed.totalPassing === passingInCell) {
-        cells[2] = `\`${entry.commitHash}\``;
-        lines[delimIdx + 1] = `| ${cells.slice(1, -1).join(' | ')} |`;
-        fs.writeFileSync(progressPath, lines.join('\n'), 'utf-8');
-        console.log(`[WPT Progress] Reconciled pending commit to ${entry.commitHash} from git notes.`);
-        break;
+      if (typeof parsed.totalPassing === 'number') {
+        notesMap.set(parsed.totalPassing, entry.commitHash);
       }
     } catch {
       // Ignore invalid json notes
     }
+  }
+
+  let gitCommits: { hash: string; time: number; msg: string }[] | null = null;
+  function getRecentGitCommits() {
+    if (gitCommits) return gitCommits;
+    try {
+      const raw = execGit(['log', '-n', '50', '--format=%h|%ad|%s', '--date=iso-strict']);
+      gitCommits = raw.trim().split('\n').filter(Boolean).map(l => {
+        const [hash, date, msg] = l.split('|');
+        return { hash: hash.trim(), time: new Date(date).getTime(), msg: (msg || '').trim() };
+      });
+    } catch {
+      gitCommits = [];
+    }
+    return gitCommits;
+  }
+
+  let modified = false;
+  for (let i = delimIdx + 1; i < lines.length; i++) {
+    const row = lines[i];
+    if (!row || !row.includes('|')) break;
+
+    const cells = row.split('|').map(s => s.trim());
+    if (cells.length < 12) continue;
+
+    const dateStr = cells[1];
+    const commitCell = cells[2];
+    if (!/pending|unknown|\*/i.test(commitCell)) continue;
+
+    const overallCell = cells[10];
+    const passingInCell = overallCell ? parseInt(overallCell.split('/')[0], 10) : NaN;
+
+    let matchedHash: string | null = null;
+    if (notesMap.has(passingInCell)) {
+      matchedHash = notesMap.get(passingInCell)!;
+    } else {
+      const rowTime = new Date(dateStr.replace(' ', 'T') + 'Z').getTime();
+      const commits = getRecentGitCommits();
+      let minDiff = Infinity;
+      for (const c of commits) {
+        const diff = Math.abs(c.time - rowTime);
+        if (diff < minDiff && diff < 30 * 60 * 1000) {
+          minDiff = diff;
+          matchedHash = c.hash;
+        }
+      }
+    }
+
+    if (matchedHash) {
+      cells[2] = `\`${matchedHash}\``;
+      lines[i] = `| ${cells.slice(1, -1).join(' | ')} |`;
+      modified = true;
+    }
+  }
+
+  if (modified) {
+    fs.writeFileSync(progressPath, lines.join('\n'), 'utf-8');
+    console.log(`[WPT Progress] Reconciled unfinalized progress rows in ${progressPath}`);
   }
 }
 

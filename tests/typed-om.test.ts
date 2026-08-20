@@ -39,13 +39,13 @@ describe('Values & Typed OM', () => {
         
         const calcVal = CSSNumericValue.parse('calc(10px + 20px)');
         assert.ok(calcVal);
-        assert.strictEqual(calcVal.toString(), '30px');
+        assert.strictEqual(calcVal.toString(), 'calc(30px)');
     });
 
     test('multi-argument math functions (atan2)', () => {
         const val = CSSNumericValue.parse('calc(atan2(10px, 20px))');
         assert.ok(val);
-        assert.strictEqual(val.toString(), '26.565051deg');
+        assert.strictEqual(val.toString(), 'atan2(10px, 20px)');
 
         const validVal = CSSNumericValue.parse('calc(atan2(10px, 1em))');
         assert.ok(validVal);

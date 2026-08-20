@@ -502,11 +502,28 @@ describe('WPT CLI Core Modules', () => {
       }
     });
 
-    test('loadReferenceBaselineStats falls back to default constants when file is missing', () => {
+    test('loadReferenceBaselineStats returns null when report file is missing', () => {
       const stats = loadReferenceBaselineStats('/non/existent/path.json');
-      assert.strictEqual(stats.milestone, '153');
-      assert.strictEqual(stats.browser, 'Chrome 153.0.8008.0');
-      assert.ok(stats.specs['css-typed-om'].total > 0);
+      assert.strictEqual(stats, null);
+    });
+
+    test('formatBaselineSummaryTable renders clean fallback table when reference report is missing', () => {
+      const dataset: TestRunDataset = {
+        timestamp: '2026-08-16 12:00:00',
+        commitHash: '1234567',
+        isDirty: false,
+        specSummaries: {
+          'css-typed-om': { passing: 100, total: 100, files: 1 },
+        },
+        totalPassing: 100,
+        totalTests: 100,
+        totalFiles: 1,
+        fileResults: [],
+      };
+      const table = formatBaselineSummaryTable(dataset, '/non/existent/report.json');
+      assert.ok(table.includes('### Feasibility & Normalized Conformance Baseline'));
+      assert.ok(table.includes('pnpm run wpt fetch-upstream'));
+      assert.ok(table.includes('| Spec Domain | Feasible Target ($M$) | **cssomnom** | Normalized ($P/M$) |'));
     });
   });
 

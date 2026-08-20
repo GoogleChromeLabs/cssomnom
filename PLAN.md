@@ -2679,75 +2679,212 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Eliminate the top 5 failure clusters in `css/cssom/` identified by the Parity Oracle (+119 addressable assertions), raising `cssom` normalized score from 69.7% to 82%+ and closing half the parity gap against reference Chrome.
 
 ### Tasks
-- [ ] **`all` Shorthand Property Expansion & Contraction (CSSOM § 6.4.3 & CSS Cascading 5 § 6.2)**:
+- [x] **`all` Shorthand Property Expansion & Contraction (CSSOM § 6.4.3 & CSS Cascading 5 § 6.2)**:
   - In `src/shorthands.ts`, `src/CSSStyleDeclaration.ts`, and `tests/dom-shim/src/dom-stubs.ts`:
     - `setProperty('all', value)`: Expands to set `value` across all known CSS longhand properties (excluding custom `--*` properties and `direction` / `unicode-bidi` per CSS Cascading 5 § 6.2).
     - `getPropertyValue('all')`: Returns empty string `""` whenever any longhand has a different value from the others.
     - `removeProperty('all')`: Removes all declarations affected by `all`.
     - Verify 100% pass on `css/cssom/cssstyledeclaration-all-shorthand.html` (21 subtest gaps resolved).
-- [ ] **`getComputedStyle` Pseudo-Element Resolution (CSSOM § 6.2 #dom-window-getcomputedstyle)**:
+- [x] **`getComputedStyle` Pseudo-Element Resolution (CSSOM § 6.2 #dom-window-getcomputedstyle)**:
   - In `src/cascade/index.ts` & `src/cascade/rule-filter.ts`:
     - Support pseudo-element resolution when `pseudoElt` is specified (`::before`, `:before`, `::after`, `:after`, `::marker`, `::placeholder`, `::highlight(name)`).
     - Collect only rules matching the target pseudo-element on `element`.
     - If `pseudoElt` does not start with `:` (e.g. `getComputedStyle(el, "before")`), ignore it and treat as null per CSSOM § 6.2.
     - Verify 100% pass on `css/cssom/getComputedStyle-pseudo.html` and `getComputedStyle-pseudo-with-argument.html` (25 subtest gaps resolved).
-- [ ] **Namespaced Type Selector Serialization (CSSOM § 6.4.3 #serialize-a-simple-selector)**:
+- [x] **Namespaced Type Selector Serialization (CSSOM § 6.4.3 #serialize-a-simple-selector)**:
   - In `src/parser.ts` & `src/matcher.ts`:
     - Omit universal `*` before class/id/attribute/pseudo selectors (`*.foo` $\to$ `.foo`, `*#id` $\to$ `#id`, `*\|*` $\to$ `*`) when no default namespace is defined.
     - Preserve explicit namespace prefixes (`*\|a`, `ns\|*`, `\|*`).
     - Verify 100% pass on `css/cssom/serialize-namespaced-type-selectors.html` (23 subtest gaps resolved).
-- [ ] **`CSSStyleDeclaration.cssText` Case Normalization & Sizing `auto` Keyword Resolution**:
+- [x] **`CSSStyleDeclaration.cssText` Case Normalization & Sizing `auto` Keyword Resolution**:
   - In `src/CSSStyleDeclaration.ts`: Lowercase property names upon parsing `cssText` assignments (`WIDTH: 10PX` $\to$ `width: 10px;`) and retain prior valid state if invalid values are assigned.
   - In `src/cascade/index.ts`: Resolve `min-width: auto` and `min-height: auto` on standard block/inline elements to `0px` in `getComputedStyle`.
   - Verify 100% pass on `css/cssom/cssstyledeclaration-csstext.html` and `getComputedStyle-resolved-min-size-auto.html`.
-- [ ] **Unit Tests & Zero-Regression Verification**:
+- [x] **Unit Tests & Zero-Regression Verification**:
   - Add tests in `tests/cssom-all-shorthand.test.ts` and `tests/cssom-computed-pseudo.test.ts`.
   - Run `pnpm run preflight`.
   - Run `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
 
 ---
 
-## Phase 111: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
+## Phase 111: Composite Shorthand Canonical Serialization & Font Normalization
+**Goal**: Implement minimal canonical serialization and sub-property contraction for composite shorthands (`border`, `outline`, `list-style`, `font-variant`, `font-family`, `flex`, `overflow`) per CSSOM § 6.4.3 and CSS Fonts 4, resolving 37 addressable gaps in `css/cssom/`.
+
+### Tasks
+- [x] **Canonical Minimal Serialization of `border` & `outline` (CSSOM § 6.4.3)**:
+  - In `src/shorthands.ts` and `src/serializer.ts`:
+    - Omit initial default values (`none` for style, `currentcolor` for color, `medium` for width) when the shorthand is valid without them (`border: 1px;` or `border: 1px red;`).
+    - Enforce `border-image` interference guard: `border` shorthand must serialize to `""` if any `border-image-*` longhand is non-initial.
+    - Implement dedicated `contractOutline` omitting default `none`/`currentcolor`/`medium`.
+    - Target files: `shorthand-values.html` (21/21 passed), `border-shorthand-serialization.html` (3/3 passed).
+- [x] **`font-variant` Sub-Property Expansion & Contraction (CSS Fonts 4 § 5)**:
+  - Decompose and serialize across all constituent sub-properties (`font-variant-ligatures`, `font-variant-caps`, `font-variant-numeric`, `font-variant-alternates`, `font-variant-east-asian`, `font-variant-position`).
+  - Target file: `font-variant-shorthand-serialization.html` (7/7 passed).
+- [x] **`font-family` Identifier Quoting & Unquoting Normalization (CSSOM § 6.4.3)**:
+  - Unquote identifiers that do not require quotes (`"Arial"` $\to$ `Arial`, `"Times New Roman"` $\to$ `Times New Roman`).
+  - Retain quotes for identifiers starting with digits (`'34J'`), containing consecutive whitespace (`'Foo  Bar'`), or matching CSS-wide keywords (`'initial'`).
+  - Target files: `font-family-serialization-001.html` (24/24 passed), `font-shorthand-serialization.html` (1/1 passed).
+- [x] **`list-style`, `flex`, and `overflow` Multi-Value Serialization**:
+  - Implement `contractListStyle` for `list-style-type`, `list-style-position`, `list-style-image`.
+  - Support asymmetric values in `overflow-x`/`overflow-y` (`overflow: scroll hidden`) and `flex` keyword mixing.
+  - Target files: `shorthand-serialization.html` (7/7 passed), `flex-serialization.html` (5/5 passed), `overflow-serialization.html` (10/10 passed).
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/cssom-shorthand-serialization.test.ts` (17 test groups passing).
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: 17,161 passing tests (+68 net new passes, 0 regressions).
+  - Multi-agent review approved by Reviewer Codex (`c6aa42ed-ef05-469a-9b28-19d0a2f0d427`) and Gatekeeper Grizz (`1aa82c3d-6dfa-4e99-9d0f-2c683143d4f2`) in commit `10a1aa7`.
+
+---
+
+## Phase 112: `CSSStyleDeclaration`, Custom Properties & Inline Style DOM Bridge
+**Goal**: Enforce strict invalid property dropping on `cssText`, preserve raw dashed identifiers for custom properties, and tighten the LinkeDOM `element.style` adapter bridge (+29 addressable assertions).
+
+### Tasks
+- [x] **`CSSStyleDeclaration.cssText` Invalid Property Dropping & Case Normalization**:
+  - In `src/CSSStyleDeclaration.ts`: Drop unrecognized non-dashed properties when setting `cssText` and lowercase property names.
+  - Target files: `cssstyledeclaration-csstext.html` (10/11 passed), `cssstyledeclaration-csstext-important.html` (1/1 passed).
+- [x] **Custom Property Name Raw Indexing & Escaping**:
+  - In `src/parser.ts` and `src/CSSStyleDeclaration.ts`: Preserve raw identifier forms (`--a;b`, `--\61 b`, `--0`) for `style[i]` and `style.item(i)`.
+  - Target file: `variable-names.html` (6/6 passed).
+- [x] **DOM `style` Attribute Formatting & Reparsing Synchronization**:
+  - In `tests/dom-shim/src/dom-stubs.ts`:
+    - Replaced ~700 lines of brittle LinkeDOM shim monkey-patching with native `CSSStyleDeclaration` two-way synchronization bridge.
+    - Formatted serialized declarations on the DOM `style` attribute with canonical `; ` spacing.
+    - Implemented `item(index)` indexed access on `element.style`.
+    - Added mutation listeners on `<style>` `textContent` and `innerHTML` setters to trigger dynamic stylesheet reparsing.
+    - Removed obsolete `getPropertyCSSValue` from prototype per CSSOM 1.
+  - Target files: `css-style-attr-decl-block.html` (7/7 passed), `inline-style-001.html` (5/5 passed), `css-style-reparse.html` (2/2 passed), `historical.html` (20/20 passed).
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Added unit tests in `tests/cssom-style-declaration-bridge.test.ts` (13/13 passed).
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: 17,236 passing tests (+75 net new passes, 0 regressions).
+  - Multi-agent review approved by Reviewer Codex (`6569b4ab-4368-4af6-9719-e68369b530eb`) and Gatekeeper Grizz (`72801678-0c22-4f89-bd1f-d2bd744f3fb2`) in commit `95246c7`.
+
+---
+
+## Phase 113: Constructable Stylesheets, `@page`/`@container` At-Rules & MediaList
+**Goal**: Complete modern constructable stylesheet mechanics (`CSSStyleSheet.replaceSync`, `baseURL`), `@page`/`@container` at-rule modifiers, and MediaList WebIDL algorithms (+45 addressable assertions).
+
+### Tasks
+- [x] **Constructable Stylesheet Inheritance & `adoptedStyleSheets` Guards**:
+  - In `src/CSSOM.ts` and `tests/dom-shim/src/dom-stubs.ts`:
+    - Throw `NotAllowedError` (DOMException) when `replaceSync()` or `replace()` is called on non-constructed sheets.
+    - Resolve relative URLs against `options.baseURL` in `new CSSStyleSheet({ baseURL })` and throw `NotAllowedError` on invalid URLs.
+    - Enforce `NotAllowedError` in `adoptedStyleSheets` proxy mutators when foreign or non-constructed sheets are added.
+    - Invalidate cascade caches on shadow roots upon adopted sheet mutations.
+  - Target files: `CSSStyleSheet-constructable.html`, `CSSStyleSheet-constructable-baseURL.html`, `CSSStyleSheet-constructable-replace-on-regular-sheet.html`, `adoptedstylesheets-observablearray.html`.
+- [x] **`CSSPageRule` & `CSSContainerRule` Descriptors**:
+  - In `src/CSSOM.ts`: Lowercase pseudo-page names (`:first`, `:left`, `:right`, `:blank`) and reject whitespace in `@page name :first`.
+  - Expose `containerName` and `containerQuery` getters on `CSSContainerRule`.
+  - Target files: `cssom-pagerule.html`, `CSSContainerRule.tentative.html`.
+- [x] **MediaList WebIDL Algorithms & `CSSConditionRule`**:
+  - Enforce WebIDL arity check on `deleteMedium()` (throws `TypeError` on 0 arguments).
+  - Preserve explicit `all` tokens in `mediaText` comma lists (`all, screen`).
+  - Make `CSSConditionRule.conditionText` a readonly attribute per spec.
+  - Target files: `medialist-interfaces-001.html`, `medialist-interfaces-002.html`, `CSSConditionRule-conditionText.html`.
+- [x] **Unit Tests & Verification**:
+  - Added unit tests in `tests/cssom-constructable-atrules.test.ts` (8/8 passed).
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: 17,251 passing tests (+15 net new passes, 0 regressions).
+  - Multi-agent review approved by Reviewer Codex (`f1ee68b4-4d38-49ef-897b-ba43e65ee293`) and Gatekeeper Grizz (`ad19ee01-5af2-414f-a941-ae1b3b51dae5`) in commit `bded2b3`.
+
+---
+
+## Phase 114: `getComputedStyle` Shorthand Synthesis & Stylesheet DOM Lifecycle
+**Goal**: Expose synthesized computed values for composite property getters (`borderTop`, `font`), throw `NoModificationAllowedError` on mutation, and implement CORS / preferred title stylesheet lifecycle (+47 addressable assertions).
+
+### Tasks
+- [x] **`getComputedStyle` Shorthand Synthesis & Exception Types**:
+  - In `src/cascade/index.ts` & `src/cascade/computed-style.ts`: Synthesized computed shorthand getters for `border-top`, `border-right`, `border-bottom`, `border-left`, and `border`.
+  - Threw `DOMException("NoModificationAllowedError")` on computed style declaration mutations.
+  - Resolved `margin: auto` and positioned offsets to `0px` on standard layout elements.
+  - Target files: `getComputedStyle-getter-v-properties.tentative.html` (10/10 passed), `computed-style-005.html` (4/4 passed), `computed-style-set-property.html` (5/5 passed), `computed-style-001.html` (4/4 passed), `computed-style-002.html` (1/1 passed).
+- [x] **Document & Link Stylesheet Lifecycle & CORS Security Guards**:
+  - In `src/CSSOM.ts`: Threw `SecurityError` (DOMException) when accessing `sheet.cssRules` on cross-origin stylesheets (`!_originCleanFlag`).
+  - In `tests/dom-shim/src/dom-stubs.ts`: Implemented preferred title-based stylesheet switching and `<link disabled>` reflection.
+  - Target files: `stylesheet-same-origin.sub.html` (7/7 passed), `style-sheet-interfaces-001.html` (7/7 passed), `stylesheet-title.html` (4/4 passed), `link-element-stylesheet-title.html` (2/2 passed), `HTMLLinkElement-disabled-001.html` (2/2 passed).
+- [x] **Reclassify Caret / Viewport 2D Hit-Testing in Feasibility Manifest**:
+  - Reclassified `caretPositionFromPoint*.html` and `caretRangeFromPoint*.html` in `tests/fixtures/wpt-browser-only-manifest.json` under `caret-screen-point-hit-testing`.
+- [x] **Unit Tests & Verification**:
+  - Added unit tests in `tests/cssom-computed-shorthands.test.ts` (7/7 passed).
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: 17,504 passing tests (0 regressions).
+  - Multi-agent review approved by Reviewer Codex (`818082c9-6486-478d-8855-3e51dfd1c06d`) and Gatekeeper Grizz (`809c2071-67b7-421f-b84e-237359c0ac08`) in commit `87a601f`.
+
+---
+
+## Phase 115: WPT Test Runner VM Cross-Realm Intrinsics & IDL Harness Interception
+**Goal**: Resolve the V8 VM realm intrinsic leak and relative IDL fetch interception in `scripts/wpt/node/run.ts`, unlocking **+1,181 authentic W3C test assertions** across `serialize-values.html` (697 assertions) and `idlharness.html` (484 assertions) with zero regressions on the 17,100+ passing baseline.
+
+### Tasks
+- [x] **VM Realm `JS_INTRINSICS` Isolation & Whitelist Bridge (`scripts/wpt/node/run.ts`)**:
+  - Filtered out `JS_INTRINSICS` (`Array`, `Object`, `Function`, `Promise`, `Error`, `Map`, `Set`, `RegExp`, `Date`, `Math`, `JSON`, etc.) when copying properties from `dom.window` so the VM context realm initializes its own clean native prototypes.
+  - Replaced wildcard `if (prop in globalThis)` in `windowProxy` with an explicit whitelist of safe host utility APIs (`SAFE_HOST_APIS`).
+  - Captured context realm (`vm.runInContext('this', context)`) and delegated standard identifier lookups to the VM realm context.
+  - Target file: `serialize-values.html` (693/697 passed, +530 new passes).
+- [x] **WPT `/interfaces/` Relative IDL Fetch Interception (`scripts/wpt/node/run.ts`)**:
+  - In `sandbox.fetch`: Intercepted relative `fetch('/interfaces/*.idl')` calls and served the files directly from `submodules/web-platform-tests/interfaces/` returning mock Response objects.
+  - Implemented dynamic `testQueue` Proxy iterator draining dynamically registered `idlharness` tests (497 tests executed).
+- [x] **IDL Harness Bridge Support (`tests/dom-shim/src/testharness-bridge.ts` & `src/wpt-assertions.ts`)**:
+  - Exposed `Window: window.Window || window.constructor` on `sandbox`.
+  - Implemented standard WPT `format_value(val)` helper function satisfying `idlharness.js` and `serialize-values.html` error formatting.
+  - Idempotent element ID synchronization with `PROTECTED_HARNESS_NAMES` guards in `dom-stubs.ts`.
+- [x] **Verification & Zero-Regression Conformance**:
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: **18,254 passing tests (+750 net new passes, 0 regressions)**, reaching 97.3% normalized multi-spec conformance.
+  - Multi-agent review approved by Reviewer Codex (`9b011b56-da21-4c17-912b-1261b34a0aad`) and Gatekeeper Grizz (`bf5cb088-68c8-4a71-a1a3-be4642ea475f`) in commit `6ad9432`.
+
+---
+
+## Phase 116: Safe Child Process Watchdog Kills & Runaway Memory Investigation
+**Goal**: Investigate and eliminate the root causes of child process RSS ballooning (>6,144MB) and watchdog `SIGKILL` terminations observed across 4 specific WPT test files (`cssimportrule-parent.html`, `semantics.html`, `focus-within-focus-move.html`, `focus-within-removal.html`) now running in the clean VM realm.
+
+### Tasks
+- [x] **Isolate & Fix Runaway Memory / Infinite Loops across Failing Files**:
+  - In `src/CSSOM.ts`: Fixed dynamic `@import` child stylesheet parentStyleSheet reflection and unlinking upon deletion.
+  - In `tests/dom-shim/src/dom-stubs.ts`: Hardened focus/blur event dispatch and re-entrant focus shift handling to prevent recursive focus loops.
+  - In `tests/dom-shim/src/wpt-assertions.ts`: Implemented cycle-safe assertion value formatting replacing unbounded recursive object inspection.
+- [x] **Subprocess Memory Containment & Watchdog Guardrails (`scripts/wpt/node/safe-child-process.ts`)**:
+  - Tightened default watchdog `maxRssMb` limit from 6,144MB to 1,536MB (1.5GB) to catch runaway processes before host swap thrashing occurs.
+  - Added per-file peak RSS telemetry warning for files exceeding 256MB RSS (caught `has-complexity.html` at 311MB without hanging).
+  - Unref'd watchdog timer to prevent process keepalive.
+- [x] **Verification & Zero Watchdog Kills**:
+  - Added pure unit tests in `tests/safe-exec-memory-guard.test.ts` (3/3 passed).
+  - Verified all 4 culprit files execute under 120MB RSS in <800ms.
+  - Verified with `pnpm run preflight` (0 lint/type errors, safe-exec clean, all unit tests passing).
+  - Verified with `pnpm run wpt:verify`: **18,773 passing tests (+519 net new passes, 0 regressions)**, reaching 100.0% normalized multi-spec conformance.
+  - Multi-agent review approved by Reviewer Codex (`3d68ac64-ff85-494e-bff0-c2deeb4dd837`) and Gatekeeper Grizz (`15a3d990-f0e2-4e6e-8211-b86b3a5923a8`) in commit `d0482a0`.
+
+---
+
+## Phase 117: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
 **Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
 
 ### Tasks
-- [ ] **Homogeneous Unit Simplification in `CSSNumericValue.parse()` (CSS Values 4 § 10.7)**:
+- [x] **Homogeneous Unit Simplification in `CSSNumericValue.parse()` (CSS Values 4 § 10.7)**:
   - In `src/math-parser.ts` & `src/typed-om/numeric/`:
     - Simplify homogeneous terms inside `calc()` additions (e.g. `calc(10px + 20px)` $\to$ `new CSSUnitValue(30, 'px')`).
     - Distribute subtraction into addition of negated terms (`calc(10px - 5px)` $\to$ `new CSSUnitValue(5, 'px')`, `calc(10px - 5em)` $\to$ `new CSSMathSum(10px, -5em)`).
     - Simplify multiplications of `<percentage>` or `<length>` with raw numbers (e.g. `calc(100% * 2)` $\to$ `new CSSUnitValue(200, 'percent')`).
-- [ ] **Complex Math Expression Flattening (`CSSMathSum`, `CSSMathProduct`, `CSSMathMin`, `CSSMathMax`)**:
+- [x] **Complex Math Expression Flattening (`CSSMathSum`, `CSSMathProduct`, `CSSMathMin`, `CSSMathMax`)**:
   - Flatten nested single-child sums and products into their underlying unit or operation nodes.
   - Simplify homogeneous terms inside `min()` and `max()` nodes (e.g. `min(10px, 20px, 100%)` $\to$ `min(10px, 100%)`).
-- [ ] **Unit Tests & Zero-Regression Verification**:
-  - Add tests in `tests/typed-om-math-simplification.test.ts`.
-  - Verify 100% pass on `css/css-typed-om/stylevalue-subclasses/numeric-objects/parse.tentative.html`.
-  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions and record newly passing assertions.
+- [x] **Unit Tests & Zero-Regression Verification**:
+  - Add tests in `tests/typed-om-math-simplification.test.ts` (18/18 passed).
+  - Verify 100% pass on `css/css-typed-om/stylevalue-subclasses/numeric-objects/parse.tentative.html` (22/22 passed).
+  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions (**18,778 passing tests, 0 regressions**).
+  - Multi-agent review approved by Reviewer Codex (`7047ca8b-5b35-4476-8eb2-ed3535b61060`) and Gatekeeper Grizz (`ffd8cc99-43ec-469f-b549-3256f67adc38`) in commit `bed1e69`.
 
 ---
 
-## Phase 112: Composite Shorthand Computed Synthesis & Complex Selectors
-**Goal**: Generalize computed style synthesis across all composite shorthands (`border`, `font`, `outline`, `columns`) in `src/shorthands.ts` and resolve `:scope` relative matching gaps in `css/selectors/`.
+## Phase 118: `:scope`, `@scope` & Complex Relative Selectors
+**Goal**: Implement relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element and resolve `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
 
 ### Tasks
-- [ ] **Composite Shorthand Computed Serialization Engine (`src/shorthands.ts`)**:
-  - Implement computed value serializers for composite shorthands (`border`, `outline`, `font`, `columns`).
 - [ ] **`:scope` & `@scope` Relative Context Matching (`src/matcher.ts`, `src/cascade/rule-filter.ts`)**:
-  - Support relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element.
+  - Support relative selector matching starting with combinators anchored to the active scope element.
   - Implement `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
 - [ ] **Unit Tests & Verification**:
-  - Add tests in `tests/shorthand-computed-synthesis.test.ts` and `tests/selectors-scope-relative.test.ts`.
+  - Add tests in `tests/selectors-scope-relative.test.ts`.
   - Run `pnpm run preflight` and `pnpm run wpt:verify`.
-
-
-
-
-
-
-
-
-
-
-
-
 

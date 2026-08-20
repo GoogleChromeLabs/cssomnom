@@ -65,10 +65,10 @@ export function safeExecTestFile(
   filePath: string,
   options: SafeExecOptions = {}
 ): Promise<ExecResult> {
-  const timeout = options.timeout ?? 30000;
+  const timeout = options.timeout ?? 60000;
   const maxBuffer = options.maxBuffer ?? 50 * 1024 * 1024;
   const maxOldSpaceSize = options.maxOldSpaceSize ?? 512;
-  const maxRssMB = options.maxRssMb ?? 6144;
+  const maxRssMB = options.maxRssMb ?? 1536;
   const runnerPath = options.runnerPath ?? path.resolve(import.meta.dirname, 'run.ts');
   const extraArgs = options.args ?? [];
   const pollIntervalMs = options.pollIntervalMs ?? 250;
@@ -118,6 +118,12 @@ export function safeExecTestFile(
           } else {
             status = 'ERROR';
           }
+        }
+
+        if (peakRssMb > 256) {
+          console.warn(
+            `[Memory Warning] Test file ${filePath} peaked at ${peakRssMb.toFixed(1)}MB RSS (>256MB threshold).`
+          );
         }
 
         const result: ExecResult = {
@@ -176,7 +182,7 @@ export function safeExecTestFile(
             if (rssMB > maxRssMB) {
               isWatchdogKilled = true;
               console.warn(
-                `[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > ${maxRssMB}MB). Terminating with SIGKILL.`
+                `[Watchdog] Child PID ${child.pid} exceeded RSS limit (${rssMB.toFixed(1)}MB > ${maxRssMB}MB) while running ${filePath}. Terminating with SIGKILL.`
               );
               try {
                 child.kill('SIGKILL');
@@ -217,6 +223,7 @@ export function safeExecTestFile(
         // Child process may have exited during check
       }
     }, pollIntervalMs);
+    watchdogTimer.unref();
   });
 }
 

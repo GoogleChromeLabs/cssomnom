@@ -384,3 +384,36 @@ export function parseStyleValue(property: string, css: string): CSSStyleValue {
 
 CSSStyleValue.parseAll = parseAllStyleValues;
 CSSStyleValue.parse = parseStyleValue;
+
+ParseHooks.validatePropertyValue = (property: string, value: string): boolean => {
+  if (property.startsWith('--')) return true;
+  const lowerProp = property.toLowerCase();
+  if (!SUPPORTED_PROPERTIES.has(lowerProp)) return true;
+  const lowerVal = value.trim().toLowerCase();
+  if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(lowerVal)) return true;
+  if (lowerVal.includes('var(') || lowerVal.includes('calc(') || lowerVal.includes('env(') || lowerVal.includes('attr(')) return true;
+
+  const tokens = tokenize(value).filter(t => t.type !== 'whitespace' && t.type !== 'EOF');
+  if (tokens.length === 0 || tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) return false;
+
+  // Reject unitless non-zero numbers on length properties (e.g. width: -100 or width: 100)
+  if (tokens.length === 1 && tokens[0].type === 'number' && tokens[0].value !== 0) {
+    const syntax = STANDARD_PROPERTIES_SYNTAX[lowerProp] || '';
+    if (!syntax.includes('<number>') && !syntax.includes('<integer>') && !syntax.includes('<flex>')) {
+      return false;
+    }
+  }
+
+  // Reject negative dimensions on non-negative properties
+  if (tokens.length === 1 && tokens[0].type === 'dimension' && (tokens[0] as { value?: number }).value !== undefined && (tokens[0] as { value: number }).value < 0) {
+    const syntax = STANDARD_PROPERTIES_SYNTAX[lowerProp] || '';
+    if (syntax.includes('[0,∞]') || syntax.includes('[0,') || syntax.includes('[0.0,')) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+
+

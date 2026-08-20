@@ -94,24 +94,86 @@ export function collectStyleSheetsAndRules(
     ? elObj.getRootNode()
     : (elObj.ownerDocument || (elObj.nodeType === 9 ? (element as unknown as Document) : null));
 
+  const getSheetTitle = (sheet: unknown): string | null => {
+    const s = sheet as { title?: string | null; ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
+    if (s.title) return s.title;
+    if (s.ownerNode && typeof s.ownerNode.getAttribute === 'function') {
+      const t = s.ownerNode.getAttribute('title');
+      if (t) return t;
+    }
+    if (typeof s.getAttribute === 'function') {
+      const t = s.getAttribute('title');
+      if (t) return t;
+    }
+    return null;
+  };
+
+  const getSheetRel = (sheet: unknown): string | null => {
+    const s = sheet as { ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
+    if (s.ownerNode && typeof s.ownerNode.getAttribute === 'function') {
+      return s.ownerNode.getAttribute('rel');
+    }
+    if (typeof s.getAttribute === 'function') {
+      return s.getAttribute('rel');
+    }
+    return null;
+  };
+
+  let preferredTitle: string | null = null;
+  let preferredTitleFound = false;
+
+  const determinePreferredTitle = (sheetsOrTags: ArrayLike<unknown>) => {
+    if (preferredTitleFound) return;
+    for (let i = 0; i < sheetsOrTags.length; i++) {
+      const item = sheetsOrTags[i];
+      const title = getSheetTitle(item);
+      const rel = getSheetRel(item) || '';
+      const isAlternate = rel.toLowerCase().includes('alternate');
+      if (title && !isAlternate) {
+        preferredTitle = title;
+        preferredTitleFound = true;
+        break;
+      }
+    }
+  };
+
+  const isSheetEnabledForSet = (sheet: unknown): boolean => {
+    const title = getSheetTitle(sheet);
+    const rel = getSheetRel(sheet) || '';
+    const isAlternate = rel.toLowerCase().includes('alternate');
+    if (!title && !isAlternate) {
+      return true;
+    }
+    if (preferredTitleFound && preferredTitle !== null) {
+      return title === preferredTitle;
+    }
+    return !isAlternate;
+  };
+
   const addSheetRules = (sheet: unknown) => {
     if (!sheet) return;
     const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
     if (s.disabled) return;
-    if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
-      const parsed = parseStyleSheet(s.textContent);
-      ruleList.push(...parsed);
-      return;
-    }
-    if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
-      addSheetRules(s.sheet);
-      return;
+    if (!isSheetEnabledForSet(sheet)) return;
+    try {
+      if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
+        addSheetRules(s.sheet);
+        return;
+      }
+    } catch {
+      // linkedom style.sheet throws on modern CSS syntax (@layer, nesting)
     }
     if (s.cssRules && s.cssRules.length !== undefined) {
       for (let j = 0; j < s.cssRules.length; j++) {
         const r = s.cssRules[j];
         if (r) ruleList.push(r as unknown as CSSRule);
       }
+      return;
+    }
+    if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
+      const parsed = parseStyleSheet(s.textContent);
+      ruleList.push(...parsed);
+      return;
     }
   };
 
@@ -131,6 +193,7 @@ export function collectStyleSheetsAndRules(
     // 1. Regular non-adopted stylesheets
     let addedFromStyleSheets = false;
     if ('styleSheets' in rootObj && rootObj.styleSheets && rootObj.styleSheets.length > 0) {
+      determinePreferredTitle(rootObj.styleSheets);
       for (let i = 0; i < rootObj.styleSheets.length; i++) {
         addSheetRules(rootObj.styleSheets[i]);
         addedFromStyleSheets = true;
@@ -138,6 +201,7 @@ export function collectStyleSheetsAndRules(
     }
     if (!addedFromStyleSheets && typeof rootObj.querySelectorAll === 'function') {
       const styleTags = rootObj.querySelectorAll('style');
+      determinePreferredTitle(styleTags);
       for (let i = 0; i < styleTags.length; i++) {
         addSheetRules(styleTags[i]);
       }
@@ -183,6 +247,71 @@ export function collectStyleSheetsAndRules(
   return ruleList;
 }
 
+function splitSelectorList(selectorText: string): string[] {
+  const result: string[] = [];
+  let depth = 0;
+  let inString: string | null = null;
+  let current = '';
+
+  for (let i = 0; i < selectorText.length; i++) {
+    const char = selectorText[i];
+    if (inString) {
+      current += char;
+      if (char === '\\' && i + 1 < selectorText.length) {
+        current += selectorText[++i];
+      } else if (char === inString) {
+        inString = null;
+      }
+    } else if (char === '"' || char === "'") {
+      inString = char;
+      current += char;
+    } else if (char === '(' || char === '[' || char === '{') {
+      depth++;
+      current += char;
+    } else if (char === ')' || char === ']' || char === '}') {
+      if (depth > 0) depth--;
+      current += char;
+    } else if (char === ',' && depth === 0) {
+      if (current.trim()) result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) result.push(current.trim());
+  return result.length > 0 ? result : [selectorText];
+}
+
+function getRuleBaseURL(rule: unknown, element?: unknown): string | null {
+  const r = rule as { parentStyleSheet?: { _baseURL?: string | null; href?: string | null } } | null;
+  if (r?.parentStyleSheet?._baseURL) return r.parentStyleSheet._baseURL;
+  if (r?.parentStyleSheet?.href) return r.parentStyleSheet.href;
+  if (element && typeof element === 'object') {
+    const el = element as { ownerDocument?: { baseURI?: string; defaultView?: { location?: { href?: string } } } };
+    if (el.ownerDocument?.baseURI) return el.ownerDocument.baseURI;
+    if (el.ownerDocument?.defaultView?.location?.href) return el.ownerDocument.defaultView.location.href;
+  }
+  if (typeof globalThis.document !== 'undefined' && globalThis.document.baseURI) return globalThis.document.baseURI;
+  if (typeof globalThis.location !== 'undefined' && globalThis.location.href) return globalThis.location.href;
+  return null;
+}
+
+function resolveUrlsInValue(val: string, baseURL: string | null): string {
+  if (!baseURL || !val.includes('url(')) return val;
+  return val.replace(/url\(\s*(['"]?)(.*?)\1\s*\)/gi, (match, _quote, rawUrl) => {
+    try {
+      const trimmed = rawUrl.trim();
+      if (!trimmed || trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.startsWith('#')) {
+        return `url("${trimmed}")`;
+      }
+      const resolved = new URL(trimmed, baseURL).href;
+      return `url("${resolved}")`;
+    } catch {
+      return match;
+    }
+  });
+}
+
 /**
  * Traverses rule list, evaluates conditional at-rules and selectors, and collects matched declarations.
  * css-cascade-5 § 2 #filtering
@@ -213,28 +342,53 @@ export function collectMatchedDeclarations(
       ) {
         const selectorText = (rule as CSSStyleRule).selectorText || serialize((rule as { prelude?: ComponentValue[] }).prelude || []).trim();
         const resolvedSelector = resolveNestedSelector(selectorText, parentSelector);
+        const selectors = splitSelectorList(resolvedSelector);
 
-        const normalizedPseudo = pseudoElement
-          ? (pseudoElement.startsWith('::') ? pseudoElement : `::${pseudoElement.replace(/^:/, '')}`)
-          : null;
+        let maxSpecificity: Specificity | null = null;
         let isMatchingSelector = false;
-        let selectorForMatching = resolvedSelector;
-        if (normalizedPseudo) {
-          if (resolvedSelector.endsWith(normalizedPseudo) || resolvedSelector.endsWith(`:${normalizedPseudo.slice(2)}`)) {
-            selectorForMatching = resolvedSelector.replace(/::?[a-zA-Z-]+$/, '').trim() || ':scope';
-            isMatchingSelector = matches(element, selectorForMatching, scopeNode);
+
+        for (const sel of selectors) {
+          let matchesThisSel = false;
+          let selectorForMatching = sel;
+          if (pseudoElement) {
+            const normTarget = pseudoElement.toLowerCase().replace(/\s+/g, '');
+            const isLegacy = ['::before', '::after', '::first-line', '::first-letter'].includes(normTarget);
+            const legacySingleColon = isLegacy ? `:${normTarget.slice(2)}` : null;
+
+            const pseudoRegex = /(::?[a-zA-Z-]+(?:\([^)]*\))?)\s*$/;
+            const match = sel.match(pseudoRegex);
+            if (match) {
+              const rawMatchedPseudo = match[1].toLowerCase().replace(/\s+/g, '');
+              let isMatch = rawMatchedPseudo === normTarget;
+              if (!isMatch && legacySingleColon && rawMatchedPseudo === legacySingleColon) {
+                isMatch = true;
+              }
+              if (isMatch) {
+                selectorForMatching = sel.slice(0, match.index).trim() || ':scope';
+                matchesThisSel = matches(element, selectorForMatching, scopeNode);
+              }
+            }
+          } else {
+            const hasPseudo = /::[a-zA-Z-]+(?:\([^)]*\))?$/.test(sel) || /:(before|after|first-line|first-letter)\b/.test(sel);
+            if (!hasPseudo) {
+              matchesThisSel = matches(element, sel, scopeNode);
+            }
           }
-        } else {
-          const hasPseudo = /::[a-zA-Z-]+$/.test(resolvedSelector) || /:(before|after|first-line|first-letter)\b/.test(resolvedSelector);
-          if (!hasPseudo) {
-            isMatchingSelector = matches(element, resolvedSelector, scopeNode);
+
+          if (matchesThisSel) {
+            isMatchingSelector = true;
+            const spec = getMatchingSpecificity(element, selectorForMatching);
+            if (!maxSpecificity || compareSpecificity(spec, maxSpecificity) > 0) {
+              maxSpecificity = spec;
+            }
           }
         }
 
-        if (isMatchingSelector) {
-          const spec = getMatchingSpecificity(element, selectorForMatching);
+        if (isMatchingSelector && maxSpecificity) {
+          const spec = maxSpecificity;
           const style = (rule as CSSStyleRule).style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
+          const ruleBase = getRuleBaseURL(rule, element);
 
           if (style) {
             if (typeof (style as { length?: number }).length === 'number' && (style as { length: number }).length >= 0) {
@@ -250,9 +404,10 @@ export function collectMatchedDeclarations(
                 const priority = typeof (style as { getPropertyPriority?: (p: string) => string }).getPropertyPriority === 'function'
                   ? (style as { getPropertyPriority: (p: string) => string }).getPropertyPriority(name)
                   : '';
+                const rawValStr = typeof value === 'string' ? value : serialize(value as unknown as ComponentValue[]);
                 matchedDeclarations.push({
                   name,
-                  value: typeof value === 'string' ? value : serialize(value as unknown as ComponentValue[]),
+                  value: resolveUrlsInValue(rawValStr, ruleBase),
                   important: priority === 'important',
                   isInline: false,
                   layerOrder,
@@ -262,9 +417,10 @@ export function collectMatchedDeclarations(
               }
             } else if (Array.isArray((style as { declarations?: unknown[] }).declarations)) {
               for (const d of (style as { declarations: Declaration[] }).declarations) {
+                const rawValStr = serialize(d.value);
                 matchedDeclarations.push({
                   name: d.name,
-                  value: serialize(d.value),
+                  value: resolveUrlsInValue(rawValStr, ruleBase),
                   important: d.important,
                   isInline: false,
                   layerOrder,
@@ -277,9 +433,10 @@ export function collectMatchedDeclarations(
             const blockVal = (rule as { block?: { value?: ComponentValue[] } }).block!.value || [];
             const decls = ParseHooks.parseStyleAttribute(tokenize(serialize(blockVal)));
             for (const d of decls.declarations) {
+              const rawValStr = serialize(d.value);
               matchedDeclarations.push({
                 name: d.name,
-                value: serialize(d.value),
+                value: resolveUrlsInValue(rawValStr, ruleBase),
                 important: d.important,
                 isInline: false,
                 layerOrder,
@@ -401,13 +558,14 @@ export function collectMatchedDeclarations(
           const spec = (scopeNode ? [0, 0, 0] : getMatchingSpecificity(element, selectorToMatch)) as Specificity;
           const style = rule.style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
+          const ruleBase = getRuleBaseURL(rule, element);
           for (let k = 0; k < style.length; k++) {
             const name = style.item(k);
             const value = style.getPropertyValue(name);
             const priority = style.getPropertyPriority(name);
             matchedDeclarations.push({
               name,
-              value,
+              value: resolveUrlsInValue(value, ruleBase),
               important: priority === 'important',
               isInline: false,
               layerOrder,

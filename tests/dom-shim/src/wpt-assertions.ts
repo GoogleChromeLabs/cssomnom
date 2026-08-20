@@ -51,6 +51,63 @@ export function sanitize_unpaired_surrogates(str: string): string {
   );
 }
 
+export function format_value(val: unknown, seen?: unknown[]): string {
+  if (!seen) {
+    seen = [];
+  }
+  if (typeof val === 'object' && val !== null) {
+    if (seen.includes(val)) {
+      return '[...]';
+    }
+    seen.push(val);
+  }
+  if (Array.isArray(val)) {
+    let output = '[';
+    output += val.map(x => format_value(x, seen)).join(', ');
+    return output + ']';
+  }
+
+  switch (typeof val) {
+    case 'string':
+      return JSON.stringify(val);
+    case 'boolean':
+    case 'undefined':
+      return String(val);
+    case 'number':
+      if (val === 0 && 1 / val === -Infinity) {
+        return '-0';
+      }
+      return String(val);
+    case 'bigint':
+      return String(val) + 'n';
+    case 'symbol':
+      return String(val);
+    case 'function':
+      return `function ${(val as Function).name || 'anonymous'}() { [native code] }`;
+    case 'object':
+      if (val === null) {
+        return 'null';
+      }
+      if (val && typeof (val as { nodeType?: number }).nodeType === 'number') {
+        const node = val as { nodeType: number; localName?: string; nodeName?: string; data?: string };
+        if (node.nodeType === 1) {
+          return `<${node.localName || node.nodeName || 'element'}>`;
+        }
+        if (node.nodeType === 3) {
+          return `Text node "${node.data || ''}"`;
+        }
+        return `Node object of type ${node.nodeType}`;
+      }
+      try {
+        return typeof val + ' "' + String(val) + '"';
+      } catch (e) {
+        return `[stringifying object threw ${String(e)}]`;
+      }
+    default:
+      return String(val);
+  }
+}
+
 export function get_test_name(func: Function, name: string | undefined, defaultName: string, tests: Array<{ name: string }>): string {
   if (name) {
     return name;
@@ -136,19 +193,47 @@ for (const [k, v] of Object.entries(NAME_CODE_MAP)) {
 
 export const WPT_ASSERTIONS = {
   assert_equals(actual: unknown, expected: unknown, description?: string): void {
-    assert.strictEqual(actual, expected, description ?? '');
+    if (!Object.is(actual, expected)) {
+      throw new AssertionErrorProxy({
+        message: `${description ? description + ': ' : ''}expected ${format_value(expected)} but got ${format_value(actual)}`,
+        actual: format_value(actual),
+        expected: format_value(expected),
+        operator: 'strictEqual'
+      });
+    }
   },
 
   assert_not_equals(actual: unknown, expected: unknown, message?: string): void {
-    assert.notStrictEqual(actual, expected, message ?? '');
+    if (Object.is(actual, expected)) {
+      throw new AssertionErrorProxy({
+        message: `${message ? message + ': ' : ''}expected not ${format_value(expected)} but got ${format_value(actual)}`,
+        actual: format_value(actual),
+        expected: format_value(expected),
+        operator: 'notStrictEqual'
+      });
+    }
   },
 
   assert_true(actual: unknown, description?: string): void {
-    assert.strictEqual(actual, true, description ?? '');
+    if (actual !== true) {
+      throw new AssertionErrorProxy({
+        message: `${description ? description + ': ' : ''}expected true but got ${format_value(actual)}`,
+        actual: format_value(actual),
+        expected: 'true',
+        operator: 'strictEqual'
+      });
+    }
   },
 
   assert_false(actual: unknown, description?: string): void {
-    assert.strictEqual(actual, false, description ?? '');
+    if (actual !== false) {
+      throw new AssertionErrorProxy({
+        message: `${description ? description + ': ' : ''}expected false but got ${format_value(actual)}`,
+        actual: format_value(actual),
+        expected: 'false',
+        operator: 'strictEqual'
+      });
+    }
   },
 
   assert_approx_equals(actual: unknown, expected: unknown, epsilon: number, description?: string): void {
@@ -204,14 +289,38 @@ export const WPT_ASSERTIONS = {
       func();
       assert.fail(`${description || ''}: Expected to throw exception`);
     } catch (e: unknown) {
-      assert.strictEqual(e, expected, description ?? '');
+      if (e instanceof assert.AssertionError) {
+        throw e;
+      }
+      if (!Object.is(e, expected)) {
+        throw new AssertionErrorProxy({
+          message: `${description ? description + ': ' : ''}expected ${format_value(expected)} but got ${format_value(e)}`,
+          actual: format_value(e),
+          expected: format_value(expected),
+          operator: 'strictEqual'
+        });
+      }
     }
   },
 
   assert_array_equals(actual: unknown[], expected: unknown[], message?: string): void {
-    assert.strictEqual(actual.length, expected.length, `${message || 'Array length mismatch'}: expected ${expected.length} but got ${actual.length}`);
+    if (actual.length !== expected.length) {
+      throw new AssertionErrorProxy({
+        message: `${message || 'Array length mismatch'}: expected ${expected.length} but got ${actual.length}`,
+        actual: String(actual.length),
+        expected: String(expected.length),
+        operator: 'strictEqual'
+      });
+    }
     for (let i = 0; i < actual.length; i++) {
-      assert.strictEqual(actual[i], expected[i], `${message || 'Array element mismatch at index ' + i}: expected ${expected[i]} but got ${actual[i]}`);
+      if (!Object.is(actual[i], expected[i])) {
+        throw new AssertionErrorProxy({
+          message: `${message || 'Array element mismatch at index ' + i}: expected ${format_value(expected[i])} but got ${format_value(actual[i])}`,
+          actual: format_value(actual[i]),
+          expected: format_value(expected[i]),
+          operator: 'strictEqual'
+        });
+      }
     }
   },
 

@@ -82,6 +82,18 @@ const knownSkips = new Map<string, string>([
   [
     '@-some-ridiculously-long-vendor-prefix-that-must-be-supported-keyframes therulename /*comment*/{0%{top:0px; left:0px; background:red;}100% {top:4em; left:40px; background:maroon;}}',
     'Fixture expects background shorthand to be preserved as-is, but we expand it to longhands.'
+  ],
+  [
+    'h2 {font: normal\n1.6em\r\nTimes New Roman,\tserif  ;}',
+    'Fixture expects font shorthand to be preserved as-is, but we expand it to longhands per CSSOM specification.'
+  ],
+  [
+    "h1 {font-family: 'Times New Roman', Helvetica Neue, sans-serif }",
+    'Fixture expects quoted "Times New Roman", but CSS Fonts 4 / CSSOM § 6.4.3 requires unquoted valid ident sequences.'
+  ],
+  [
+    "h3 {font-family: 'times new roman'} ",
+    'Fixture expects quoted "times new roman", but CSS Fonts 4 / CSSOM § 6.4.3 requires unquoted valid ident sequences.'
   ]
 ]);
 

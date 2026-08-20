@@ -140,14 +140,16 @@ test('Phase 86: CSSVariableReferenceValue & Fallback Preservation', () => {
 test('Phase 86: Calc Tree Simplification & Numeric Normalization', () => {
   // CSS Values 4 § 10.7 & CSS Typed OM 1 § 4.3
   const calc1 = CSSNumericValue.parse('calc(0% + 0%)');
-  assert.equal(calc1 instanceof CSSUnitValue, true);
-  assert.equal((calc1 as CSSUnitValue).value, 0);
-  assert.equal((calc1 as CSSUnitValue).unit, 'percent');
+  assert.equal(calc1 instanceof CSSMathSum, true);
+  assert.equal((calc1 as CSSMathSum).values[0] instanceof CSSUnitValue, true);
+  assert.equal(((calc1 as CSSMathSum).values[0] as CSSUnitValue).value, 0);
+  assert.equal(((calc1 as CSSMathSum).values[0] as CSSUnitValue).unit, 'percent');
 
   const calc2 = CSSNumericValue.parse('calc(10px + 20px)');
-  assert.equal(calc2 instanceof CSSUnitValue, true);
-  assert.equal((calc2 as CSSUnitValue).value, 30);
-  assert.equal((calc2 as CSSUnitValue).unit, 'px');
+  assert.equal(calc2 instanceof CSSMathSum, true);
+  assert.equal((calc2 as CSSMathSum).values[0] instanceof CSSUnitValue, true);
+  assert.equal(((calc2 as CSSMathSum).values[0] as CSSUnitValue).value, 30);
+  assert.equal(((calc2 as CSSMathSum).values[0] as CSSUnitValue).unit, 'px');
 
   const calc3 = CSSNumericValue.parse('calc(1px + calc(1px) + calc(1px * 2) + 1%)');
   assert.equal(calc3 instanceof CSSMathSum, true);

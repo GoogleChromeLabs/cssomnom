@@ -3,7 +3,7 @@
 
 
 import { parseHTML } from 'linkedom';
-import { patchWindowForTypedOM, createWptContext, type WptSandboxTest } from '../../../tests/wpt-shim.ts';
+import { patchWindowForTypedOM, createWptContext, format_value, type WptSandboxTest } from '../../../tests/wpt-shim.ts';
 import assert from 'node:assert/strict';
 import * as vm from 'node:vm';
 import * as fs from 'node:fs';
@@ -22,6 +22,72 @@ export interface WptFileResult {
 }
 
 const WPT_ROOT = path.resolve(process.cwd(), 'submodules/web-platform-tests');
+
+const JS_INTRINSICS = new Set([
+  'Array',
+  'Object',
+  'Function',
+  'Promise',
+  'Error',
+  'TypeError',
+  'RangeError',
+  'SyntaxError',
+  'ReferenceError',
+  'URIError',
+  'EvalError',
+  'Map',
+  'Set',
+  'WeakMap',
+  'WeakSet',
+  'RegExp',
+  'Date',
+  'Math',
+  'JSON',
+  'Symbol',
+  'BigInt',
+  'ArrayBuffer',
+  'Uint8Array',
+  'Int8Array',
+  'Uint16Array',
+  'Int16Array',
+  'Uint32Array',
+  'Int32Array',
+  'Float32Array',
+  'Float64Array',
+  'DataView',
+  'Proxy',
+  'Reflect',
+  'Iterator',
+  'AsyncIterator',
+  'module',
+  'exports',
+  'require',
+  'global',
+  'process',
+  'Buffer',
+  'clearImmediate',
+  'setImmediate'
+]);
+
+const SAFE_HOST_APIS = new Set([
+  'console',
+  'crypto',
+  'performance',
+  'URL',
+  'URLSearchParams',
+  'TextEncoder',
+  'TextDecoder',
+  'queueMicrotask',
+  'structuredClone',
+  'btoa',
+  'atob',
+  'fetch',
+  'Response',
+  'Request',
+  'Headers',
+  'AbortController',
+  'AbortSignal'
+]);
 
 function getScriptContent(htmlDir: string, src: string): string {
   if (src.startsWith('/resources/testharness')) {
@@ -52,21 +118,51 @@ export function runWptFile(filePath: string): WptFileResult {
   const htmlContent = fs.readFileSync(filePath, 'utf-8');
   const dom = parseHTML(htmlContent);
   const win = dom.window;
+  (dom.document as unknown as { _htmlDir?: string })._htmlDir = path.dirname(path.resolve(filePath));
+  (win as unknown as { _htmlDir?: string })._htmlDir = path.dirname(path.resolve(filePath));
   patchWindowForTypedOM(win);
 
   const tests: WptSandboxTest[] = [];
   const sandbox = createWptContext(win, dom.document, tests);
 
-  // Copy linkedom window properties to sandbox
+  // Copy linkedom window properties to sandbox, filtering out JS_INTRINSICS
   const winObj = win as unknown as Record<string, unknown>;
   const windowKeys = Object.getOwnPropertyNames(win);
   for (const key of windowKeys) {
+    if (JS_INTRINSICS.has(key)) continue;
     try {
       if (!(key in sandbox)) { sandbox[key] = winObj[key]; }
     } catch {
       // Ignore getter errors
     }
   }
+
+  // Intercept relative /interfaces/*.idl fetch calls
+  sandbox.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const urlStr = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as { url?: string }).url || '';
+    if (urlStr.startsWith('/interfaces/')) {
+      const idlFileName = urlStr.slice('/interfaces/'.length);
+      const fullPath = path.join(WPT_ROOT, 'interfaces', idlFileName);
+      if (fs.existsSync(fullPath)) {
+        const content = fs.readFileSync(fullPath, 'utf-8');
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          headers: new Headers({ 'Content-Type': 'text/plain' }),
+          text: async () => content,
+          json: async () => JSON.parse(content)
+        } as unknown as Response;
+      }
+    }
+    return fetch(input as unknown as RequestInfo, init);
+  };
+
+  // Expose Window and format_value on sandbox
+  sandbox.Window = win.Window || (win as unknown as { constructor: unknown }).constructor || (globalThis as unknown as Record<string, unknown>).Window;
+  sandbox.format_value = (sandbox as { format_value?: unknown }).format_value || format_value;
+
+  let contextRealm: Record<string, unknown> | undefined;
 
   const windowProxy: unknown = new Proxy(winObj, {
     get(target, prop) {
@@ -77,11 +173,16 @@ export function runWptFile(filePath: string): WptFileResult {
         return sandbox.navigator;
       }
       if (typeof prop === 'string') {
-        if (prop in globalThis) {
-          return Reflect.get(globalThis, prop);
+        if (JS_INTRINSICS.has(prop)) {
+          if (contextRealm && prop in contextRealm) {
+            return Reflect.get(contextRealm, prop);
+          }
         }
         if (prop in sandbox) {
           return Reflect.get(sandbox, prop);
+        }
+        if (SAFE_HOST_APIS.has(prop)) {
+          return Reflect.get(globalThis, prop);
         }
         const val = target[prop];
         if (val !== undefined) {
@@ -105,15 +206,60 @@ export function runWptFile(filePath: string): WptFileResult {
         return true;
       }
       if (typeof prop === 'string') {
-        return (target[prop] !== undefined) || (prop in sandbox) || (prop in globalThis) || (Boolean(dom.document?.getElementById?.(prop)));
+        if (JS_INTRINSICS.has(prop)) return true;
+        if (prop in sandbox) return true;
+        if (SAFE_HOST_APIS.has(prop)) return true;
+        return (target[prop] !== undefined) || (Boolean(dom.document?.getElementById?.(prop)));
       }
       return prop in sandbox;
     },
     set(target, prop, value) {
       if (typeof prop === 'string' && target[prop] !== undefined) {
-        return Reflect.set(target, prop, value);
+        try {
+          if (Reflect.set(target, prop, value)) return true;
+        } catch {}
       }
       return Reflect.set(sandbox, prop as string, value);
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      const targetDesc = Object.getOwnPropertyDescriptor(target, prop);
+      if (targetDesc && !targetDesc.configurable) {
+        return targetDesc;
+      }
+      if (prop === 'window' || prop === 'self' || prop === 'globalThis') {
+        return { value: windowProxy, writable: true, enumerable: false, configurable: true };
+      }
+      if (typeof prop === 'string') {
+        if (JS_INTRINSICS.has(prop) && contextRealm && prop in contextRealm) {
+          return { value: contextRealm[prop], writable: true, enumerable: false, configurable: true };
+        }
+        if (prop in sandbox) {
+          return { value: sandbox[prop], writable: true, enumerable: false, configurable: true };
+        }
+        if (SAFE_HOST_APIS.has(prop) && prop in globalThis) {
+          return { value: (globalThis as unknown as Record<string, unknown>)[prop], writable: true, enumerable: false, configurable: true };
+        }
+        if (targetDesc) {
+          return targetDesc;
+        }
+        if (prop in target) {
+          return { value: target[prop], writable: true, enumerable: false, configurable: true };
+        }
+        if (dom.document && typeof dom.document.getElementById === 'function') {
+          const el = dom.document.getElementById(prop);
+          if (el) {
+            return { value: el, writable: true, enumerable: false, configurable: true };
+          }
+        }
+      }
+      return undefined;
+    },
+    ownKeys(target) {
+      return Array.from(new Set([
+        ...Reflect.ownKeys(target),
+        ...Reflect.ownKeys(sandbox),
+        ...(contextRealm ? Reflect.ownKeys(contextRealm) : [])
+      ]));
     }
   });
 
@@ -125,18 +271,41 @@ export function runWptFile(filePath: string): WptFileResult {
 
   // Copy common globals explicitly if they are on window
   const commonGlobals = [
+    'Window',
+    'Document',
+    'DocumentFragment',
+    'ProcessingInstruction',
     'Node',
     'Element',
     'HTMLElement',
     'HTMLStyleElement',
+    'SVGElement',
+    'CharacterData',
+    'Comment',
+    'Text',
+    'Attr',
+    'DocumentType',
     'DOMException',
     'Event',
     'CustomEvent',
-    'navigator'
+    'customElements',
+    'MutationObserver',
+    'navigator',
+    'location',
+    'history',
+    'getComputedStyle',
+    'matchMedia',
+    'requestAnimationFrame',
+    'cancelAnimationFrame'
   ];
   for (const g of commonGlobals) {
-    if (g in win && !(g in sandbox)) {
-      sandbox[g] = winObj[g];
+    const val = winObj[g] ?? (win as unknown as Record<string, unknown>)[g];
+    if (val !== undefined && !(g in sandbox)) {
+      if (typeof val === 'function' && (!val.prototype || val.prototype.constructor !== val)) {
+        sandbox[g] = (val as Function).bind(winObj);
+      } else {
+        sandbox[g] = val;
+      }
     }
   }
 
@@ -151,12 +320,24 @@ export function runWptFile(filePath: string): WptFileResult {
     }
   }
 
+
+
   const htmlDir = path.dirname(filePath);
   (dom.document as unknown as { _htmlDir?: string })._htmlDir = htmlDir;
 
-  const context = vm.createContext(windowProxy as Record<string, unknown>);
+  (winObj as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = sandbox;
+  if (dom.document) {
+    (dom.document as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = sandbox;
+  }
+
+  const context = vm.createContext(sandbox);
+  contextRealm = vm.runInContext('this', context) as Record<string, unknown>;
 
   const cleanup = () => {
+    (winObj as unknown as { __sandbox?: unknown }).__sandbox = undefined;
+    if (dom.document) {
+      (dom.document as unknown as { __sandbox?: unknown }).__sandbox = undefined;
+    }
     const sandboxObj = sandbox as {[key: string]: unknown};
     if (sandboxObj && typeof sandboxObj.__cleanup === 'function') {
       (sandboxObj.__cleanup as () => void)();
@@ -191,20 +372,33 @@ export function runWptFile(filePath: string): WptFileResult {
     // @ts-expect-error - internal load event tracking property
     win.__loadEventFired = true;
     win.dispatchEvent(new win.Event('load'));
+    const onloadFn = (sandbox as { onload?: (e: unknown) => void }).onload || (win as unknown as { onload?: (e: unknown) => void }).onload;
+    if (typeof onloadFn === 'function') {
+      try { onloadFn(new win.Event('load')); } catch {}
+    }
   } catch (err) {
     console.error("Failed to dispatch load event:", err);
   }
 
-  const testQueue: WptTest[] = [];
-  for (const t of tests) {
+  function wrapTest(t: WptSandboxTest): WptTest {
     if (t.executed) {
       const wrappedFn = async () => {
+        if ('promise' in t && t.promise) {
+          let timeoutId: NodeJS.Timeout | undefined;
+          const timeoutPromise = new Promise<void>((_, reject) => {
+            timeoutId = setTimeout(() => reject(new Error('Async test timed out')), 500);
+          });
+          try {
+            await Promise.race([t.promise, timeoutPromise]);
+          } finally {
+            if (timeoutId) clearTimeout(timeoutId);
+          }
+        }
         if ((t.status ?? 0) !== 0) {
           throw new Error(t.message || `Test failed with status ${t.status}`);
         }
       };
-      testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
-      continue;
+      return { name: t.name, fn: wrappedFn, isAsync: 'promise' in t && !!t.promise };
     }
 
     const cleanups: Function[] = [];
@@ -246,8 +440,31 @@ export function runWptFile(filePath: string): WptFileResult {
         }
       }
     };
-    testQueue.push({ name: t.name, fn: wrappedFn, isAsync: false });
+    return { name: t.name, fn: wrappedFn, isAsync: false };
   }
+
+  const testQueue: WptTest[] = new Proxy([] as WptTest[], {
+    get(target, prop) {
+      if (prop === 'length') return tests.length;
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const idx = Number(prop);
+        if (idx < tests.length) {
+          return wrapTest(tests[idx]);
+        }
+      }
+      if (prop === Symbol.iterator) {
+        return function* () {
+          let i = 0;
+          while (i < tests.length) {
+            yield wrapTest(tests[i]);
+            i++;
+          }
+        };
+      }
+      return Reflect.get(target, prop);
+    }
+  });
+
   return {
     tests: testQueue,
     cleanup: () => {

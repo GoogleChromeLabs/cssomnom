@@ -26,6 +26,19 @@ import { substituteVariables } from './variable-resolver.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 
+const EXTRA_INITIAL_VALUES: Record<string, string> = {
+  '-webkit-mask-box-image-outset': '0',
+  '-webkit-mask-box-image-repeat': 'stretch',
+  '-webkit-mask-box-image-slice': '0 fill',
+  '-webkit-mask-box-image-source': 'none',
+  '-webkit-mask-box-image-width': 'auto',
+  '-webkit-text-fill-color': 'currentcolor',
+  '-webkit-text-stroke-color': 'currentcolor',
+  '-webkit-text-stroke-width': '0px',
+  'background-tbd': 'none',
+  'font-presentation': 'auto',
+};
+
 export function getUaDefault(prop: string, element: unknown): string {
   const el = element as { tagName?: string; nodeName?: string };
   const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
@@ -36,11 +49,25 @@ export function getUaDefault(prop: string, element: unknown): string {
   if (prop === 'display') {
     return BLOCK_TAGS.has(tag) ? 'block' : 'inline';
   }
-  return DEFAULT_PROPERTY_VALUES[prop] ?? '';
+  const val = DEFAULT_PROPERTY_VALUES[prop] || EXTRA_INITIAL_VALUES[prop];
+  if (val !== undefined && val !== '') return val;
+  if (prop.startsWith('-webkit-')) {
+    const unPrefixed = prop.slice(8);
+    const unPrefixedVal = DEFAULT_PROPERTY_VALUES[unPrefixed] || EXTRA_INITIAL_VALUES[unPrefixed];
+    if (unPrefixedVal !== undefined && unPrefixedVal !== '') return unPrefixedVal;
+  }
+  return '';
 }
 
 export function getInitialValue(prop: string, _element: unknown): string {
-  return DEFAULT_PROPERTY_VALUES[prop] ?? '';
+  const val = DEFAULT_PROPERTY_VALUES[prop] || EXTRA_INITIAL_VALUES[prop];
+  if (val !== undefined && val !== '') return val;
+  if (prop.startsWith('-webkit-')) {
+    const unPrefixed = prop.slice(8);
+    const unPrefixedVal = DEFAULT_PROPERTY_VALUES[unPrefixed] || EXTRA_INITIAL_VALUES[unPrefixed];
+    if (unPrefixedVal !== undefined && unPrefixedVal !== '') return unPrefixedVal;
+  }
+  return '';
 }
 
 /**

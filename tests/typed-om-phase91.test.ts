@@ -108,7 +108,7 @@ test('Phase 91: Same-Unit Literal Combining in min() / max() (css-values-4 § 10
   assert.equal(((nestedMin as CSSMathMin).values[1] as CSSUnitValue).unit, 'percent');
 
   // Parsing min() / max() inside calc()
-  const parsedMin = CSSNumericValue.parse('calc(min(10px, 20px, 100%))');
+  const parsedMin = simplify(CSSNumericValue.parse('calc(min(10px, 20px, 100%))'));
   assert.equal(parsedMin instanceof CSSMathMin, true);
   assert.equal((parsedMin as CSSMathMin).values.length, 2);
   assert.equal(((parsedMin as CSSMathMin).values[0] as CSSUnitValue).value, 10);
@@ -116,7 +116,7 @@ test('Phase 91: Same-Unit Literal Combining in min() / max() (css-values-4 § 10
   assert.equal(((parsedMin as CSSMathMin).values[1] as CSSUnitValue).value, 100);
   assert.equal(((parsedMin as CSSMathMin).values[1] as CSSUnitValue).unit, 'percent');
 
-  const parsedMax = CSSNumericValue.parse('calc(max(5em, 10em, 50px))');
+  const parsedMax = simplify(CSSNumericValue.parse('calc(max(5em, 10em, 50px))'));
   assert.equal(parsedMax instanceof CSSMathMax, true);
   assert.equal((parsedMax as CSSMathMax).values.length, 2);
   assert.equal(((parsedMax as CSSMathMax).values[0] as CSSUnitValue).value, 10);

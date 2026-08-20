@@ -47,6 +47,15 @@ To prevent unmonitored child process spawning, worker process memory ballooning,
 - **Exceptions**: Only the centralized safe kernel (`scripts/wpt/node/safe-child-process.ts`) and synchronous codegen build scripts (`scripts/codegen/generate_all.ts`, `scripts/external_suites/extract_all.ts`, `scripts/wpt/browser/run.ts`) may import `child_process`.
 - **Solution**: Always import `safeExecTestFile` and `safeWorkerPool` from `scripts/wpt/node/safe-child-process.ts`. Every child process spawned via `safeExecTestFile` is constrained with `--max-old-space-size=512`, guarded by a 250ms `/proc/[pid]/stat` RSS (>2048MB) and state 'D' watchdog (`SIGKILL`), and tracked for cleanup upon parent termination.
 
+### DOM & Cyclic Object Assertion Safety
+`node:assert/strict` structural diffs on cyclic DOM nodes explode heap memory (>8GB) and crash the host.
+- **Rule**: Never pass DOM nodes or cyclic objects directly to `assert.equal` / `assert.deepStrictEqual`. Compare scalars (`assert.equal(a?.id, '...')`), booleans (`assert.ok(a === b)`), or use cycle-safe formatters (`format_value(val)`).
+
+### Test Isolation & Event Loop Safety
+- **Pure Unit Tests**: Tests in `tests/**/*.test.ts` (`pnpm test:node`) must remain 100% in-memory without spawning child processes.
+- **Watchdog Unref**: All background watchdog/polling intervals must call `timer.unref()` immediately so timers do not keep the Node event loop alive.
+- **Progress Hash Reconciliation**: Reconcile unfinalized pre-commit hashes (`*`) in `wpt-progress.md` via `syncProgressFromNotes()` using `git notes` and `git log`.
+
 ## Spec Evolution & Maintainability
 
 ### Automation Over Hardcoding

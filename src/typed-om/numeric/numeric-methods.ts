@@ -33,7 +33,7 @@ import {
 import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { ParseHooks } from '../../parse-hooks.ts';
-import { parseMathFunction, simplify } from '../../math-parser.ts';
+import { parseMathFunction } from '../../math-parser.ts';
 import { unitToBase, unitToPixels, unitToRadians, unitToSeconds } from '../../data/gen/units.ts';
 import { compareStrings } from '../utils/validation.ts';
 import { ensureNumeric } from '../utils/formatting.ts';
@@ -205,6 +205,7 @@ function isStandardCSSNumericValue(node: CSSNumericValue): boolean {
     return isStandardCSSNumericValue(node.value) && isStandardCSSNumericValue(node.precision);
   }
   if (node instanceof CSSMathFunction) {
+    if (node.name.toLowerCase() === 'sign') return false;
     return Array.from(node.values).every(isStandardCSSNumericValue);
   }
   return false;
@@ -307,9 +308,6 @@ export function parseNumericValue(css: string): CSSNumericValue {
         } catch (e) {
           throw new DOMException(`Invalid types in mathematical function: ${css}`, 'SyntaxError');
         }
-        if ((v as CSSFunction).name.toLowerCase() === 'calc') {
-          return simplify(mathNode);
-        }
         return mathNode;
       }
       throw new DOMException(`Invalid numeric value: ${css}`, 'SyntaxError');
@@ -331,7 +329,13 @@ export function numericAdd(self: CSSNumericValue, ...values: (number | CSSNumeri
   } else {
     allValues.push(self);
   }
-  allValues.push(...rectifiedValues);
+  for (const v of rectifiedValues) {
+    if (v instanceof CSSMathSum) {
+      allValues.push(...v.values);
+    } else {
+      allValues.push(v);
+    }
+  }
 
   if (allValues.every(v => v instanceof CSSUnitValue)) {
     const unitValues = allValues as CSSUnitValue[];
@@ -369,7 +373,13 @@ export function numericMul(self: CSSNumericValue, ...values: (number | CSSNumeri
   } else {
     allValues.push(self);
   }
-  allValues.push(...rectifiedValues);
+  for (const v of rectifiedValues) {
+    if (v instanceof CSSMathProduct) {
+      allValues.push(...v.values);
+    } else {
+      allValues.push(v);
+    }
+  }
 
   if (allValues.every(v => v instanceof CSSUnitValue)) {
     const unitValues = allValues as CSSUnitValue[];
@@ -390,8 +400,22 @@ export function numericMul(self: CSSNumericValue, ...values: (number | CSSNumeri
 }
 
 export function numericDiv(self: CSSNumericValue, ...values: (number | CSSNumericValue)[]): CSSNumericValue {
-  const invertedValues = values.map(v => {
-    const num = ensureNumeric(v);
+  const rectifiedValues = values.map(v => ensureNumeric(v));
+
+  if (self instanceof CSSUnitValue && rectifiedValues.length === 1 && rectifiedValues[0] instanceof CSSUnitValue) {
+    const other = rectifiedValues[0];
+    if (other.value === 0) {
+      throw new RangeError('Division by zero');
+    }
+    if (other.unit === 'number') {
+      return new CSSUnitValue(self.value / other.value, self.unit);
+    }
+    if (other.unit === self.unit) {
+      return new CSSUnitValue(self.value / other.value, 'number');
+    }
+  }
+
+  const invertedValues = rectifiedValues.map(num => {
     if (num instanceof CSSMathInvert) {
       return num.value;
     }
@@ -414,7 +438,13 @@ export function numericMin(self: CSSNumericValue, ...values: (number | CSSNumeri
   } else {
     allValues.push(self);
   }
-  allValues.push(...rectifiedValues);
+  for (const v of rectifiedValues) {
+    if (v instanceof CSSMathMin) {
+      allValues.push(...v.values);
+    } else {
+      allValues.push(v);
+    }
+  }
 
   if (allValues.every(v => v instanceof CSSUnitValue)) {
     const unitValues = allValues as CSSUnitValue[];
@@ -436,7 +466,13 @@ export function numericMax(self: CSSNumericValue, ...values: (number | CSSNumeri
   } else {
     allValues.push(self);
   }
-  allValues.push(...rectifiedValues);
+  for (const v of rectifiedValues) {
+    if (v instanceof CSSMathMax) {
+      allValues.push(...v.values);
+    } else {
+      allValues.push(v);
+    }
+  }
 
   if (allValues.every(v => v instanceof CSSUnitValue)) {
     const unitValues = allValues as CSSUnitValue[];

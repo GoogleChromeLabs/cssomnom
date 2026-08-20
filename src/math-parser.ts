@@ -33,64 +33,272 @@ function isSameType(a: CSSNumericType, b: CSSNumericType): boolean {
   return true;
 }
 
-// 10 Mathematical Expressions
-export function parseMathFunction(name: string, values: ComponentValue[]): CSSNumericValue | null {
-  // Remove whitespace and EOF tokens
-  const tokens = values.filter(v => v.type !== 'whitespace' && v.type !== 'EOF');
-  
+function toCanonical(val: CSSUnitValue): { value: number, unit: CSSUnit } {
+  const base = unitToBase[val.unit] || 'other';
+  if (base === 'length' && unitToPixels[val.unit]) {
+    return { value: val.value * unitToPixels[val.unit], unit: 'px' };
+  } else if (base === 'angle' && unitToRadians[val.unit]) {
+    return { value: val.value * (unitToRadians[val.unit] / unitToRadians['deg']), unit: 'deg' };
+  } else if (base === 'time' && unitToSeconds[val.unit]) {
+    return { value: val.value * unitToSeconds[val.unit], unit: 's' };
+  } else if (base === 'resolution') {
+    if (val.unit === 'dpi') return { value: val.value, unit: 'dpi' };
+    if (val.unit === 'dpcm') return { value: val.value * 2.54, unit: 'dpi' };
+    if (val.unit === 'dppx' || val.unit === 'x') return { value: val.value * 96, unit: 'dpi' };
+  }
+  return { value: val.value, unit: val.unit };
+}
+
+function fromCanonical(value: number, targetUnit: CSSUnit): number {
+  const base = unitToBase[targetUnit] || 'other';
+  if (base === 'length' && unitToPixels[targetUnit]) {
+    return value / unitToPixels[targetUnit];
+  } else if (base === 'angle' && unitToRadians[targetUnit]) {
+    return value / (unitToRadians[targetUnit] / unitToRadians['deg']);
+  } else if (base === 'time' && unitToSeconds[targetUnit]) {
+    return value / unitToSeconds[targetUnit];
+  } else if (base === 'resolution') {
+    if (targetUnit === 'dpi') return value;
+    if (targetUnit === 'dpcm') return value / 2.54;
+    if (targetUnit === 'dppx' || targetUnit === 'x') return value / 96;
+  }
+  return value;
+}
+
+function isCanonicalizable(val: CSSUnitValue): boolean {
+  const base = unitToBase[val.unit] || 'other';
+  if (base === 'length') return !!unitToPixels[val.unit];
+  if (base === 'angle') return !!unitToRadians[val.unit];
+  if (base === 'time') return !!unitToSeconds[val.unit];
+  if (base === 'resolution') return true;
+  if (base === 'number') return true;
+  return false;
+}
+
+function areCompatibleForSimplification(values: CSSUnitValue[]): boolean {
+  if (values.length === 0) return true;
+  const firstUnit = values[0].unit;
+  if (values.every(v => v.unit === firstUnit)) return true;
+  return values.every(v => isCanonicalizable(v));
+}
+
+function combineSumTerms(terms: CSSNumericValue[]): CSSNumericValue {
+  const flattened: CSSNumericValue[] = [];
+  for (const t of terms) {
+    if (t instanceof CSSMathSum) {
+      flattened.push(...t.values);
+    } else {
+      flattened.push(t);
+    }
+  }
+
+  type UnitTerm = {
+    value: number;
+    unit: CSSUnit;
+    original: CSSNumericValue;
+    isNegate: boolean;
+  };
+
+  const groups = new Map<string, UnitTerm[]>();
+  const otherTerms: CSSNumericValue[] = [];
+
+  for (const t of flattened) {
+    if (t instanceof CSSUnitValue) {
+      const key = isCanonicalizable(t) ? (unitToBase[t.unit] ?? t.unit) : t.unit;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push({ value: t.value, unit: t.unit, original: t, isNegate: false });
+    } else if (t instanceof CSSMathNegate && t.value instanceof CSSUnitValue) {
+      const key = isCanonicalizable(t.value) ? (unitToBase[t.value.unit] ?? t.value.unit) : t.value.unit;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push({ value: -t.value.value, unit: t.value.unit, original: t, isNegate: true });
+    } else {
+      otherTerms.push(t);
+    }
+  }
+
+  const combinedResult: CSSNumericValue[] = [];
+
+  for (const [, group] of groups) {
+    if (group.length === 1) {
+      combinedResult.push(group[0].original);
+    } else {
+      let canonicalSum = 0;
+      let targetUnit: CSSUnit = group[0].unit;
+
+      for (const item of group) {
+        const canonical = toCanonical(new CSSUnitValue(item.value, item.unit));
+        canonicalSum += canonical.value;
+        if (unitToBase[item.unit] === 'length' && item.unit === 'px') {
+          targetUnit = 'px';
+        }
+      }
+
+      const finalValue = fromCanonical(canonicalSum, targetUnit);
+      combinedResult.push(new CSSUnitValue(finalValue, targetUnit));
+    }
+  }
+
+  combinedResult.push(...otherTerms);
+
+  if (combinedResult.length === 1) {
+    return new CSSMathSum(combinedResult[0]);
+  }
+
+  return new CSSMathSum(...combinedResult);
+}
+
+function combineProductTerms(terms: CSSNumericValue[]): CSSNumericValue {
+  const flattened: CSSNumericValue[] = [];
+  for (const t of terms) {
+    if (t instanceof CSSMathProduct) {
+      flattened.push(...t.values);
+    } else {
+      flattened.push(t);
+    }
+  }
+
+  const numericChildren: { value: number; unit: CSSUnit; inverted: boolean; original: CSSNumericValue }[] = [];
+  const otherChildren: CSSNumericValue[] = [];
+
+  for (const child of flattened) {
+    if (child instanceof CSSUnitValue) {
+      numericChildren.push({ value: child.value, unit: child.unit, inverted: false, original: child });
+    } else if (child instanceof CSSMathInvert && child.value instanceof CSSUnitValue) {
+      numericChildren.push({ value: child.value.value, unit: child.value.unit, inverted: true, original: child });
+    } else {
+      otherChildren.push(child);
+    }
+  }
+
+  if (numericChildren.length > 0) {
+    if (numericChildren.length === 1 && otherChildren.length > 0) {
+      return new CSSMathProduct(numericChildren[0].original, ...otherChildren);
+    }
+
+    const baseExponents = new Map<string, number>();
+    for (const child of numericChildren) {
+      if (child.unit !== 'number') {
+        const base = unitToBase[child.unit] || child.unit;
+        const delta = child.inverted ? -1 : 1;
+        baseExponents.set(base, (baseExponents.get(base) || 0) + delta);
+      }
+    }
+
+    for (const [base, exp] of baseExponents) {
+      if (exp === 0) {
+        baseExponents.delete(base);
+      }
+    }
+
+    if (baseExponents.size === 0 || (baseExponents.size === 1 && Array.from(baseExponents.values())[0] === 1)) {
+      let scalarProduct = 1;
+      for (const child of numericChildren) {
+        const canonicalInfo = toCanonical(new CSSUnitValue(child.value, child.unit));
+        const canonicalVal = canonicalInfo.value;
+
+        if (child.inverted) {
+          scalarProduct /= canonicalVal;
+        } else {
+          scalarProduct *= canonicalVal;
+        }
+      }
+
+      let targetUnit: CSSUnit = 'number';
+      if (baseExponents.size === 1) {
+        const targetBase = Array.from(baseExponents.keys())[0];
+        const matchingChild = numericChildren.find(c => !c.inverted && (unitToBase[c.unit] || c.unit) === targetBase);
+        targetUnit = matchingChild ? matchingChild.unit : (targetBase === 'length' ? 'px' : (targetBase === 'angle' ? 'deg' : (targetBase === 'time' ? 's' : 'number')));
+      }
+
+      const finalValue = fromCanonical(scalarProduct, targetUnit);
+      const combinedUnitValue = new CSSUnitValue(finalValue, targetUnit);
+
+      if (otherChildren.length === 0) {
+        return combinedUnitValue;
+      }
+
+      if (combinedUnitValue.unit === 'number') {
+        otherChildren.unshift(combinedUnitValue);
+      } else {
+        otherChildren.push(combinedUnitValue);
+      }
+      return new CSSMathProduct(...otherChildren);
+    } else {
+      for (const child of numericChildren) {
+        otherChildren.push(child.original);
+      }
+    }
+  }
+
+  if (otherChildren.length === 1) {
+    return otherChildren[0];
+  }
+  return new CSSMathProduct(...otherChildren);
+}
+
+export function parseMathExpressionTokens(tokenList: ComponentValue[]): CSSNumericValue | null {
+  const tokens = tokenList.filter(v => v.type !== 'whitespace' && v.type !== 'EOF');
   let index = 0;
-  
+
   function consumeSum(): CSSNumericValue | null {
-    let left = consumeProduct();
-    if (!left) return null;
-    
+    const first = consumeProduct();
+    if (!first) return null;
+    const terms: CSSNumericValue[] = [first];
+
     while (index < tokens.length) {
       const token = tokens[index];
       if (token.type === 'delim' && (token.value === '+' || token.value === '-')) {
         index++;
-        const right = consumeProduct();
-        if (!right) return null;
-        
+        const next = consumeProduct();
+        if (!next) return null;
         if (token.value === '+') {
-          left = new CSSMathSum(left, right);
+          terms.push(next);
         } else {
-          left = new CSSMathSum(left, new CSSMathNegate(right));
+          terms.push(new CSSMathNegate(next));
         }
       } else {
         break;
       }
     }
-    return left;
+
+    if (terms.length === 1) {
+      return terms[0];
+    }
+    return combineSumTerms(terms);
   }
-  
+
   function consumeProduct(): CSSNumericValue | null {
-    let left = consumeValue();
-    if (!left) return null;
-    
+    const first = consumeValue();
+    if (!first) return null;
+    const terms: CSSNumericValue[] = [first];
+
     while (index < tokens.length) {
       const token = tokens[index];
       if (token.type === 'delim' && (token.value === '*' || token.value === '/')) {
         index++;
-        const right = consumeValue();
-        if (!right) return null;
-        
+        const next = consumeValue();
+        if (!next) return null;
         if (token.value === '*') {
-          left = new CSSMathProduct(left, right);
+          terms.push(next);
         } else {
-          left = new CSSMathProduct(left, new CSSMathInvert(right));
+          terms.push(new CSSMathInvert(next));
         }
       } else {
         break;
       }
     }
-    return left;
+
+    if (terms.length === 1) {
+      return terms[0];
+    }
+    return combineProductTerms(terms);
   }
-  
+
   function consumeValue(): CSSNumericValue | null {
     if (index >= tokens.length) return null;
     const token = tokens[index];
     index++;
-    
+
     if (token.type === 'number') {
       return new CSSUnitValue(token.value, 'number');
     }
@@ -106,36 +314,39 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
     }
 
     if (token.type === 'simple-block' && token.associatedToken.type === '(') {
-      return parseMathFunction('calc', token.value);
+      return parseMathExpressionTokens(token.value as ComponentValue[]);
     }
     if (token.type === 'function') {
       const functionToken = token as CSSFunction;
       return parseMathFunction(functionToken.name, functionToken.value);
     }
-    
+
     if (token.type === 'ident') {
       const val = token.value.toLowerCase();
-      if (val === 'infinity') {
-        return new CSSUnitValue(Infinity, 'number');
-      }
-      if (val === '-infinity') {
-        return new CSSUnitValue(-Infinity, 'number');
-      }
-      if (val === 'nan') {
-        return new CSSUnitValue(NaN, 'number');
-      }
-      if (val === 'e') {
-        return new CSSUnitValue(Math.E, 'number');
-      }
-      if (val === 'pi') {
-        return new CSSUnitValue(Math.PI, 'number');
-      }
+      if (val === 'infinity') return new CSSUnitValue(Infinity, 'number');
+      if (val === '-infinity') return new CSSUnitValue(-Infinity, 'number');
+      if (val === 'nan') return new CSSUnitValue(NaN, 'number');
+      if (val === 'e') return new CSSUnitValue(Math.E, 'number');
+      if (val === 'pi') return new CSSUnitValue(Math.PI, 'number');
     }
 
     if (token.type === 'delim' && (token.value === '+' || token.value === '-')) {
       const val = consumeValue();
       if (!val) return null;
       if (token.value === '-') {
+        if (val instanceof CSSMathSum) {
+          // Negation distribution over sum (CSS Values 4 § 10.7 step 6.3)
+          const negatedGrandchildren = val.values.map(grandchild => {
+            if (grandchild instanceof CSSUnitValue) {
+              return new CSSUnitValue(-grandchild.value, grandchild.unit);
+            }
+            if (grandchild instanceof CSSMathNegate) {
+              return grandchild.value;
+            }
+            return new CSSMathNegate(grandchild);
+          });
+          return new CSSMathSum(...negatedGrandchildren);
+        }
         return new CSSMathNegate(val);
       }
       return val;
@@ -143,37 +354,69 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
 
     return null;
   }
-  
+
+  const res = consumeSum();
+  if (index < tokens.length) return null;
+  return res;
+}
+
+// 10 Mathematical Expressions
+export function parseMathFunction(name: string, values: ComponentValue[]): CSSNumericValue | null {
   const nameLower = name.toLowerCase();
-  
+
   // 10.1 Basic Arithmetic: calc()
   if (nameLower === 'calc') {
-    const result = consumeSum();
-    if (index < tokens.length) return null;
+    const result = parseMathExpressionTokens(values);
+    if (!result) return null;
+    if (result instanceof CSSUnitValue) {
+      return new CSSMathSum(result);
+    }
     return result;
   }
-  
+
+  const tokens = values.filter(v => v.type !== 'whitespace' && v.type !== 'EOF');
+  let index = 0;
+
+  function consumeArg(): CSSNumericValue | null {
+    const argTokens: ComponentValue[] = [];
+    let nesting = 0;
+    while (index < tokens.length) {
+      const t = tokens[index];
+      if (t.type === 'comma' && nesting === 0) {
+        break;
+      }
+      if (t.type === 'simple-block' || t.type === 'function') {
+        argTokens.push(t);
+      } else {
+        argTokens.push(t);
+      }
+      index++;
+    }
+    if (argTokens.length === 0) return null;
+    return parseMathExpressionTokens(argTokens);
+  }
+
   // 10.2 Comparison Functions: min(), max(), and clamp()
   if (nameLower === 'min' || nameLower === 'max') {
     const args: CSSNumericValue[] = [];
-    const firstArg = consumeSum();
+    const firstArg = consumeArg();
     if (!firstArg) return null;
     args.push(firstArg);
-    
+
     while (index < tokens.length) {
       const token = tokens[index];
       if (token.type === 'comma') {
         index++;
-        const nextArg = consumeSum();
+        const nextArg = consumeArg();
         if (!nextArg) return null;
         args.push(nextArg);
       } else {
         break;
       }
     }
-    
+
     if (index < tokens.length) return null;
-    
+
     const result = nameLower === 'min' ? new CSSMathMin(...args) : new CSSMathMax(...args);
     return result;
   }
@@ -183,7 +426,7 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
     let lower: CSSNumericValue | CSSKeywordValue | null = null;
     let valueNode: CSSNumericValue | null = null;
     let upper: CSSNumericValue | CSSKeywordValue | null = null;
-    
+
     // Parse first argument (min)
     {
       const token = tokens[index];
@@ -191,18 +434,18 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
         index++;
         lower = new CSSKeywordValue('none');
       } else {
-        lower = consumeSum();
+        lower = consumeArg();
       }
     }
 
     if (!lower) return null;
-    
+
     // Parse second argument (value)
     if (index >= tokens.length || tokens[index].type !== 'comma') return null;
     index++;
-    valueNode = consumeSum();
+    valueNode = consumeArg();
     if (!valueNode) return null;
-    
+
     // Parse third argument (max)
     if (index >= tokens.length || tokens[index].type !== 'comma') return null;
     index++;
@@ -212,14 +455,14 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
         index++;
         upper = new CSSKeywordValue('none');
       } else {
-        upper = consumeSum();
+        upper = consumeArg();
       }
     }
 
     if (!upper) return null;
-    
+
     if (index < tokens.length) return null;
-    
+
     const result = new CSSMathClamp(lower, valueNode, upper);
     return result;
   }
@@ -239,7 +482,7 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
       }
     }
 
-    const value = consumeSum();
+    const value = consumeArg();
     if (!value) return null;
 
     let precision: CSSNumericValue | null = null;
@@ -247,7 +490,7 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
       const token = tokens[index];
       if (token.type === 'comma') {
         index++;
-        precision = consumeSum();
+        precision = consumeArg();
         if (!precision) return null;
       }
     }
@@ -268,9 +511,8 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
   // 10.5 Sign-Related Functions: abs(), sign()
   // 10.6 Stepped-Value Functions: round(), mod(), rem()
   if (MATH_FUNCTIONS.includes(nameLower)) {
-
     const args: CSSNumericValue[] = [];
-    const firstArg = consumeSum();
+    const firstArg = consumeArg();
     if (!firstArg) return null;
     args.push(firstArg);
 
@@ -278,7 +520,7 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
       const token = tokens[index];
       if (token.type === 'comma') {
         index++;
-        const nextArg = consumeSum();
+        const nextArg = consumeArg();
         if (!nextArg) return null;
         args.push(nextArg);
       } else {
@@ -338,55 +580,6 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
   }
 
   return null;
-}
-
-function toCanonical(val: CSSUnitValue): { value: number, unit: CSSUnit } {
-  const base = unitToBase[val.unit] || 'other';
-  if (base === 'length' && unitToPixels[val.unit]) {
-    return { value: val.value * unitToPixels[val.unit], unit: 'px' };
-  } else if (base === 'angle' && unitToRadians[val.unit]) {
-    return { value: val.value * (unitToRadians[val.unit] / unitToRadians['deg']), unit: 'deg' };
-  } else if (base === 'time' && unitToSeconds[val.unit]) {
-    return { value: val.value * unitToSeconds[val.unit], unit: 's' };
-  } else if (base === 'resolution') {
-    if (val.unit === 'dpi') return { value: val.value, unit: 'dpi' };
-    if (val.unit === 'dpcm') return { value: val.value * 2.54, unit: 'dpi' };
-    if (val.unit === 'dppx' || val.unit === 'x') return { value: val.value * 96, unit: 'dpi' };
-  }
-  return { value: val.value, unit: val.unit };
-}
-
-function fromCanonical(value: number, targetUnit: CSSUnit): number {
-  const base = unitToBase[targetUnit] || 'other';
-  if (base === 'length' && unitToPixels[targetUnit]) {
-    return value / unitToPixels[targetUnit];
-  } else if (base === 'angle' && unitToRadians[targetUnit]) {
-    return value / (unitToRadians[targetUnit] / unitToRadians['deg']);
-  } else if (base === 'time' && unitToSeconds[targetUnit]) {
-    return value / unitToSeconds[targetUnit];
-  } else if (base === 'resolution') {
-    if (targetUnit === 'dpi') return value;
-    if (targetUnit === 'dpcm') return value / 2.54;
-    if (targetUnit === 'dppx' || targetUnit === 'x') return value / 96;
-  }
-  return value;
-}
-
-function isCanonicalizable(val: CSSUnitValue): boolean {
-  const base = unitToBase[val.unit] || 'other';
-  if (base === 'length') return !!unitToPixels[val.unit];
-  if (base === 'angle') return !!unitToRadians[val.unit];
-  if (base === 'time') return !!unitToSeconds[val.unit];
-  if (base === 'resolution') return true;
-  if (base === 'number') return true;
-  return false;
-}
-
-function areCompatibleForSimplification(values: CSSUnitValue[]): boolean {
-  if (values.length === 0) return true;
-  const firstUnit = values[0].unit;
-  if (values.every(v => v.unit === firstUnit)) return true;
-  return values.every(v => isCanonicalizable(v));
 }
 
 export function simplify(node: CSSNumericValue): CSSNumericValue {
@@ -619,6 +812,17 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
     const min = node.lower instanceof CSSKeywordValue ? node.lower : simplify(node.lower);
     const val = simplify(node.value);
     const max = node.upper instanceof CSSKeywordValue ? node.upper : simplify(node.upper);
+
+    if (min instanceof CSSUnitValue && val instanceof CSSUnitValue && max instanceof CSSUnitValue) {
+      if (areCompatibleForSimplification([min, val, max])) {
+        const canonicalMin = toCanonical(min);
+        const canonicalVal = toCanonical(val);
+        const canonicalMax = toCanonical(max);
+        const targetUnit = val.unit;
+        const clampedCanonical = Math.max(canonicalMin.value, Math.min(canonicalVal.value, canonicalMax.value));
+        return new CSSUnitValue(fromCanonical(clampedCanonical, targetUnit), targetUnit);
+      }
+    }
     return new CSSMathClamp(min, val, max);
   }
 

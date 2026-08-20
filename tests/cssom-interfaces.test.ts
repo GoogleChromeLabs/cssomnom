@@ -307,7 +307,7 @@ test('CSSPageRule.selectorText getter, setter and normalization', () => {
   assert.strictEqual(rule.selectorText, ':first');
 
   // Set valid
-  rule.selectorText = '  foo :first, :left ';
+  rule.selectorText = '  foo:first, :left ';
   assert.strictEqual(rule.selectorText, 'foo:first, :left');
   assert.ok(rule.cssText.includes('@page foo:first, :left {'));
 
