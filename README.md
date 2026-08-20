@@ -309,29 +309,25 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 - Prefer implementing standard APIs (Houdini or CSSOM) over custom ones whenever possible.
 - Cite spec anchors in code comments for all standard implementations.
 
-## Web Platform Test (WPT) Conformance
+## Web Platform Test (WPT) Conformance & Parity
 
-We actively track conformance across 7 major W3C Web Platform Tests (WPT) spec suites (including CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, and Typed OM).
+`cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 7 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, and Typed OM).
 
-- **Multi-Spec Sandbox Conformance**: **18,778 passing assertions** (**87.0%** across 21,580 tests). See [wpt-progress.md](https://github.com/GoogleChromeLabs/cssomnom/blob/main/wpt-progress.md) for live pass rates across all 7 spec suites and historical progress logs.
+* **W3C Standards Conformance**: **87.0%** (18,778 / 21,580 passed assertions across 1,687 test files).
+* **Chrome 153 Parity**: **89.7%** pass rate across 19,986 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
-| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) |
-| :--- | :---: | :---: |
-| **`Typed OM`** | **11,547 / 12,219 (94.5%)** | 12,341 / 13,125 (94.0%) |
-| **`CSSOM`** | **1,607 / 2,161 (74.4%)** | 6,381 / 6,661 (95.8%) |
-| **`Selectors`** | **4,279 / 5,691 (75.2%)** | 5,498 / 6,394 (86.0%) |
-| **`Syntax`** | **406 / 414 (98.1%)** | 430 / 437 (98.4%) |
-| **`Nesting`** | **117 / 117 (100.0%)** | 139 / 140 (99.3%) |
-| **`Media Queries`** | **412 / 417 (98.8%)** | 1,799 / 1,825 (98.6%) |
-| **`Variables`** | **410 / 561 (73.1%)** | 699 / 772 (90.5%) |
-| **OVERALL** | **18,778 / 21,580 (87.0%)** | **27,287 / 29,354 (93.0%)** |
+| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 153 |
+| :--- | :---: | :---: | :---: | :---: |
+| **`CSS Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
+| **`Media Queries 4`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
+| **`CSS Syntax 3`** | 414 | 406 | **98.1%** | **-0.3%** |
+| **`CSS Typed OM 1`** | 12,219 | 11,547 | **94.5%** | 🟢 **+0.5%** (ahead of Chrome) |
+| **`Selectors 4`** | 5,691 | 4,279 | **75.2%** | **-10.8%** |
+| **`CSSOM 1`** | 2,161 | 1,607 | **74.4%** | **-21.4%** |
+| **`CSS Variables 1`** | 561 | 410 | **73.1%** | **-17.4%** |
+| **OVERALL** | **21,580** | **18,778** | **87.0%** | **-5.9%** |
 
-<!-- WPT_CHROME_STATUS_START -->
-### Headless Chrome Conformance (Typed OM)
-Evaluated directly against the official browser WPT harness (`wpt run chrome css/css-typed-om`):
-- **Pass Rate**: 93.58% (11,929 / 12,748 passed)
-- **Failed Assertions**: 819
-<!-- WPT_CHROME_STATUS_END -->
+> See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [wpt-browser-only-manifest.json](./tests/fixtures/wpt-browser-only-manifest.json) for cataloged browser-only layout boundaries.
 
 ## Development
 
