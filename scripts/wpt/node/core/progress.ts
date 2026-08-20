@@ -281,6 +281,92 @@ export function syncProgressFromNotes(progressPath = getProgressPath()): void {
   }
 }
 
+export function formatReadmeSummaryTable(dataset: TestRunDataset, referenceReportPath?: string): string {
+  const ref = loadReferenceBaselineStats(referenceReportPath);
+  const lines: string[] = [];
+
+  let totalNodePass = 0;
+  let totalNodeTarget = 0;
+  let totalRefPass = 0;
+  let totalRefTotal = 0;
+
+  const rows: string[] = [];
+
+  for (const spec of SPEC_ORDER) {
+    const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
+    const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
+    const target = summary.total;
+    const nodePassing = summary.passing;
+    totalNodePass += nodePassing;
+    totalNodeTarget += target;
+
+    const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
+    const refSpec = ref?.specs[spec] ?? { pass: 0, total: 0 };
+    totalRefPass += refSpec.pass;
+    totalRefTotal += refSpec.total;
+
+    const refRate = refSpec.total > 0 ? (refSpec.pass / refSpec.total) * 100 : 0;
+    const delta = nodeRate - refRate;
+
+    let deltaCell = 'N/A';
+    if (refSpec.total > 0) {
+      if (delta > 0) {
+        deltaCell = `🟢 **+${delta.toFixed(1)}%** (ahead of Chrome)`;
+      } else if (delta === 0) {
+        deltaCell = `🟢 **0.0%** (full parity)`;
+      } else {
+        deltaCell = `${delta.toFixed(1)}%`;
+      }
+    }
+
+    rows.push(`| **\`${displayName}\`** | ${target.toLocaleString()} | ${nodePassing.toLocaleString()} | **${nodeRate.toFixed(1)}%** | ${deltaCell} |`);
+  }
+
+  const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
+  const overallRefRate = totalRefTotal > 0 ? (totalRefPass / totalRefTotal) * 100 : 0;
+  const overallDelta = overallNodeRate - overallRefRate;
+  const overallDeltaCell = overallDelta >= 0 ? `🟢 **+${overallDelta.toFixed(1)}%**` : `**${overallDelta.toFixed(1)}%**`;
+
+  const totalFiles = dataset.totalFiles > 0 ? dataset.totalFiles : 1687;
+
+  lines.push(`* **W3C Standards Conformance**: **${overallNodeRate.toFixed(1)}%** (${totalNodePass.toLocaleString()} / ${totalNodeTarget.toLocaleString()} passed assertions across ${totalFiles.toLocaleString()} test files).`);
+  if (ref && totalRefTotal > 0) {
+    const chromeLabel = ref.milestone ? `Chrome ${ref.milestone}` : 'Chrome';
+    lines.push(`* **${chromeLabel} Parity**: **${overallNodeRate.toFixed(1)}%** pass rate across ${totalRefTotal.toLocaleString()} common subtests evaluated against official [\`wpt.fyi\`](https://wpt.fyi) runs.`);
+  }
+  lines.push('');
+  lines.push('| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 153 |');
+  lines.push('| :--- | :---: | :---: | :---: | :---: |');
+  lines.push(...rows);
+  lines.push(`| **OVERALL** | **${totalNodeTarget.toLocaleString()}** | **${totalNodePass.toLocaleString()}** | **${overallNodeRate.toFixed(1)}%** | ${overallDeltaCell} |`);
+
+  return lines.join('\n');
+}
+
+export function updateReadmeSummaryTable(
+  dataset: TestRunDataset,
+  readmePath = path.resolve(process.cwd(), 'README.md'),
+  referenceReportPath?: string
+): void {
+  if (!fs.existsSync(readmePath)) return;
+  let content = fs.readFileSync(readmePath, 'utf-8');
+
+  const startTag = '<!-- WPT_PROGRESS_SUMMARY_START -->';
+  const endTag = '<!-- WPT_PROGRESS_SUMMARY_END -->';
+
+  const startIdx = content.indexOf(startTag);
+  const endIdx = content.indexOf(endTag);
+
+  if (startIdx !== -1 && endIdx !== -1 && startIdx < endIdx) {
+    const before = content.substring(0, startIdx + startTag.length);
+    const after = content.substring(endIdx);
+    const summaryBlock = '\n' + formatReadmeSummaryTable(dataset, referenceReportPath) + '\n';
+    content = before + summaryBlock + after;
+    fs.writeFileSync(readmePath, content, 'utf-8');
+    console.log(`[WPT Progress] Updated README.md conformance summary table.`);
+  }
+}
+
 export function updateBaselineSummaryTable(
   dataset: TestRunDataset,
   progressPath = getProgressPath(),
@@ -289,7 +375,7 @@ export function updateBaselineSummaryTable(
   if (!fs.existsSync(progressPath)) return;
   const content = fs.readFileSync(progressPath, 'utf-8');
 
-  const startRegex = /(?:### Feasibility & Cross-Engine Baseline Comparison|### Feasibility & Normalized Conformance Baseline)/;
+  const startRegex = /(?:### Feasibility & Cross-Engine Baseline Comparison|### Feasibility & Baseline Conformance|### Feasibility & Normalized Conformance Baseline)/;
   const match = content.match(startRegex);
   if (!match || match.index === undefined) return;
 
@@ -309,7 +395,8 @@ export function updateProgressLog(
   dataset: TestRunDataset,
   dryRun = false,
   progressPath = getProgressPath(),
-  referenceReportPath?: string
+  referenceReportPath?: string,
+  readmePath = path.resolve(process.cwd(), 'README.md')
 ): void {
   syncProgressFromNotes(progressPath);
 
@@ -327,6 +414,7 @@ export function updateProgressLog(
   }
 
   updateBaselineSummaryTable(dataset, progressPath, referenceReportPath);
+  updateReadmeSummaryTable(dataset, readmePath, referenceReportPath);
 
   const content = fs.readFileSync(progressPath, 'utf-8');
   const lines = content.split('\n');

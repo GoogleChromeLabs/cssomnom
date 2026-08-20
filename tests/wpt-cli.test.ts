@@ -42,6 +42,8 @@ import {
   attachGitNote,
   formatBaselineSummaryTable,
   updateBaselineSummaryTable,
+  formatReadmeSummaryTable,
+  updateReadmeSummaryTable,
   loadReferenceBaselineStats,
 } from '../scripts/wpt/node/core/progress.ts';
 
@@ -320,6 +322,7 @@ describe('WPT CLI Core Modules', () => {
     test('updates progress log and handles dry run, duplicates, and dirty status', () => {
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-progress-test-'));
       const testProgressPath = path.join(tempDir, 'wpt-progress.md');
+      const testReadmePath = path.join(tempDir, 'README.md');
 
       try {
         const initialContent = [
@@ -332,6 +335,7 @@ describe('WPT CLI Core Modules', () => {
           '',
         ].join('\n');
         fs.writeFileSync(testProgressPath, initialContent, 'utf-8');
+        fs.writeFileSync(testReadmePath, '<!-- WPT_PROGRESS_SUMMARY_START -->\nold\n<!-- WPT_PROGRESS_SUMMARY_END -->', 'utf-8');
 
         const dataset1: TestRunDataset = {
           timestamp: '2026-08-13 18:00:00',
@@ -347,17 +351,17 @@ describe('WPT CLI Core Modules', () => {
         };
 
         // Dry run should not write to file
-        updateProgressLog(dataset1, true, testProgressPath);
+        updateProgressLog(dataset1, true, testProgressPath, undefined, testReadmePath);
         assert.strictEqual(fs.readFileSync(testProgressPath, 'utf-8'), initialContent);
 
         // Actual update should insert row with dirty asterisk
-        updateProgressLog(dataset1, false, testProgressPath);
+        updateProgressLog(dataset1, false, testProgressPath, undefined, testReadmePath);
         let updatedContent = fs.readFileSync(testProgressPath, 'utf-8');
         assert.ok(updatedContent.includes('`abc1234*`'));
         assert.ok(updatedContent.includes('100/21580') || updatedContent.includes('100/100'));
 
         // Duplicate run with identical metrics should be skipped
-        updateProgressLog(dataset1, false, testProgressPath);
+        updateProgressLog(dataset1, false, testProgressPath, undefined, testReadmePath);
         const linesAfterDuplicate = fs.readFileSync(testProgressPath, 'utf-8').split('\n').filter(l => l.includes('`abc1234*`'));
         assert.strictEqual(linesAfterDuplicate.length, 1);
 
@@ -374,7 +378,7 @@ describe('WPT CLI Core Modules', () => {
           totalFiles: 2,
           fileResults: [],
         };
-        updateProgressLog(dataset2, false, testProgressPath);
+        updateProgressLog(dataset2, false, testProgressPath, undefined, testReadmePath);
         updatedContent = fs.readFileSync(testProgressPath, 'utf-8');
         const rows = updatedContent.split('\n').filter(l => l.startsWith('| 2026-'));
         assert.strictEqual(rows.length, 2);
@@ -535,6 +539,69 @@ describe('WPT CLI Core Modules', () => {
         assert.ok(updated.includes('| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
         assert.ok(updated.includes('### Historical Conformance Progress Log'));
         assert.ok(updated.includes('`abc1234`'));
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('updates README.md conformance summary table dynamically', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-readme-test-'));
+      const testReadmePath = path.join(tempDir, 'README.md');
+      const mockReportPath = path.join(tempDir, 'report-chrome.json');
+
+      try {
+        const mockReport = {
+          browser: 'Chrome 153',
+          results: [
+            {
+              test: '/css/css-typed-om/test.html',
+              status: 'OK',
+              subtests: [{ name: 't1', status: 'PASS' }],
+            },
+          ],
+        };
+        fs.writeFileSync(mockReportPath, JSON.stringify(mockReport), 'utf-8');
+
+        const initialContent = [
+          '# Project',
+          '',
+          '<!-- WPT_PROGRESS_SUMMARY_START -->',
+          'old summary',
+          '<!-- WPT_PROGRESS_SUMMARY_END -->',
+          '',
+          '## Next Section',
+        ].join('\n');
+        fs.writeFileSync(testReadmePath, initialContent, 'utf-8');
+
+        const dataset: TestRunDataset = {
+          timestamp: '2026-08-16 12:00:00',
+          commitHash: 'def5678',
+          isDirty: false,
+          specSummaries: {
+            'css-typed-om': { passing: 11547, total: 12219, files: 348 },
+            'cssom': { passing: 1607, total: 2161, files: 224 },
+            'css-nesting': { passing: 117, total: 117, files: 53 },
+            'css-syntax': { passing: 406, total: 414, files: 45 },
+            'css-variables': { passing: 410, total: 561, files: 267 },
+            'selectors': { passing: 4279, total: 5691, files: 648 },
+            'mediaqueries': { passing: 412, total: 417, files: 102 },
+          },
+          totalPassing: 18778,
+          totalTests: 21580,
+          totalFiles: 1687,
+          fileResults: [],
+        };
+
+        const formatted = formatReadmeSummaryTable(dataset, mockReportPath);
+        assert.ok(formatted.includes('| **`Nesting`** | 117 | 117 | **100.0%** |'));
+
+        updateReadmeSummaryTable(dataset, testReadmePath, mockReportPath);
+        const updated = fs.readFileSync(testReadmePath, 'utf-8');
+        assert.ok(updated.includes('* **W3C Standards Conformance**: **87.0%** (18,778 / 21,580 passed assertions across 1,687 test files).'));
+        assert.ok(updated.includes('| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 153 |'));
+        assert.ok(updated.includes('| **`Nesting`** | 117 | 117 | **100.0%** |'));
+        assert.ok(updated.includes('<!-- WPT_PROGRESS_SUMMARY_START -->'));
+        assert.ok(updated.includes('<!-- WPT_PROGRESS_SUMMARY_END -->'));
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
