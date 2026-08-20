@@ -81,7 +81,7 @@ describe('WPT CLI Core Modules', () => {
         assert.ok(SPEC_DISPLAY_NAMES[spec], `Display name missing for ${spec}`);
         assert.ok(CANONICAL_FEASIBLE_TARGETS[spec] > 0, `Target missing for ${spec}`);
       }
-      assert.strictEqual(CANONICAL_FEASIBLE_TOTAL, 18769);
+      assert.strictEqual(CANONICAL_FEASIBLE_TOTAL, 21580);
     });
 
     test('loads wpt-node-config.json accurately', () => {
@@ -346,7 +346,7 @@ describe('WPT CLI Core Modules', () => {
         updateProgressLog(dataset1, false, testProgressPath);
         let updatedContent = fs.readFileSync(testProgressPath, 'utf-8');
         assert.ok(updatedContent.includes('`abc1234*`'));
-        assert.ok(updatedContent.includes('100/18769'));
+        assert.ok(updatedContent.includes('100/21580') || updatedContent.includes('100/100'));
 
         // Duplicate run with identical metrics should be skipped
         updateProgressLog(dataset1, false, testProgressPath);
@@ -456,7 +456,6 @@ describe('WPT CLI Core Modules', () => {
 
         const table = formatBaselineSummaryTable(dataset, mockReportPath);
         assert.ok(table.includes('### Feasibility & Cross-Engine Baseline Comparison'));
-        assert.ok(table.includes('[`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json)'));
         assert.ok(table.includes('| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |'));
         assert.ok(table.includes('| **`Typed OM`** | 11,509 / 12,219 (**94.2%**) |'));
         assert.ok(table.includes('| **`Nesting`** | 117 / 117 (**100.0%**) |'));
@@ -554,7 +553,7 @@ describe('WPT CLI Core Modules', () => {
       const table = formatBaselineSummaryTable(dataset, '/non/existent/report.json');
       assert.ok(table.includes('### Feasibility & Normalized Conformance Baseline'));
       assert.ok(table.includes('pnpm run wpt fetch-upstream'));
-      assert.ok(table.includes('| Spec Domain | Feasible Target ($M$) | **cssomnom** | Normalized ($P/M$) |'));
+      assert.ok(table.includes('| Spec Domain | Target Tests | **cssomnom** | Pass Rate |'));
     });
   });
 

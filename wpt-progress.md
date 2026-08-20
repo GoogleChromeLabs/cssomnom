@@ -9,19 +9,19 @@ This file tracks the conformance progress of the CSSOM / Typed OM implementation
 ### Feasibility & Cross-Engine Baseline Comparison
 
 > [!NOTE]
-> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all 1,687 in-scope W3C test files (21,580 assertions).
 > - **Reference Engine**: Comparison numbers represent official unpolyfilled **Upstream chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across the corresponding in-scope test suites.
 
 | Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
 | :--- | :---: | :---: | :---: |
 | **`Typed OM`** | 11,547 / 12,219 (**94.5%**) | 12,341 / 13,125 (94.0%) | 🟢 **+0.5%** |
-| **`CSSOM`** | 1,607 / 923 (**174.1%**) | 6,381 / 6,661 (95.8%) | 🟢 **+78.3%** |
+| **`CSSOM`** | 1,607 / 2,161 (**74.4%**) | 6,381 / 6,661 (95.8%) | -21.4% |
 | **`Nesting`** | 117 / 117 (**100.0%**) | 139 / 140 (99.3%) | 🟢 **+0.7%** |
-| **`Syntax`** | 406 / 398 (**102.0%**) | 430 / 437 (98.4%) | 🟢 **+3.6%** |
-| **`Variables`** | 410 / 548 (**74.8%**) | 699 / 772 (90.5%) | -15.7% |
-| **`Selectors`** | 4,279 / 4,147 (**103.2%**) | 5,498 / 6,394 (86.0%) | 🟢 **+17.2%** |
+| **`Syntax`** | 406 / 414 (**98.1%**) | 430 / 437 (98.4%) | -0.3% |
+| **`Variables`** | 410 / 561 (**73.1%**) | 699 / 772 (90.5%) | -17.5% |
+| **`Selectors`** | 4,279 / 5,691 (**75.2%**) | 5,498 / 6,394 (86.0%) | -10.8% |
 | **`Media Queries`** | 412 / 417 (**98.8%**) | 1,799 / 1,825 (98.6%) | 🟢 **+0.2%** |
-| **OVERALL** | **18,778 / 18,769 (100.0%)** | **27,287 / 29,354 (93.0%)** | 🟢 **+7.1%** |
+| **OVERALL** | **18,778 / 21,580 (87.0%)** | **27,287 / 29,354 (93.0%)** | **-5.9%** |
 ---
 
 ### Historical Conformance Progress Log

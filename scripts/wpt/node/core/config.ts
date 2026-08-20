@@ -36,15 +36,15 @@ export const SPEC_ORDER: readonly SpecName[] = [
 
 export const CANONICAL_FEASIBLE_TARGETS: Record<string, number> = {
   'css-typed-om': 12219,
-  'cssom': 923,
-  'css-syntax': 398,
+  'cssom': 2161,
+  'css-syntax': 414,
   'css-nesting': 117,
-  'css-variables': 548,
-  'selectors': 4147,
+  'css-variables': 561,
+  'selectors': 5691,
   'mediaqueries': 417,
 };
 
-export const CANONICAL_FEASIBLE_TOTAL = 18769;
+export const CANONICAL_FEASIBLE_TOTAL = 21580;
 
 export const DEFAULT_REFERENCE_STATS: Record<string, { pass: number; total: number }> = {
   'css-typed-om': { pass: 10690, total: 11230 },

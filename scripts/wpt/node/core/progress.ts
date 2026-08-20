@@ -7,7 +7,6 @@ import {
   SPEC_ORDER,
   SPEC_DISPLAY_NAMES,
   CANONICAL_FEASIBLE_TARGETS,
-  CANONICAL_FEASIBLE_TOTAL,
 } from './config.ts';
 import { addGitNote, getGitNotesLog, execGit } from '../safe-child-process.ts';
 import type { TestRunDataset } from './types.ts';
@@ -84,23 +83,24 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     lines.push('### Feasibility & Cross-Engine Baseline Comparison');
     lines.push('');
     lines.push('> [!NOTE]');
-    lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all 1,687 in-scope W3C test files (21,580 assertions).');
     lines.push(`> - **Reference Engine**: Comparison numbers represent official unpolyfilled **${ref.browser}** test runs from [\`wpt.fyi\`](https://wpt.fyi) across the corresponding in-scope test suites.`);
     lines.push('');
     lines.push(`| Spec Domain | **cssomnom** | ${chromeLabel} (\`wpt.fyi\`) | Parity vs Chrome |`);
     lines.push('| :--- | :---: | :---: | :---: |');
 
     let totalNodePass = 0;
-    const totalNodeTarget = CANONICAL_FEASIBLE_TOTAL;
+    let totalNodeTarget = 0;
     let totalRefPass = 0;
     let totalRefTotal = 0;
 
     for (const spec of SPEC_ORDER) {
       const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
       const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = CANONICAL_FEASIBLE_TARGETS[spec] ?? summary.total;
+      const target = summary.total > 0 ? summary.total : (CANONICAL_FEASIBLE_TARGETS[spec] ?? 0);
       const nodePassing = summary.passing;
       totalNodePass += nodePassing;
+      totalNodeTarget += target;
 
       const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
       const nodeCell = `${nodePassing.toLocaleString()} / ${target.toLocaleString()} (**${nodeRate.toFixed(1)}%**)`;
@@ -136,21 +136,22 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     lines.push('### Feasibility & Normalized Conformance Baseline');
     lines.push('');
     lines.push('> [!NOTE]');
-    lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all 1,687 in-scope W3C test files (21,580 assertions).');
     lines.push('> - To populate cross-engine reference metrics from `wpt.fyi`, run `pnpm run wpt fetch-upstream`.');
     lines.push('');
-    lines.push('| Spec Domain | Feasible Target ($M$) | **cssomnom** | Normalized ($P/M$) |');
+    lines.push('| Spec Domain | Target Tests | **cssomnom** | Pass Rate |');
     lines.push('| :--- | :---: | :---: | :---: |');
 
     let totalNodePass = 0;
-    const totalNodeTarget = CANONICAL_FEASIBLE_TOTAL;
+    let totalNodeTarget = 0;
 
     for (const spec of SPEC_ORDER) {
       const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
       const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = CANONICAL_FEASIBLE_TARGETS[spec] ?? summary.total;
+      const target = summary.total > 0 ? summary.total : (CANONICAL_FEASIBLE_TARGETS[spec] ?? 0);
       const nodePassing = summary.passing;
       totalNodePass += nodePassing;
+      totalNodeTarget += target;
 
       const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
       lines.push(`| **\`${displayName}\`** | ${target.toLocaleString()} | ${nodePassing.toLocaleString()} | **${nodeRate.toFixed(1)}%** |`);
@@ -165,14 +166,18 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
 
 export function formatProgressRow(dataset: TestRunDataset, commitStr: string): string {
   const rowParts = [dataset.timestamp, `\`${commitStr}\``];
+  let rowTotalPass = 0;
+  let rowTotalTarget = 0;
   for (const key of SPEC_ORDER) {
     const summary = dataset.specSummaries[key] ?? { passing: 0, total: 0 };
-    const target = CANONICAL_FEASIBLE_TARGETS[key] ?? summary.total;
+    const target = summary.total > 0 ? summary.total : (CANONICAL_FEASIBLE_TARGETS[key] ?? 0);
+    rowTotalPass += summary.passing;
+    rowTotalTarget += target;
     rowParts.push(`${summary.passing}/${target}`);
   }
-  const rawRate = dataset.totalTests > 0 ? ((dataset.totalPassing / dataset.totalTests) * 100).toFixed(2) : '0.00';
-  const normRate = CANONICAL_FEASIBLE_TOTAL > 0 ? Math.min(100, (dataset.totalPassing / CANONICAL_FEASIBLE_TOTAL) * 100).toFixed(2) : '0.00';
-  rowParts.push(`${dataset.totalPassing}/${CANONICAL_FEASIBLE_TOTAL}`, `${rawRate}%`, `**${normRate}%**`);
+  const totalTests = rowTotalTarget > 0 ? rowTotalTarget : dataset.totalTests;
+  const passRate = totalTests > 0 ? ((dataset.totalPassing / totalTests) * 100).toFixed(2) : '0.00';
+  rowParts.push(`${dataset.totalPassing}/${totalTests}`, `**${passRate}%**`);
   return `| ${rowParts.join(' | ')} |`;
 }
 

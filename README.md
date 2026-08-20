@@ -313,18 +313,25 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 
 We actively track conformance across 7 major W3C Web Platform Tests (WPT) spec suites (including CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, and Typed OM).
 
-- **Multi-Spec Sandbox Conformance**: **18,778 passing assertions** (**100.0%** normalized conformance, **+7.1% ahead of Chrome 153**). See [`wpt-progress.md`](./wpt-progress.md) for live pass rates across all 7 spec suites and historical progress logs.
+- **Multi-Spec Sandbox Conformance**: **18,778 passing assertions** (**87.0%** across 21,580 tests). See [wpt-progress.md](https://github.com/GoogleChromeLabs/cssomnom/blob/main/wpt-progress.md) for live pass rates across all 7 spec suites and historical progress logs.
 
-| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
-| :--- | :---: | :---: | :---: |
-| **`CSSOM`** | **1,607 / 923 (174.1%)** | 6,381 / 6,661 (95.8%) | 🟢 **+78.3%** |
-| **`Selectors`** | **4,279 / 4,147 (103.2%)** | 5,498 / 6,394 (86.0%) | 🟢 **+17.2%** |
-| **`Syntax`** | **406 / 398 (102.0%)** | 430 / 437 (98.4%) | 🟢 **+3.6%** |
-| **`Nesting`** | **117 / 117 (100.0%)** | 139 / 140 (99.3%) | 🟢 **+0.7%** |
-| **`Typed OM`** | **11,547 / 12,219 (94.5%)** | 12,341 / 13,125 (94.0%) | 🟢 **+0.5%** |
-| **`Media Queries`** | **412 / 417 (98.8%)** | 1,799 / 1,825 (98.6%) | 🟢 **+0.2%** |
-| **`Variables`** | **410 / 548 (74.8%)** | 699 / 772 (90.5%) | -15.7% |
-| **OVERALL** | **18,778 / 18,769 (100.0%)** | **27,287 / 29,354 (93.0%)** | 🟢 **+7.1%** |
+| Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) |
+| :--- | :---: | :---: |
+| **`Typed OM`** | **11,547 / 12,219 (94.5%)** | 12,341 / 13,125 (94.0%) |
+| **`CSSOM`** | **1,607 / 2,161 (74.4%)** | 6,381 / 6,661 (95.8%) |
+| **`Selectors`** | **4,279 / 5,691 (75.2%)** | 5,498 / 6,394 (86.0%) |
+| **`Syntax`** | **406 / 414 (98.1%)** | 430 / 437 (98.4%) |
+| **`Nesting`** | **117 / 117 (100.0%)** | 139 / 140 (99.3%) |
+| **`Media Queries`** | **412 / 417 (98.8%)** | 1,799 / 1,825 (98.6%) |
+| **`Variables`** | **410 / 561 (73.1%)** | 699 / 772 (90.5%) |
+| **OVERALL** | **18,778 / 21,580 (87.0%)** | **27,287 / 29,354 (93.0%)** |
+
+<!-- WPT_CHROME_STATUS_START -->
+### Headless Chrome Conformance (Typed OM)
+Evaluated directly against the official browser WPT harness (`wpt run chrome css/css-typed-om`):
+- **Pass Rate**: 93.58% (11,929 / 12,748 passed)
+- **Failed Assertions**: 819
+<!-- WPT_CHROME_STATUS_END -->
 
 ## Development
 
