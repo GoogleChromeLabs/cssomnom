@@ -89,9 +89,10 @@ console.log(calcValue.toString()); // '192px' (canonicalizes to px)
 const angle = CSSNumericValue.parse('calc(45deg + 0.25turn)');
 console.log(angle.toString()); // '135deg'
 
-// Note: Trig functions and other complex math are preserved in the AST structure
-// rather than being eagerly simplified to a single value, 
-// matching newer CSS Values 4 behavior.
+// Note: Complex math functions (trigonometric, exponential, stepped) remain as
+// tree-structured CSSMathValue objects in the Typed OM specified style rather
+// than collapsing to a single scalar, preserving the calculation tree for
+// computed-value time resolution per CSS Values 4 §10.7.
 ```
 
 ### CSS Custom Properties & Houdini
@@ -176,14 +177,14 @@ Below are the primary entry points and custom utilities:
 
 *   **`parse(css: string): CSSStyleSheet`** — Parses a CSS string directly into a `CSSStyleSheet`.
 *   **`tokenize(css: string): Token[]`** — Synchronous low-level tokenizer.
-*   **`serialize(nodes: ComponentValue[] | Token[]): string`** — Serializes AST nodes or tokens back to CSS text.
+*   **`serialize(nodes: ComponentValue[] | Token[]): string`** — Serializes component values or tokens back to CSS text.
 *   **`new StreamingTokenizer()`** — Class for processing chunked CSS streams.
 *   **`getCascadedStyle(element: MatchableElement, rules: Rule[]): CSSStyleDeclaration`** — Computes cascaded styles against a mock/linkedom element.
 *   **`Parser` static methods**:
     *   `Parser.parseRuleText(css: string): Rule` — Parses a single CSS rule string.
     *   `Parser.parseStyleSheetText(css: string): Rule[]` — Parses a stylesheet string into an array of rules.
     *   `Parser.parseSelector(css: string): string | null` — Parses and validates a selector string.
-    *   `Parser.parseSelectorAST(css: string): SelectorList | null` — Parses a selector string into an AST.
+    *   `Parser.parseSelectorAST(css: string): SelectorList | null` — Parses a selector string into structured `SelectorList` nodes.
     *   `Parser.calculateSpecificity(selector: string | SelectorList)` — Calculates specificity tuple `[a, b, c]`.
     *   `Parser.resolveVariables(style: CSSStyleDeclaration, property: string)` — Resolves `var()` and `env()` functions.
 
@@ -202,8 +203,8 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
 
 **Deviations & Extensions**
-- **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. We allow direct instantiation of rule classes with explicit AST and token parameters (e.g., `new CSSStyleRule(selector, decls, rules)`) for headless manipulation. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
-- **AST Accessors**: `CSSStyleRule.prototype.selectorAST` and `MediaList.prototype.mediaQueriesAST` expose parsed AST structures directly on CSSOM objects for tooling integration.
+- **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. We allow direct instantiation of rule classes with explicit rule and token parameters (e.g., `new CSSStyleRule(selector, decls, rules)`) for headless manipulation. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
+- **Structured Tree Accessors**: `CSSStyleRule.prototype.selectorAST` and `MediaList.prototype.mediaQueriesAST` expose parsed selector and media query structures directly on CSSOM objects for tooling integration.
 - **Synchronous `CSSStyleSheet.prototype.replace()`**: While the CSSOM-1 specification specifies parallel parsing for `replace()`, our implementation executes parsing synchronously via `replaceSync()` and returns `Promise.resolve(this)`.
 - **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
@@ -231,7 +232,7 @@ These APIs expose low-level parsing, property registration, and typed values def
     - `CSS.parseValueList()` (alias for `parseValueListSync`)
     - `CSS.parseCommaValueList()` (alias for `parseCommaValueListSync`)
     - `CSS.parseComponentValue()`, `CSS.parseComponentValueSync()`
-- **Parser API AST Nodes**:
+- **Parser API Structure Classes**:
     - `CSSParserValue`, `CSSParserToken`, `CSSParserBlock`, `CSSParserFunction`
     - `CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`, `CSSParserDeclaration`
 - **Typed OM Values & Math**:
@@ -257,12 +258,12 @@ These APIs expose low-level parsing, property registration, and typed values def
 **Deviations & Extensions**
 - **String Boxing**: The spec defines `CSSToken` as `typedef (DOMString or CSSStyleValue or CSSParserValue) CSSToken;`. We box raw strings in `CSSParserToken` instead of using raw string primitives.
 - **Synchronous Execution & Sync Variants**: `parseRule`, `parseDeclarationList`, `parseDeclaration`, and `parseComponentValue` are executed synchronously. In addition, explicit `*Sync` variants (`parseStylesheetSync`, `parseRuleListSync`) are provided for asynchronous methods.
-- **Immutability**: AST properties (`prelude`, `body`, `args`) are mutable TypeScript arrays rather than `FrozenArray`.
+- **Immutability**: Parser rule and block properties (`prelude`, `body`, `args`) are mutable TypeScript arrays rather than `FrozenArray`.
 - **Constructor Arguments**: `body` is mandatory in `CSSParserQualifiedRule` constructor (`constructor(prelude, body)`).
 - **CSS Values 4 Math Functions (`CSSMathFunction`)**: New math functions (`sin()`, `cos()`, `abs()`, etc.) are represented by `CSSMathFunction`. Its `operator` getter returns the function's identifier name (e.g. `'sin'`).
 - **WebIDL Dictionary Bindings**: Dictionary constraints and computationally independent initial value validations for `CSS.registerProperty()` are enforced natively in JavaScript.
 - **`CSSTransformComponent` Inheritance**: `CSSTransformComponent` inherits from `CSSStyleValue`, aligning with browser implementations (Blink, WebKit) and enabling reification from `CSSStyleValue.parseAll()` and `StylePropertyMap.get()`.
-- **Math Simplification & AST Structure Preservation**: Calculation trees from `CSSNumericValue.parse()` and `StylePropertyMap` preserve AST structure per CSS Values 4 rather than performing eager unit reduction at parse time.
+- **Math Simplification & Calculation Tree Preservation**: Calculation trees from `CSSNumericValue.parse()` and `StylePropertyMap` preserve `CSSMathValue` tree structures per CSS Values 4 §10.7 rather than performing eager unit reduction at parse time.
 
 ---
 
@@ -271,11 +272,11 @@ These APIs are custom utilities for static analysis, cascading, variable resolut
 
 **Interfaces & Methods**
 - **`Parser` Static Utilities**:
-    - `Parser.parseRuleText(css)`: Parses a single CSS rule string into a `Rule` AST.
+    - `Parser.parseRuleText(css)`: Parses a single CSS rule string into a `Rule` object.
     - `Parser.parseStyleSheetText(css)`: Parses a stylesheet string into `Rule[]`.
     - `Parser.parseRuleInBlockText(css, nested?)`: Parses a rule within a nested/block context.
     - `Parser.parseSelector(css)`: Validates and serializes a selector string.
-    - `Parser.parseSelectorAST(css)`: Parses a selector string into a `SelectorList` AST.
+    - `Parser.parseSelectorAST(css)`: Parses a selector string into structured `SelectorList` nodes.
     - `Parser.calculateSpecificity(selector)`: Calculates selector specificity `[a, b, c]`.
     - `Parser.getCascadedStyle(element, rules)`: Computes cascaded styles against a DOM element.
     - `Parser.resolveVariables(style, property, envMap?)`: Resolves `var()` and `env()` substitutions with fallback handling.
@@ -285,10 +286,10 @@ These APIs are custom utilities for static analysis, cascading, variable resolut
 - **Standalone Top-Level Utilities**:
     - `parse(css)`: Direct parser returning a constructable `CSSStyleSheet`.
     - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
-    - `serialize(ast)`: Low-level serializer turning AST nodes into CSS text.
+    - `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
     - `getCascadedStyle(element, rules)`: Standalone cascading function.
-    - `matches(element, selector)`: Pure-AST static selector matcher.
-    - `querySelectorAll(root, selector)` / `querySelector(root, selector)`: AST-based DOM query utilities.
+    - `matches(element, selector)`: Static selector matcher against DOM elements.
+    - `querySelectorAll(root, selector)` / `querySelector(root, selector)`: Static DOM query utilities.
     - `escape(ident)`: Top-level string identifier escaping utility (CSSOM § 3).
     - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
     - Standalone Parser API exports for tree-shaking (`parseStylesheet`, `parseStylesheetSync`, `parseRule`, `parseRuleSync`, `parseDeclaration`, `parseDeclarationSync`, `supports`, etc.).
