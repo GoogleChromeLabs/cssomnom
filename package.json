@@ -1,6 +1,6 @@
 {
   "name": "cssomnom",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Fast, spec-compliant CSS Object Model (CSSOM) and Typed OM parser in pure TypeScript",
   "license": "Apache-2.0",
   "repository": {
