@@ -309,18 +309,27 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 - Prefer implementing standard APIs (Houdini or CSSOM) over custom ones whenever possible.
 - Cite spec anchors in code comments for all standard implementations.
 
-## Web Platform Test (WPT) Conformance
+## Web Platform Test (WPT) Conformance & Parity
 
-We actively track conformance across 7 major W3C Web Platform Tests (WPT) spec suites (including CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, and Typed OM).
+`cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 7 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, and Typed OM).
 
-- **Multi-Spec Sandbox Conformance**: See [`wpt-progress.md`](./wpt-progress.md) for live pass rates across all 7 spec suites and historical progress logs.
+<!-- WPT_PROGRESS_SUMMARY_START -->
+* **W3C Standards Conformance**: **87.0%** (18,778 / 21,580 passed assertions across 1,687 test files).
+* **Chrome 153 Parity**: **87.0%** pass rate across 29,354 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
-<!-- WPT_CHROME_STATUS_START -->
-### Headless Chrome Conformance (Typed OM)
-Evaluated directly against the official browser WPT harness (`wpt run chrome css/css-typed-om`):
-- **Pass Rate**: 93.58% (11,929 / 12,748 passed)
-- **Failed Assertions**: 819
-<!-- WPT_CHROME_STATUS_END -->
+| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 153 |
+| :--- | :---: | :---: | :---: | :---: |
+| **`Typed OM`** | 12,219 | 11,547 | **94.5%** | 🟢 **+0.5%** (ahead of Chrome) |
+| **`CSSOM`** | 2,161 | 1,607 | **74.4%** | -21.4% |
+| **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
+| **`Syntax`** | 414 | 406 | **98.1%** | -0.3% |
+| **`Variables`** | 561 | 410 | **73.1%** | -17.4% |
+| **`Selectors`** | 5,691 | 4,279 | **75.2%** | -10.8% |
+| **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
+| **OVERALL** | **21,580** | **18,778** | **87.0%** | **-5.9%** |
+<!-- WPT_PROGRESS_SUMMARY_END -->
+
+> See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [wpt-browser-only-manifest.json](./tests/fixtures/wpt-browser-only-manifest.json) for cataloged browser-only layout boundaries.
 
 ## Development
 

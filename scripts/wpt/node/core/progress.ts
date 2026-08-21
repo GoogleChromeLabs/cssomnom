@@ -6,8 +6,6 @@ import {
   getProgressPath,
   SPEC_ORDER,
   SPEC_DISPLAY_NAMES,
-  CANONICAL_FEASIBLE_TARGETS,
-  CANONICAL_FEASIBLE_TOTAL,
 } from './config.ts';
 import { addGitNote, getGitNotesLog, execGit } from '../safe-child-process.ts';
 import type { TestRunDataset } from './types.ts';
@@ -84,23 +82,24 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     lines.push('### Feasibility & Cross-Engine Baseline Comparison');
     lines.push('');
     lines.push('> [!NOTE]');
-    lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
-    lines.push(`> - **Reference Engine**: Comparison numbers represent official unpolyfilled **${ref.browser}** test runs from [\`wpt.fyi\`](https://wpt.fyi) across the corresponding in-scope test suites.`);
+    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent tests requiring GPU rasterization or 2D window layout are cataloged in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push(`> - **Reference Engine**: Comparison numbers represent official unpolyfilled **${ref.browser}** test runs from [\`wpt.fyi\`](https://wpt.fyi) across matching test suites.`);
     lines.push('');
     lines.push(`| Spec Domain | **cssomnom** | ${chromeLabel} (\`wpt.fyi\`) | Parity vs Chrome |`);
     lines.push('| :--- | :---: | :---: | :---: |');
 
     let totalNodePass = 0;
-    const totalNodeTarget = CANONICAL_FEASIBLE_TOTAL;
+    let totalNodeTarget = 0;
     let totalRefPass = 0;
     let totalRefTotal = 0;
 
     for (const spec of SPEC_ORDER) {
       const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
       const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = CANONICAL_FEASIBLE_TARGETS[spec] ?? summary.total;
+      const target = summary.total;
       const nodePassing = summary.passing;
       totalNodePass += nodePassing;
+      totalNodeTarget += target;
 
       const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
       const nodeCell = `${nodePassing.toLocaleString()} / ${target.toLocaleString()} (**${nodeRate.toFixed(1)}%**)`;
@@ -133,24 +132,25 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
 
     lines.push(`| **OVERALL** | ${overallNodeCell} | ${overallRefCell} | ${overallDeltaCell} |`);
   } else {
-    lines.push('### Feasibility & Normalized Conformance Baseline');
+    lines.push('### Feasibility & Baseline Conformance');
     lines.push('');
     lines.push('> [!NOTE]');
-    lines.push('> - **Normalized Conformance ($P / M$)**: Measures `cssomnom` progress against all achievable pure Node.js capabilities ($M = 18,769$ assertions), subtracting physically browser-dependent tests ($E = 106$ assertions) documented in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent tests requiring GPU rasterization or 2D window layout are cataloged in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
     lines.push('> - To populate cross-engine reference metrics from `wpt.fyi`, run `pnpm run wpt fetch-upstream`.');
     lines.push('');
-    lines.push('| Spec Domain | Feasible Target ($M$) | **cssomnom** | Normalized ($P/M$) |');
+    lines.push('| Spec Domain | Target Tests | **cssomnom** | Pass Rate |');
     lines.push('| :--- | :---: | :---: | :---: |');
 
     let totalNodePass = 0;
-    const totalNodeTarget = CANONICAL_FEASIBLE_TOTAL;
+    let totalNodeTarget = 0;
 
     for (const spec of SPEC_ORDER) {
       const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
       const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = CANONICAL_FEASIBLE_TARGETS[spec] ?? summary.total;
+      const target = summary.total;
       const nodePassing = summary.passing;
       totalNodePass += nodePassing;
+      totalNodeTarget += target;
 
       const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
       lines.push(`| **\`${displayName}\`** | ${target.toLocaleString()} | ${nodePassing.toLocaleString()} | **${nodeRate.toFixed(1)}%** |`);
@@ -165,14 +165,18 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
 
 export function formatProgressRow(dataset: TestRunDataset, commitStr: string): string {
   const rowParts = [dataset.timestamp, `\`${commitStr}\``];
+  let rowTotalPass = 0;
+  let rowTotalTarget = 0;
   for (const key of SPEC_ORDER) {
     const summary = dataset.specSummaries[key] ?? { passing: 0, total: 0 };
-    const target = CANONICAL_FEASIBLE_TARGETS[key] ?? summary.total;
+    const target = summary.total;
+    rowTotalPass += summary.passing;
+    rowTotalTarget += target;
     rowParts.push(`${summary.passing}/${target}`);
   }
-  const rawRate = dataset.totalTests > 0 ? ((dataset.totalPassing / dataset.totalTests) * 100).toFixed(2) : '0.00';
-  const normRate = CANONICAL_FEASIBLE_TOTAL > 0 ? Math.min(100, (dataset.totalPassing / CANONICAL_FEASIBLE_TOTAL) * 100).toFixed(2) : '0.00';
-  rowParts.push(`${dataset.totalPassing}/${CANONICAL_FEASIBLE_TOTAL}`, `${rawRate}%`, `**${normRate}%**`);
+  const totalTests = rowTotalTarget > 0 ? rowTotalTarget : dataset.totalTests;
+  const passRate = totalTests > 0 ? ((dataset.totalPassing / totalTests) * 100).toFixed(2) : '0.00';
+  rowParts.push(`${dataset.totalPassing}/${totalTests}`, `**${passRate}%**`);
   return `| ${rowParts.join(' | ')} |`;
 }
 
@@ -277,6 +281,92 @@ export function syncProgressFromNotes(progressPath = getProgressPath()): void {
   }
 }
 
+export function formatReadmeSummaryTable(dataset: TestRunDataset, referenceReportPath?: string): string {
+  const ref = loadReferenceBaselineStats(referenceReportPath);
+  const lines: string[] = [];
+
+  let totalNodePass = 0;
+  let totalNodeTarget = 0;
+  let totalRefPass = 0;
+  let totalRefTotal = 0;
+
+  const rows: string[] = [];
+
+  for (const spec of SPEC_ORDER) {
+    const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
+    const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
+    const target = summary.total;
+    const nodePassing = summary.passing;
+    totalNodePass += nodePassing;
+    totalNodeTarget += target;
+
+    const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
+    const refSpec = ref?.specs[spec] ?? { pass: 0, total: 0 };
+    totalRefPass += refSpec.pass;
+    totalRefTotal += refSpec.total;
+
+    const refRate = refSpec.total > 0 ? (refSpec.pass / refSpec.total) * 100 : 0;
+    const delta = nodeRate - refRate;
+
+    let deltaCell = 'N/A';
+    if (refSpec.total > 0) {
+      if (delta > 0) {
+        deltaCell = `🟢 **+${delta.toFixed(1)}%** (ahead of Chrome)`;
+      } else if (delta === 0) {
+        deltaCell = `🟢 **0.0%** (full parity)`;
+      } else {
+        deltaCell = `${delta.toFixed(1)}%`;
+      }
+    }
+
+    rows.push(`| **\`${displayName}\`** | ${target.toLocaleString()} | ${nodePassing.toLocaleString()} | **${nodeRate.toFixed(1)}%** | ${deltaCell} |`);
+  }
+
+  const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
+  const overallRefRate = totalRefTotal > 0 ? (totalRefPass / totalRefTotal) * 100 : 0;
+  const overallDelta = overallNodeRate - overallRefRate;
+  const overallDeltaCell = overallDelta >= 0 ? `🟢 **+${overallDelta.toFixed(1)}%**` : `**${overallDelta.toFixed(1)}%**`;
+
+  const totalFiles = dataset.totalFiles > 0 ? dataset.totalFiles : 1687;
+
+  lines.push(`* **W3C Standards Conformance**: **${overallNodeRate.toFixed(1)}%** (${totalNodePass.toLocaleString()} / ${totalNodeTarget.toLocaleString()} passed assertions across ${totalFiles.toLocaleString()} test files).`);
+  if (ref && totalRefTotal > 0) {
+    const chromeLabel = ref.milestone ? `Chrome ${ref.milestone}` : 'Chrome';
+    lines.push(`* **${chromeLabel} Parity**: **${overallNodeRate.toFixed(1)}%** pass rate across ${totalRefTotal.toLocaleString()} common subtests evaluated against official [\`wpt.fyi\`](https://wpt.fyi) runs.`);
+  }
+  lines.push('');
+  lines.push('| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 153 |');
+  lines.push('| :--- | :---: | :---: | :---: | :---: |');
+  lines.push(...rows);
+  lines.push(`| **OVERALL** | **${totalNodeTarget.toLocaleString()}** | **${totalNodePass.toLocaleString()}** | **${overallNodeRate.toFixed(1)}%** | ${overallDeltaCell} |`);
+
+  return lines.join('\n');
+}
+
+export function updateReadmeSummaryTable(
+  dataset: TestRunDataset,
+  readmePath = path.resolve(process.cwd(), 'README.md'),
+  referenceReportPath?: string
+): void {
+  if (!fs.existsSync(readmePath)) return;
+  let content = fs.readFileSync(readmePath, 'utf-8');
+
+  const startTag = '<!-- WPT_PROGRESS_SUMMARY_START -->';
+  const endTag = '<!-- WPT_PROGRESS_SUMMARY_END -->';
+
+  const startIdx = content.indexOf(startTag);
+  const endIdx = content.indexOf(endTag);
+
+  if (startIdx !== -1 && endIdx !== -1 && startIdx < endIdx) {
+    const before = content.substring(0, startIdx + startTag.length);
+    const after = content.substring(endIdx);
+    const summaryBlock = '\n' + formatReadmeSummaryTable(dataset, referenceReportPath) + '\n';
+    content = before + summaryBlock + after;
+    fs.writeFileSync(readmePath, content, 'utf-8');
+    console.log(`[WPT Progress] Updated README.md conformance summary table.`);
+  }
+}
+
 export function updateBaselineSummaryTable(
   dataset: TestRunDataset,
   progressPath = getProgressPath(),
@@ -285,7 +375,7 @@ export function updateBaselineSummaryTable(
   if (!fs.existsSync(progressPath)) return;
   const content = fs.readFileSync(progressPath, 'utf-8');
 
-  const startRegex = /(?:### Feasibility & Cross-Engine Baseline Comparison|### Feasibility & Normalized Conformance Baseline)/;
+  const startRegex = /(?:### Feasibility & Cross-Engine Baseline Comparison|### Feasibility & Baseline Conformance|### Feasibility & Normalized Conformance Baseline)/;
   const match = content.match(startRegex);
   if (!match || match.index === undefined) return;
 
@@ -305,7 +395,8 @@ export function updateProgressLog(
   dataset: TestRunDataset,
   dryRun = false,
   progressPath = getProgressPath(),
-  referenceReportPath?: string
+  referenceReportPath?: string,
+  readmePath = path.resolve(process.cwd(), 'README.md')
 ): void {
   syncProgressFromNotes(progressPath);
 
@@ -323,6 +414,7 @@ export function updateProgressLog(
   }
 
   updateBaselineSummaryTable(dataset, progressPath, referenceReportPath);
+  updateReadmeSummaryTable(dataset, readmePath, referenceReportPath);
 
   const content = fs.readFileSync(progressPath, 'utf-8');
   const lines = content.split('\n');

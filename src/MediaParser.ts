@@ -140,7 +140,12 @@ export class MediaParser {
 
       } else if (v.type === 'function') {
         const fn = v as CSSFunction;
-        const mathVal = parseMathFunction(fn.name, fn.value);
+        let mathVal: ReturnType<typeof parseMathFunction> = null;
+        try {
+          mathVal = parseMathFunction(fn.name, fn.value);
+        } catch {
+          mathVal = null;
+        }
         if (mathVal && fn.name.toLowerCase() === 'calc') {
           const simp = simplify(mathVal);
           if (simp instanceof CSSUnitValue) {

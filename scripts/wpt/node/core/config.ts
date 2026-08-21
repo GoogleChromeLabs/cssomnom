@@ -34,17 +34,37 @@ export const SPEC_ORDER: readonly SpecName[] = [
   'mediaqueries',
 ];
 
-export const CANONICAL_FEASIBLE_TARGETS: Record<string, number> = {
-  'css-typed-om': 12219,
-  'cssom': 923,
-  'css-syntax': 398,
-  'css-nesting': 117,
-  'css-variables': 548,
-  'selectors': 4147,
-  'mediaqueries': 417,
-};
+export interface ManifestEntry {
+  file: string;
+  category: string;
+  clusterId: string;
+  description: string;
+}
 
-export const CANONICAL_FEASIBLE_TOTAL = 18769;
+export function getBrowserOnlyManifestPath(cwd = process.cwd()): string {
+  return path.resolve(cwd, 'tests/fixtures/wpt-browser-only-manifest.json');
+}
+
+export function loadBrowserOnlyManifest(customPath?: string): Record<string, ManifestEntry[]> {
+  const manifestPath = customPath ?? getBrowserOnlyManifestPath();
+  if (!fs.existsSync(manifestPath)) {
+    return {};
+  }
+  return JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Record<string, ManifestEntry[]>;
+}
+
+export function getBrowserOnlyFileCount(spec: string, manifest?: Record<string, ManifestEntry[]>): number {
+  const data = manifest ?? loadBrowserOnlyManifest();
+  return data[spec]?.length ?? 0;
+}
+
+export function isBrowserOnlyFile(spec: string, relativeFilePath: string, manifest?: Record<string, ManifestEntry[]>): boolean {
+  const data = manifest ?? loadBrowserOnlyManifest();
+  const entries = data[spec];
+  if (!entries) return false;
+  const normalized = relativeFilePath.replace(/^submodules\/web-platform-tests\//, '');
+  return entries.some(e => e.file === normalized);
+}
 
 export const DEFAULT_REFERENCE_STATS: Record<string, { pass: number; total: number }> = {
   'css-typed-om': { pass: 10690, total: 11230 },
