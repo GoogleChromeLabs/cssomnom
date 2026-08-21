@@ -38,7 +38,21 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
        - **Execution Rules & Scripts**: Enforce that documentation consistently specifies native Node execution (`node script.ts`, NOT `npx tsx` or `ts-node`) and valid npm scripts (`pnpm run preflight`, `pnpm run codegen`, `pnpm run maintain`, `pnpm test`, `wpt:node:*`, `wpt:browser:*`).
      - Identify any contradictory claims, outdated API signatures, or conflicting guidelines between files.
 
-  2. **Codebase & Script Terminology Consistency Audit**:
+  2. **CSS Specification & Math Terminology Enforcement**:
+     - Audit all documentation (`README.md`, `PLAN.md`, `AGENTS.md`, code comments, tests) for spec-compliant, normative terminology:
+       - **Math & Calculation Terminology (CSS Values 4 §10.7 & CSS Typed OM Level 1)**:
+         - **Flag & Prohibit Anti-Patterns**: Ban the loose use of *"AST"*, *"AST structure"*, *"AST nodes"*, *"Math AST"*, *"CSS AST"*, or *"AST parsing"* when describing CSS math expressions or Typed OM trees.
+         - **Enforce Normative Terms**:
+           - **Calculation Tree** (CSS Values 4 §10.7 `#calc-internal`): Internal representation of math functions composed of **operator nodes** (or **calc-operator nodes**: `Sum`, `Product`, `Negate`, `Invert`) and **leaf nodes** (numeric scalars).
+           - **Typed OM Numeric Tree / `CSSMathValue` Subclasses** (CSS Typed OM 1 §7, §10): Public WebIDL objects (`CSSMathSum`, `CSSMathProduct`, `CSSMathMin`, etc.) and atomic leaf objects (`CSSUnitValue`).
+           - **Reification** (CSS Typed OM 1 §16.1 `#reification-algorithms`): The normative conversion of parsed calculations and component values into live `CSSNumericValue` instances.
+           - **Simplification of Calculation Trees** (CSS Values 4 §10.7.1): Parse-time algebraic reduction of calculation trees, distinct from **computed-value resolution** (§10.8) and **used-value evaluation**.
+       - **CSS Syntax & Parser Terminology (CSS Syntax 3)**:
+         - Use **component values**, **tokens**, **qualified rules**, **at-rules**, and **declarations** rather than generic compiler AST terms.
+       - **Selector Terminology (Selectors 4)**:
+         - Use **complex selectors**, **compound selectors**, **relative selectors**, **forgiving selector lists**, and **specificity**.
+
+  3. **Codebase & Script Terminology Consistency Audit**:
      - Audit directory structure, naming casing, and terminology across `scripts/`, `src/`, `tests/`, and configuration files:
        - **Generated Code Separation**: Verify that all machine-generated spec files reside in `src/data/gen/` (e.g. `src/data/gen/properties.ts`, `src/data/gen/units.ts`, etc.). Flag any generated files placed directly in `src/data/` or other non-gen folders.
        - **Extraction Scripts Directory**: Verify that all external test suite extraction scripts reside in `scripts/external_suites/` and use the `extract_<suite>.ts` naming pattern. Flag any extraction scripts placed directly in `scripts/` or missing the `extract_` verb prefix.
@@ -49,32 +63,33 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
        - **Test Failure & Skip Taxonomy**: Audit terms used for skipping/categorizing failures (`exclude` for unexecutable HTML suites, `knownFailures` for baseline failures checked and pruned by `scripts/baselines/prune_resolved_failures.ts`, and `knownSkips` for mapped skips with explicit spec reason strings).
        - **Script & Command Alignment**: Ensure script filenames correspond logically to npm script names in `package.json` (e.g. `codegen` $\to$ `scripts/codegen/generate_all.ts`, `external:extract` $\to$ `scripts/external_suites/extract_all.ts`, `baselines:prune` $\to$ `scripts/baselines/prune_resolved_failures.ts`).
 
-  3. **Index & Link Integrity Verification**:
+  4. **Index & Link Integrity Verification**:
      - **Automated Link & Spec Path Validation**: Run `node .agents/skills/coherence-auditor/scripts/validate_links.ts` to automatically detect broken relative markdown links, invalid spec submodule paths, and missing script/source file references across all docs.
      - Verify relative markdown links across canonical docs (`README.md`, `PLAN.md`, `AGENTS.md`, `API_BOUNDARIES.md`, `LOOP.md`, `MAINTENANCE.md`, `contributing.md`).
      - Check main index integrity in `README.md` and `PLAN.md`.
 
-  4. **Open Question Lifecycle & Task Tracker Check**:
+  5. **Open Question Lifecycle & Task Tracker Check**:
      - Audit the strategic source of truth: `PLAN.md`.
      - Check for un-tracked open questions, `TODO` / `TBD` markers, or incomplete phase tasks (`[ ]`).
      - Verify that resolved items are marked `[x]` with appropriate completion descriptions.
      - Highlight any open decision items that lack an assigned phase or owner.
 
-  5. **Git Repository Health Check**:
+  6. **Git Repository Health Check**:
      - Execute `git status` to inspect working-tree health.
      - Flag any uncommitted changes, untracked temporary files, or uncommitted milestone work.
      - Check current branch status relative to `main`.
 
-  6. **Actionable Output**:
+  7. **Actionable Output**:
      - Operate in **Report-Only** mode. Do NOT make direct edits to files.
      - Format your response clearly with the following sections:
        # Coherence & Repository Audit Report
        ## 1. Cross-Document Consistency & Terminology Findings
-       ## 2. Codebase & Script Terminology Findings
-       ## 3. Link Integrity & Index Audit (Validator Output)
-       ## 4. PLAN.md & Open Question Lifecycle Status
-       ## 5. Git Repository Health & Working Tree Status
-       ## 6. Recommended Action Items & Suggested Diffs
+       ## 2. CSS Specification & Math Terminology Findings
+       ## 3. Codebase & Script Terminology Findings
+       ## 4. Link Integrity & Index Audit (Validator Output)
+       ## 5. PLAN.md & Open Question Lifecycle Status
+       ## 6. Git Repository Health & Working Tree Status
+       ## 7. Recommended Action Items & Suggested Diffs
   ```
 
 2. **Process Subagent Audit Output**:
