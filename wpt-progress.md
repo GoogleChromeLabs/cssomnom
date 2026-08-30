@@ -6,24 +6,25 @@ This file tracks the conformance progress of the CSSOM / Typed OM implementation
 
 > [!NOTE]
 > - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent tests requiring GPU rasterization or 2D window layout are cataloged in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
-> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across matching test suites.
+> - **Reference Engine**: Comparison numbers represent official unpolyfilled **Upstream chrome 153.0.8008.0** test runs from [`wpt.fyi`](https://wpt.fyi) across matching test suites.
 
 | Spec Domain | **cssomnom** | Chrome 153 (`wpt.fyi`) | Parity vs Chrome |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| :--- | :---: | :---: | :---: |
 | **`Typed OM`** | 11,547 / 12,219 (**94.5%**) | 12,341 / 13,125 (94.0%) | 🟢 **+0.5%** |
 | **`CSSOM`** | 1,607 / 2,161 (**74.4%**) | 6,381 / 6,661 (95.8%) | -21.4% |
 | **`Nesting`** | 117 / 117 (**100.0%**) | 139 / 140 (99.3%) | 🟢 **+0.7%** |
 | **`Syntax`** | 406 / 414 (**98.1%**) | 430 / 437 (98.4%) | -0.3% |
 | **`Variables`** | 410 / 561 (**73.1%**) | 699 / 772 (90.5%) | -17.5% |
-| **`Selectors`** | 4,279 / 5,691 (**75.2%**) | 5,498 / 6,394 (86.0%) | -10.8% |
+| **`Selectors`** | 4,019 / 5,431 (**74.0%**) | 5,498 / 6,394 (86.0%) | -12.0% |
 | **`Media Queries`** | 412 / 417 (**98.8%**) | 1,799 / 1,825 (98.6%) | 🟢 **+0.2%** |
-| **OVERALL** | **18,778 / 21,580 (87.0%)** | **27,287 / 29,354 (93.0%)** | **-5.9%** |
+| **OVERALL** | **18,518 / 21,320 (86.9%)** | **27,287 / 29,354 (93.0%)** | **-6.1%** |
 ---
 
 ### Historical Conformance Progress Log
 
 | Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Pass Rate |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 2026-08-30 22:53:07 | `6b1fa3d*` | 11547/12219 | 1607/2161 | 117/117 | 406/414 | 410/561 | 4019/5431 | 412/417 | 18518/21320 | **86.86%** |
 | 2026-08-18 02:53:43 | `563279a*` | 11547/12219 | 1607/2161 | 117/117 | 406/414 | 410/561 | 4279/5691 | 412/417 | 18778/21580 | **87.02%** |
 | 2026-08-18 02:51:39 | `563279a*` | 11547/12219 | 1607/2161 | 117/117 | 406/414 | 410/561 | 3975/5691 | 412/417 | 18474/21580 | **85.61%** |
 | 2026-08-18 00:06:24 | `d0482a0` | 11542/12219 | 1607/2161 | 117/117 | 406/414 | 410/561 | 4279/5691 | 412/417 | 18773/21580 | **86.99%** |
