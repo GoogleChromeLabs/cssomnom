@@ -75,8 +75,9 @@ export class CSSRule {
   get SUPPORTS_RULE() { return CSSRule.SUPPORTS_RULE; }
   get FONT_FEATURE_VALUES_RULE() { return CSSRule.FONT_FEATURE_VALUES_RULE; }
 
+  // cssom-1 § 6.4 #dom-cssrule-type: returns 0 if no legacy constant matches
   get type(): number {
-    throw new Error('Not implemented');
+    return 0;
   }
 
   // 6.13 The CSSRule Interface

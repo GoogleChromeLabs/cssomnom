@@ -68,8 +68,6 @@ export class CSSCustomMediaRule extends CSSRule {
     this.query = query;
   }
 
-  get type() { return 0; }
-
   get cssText(): string {
     const queryStr = typeof this.query === 'boolean' ? String(this.query) : this.query.mediaText;
     return `@custom-media ${this.name}${queryStr ? ' ' + queryStr : ''};`;
@@ -142,8 +140,6 @@ export class CSSContainerRule extends CSSConditionRule {
     return this.containerQuery;
   }
 
-  get type() { return 0; }
-
   get cssText() {
     return serializeGroupingRule('container', this.conditionText, this._rules);
   }
@@ -158,8 +154,6 @@ export class CSSLayerBlockRule extends CSSGroupingRule {
     super(rules, parseRuleInBlock);
     this.name = name;
   }
-
-  get type() { return 0; }
 
   get cssText() {
     return serializeGroupingRule('layer', this.name, this._rules);
@@ -176,8 +170,6 @@ export class CSSLayerStatementRule extends CSSRule {
     this.nameList = nameList;
   }
 
-  get type() { return 0; }
-
   get cssText() {
     return `@layer ${this.nameList.join(', ')};`;
   }
@@ -189,8 +181,6 @@ export class CSSStartingStyleRule extends CSSGroupingRule {
   constructor(_prelude: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
   }
-
-  get type() { return 0; }
 
   get cssText() {
     return serializeGroupingRule('starting-style', '', this._rules);
@@ -208,8 +198,6 @@ export class CSSScopeRule extends CSSGroupingRule {
     this.startSelector = startSelector;
     this.endSelector = endSelector;
   }
-
-  get type() { return 0; }
 
   get cssText() {
     let prelude = '';
@@ -239,8 +227,6 @@ export class CSSViewTransitionRule extends CSSRule {
     }
     this.navigation = navigation;
   }
-
-  get type() { return 0; }
 
   get cssText() {
     return `@view-transition { navigation: ${this.navigation}; }`;
@@ -425,8 +411,6 @@ export class CSSNestedDeclarations extends CSSRule {
   set style(value: string) {
     this._style.cssText = value;
   }
-
-  get type() { return 0; }
 
   // The CSSNestedDeclarations Interface
   get cssText() {
@@ -1035,26 +1019,23 @@ export class CSSFontFeatureValuesRule extends CSSRule {
 
   get cssText(): string {
     const blocks: string[] = [];
-    const serializeMap = (name: string, map: CSSFontFeatureValuesMap) => {
-      if (map.size === 0) return;
-      const entries: string[] = [];
-      for (const [k, v] of map.entries()) {
-        entries.push(`${k}: ${v.join(' ')};`);
+    const maps: [string, CSSFontFeatureValuesMap][] = [
+      ['annotation', this.annotation],
+      ['ornaments', this.ornaments],
+      ['stylistic', this.stylistic],
+      ['swash', this.swash],
+      ['character-variant', this.characterVariant],
+      ['styleset', this.styleset],
+      ['historical-forms', this.historicalForms],
+    ];
+    for (const [name, map] of maps) {
+      if (map.size > 0) {
+        const entries = Array.from(map.entries(), ([k, v]) => `${k}: ${v.join(' ')};`).join(' ');
+        blocks.push(`@${name} { ${entries} }`);
       }
-      blocks.push(`@${name} { ${entries.join(' ')} }`);
-    };
-    serializeMap('annotation', this.annotation);
-    serializeMap('ornaments', this.ornaments);
-    serializeMap('stylistic', this.stylistic);
-    serializeMap('swash', this.swash);
-    serializeMap('character-variant', this.characterVariant);
-    serializeMap('styleset', this.styleset);
-    serializeMap('historical-forms', this.historicalForms);
-
-    if (blocks.length > 0) {
-      return `@font-feature-values ${this._fontFamily} { ${blocks.join(' ')} }`;
     }
-    return `@font-feature-values ${this._fontFamily} {}`;
+    const body = blocks.length > 0 ? ` { ${blocks.join(' ')} }` : ' {}';
+    return `@font-feature-values ${this._fontFamily}${body}`;
   }
   set cssText(_value: string) {}
 }

@@ -219,56 +219,48 @@ export class CSSStyleSheet extends StyleSheet {
     return sheet;
   }
 
+  private _replaceRulesFromText(text: string): void {
+    const tokens = tokenize(text);
+    const rules = ParseHooks.consumeListOfRules(tokens, true);
+
+    const filteredRules = rules.filter(rule => {
+      if (isImportRule(rule)) {
+        console.warn('CSS Parse Error: @import rules are not allowed in constructed stylesheets and were removed.');
+        return false;
+      }
+      return true;
+    });
+
+    for (const rule of this._rules) {
+      if (rule instanceof CSSRule) {
+        rule.parentRule = null;
+        rule.parentStyleSheet = null;
+      }
+    }
+
+    this._unregisterProperties();
+    this._rules = filteredRules;
+    for (const rule of this._rules) {
+      if (rule instanceof CSSRule) {
+        rule.parentStyleSheet = this;
+        rule.parentRule = null;
+      }
+      this._registerRuleProperties(rule);
+    }
+  }
+
   // cssom-1 § 6.5.1 #dom-cssstylesheet-replace
   replace(text: string): Promise<CSSStyleSheet> {
-    // 1. Let promise be a promise.
-    // 2. If the constructed flag is not set, or the disallow modification flag is set, reject promise with a NotAllowedError DOMException and return promise.
     if (!this._constructedFlag || this._disallowModificationFlag) {
       return Promise.reject(new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError"));
     }
-    // 3. Set the disallow modification flag.
     this._disallowModificationFlag = true;
 
-    // 4. In parallel, do these steps:
     return new Promise<CSSStyleSheet>((resolve, reject) => {
       queueMicrotask(() => {
         try {
-          // 4.1 Let rules be the result of running parse a stylesheet's contents from text.
-          const tokens = tokenize(text);
-          const rules = ParseHooks.consumeListOfRules(tokens, true);
-
-          // 4.2 If rules contains one or more @import rules, remove those rules from rules.
-          const filteredRules = rules.filter(rule => {
-            if (isImportRule(rule)) {
-              console.warn('CSS Parse Error: @import rules are not allowed in constructed stylesheets and were removed.');
-              return false;
-            }
-            return true;
-          });
-
-          // Clear parent references on previously attached rules
-          for (const rule of this._rules) {
-            if (rule instanceof CSSRule) {
-              rule.parentRule = null;
-              rule.parentStyleSheet = null;
-            }
-          }
-
-          this._unregisterProperties();
-          // 4.3 Set sheet's CSS rules to rules.
-          this._rules = filteredRules;
-          for (const rule of this._rules) {
-            if (rule instanceof CSSRule) {
-              rule.parentStyleSheet = this;
-              rule.parentRule = null;
-            }
-            this._registerRuleProperties(rule);
-          }
-
-          // 4.4 Unset sheet's disallow modification flag.
+          this._replaceRulesFromText(text);
           this._disallowModificationFlag = false;
-
-          // 4.5 Resolve promise with sheet.
           resolve(this);
         } catch (e) {
           this._disallowModificationFlag = false;
@@ -281,44 +273,13 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 § 6.5.1 #dom-cssstylesheet-replacesync
   // cssom-1 § 6.5.1 #synchronously-replace-the-rules-of-a-cssstylesheet
   replaceSync(text: string): void {
-    // 1. If the constructed flag is not set, or the disallow modification flag is set, throw a NotAllowedError DOMException.
     if (!this._constructedFlag) {
       throw new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError");
     }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
     }
-    // 2. Let rules be the result of running parse a stylesheet's contents from text.
-    const tokens = tokenize(text);
-    const rules = ParseHooks.consumeListOfRules(tokens, true);
-    
-    // 3. If rules contains one or more @import rules, remove those rules from rules.
-    const filteredRules = rules.filter(rule => {
-      if (isImportRule(rule)) {
-        console.warn('CSS Parse Error: @import rules are not allowed in constructed stylesheets and were removed.');
-        return false;
-      }
-      return true;
-    });
-
-    // Clear parent references on previously attached rules
-    for (const rule of this._rules) {
-      if (rule instanceof CSSRule) {
-        rule.parentRule = null;
-        rule.parentStyleSheet = null;
-      }
-    }
-
-    this._unregisterProperties();
-    // 4. Set sheet's CSS rules to rules.
-    this._rules = filteredRules;
-    for (const rule of this._rules) {
-      if (rule instanceof CSSRule) {
-        rule.parentStyleSheet = this;
-        rule.parentRule = null;
-      }
-      this._registerRuleProperties(rule);
-    }
+    this._replaceRulesFromText(text);
   }
 
   // cssom-1 § 6.3 #dom-cssstylesheet-insertrule
