@@ -15,5 +15,8 @@
  * limitations under the License.
  */
 
+// css-cascade-5 § 6 #cascading
+// css-cascade-5 § 6.1 #cascade-sort
+// css-cascade-5 § 6.4 #layering
 // Spec-Aligned Cascade Pipeline Architecture (CSS Cascade 5, CSS Variables 1, CSS Env 1, CSS Color 4)
 export * from './cascade/index.ts';

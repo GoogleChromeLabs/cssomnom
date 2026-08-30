@@ -19,22 +19,29 @@ import { compareSpecificity } from '../specificity.ts';
 import type { MatchedDeclaration } from './types.ts';
 
 /**
- * Compares two declarations according to CSS Cascade 5 § 6 #cascade-sort.
- * 1. Origin & Importance (Important inline > Important layered > Important unlayered > Normal inline > Normal unlayered > Normal layered)
- * 2. Layer Order (Normal: ascending; Important: descending)
- * 3. Specificity (selectors-4 § 4 #specificity-rules)
- * 4. Order of Appearance / Source Order (ascending)
+ * Compares two declarations according to CSS Cascade 5 § 6.1 #cascade-sort.
+ * 1. Origin & Importance: css-cascade-5 § 6.1 #cascade-origin, § 6.1 #style-attr, § 6.1 #cascade-layering, § 6.3 #importance
+ *    (Important inline > Important layered > Important unlayered > Normal inline > Normal unlayered > Normal layered)
+ * 2. Layer Order: css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering (Normal: ascending; Important: descending)
+ * 3. Specificity: css-cascade-5 § 6.1 #cascade-specificity, selectors-4 § 15 #specificity-rules
+ * 4. Order of Appearance: css-cascade-5 § 6.1 #cascade-order (ascending)
  */
 export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDeclaration): number {
   const getPrecedence = (decl: MatchedDeclaration): number => {
     if (decl.important) {
-      if (decl.isInline) return 60; // Important inline
-      if (decl.layerOrder !== Infinity) return 50; // Important layered
-      return 40; // Important unlayered
+      // css-cascade-5 § 6.1 #style-attr, § 6.3 #importance
+      if (decl.isInline) return 60;
+      // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance, § 6.4.3 #layer-ordering
+      if (decl.layerOrder !== Infinity) return 50;
+      // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance (unlayered is implicit final layer; loses to explicit layers)
+      return 40;
     } else {
-      if (decl.isInline) return 30; // Normal inline
-      if (decl.layerOrder === Infinity) return 20; // Normal unlayered
-      return 10; // Normal layered
+      // css-cascade-5 § 6.1 #style-attr
+      if (decl.isInline) return 30;
+      // css-cascade-5 § 6.1 #cascade-layering (unlayered is implicit final layer; wins over explicit layers)
+      if (decl.layerOrder === Infinity) return 20;
+      // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering
+      return 10;
     }
   };
 
@@ -44,31 +51,34 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
     return precA - precB;
   }
 
-  // Layer order within importance bucket
+  // Layer order within importance bucket: css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering
   if (a.important && a.layerOrder !== Infinity && b.layerOrder !== Infinity) {
-    // !important layered: REVERSE layer order (lower layerOrder wins!)
+    // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering: for important rules, earliest layer wins (lower index)
     if (a.layerOrder !== b.layerOrder) {
       return b.layerOrder - a.layerOrder;
     }
   } else if (!a.important && a.layerOrder !== Infinity && b.layerOrder !== Infinity) {
-    // Normal layered: normal layer order (higher layerOrder wins!)
+    // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering: for normal rules, latest layer wins (higher index)
     if (a.layerOrder !== b.layerOrder) {
       return a.layerOrder - b.layerOrder;
     }
   }
 
-  // Compare Specificity: selectors-4 § 4 #specificity-rules
+  // Compare Specificity: css-cascade-5 § 6.1 #cascade-specificity, selectors-4 § 15 #specificity-rules
   const specDiff = compareSpecificity(a.specificity, b.specificity);
   if (specDiff !== 0) {
     return specDiff;
   }
 
-  // Source Order
+  // Order of Appearance: css-cascade-5 § 6.1 #cascade-order (last declaration in document order wins)
   return a.sourceOrder - b.sourceOrder;
 }
 
 /**
  * Groups declarations by property name (case-sensitive for custom properties, lowercase for standard).
+ * css-cascade-5 § 6 #cascading (grouping declared values for a given property)
+ * css-variables-1 § 2 #defining-custom-properties (custom property names are case-sensitive)
+ * css-values-4 § 3.1 #keywords (standard property names are ASCII case-insensitive)
  */
 export function groupDeclarationsByProperty(matchedDeclarations: MatchedDeclaration[]): Map<string, MatchedDeclaration[]> {
   const declarationsByProperty = new Map<string, MatchedDeclaration[]>();

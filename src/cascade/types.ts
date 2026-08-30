@@ -23,8 +23,8 @@ export type Specificity = [number, number, number];
 
 /**
  * Matched CSS declaration with full cascade metadata.
- * css-cascade-5 § 2 #filtering
- * css-cascade-5 § 6 #cascade-sort
+ * css-cascade-5 § 5 #filtering
+ * css-cascade-5 § 6.1 #cascade-sort
  */
 export interface MatchedDeclaration {
   name: string;
@@ -40,15 +40,27 @@ export interface MatchedDeclaration {
 /**
  * Cascade origin and importance precedence levels.
  * css-cascade-5 § 6.1 #cascade-origin
+ * css-cascade-5 § 6.1 #style-attr
+ * css-cascade-5 § 6.1 #cascade-layering
+ * css-cascade-5 § 6.2 #cascading-origins
+ * css-cascade-5 § 6.3 #importance
  */
 export const CascadeOrigin = {
+  // css-cascade-5 § 6.1 #cascade-origin, § 6.2 #cascade-origin-ua
   USER_AGENT: 0,
+  // css-cascade-5 § 6.1 #cascade-origin, § 6.2 #cascade-origin-user
   USER: 10,
+  // css-cascade-5 § 6.1 #cascade-origin, § 6.1 #cascade-layering
   AUTHOR_NORMAL_LAYERED: 10,
+  // css-cascade-5 § 6.1 #cascade-origin, § 6.1 #cascade-layering (implicit final layer)
   AUTHOR_NORMAL_UNLAYERED: 20,
+  // css-cascade-5 § 6.1 #style-attr (element-attached styles)
   INLINE_NORMAL: 30,
+  // css-cascade-5 § 6.1 #cascade-origin, § 6.1 #cascade-layering, § 6.3 #importance
   AUTHOR_IMPORTANT_UNLAYERED: 40,
+  // css-cascade-5 § 6.1 #cascade-origin, § 6.1 #cascade-layering, § 6.3 #importance
   AUTHOR_IMPORTANT_LAYERED: 50,
+  // css-cascade-5 § 6.1 #style-attr, § 6.3 #importance
   INLINE_IMPORTANT: 60,
 } as const;
 
@@ -56,7 +68,7 @@ export type CascadeOrigin = typeof CascadeOrigin[keyof typeof CascadeOrigin];
 
 /**
  * Standard CSS properties that are inherited by default according to CSS specs.
- * css-cascade-5 § 7.2 #computed-values
+ * css-cascade-5 § 7.2 #inheriting
  */
 export const INHERITED_PROPERTIES = new Set([
   'color',
