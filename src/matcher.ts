@@ -78,6 +78,7 @@ export function isElement(node: unknown): node is DOMElement {
   );
 }
 
+// selectors-4 § 17.1 #parse-selector
 function parseSelector(selector: string | ComplexSelector | SelectorList): SelectorList {
   if (typeof selector !== 'string') {
     if (selector.type === 'selector-list') return selector;
@@ -96,7 +97,7 @@ function parseSelector(selector: string | ComplexSelector | SelectorList): Selec
 
 /**
  * Evaluates whether a given DOM element matches a CSS selector.
- * selectors-4 § 15 #match-against-element
+ * selectors-4 § 17.3 #match-against-element
  */
 export function matches(element: unknown, selector: string | ComplexSelector | SelectorList, scopeElement?: unknown): boolean {
   if (!isElement(element)) return false;
@@ -128,7 +129,7 @@ export function matches(element: unknown, selector: string | ComplexSelector | S
 
 /**
  * Returns all descendant elements matching a CSS selector in tree order.
- * selectors-4 § 16 #match-against-tree
+ * selectors-4 § 17.5 #match-against-tree
  */
 export function querySelectorAll(root: unknown, selector: string | ComplexSelector | SelectorList): DOMElement[] {
   if (!root || typeof root !== 'object') return [];
@@ -170,7 +171,7 @@ export function querySelectorAll(root: unknown, selector: string | ComplexSelect
 
 /**
  * Returns the first descendant element matching a CSS selector in tree order.
- * selectors-4 § 16 #match-against-tree
+ * selectors-4 § 17.5 #match-against-tree
  */
 export function querySelector(root: unknown, selector: string | ComplexSelector | SelectorList): DOMElement | null {
   const all = querySelectorAll(root, selector);
@@ -179,7 +180,7 @@ export function querySelector(root: unknown, selector: string | ComplexSelector 
 
 /**
  * Matches a Complex Selector against an element using backtracking combinator evaluation.
- * selectors-4 § 3 #structure-of-selectors
+ * selectors-4 § 17.3 #match-against-element
  */
 export function matchComplexSelector(element: DOMElement, complex: ComplexSelector, scope?: DOMElement): boolean {
   const items = complex.items;
@@ -234,19 +235,19 @@ function matchComplexRecursive(
   const combinator = items[itemIndex - 1] as Combinator;
   const prevCompoundIndex = itemIndex - 2;
 
-  // selectors-4 § 3.2 #child-combinators
+  // selectors-4 § 14.2 #child-combinators
   if (combinator.value === '>') {
     if (!element.parentElement) return false;
     return matchComplexRecursive(element.parentElement, items, prevCompoundIndex, scope);
   }
 
-  // selectors-4 § 3.3 #adjacent-sibling-combinators
+  // selectors-4 § 14.3 #adjacent-sibling-combinators
   if (combinator.value === '+') {
     if (!element.previousElementSibling) return false;
     return matchComplexRecursive(element.previousElementSibling, items, prevCompoundIndex, scope);
   }
 
-  // selectors-4 § 3.4 #subsequent-sibling-combinators
+  // selectors-4 § 14.4 #general-sibling-combinators
   if (combinator.value === '~') {
     let sib = element.previousElementSibling;
     while (sib) {
@@ -256,7 +257,7 @@ function matchComplexRecursive(
     return false;
   }
 
-  // selectors-4 § 3.1 #descendant-combinators
+  // selectors-4 § 14.1 #descendant-combinators
   if (combinator.value === ' ') {
     let parent = element.parentElement;
     while (parent) {
@@ -266,7 +267,7 @@ function matchComplexRecursive(
     return false;
   }
 
-  // selectors-4 § 3.5 #column-combinator
+  // selectors-5 § #the-column-combinator
   if (combinator.value === '||') {
     return false;
   }
@@ -276,7 +277,8 @@ function matchComplexRecursive(
 
 /**
  * Matches a compound selector (sequence of simple selectors).
- * selectors-4 § 3.6 #compound
+ * selectors-4 § 3.1 #structure (<compound-selector>)
+ * selectors-4 § 17.3 #match-against-element
  */
 function matchCompoundSelector(element: DOMElement, compound: CompoundSelector, scope?: DOMElement): boolean {
   for (const simple of compound.selectors) {
@@ -289,13 +291,15 @@ function matchCompoundSelector(element: DOMElement, compound: CompoundSelector, 
 
 /**
  * Matches a simple selector (type, universal, class, ID, attribute, pseudo).
- * selectors-4 § 3 #structure-of-selectors
+ * selectors-4 § 3.1 #structure (<simple-selector>)
+ * selectors-4 § 17.3 #match-against-element
  */
 function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?: DOMElement): boolean {
   switch (simple.type) {
     // selectors-4 § 5.1 #type-selectors
-    // selectors-4 § 3.2 #case-sensitive
-    // html#case-sensitivity-of-selectors
+    // selectors-4 § 5.3 #type-nmsp
+    // selectors-4 § 3.7 #case-sensitive
+    // html § 15.3.1 #case-sensitivity-of-selectors
     case 'type-selector': {
       const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
       const selName = toAsciiLowerCase(simple.name);
@@ -314,8 +318,9 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       return true;
     }
 
-    // selectors-4 § 5.2 #universal-selector
-    // selectors-4 § 3.2 #case-sensitive
+    // selectors-4 § 5.2 #the-universal-selector
+    // selectors-4 § 5.3 #type-nmsp
+    // selectors-4 § 3.7 #case-sensitive
     case 'universal-selector': {
       const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
       if (simple.namespace !== undefined && simple.namespace !== '*') {
@@ -332,13 +337,13 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       return true;
     }
 
-    // selectors-4 § 6.2 #id-selectors
+    // selectors-4 § 6.7 #id-selectors
     case 'id-selector': {
       const id = element.id || (element.getAttribute ? element.getAttribute('id') : null);
       return id === simple.name;
     }
 
-    // selectors-4 § 6.1 #class-html
+    // selectors-4 § 6.6 #class-html
     case 'class-selector': {
       if (element.classList && typeof element.classList.contains === 'function') {
         return element.classList.contains(simple.name);
@@ -347,7 +352,7 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       return classAttr.split(/\s+/).includes(simple.name);
     }
 
-    // selectors-4 § 7 #attribute-selectors
+    // selectors-4 § 6 #attribute-selectors
     case 'attribute-selector': {
       return matchAttributeSelector(element, simple);
     }
@@ -358,11 +363,13 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       return false;
     }
 
-    // selectors-4 § 8 #pseudo-classes
+    // selectors-4 § 3.5 #pseudo-classes
     case 'pseudo-class-selector': {
       return matchPseudoClassSelector(element, simple, scope);
     }
 
+    // selectors-4 § 3.6 #pseudo-elements
+    // selectors-4 § 17.4 #match-against-pseudo-element
     case 'pseudo-element-selector': {
       return false;
     }
@@ -374,9 +381,13 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
 
 /**
  * Matches attribute selectors including null namespaces, operators, and sensitivity flags.
- * selectors-4 § 7 #attribute-selectors
- * selectors-4 § 3.2 #case-sensitive
- * html#case-sensitivity-of-selectors
+ * selectors-4 § 6 #attribute-selectors
+ * selectors-4 § 6.1 #attribute-representation
+ * selectors-4 § 6.2 #attribute-substrings
+ * selectors-4 § 6.3 #attribute-case
+ * selectors-4 § 6.4 #attrnmsp
+ * selectors-4 § 3.7 #case-sensitive
+ * html § 15.3.1 #case-sensitivity-of-selectors
  */
 function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): boolean {
   const attrName = sel.name;
@@ -420,6 +431,7 @@ function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): bo
   }
 
   switch (sel.operator) {
+    // selectors-4 § 6.1 #attribute-representation
     case '=':
       return actual === expected;
     case '~=':
@@ -427,6 +439,7 @@ function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): bo
       return actual.split(/\s+/).includes(expected);
     case '|=':
       return actual === expected || actual.startsWith(expected + '-');
+    // selectors-4 § 6.2 #attribute-substrings
     case '^=':
       if (expected === '') return false;
       return actual.startsWith(expected);
@@ -454,18 +467,18 @@ function isHTMLCaseInsensitiveAttribute(element: DOMElement, attrName: string): 
 
 /**
  * Matches functional, structural, and state pseudo-classes.
- * selectors-4 § 8 #pseudo-classes
- * selectors-4 § 3.2 #case-sensitive
+ * selectors-4 § 3.5 #pseudo-classes
+ * selectors-4 § 3.7 #case-sensitive
  */
 function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelector, scope?: DOMElement): boolean {
   const name = toAsciiLowerCase(pseudo.name);
 
-  // selectors-4 § 3.7 #legacy-pseudo-element-aliases
+  // selectors-4 § 3.6.1 #pseudo-element-syntax, § 3.10 #legacy-aliasing
   if (name === 'after' || name === 'before' || name === 'first-letter' || name === 'first-line') {
     return false;
   }
 
-  // selectors-4 § 4.1 #forgiving-selector
+  // selectors-4 § 4.2 #matches (:is, :matches) & § 4.4 #zero-matches (:where)
   if (name === 'is' || name === 'where' || name === 'matches') {
     if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
       for (const complex of pseudo.argument.selectors) {
@@ -476,7 +489,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return false;
   }
 
-  // selectors-4 § 4.2 #negation
+  // selectors-4 § 4.3 #negation
   if (name === 'not') {
     if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
       for (const complex of pseudo.argument.selectors) {
@@ -487,7 +500,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return true;
   }
 
-  // selectors-4 § 4.3 #relational
+  // selectors-4 § 4.5 #relational
   if (name === 'has') {
     if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
       return matchHasPseudo(element, pseudo.argument);
@@ -495,7 +508,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return false;
   }
 
-  // selectors-4 § 8.1 #root-pseudo
+  // selectors-4 § 13.1 #the-root-pseudo
   if (name === 'root') {
     if (element.ownerDocument && element.ownerDocument.documentElement) {
       return element === element.ownerDocument.documentElement;
@@ -503,13 +516,13 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return !element.parentElement && (!element.parentNode || element.parentNode.nodeType === 9);
   }
 
-  // selectors-4 § 8.2 #empty-pseudo
+  // selectors-4 § 13.2 #the-empty-pseudo
   if (name === 'empty') {
     const childNodes = element.childNodes ? Array.from(element.childNodes) : [];
     return childNodes.every(n => n.nodeType === 8 || (n.nodeType === 3 && n.nodeValue === ''));
   }
 
-  // selectors-4 § 8.3 #the-scope-pseudo
+  // selectors-4 § 8.4 #the-scope-pseudo
   if (name === 'scope') {
     if (scope) return element === scope;
     if (element.ownerDocument && element.ownerDocument.documentElement) {
@@ -523,13 +536,15 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   const elIndex1Based = siblings.indexOf(element) + 1;
   if (elIndex1Based === 0) return false;
 
-  // selectors-4 § 8.7 #the-first-child-pseudo
+  // selectors-4 § 13.3.3 #the-first-child-pseudo
   if (name === 'first-child') {
     return elIndex1Based === 1;
   }
+  // selectors-4 § 13.3.4 #the-last-child-pseudo
   if (name === 'last-child') {
     return elIndex1Based === siblings.length;
   }
+  // selectors-4 § 13.3.5 #the-only-child-pseudo
   if (name === 'only-child') {
     return siblings.length === 1;
   }
@@ -539,17 +554,20 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   const typeSiblings = siblings.filter(s => toAsciiLowerCase(s.localName || s.tagName || '') === elLocal);
   const typeIndex1Based = typeSiblings.indexOf(element) + 1;
 
+  // selectors-4 § 13.4.3 #the-first-of-type-pseudo
   if (name === 'first-of-type') {
     return typeIndex1Based === 1;
   }
+  // selectors-4 § 13.4.4 #the-last-of-type-pseudo
   if (name === 'last-of-type') {
     return typeIndex1Based === typeSiblings.length;
   }
+  // selectors-4 § 13.4.5 #the-only-of-type-pseudo
   if (name === 'only-of-type') {
     return typeSiblings.length === 1;
   }
 
-  // selectors-4 § 8.5 #the-nth-child-pseudo
+  // selectors-4 § 13.3.1 #the-nth-child-pseudo, § 13.3.2 #the-nth-last-child-pseudo
   if (name === 'nth-child' || name === 'nth-last-child') {
     const anb = getAnPlusB(pseudo);
     if (!anb) return false;
@@ -567,7 +585,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return matchAnPlusB(pos, anb.a, anb.b);
   }
 
-  // selectors-4 § 8.6 #the-nth-of-type-pseudo
+  // selectors-4 § 13.4.1 #the-nth-of-type-pseudo, § 13.4.2 #the-nth-last-of-type-pseudo
   if (name === 'nth-of-type' || name === 'nth-last-of-type') {
     const anb = getAnPlusB(pseudo);
     if (!anb) return false;
@@ -575,14 +593,14 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return matchAnPlusB(pos, anb.a, anb.b);
   }
 
-  // selectors-4 § 9.1 #the-dir-pseudo
+  // selectors-4 § 7.1 #the-dir-pseudo
   if (name === 'dir') {
     const expectedDir = toAsciiLowerCase(getPseudoArgumentString(pseudo));
     const actualDir = getElementDirection(element);
     return actualDir === expectedDir;
   }
 
-  // selectors-4 § 10.1 #the-heading-pseudo
+  // selectors-5 § #headings
   if (name === 'heading') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     const match = tag.match(/^h([1-6])$/);
@@ -593,8 +611,8 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return levels.includes(level);
   }
 
-  // selectors-4 § 9.2 #the-lang-pseudo
-  // selectors-4 § 3.2 #case-sensitive
+  // selectors-4 § 7.2 #the-lang-pseudo
+  // selectors-4 § 3.7 #case-sensitive
   if (name === 'lang') {
     const langArgs = getPseudoArgumentString(pseudo).split(/\s*,\s*/);
     const elementLang = toAsciiLowerCase(getElementLanguage(element));
@@ -605,6 +623,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   }
 
   // Form states and interactions
+  // selectors-4 § 12.2.1 #checked & html § 15.3.1.4 #selector-checked
   if (name === 'checked') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'input') {
@@ -619,9 +638,11 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return false;
   }
 
+  // selectors-4 § 12.1.1 #enableddisabled & html § 15.3.1.2 #selector-disabled
   if (name === 'disabled') {
     return isElementDisabled(element);
   }
+  // selectors-4 § 12.1.1 #enableddisabled & html § 15.3.1.2 #selector-enabled
   if (name === 'enabled') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (['button', 'input', 'select', 'textarea', 'optgroup', 'option', 'fieldset'].includes(tag)) {
@@ -630,6 +651,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return false;
   }
 
+  // selectors-4 § 12.1.2 #rw-pseudos & html § 15.3.1.3 #selector-read-only
   if (name === 'read-only') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'input' || tag === 'textarea') {
@@ -637,6 +659,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     }
     return true;
   }
+  // selectors-4 § 12.1.2 #rw-pseudos & html § 15.3.1.3 #selector-read-write
   if (name === 'read-write') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'input' || tag === 'textarea') {
@@ -645,20 +668,24 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return element.getAttribute?.('contenteditable') === 'true';
   }
 
+  // selectors-4 § 8.1 #the-any-link-pseudo & selectors-4 § 8.2 #link & html § 15.3.1.1 #selector-link
   if (name === 'link' || name === 'any-link') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     return ['a', 'area', 'link'].includes(tag) && !!(element.hasAttribute?.('href') || element.getAttribute?.('href'));
   }
 
+  // selectors-4 § 8.3 #the-target-pseudo
   if (name === 'target') {
     const hash = element.ownerDocument?.location?.hash?.replace(/^#/, '');
     return !!hash && (element.id === hash || element.getAttribute?.('id') === hash);
   }
 
+  // selectors-4 § 5.4 #the-defined-pseudo
   if (name === 'defined') {
     return true;
   }
 
+  // selectors-4 § 9.3 #the-focus-pseudo
   if (name === 'focus') {
     const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
     const active = doc?.activeElement;
@@ -666,6 +693,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return typeof doc?.contains === 'function' ? doc.contains(element) : true;
   }
 
+  // selectors-4 § 9.4 #the-focus-visible-pseudo
   if (name === 'focus-visible') {
     const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
     const active = doc?.activeElement;
@@ -673,6 +701,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return typeof doc?.contains === 'function' ? doc.contains(element) : true;
   }
 
+  // selectors-4 § 9.5 #the-focus-within-pseudo
   if (name === 'focus-within') {
     const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
     const active = doc?.activeElement;
@@ -690,6 +719,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return false;
   }
 
+  // css-shadow-1 § 4.3 #the-has-slotted-pseudo
   if (name === 'has-slotted') {
     const tag = toAsciiLowerCase(element.localName || element.tagName || '');
     if (tag === 'slot') {
@@ -707,7 +737,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
 
 /**
  * Evaluates the relational :has() pseudo-class against relative and descendant selectors.
- * selectors-4 § 4.3 #relational
+ * selectors-4 § 4.5 #relational
  */
 function matchHasPseudo(element: DOMElement, selectorList: SelectorList): boolean {
   for (const complex of selectorList.selectors) {

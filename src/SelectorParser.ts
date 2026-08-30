@@ -129,7 +129,10 @@ export interface SelectorParserOptions {
 
 /**
  * Selector Parser according to Selectors Level 4.
- * @see https://drafts.csswg.org/selectors-4/#grammar
+ *
+ * selectors-4 § 16 #grammar
+ * selectors-4 § 17.1 #parse-selector
+ * selectors-4 § 17.2 #parse-relative-selector
  */
 export class SelectorParser {
   public static readonly PSEUDO_CLASSES = PSEUDO_CLASSES;
@@ -164,6 +167,14 @@ export class SelectorParser {
     });
   }
 
+  /**
+   * Parses component values into a SelectorList.
+   *
+   * selectors-4 § 4.1 #grouping (<selector-list>)
+   * selectors-4 § 16 #grammar (<complex-selector-list>)
+   * selectors-4 § 16.1 #forgiving-selector (parsing forgiving selector list)
+   * selectors-4 § 17.1 #parse-selector
+   */
   public parse(): SelectorList {
     const selectors: (ComplexSelector | InvalidSelector)[] = [];
     
@@ -213,6 +224,12 @@ export class SelectorParser {
     return { type: 'selector-list', selectors };
   }
 
+  /**
+   * Validates namespace prefixes against declared namespaces.
+   *
+   * selectors-4 § 3.8 #namespaces
+   * selectors-4 § 17.1 #parse-selector step 2
+   */
   private validateNamespace(namespace: string | undefined): void {
     if (this.declaredNamespaces !== undefined && namespace !== undefined && namespace !== '*' && namespace !== '') {
       if (!this.declaredNamespaces.has(namespace)) {
@@ -220,6 +237,12 @@ export class SelectorParser {
       }
     }
   }
+  /**
+   * Consumes a complex selector.
+   *
+   * selectors-4 § 3.1 #structure (<complex-selector>)
+   * selectors-4 § 16 #grammar
+   */
   private consumeComplexSelector(): ComplexSelector {
     const items: (CompoundSelector | Combinator)[] = [];
     const start = this.cursor.i;
@@ -232,12 +255,15 @@ export class SelectorParser {
       // Check for combinators
       const combinator = this.tryConsumeCombinator();
       if (combinator) {
+        // selectors-4 § 3.4 #relative: Relative selector allowed only when flag is set
         if (items.length === 0 && !this.allowRelative) {
           throw new DOMException('Relative selector not allowed in this context', 'SyntaxError');
         }
+        // selectors-4 § 3.6.1 #pseudo-element-syntax, § 3.6.5 #pseudo-element-structure
         if (seenPseudoElement) {
           throw new DOMException('Pseudo-element must be at the end of the selector', 'SyntaxError');
         }
+        // selectors-4 § 16 #grammar: consecutive combinators are not allowed
         if (items.length > 0 && items[items.length - 1].type === 'combinator') {
           throw new DOMException('Consecutive combinators are not allowed', 'SyntaxError');
         }
@@ -247,13 +273,14 @@ export class SelectorParser {
       
       const compound = this.consumeCompoundSelector();
       if (compound.selectors.length > 0) {
+        // selectors-4 § 3.6.1 #pseudo-element-syntax, § 3.6.5 #pseudo-element-structure
         if (seenPseudoElement) {
           throw new DOMException('Pseudo-element must be at the end of the selector', 'SyntaxError');
         }
         
         const hasPseudo = compound.selectors.some(s => s.type === 'pseudo-element-selector');
         
-        // If the previous item was also a compound selector, insert a descendant combinator
+        // selectors-4 § 14.1 #descendant-combinators, § 16 #white-space: implicit descendant combinator between compounds
         if (items.length > 0 && items[items.length - 1].type === 'compound-selector') {
           items.push({ type: 'combinator', value: ' ' });
         }
@@ -267,11 +294,12 @@ export class SelectorParser {
       }
     }
     
+    // selectors-4 § 16 #grammar: trailing combinator is not allowed
     if (items.length > 0 && items[items.length - 1].type === 'combinator') {
       throw new DOMException('Trailing combinator is not allowed', 'SyntaxError');
     }
     
-    // selectors-4 #grammar
+    // selectors-4 § 16 #grammar: complex selector cannot be empty
     if (items.length === 0) {
       throw new DOMException('Complex selector cannot be empty', 'SyntaxError');
     }
@@ -281,17 +309,22 @@ export class SelectorParser {
     return { type: 'complex-selector', items, tokens };
   }
 
-
+  /**
+   * selectors-4 § 14 #combinators
+   * selectors-5 § #the-column-combinator (||)
+   */
   private tryConsumeCombinator(): Combinator | null {
     const token = this.cursor.next;
     if (!token) return null;
     
     if (isDelimToken(token)) {
       const val = token.value;
+      // selectors-4 § 14.2 #child-combinators (>), § 14.3 #adjacent-sibling-combinators (+), § 14.4 #general-sibling-combinators (~)
       if (val === '>' || val === '+' || val === '~') {
         this.cursor.consume();
         return { type: 'combinator', value: val as ' ' | '>' | '+' | '~' | '||' };
       }
+      // selectors-5 § #the-column-combinator (||)
       if (val === '|' && isDelimToken(this.cursor.peek(1), '|')) {
         this.cursor.consume();
         this.cursor.consume();
@@ -302,6 +335,8 @@ export class SelectorParser {
     return null;
   }
 
+  // selectors-4 § 3.6.3 #pseudo-element-states
+  // selectors-4 § 9 #useraction-pseudos
   private isUserActionPseudoClass(name: string): boolean {
     const lower = name.toLowerCase();
     return ['hover', 'active', 'focus', 'focus-visible', 'focus-within'].includes(lower);
@@ -799,8 +834,12 @@ export interface AnPlusBValue {
 }
 
 /**
- * Parses An+B microsyntax according to CSS Syntax 3 / Selectors 4.
- * @see https://drafts.csswg.org/css-syntax-3/#anb-production
+ * Parses An+B microsyntax into { a, b }.
+ *
+ * selectors-4 § 13.3 #child-index
+ * css-syntax-3 § 8 #anb-microsyntax
+ * css-syntax-3 § 8.1 #anb-syntax
+ * css-syntax-3 § 8.2 #the-anb-type (<a-n-plus-b> production)
  */
 export function parseAnPlusB(values: ComponentValue[]): AnPlusBValue | null {
   const nonComment = values.filter(v => v.type !== 'comment');
