@@ -2972,6 +2972,23 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Authored `tests/wpt-classifier.test.ts` covering all 7 browser capability categories and verifying zero false positives on pure CSSOM failures.
   - Verified preflight passes cleanly with 0 type errors, 0 lint warnings, safe-exec clean, and 4,159 tests passing.
   - Live WPT runner executes across 1,768 test files (18,999 / 21,884 passing = 86.82% raw rate, 91 browser-only subtests detected $\to$ 87.18% normalized rate across 21,793 feasible subtests).
+- [x] **Establish Two-Tier Hybrid Feasibility Architecture**:
+  - Reconciled `scripts/wpt/node/feasibility/` and `scripts/wpt/node/core/classifier.ts`:
+    - **Tier 1 (Runtime Sensor)**: `classifier.ts` operates at assertion-level during test execution to prevent all-or-nothing file dropping.
+    - **Tier 2 (Calibration Jury)**: Delphi consensus tools audit failure clusters to calibrate classifier rules, eliminate blind spots, and verify anti-greenwashing invariants.
+  - Aligned `scripts/wpt/node/feasibility/README.md` and `scripts/wpt/node/feasibility/audit.ts` to support subtest-level counts and eliminate dimensional file-subtraction mismatch.
+
+---
+
+## Phase 122: Delphi-Classifier Calibration & Conformance Wave
+**Goal**: Run a calibration audit between the Delphi consensus committee and the live classifier across remaining failure clusters, then target high-frequency pure-CSSOM conformance gaps in `selectors` and `css-cascade`.
+
+### Tasks
+- [ ] **Cross-Calibration Audit**:
+  - Run `export_dataset.ts` on the 2,885 failing subtests to identify any unclassified browser-dependent clusters or false-positive classifier rules.
+  - Audit the 58 remaining files in `tests/wpt-node-config.json` `exclude` to determine which can safely run under Option B subtest classification.
+- [ ] **Targeted Conformance Remediation**:
+  - Triage the top failure cluster in `selectors` and `css-cascade` to implement normative spec algorithms and advance passing assertions past 19,000.
 
 
 

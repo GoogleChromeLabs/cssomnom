@@ -24,7 +24,7 @@ export type { ManifestEntry };
 export { getBrowserOnlyFileCount, isBrowserOnlyFile };
 export const BROWSER_ONLY_MANIFEST = loadBrowserOnlyManifest();
 
-export function calculateFeasibility(currentResults: Record<string, { passing: number; total: number }>): {
+export function calculateFeasibility(currentResults: Record<string, { passing: number; total: number; browserOnly?: number }>): {
   specs: SpecFeasibility[];
   overall: SpecFeasibility;
 } {
@@ -35,20 +35,24 @@ export function calculateFeasibility(currentResults: Record<string, { passing: n
   let passingAll = 0;
 
   for (const [spec, counts] of Object.entries(currentResults)) {
-    const outOfScope = getBrowserOnlyFileCount(spec);
+    // If runtime classifier detected browser-only subtests, use assertion-level count;
+    // otherwise fall back to the Delphi manifest file count.
+    const outOfScope = typeof counts.browserOnly === 'number'
+      ? counts.browserOnly
+      : getBrowserOnlyFileCount(spec);
     const feasible = Math.max(counts.passing, counts.total - outOfScope);
     const rawRate = counts.total > 0 ? ((counts.passing / counts.total) * 100).toFixed(2) + '%' : '0.00%';
     const normalizedRate = feasible > 0 ? Math.min(100, (counts.passing / feasible) * 100).toFixed(2) + '%' : '0.00%';
 
     totalAll += counts.total;
-    outOfScopeAll += (counts.total - feasible);
+    outOfScopeAll += outOfScope;
     feasibleAll += feasible;
     passingAll += counts.passing;
 
     specs.push({
       spec,
       totalTests: counts.total,
-      outOfScopeTests: counts.total - feasible,
+      outOfScopeTests: outOfScope,
       feasibleTests: feasible,
       passingTests: counts.passing,
       rawPassRate: rawRate,

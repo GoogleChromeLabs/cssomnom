@@ -10,7 +10,11 @@ This directory contains the tools and methodology used to establish, audit, and 
 
 - **Pure Node.js Environment**: The test harness runs inside Node.js using an in-memory DOM ([LinkeDOM](https://github.com/WebReflection/linkedom)) without a visual browser layout engine, GPU rasterizer, or OS windowing system.
 - **Anti-Greenwashing Invariant**: We never declare a test "out of scope" simply because it is hard, buggy, or requires non-trivial AST manipulation. A test is considered out-of-scope **only if it is physically impossible to satisfy in headless Node.js without a full browser engine** (e.g. 2D layout geometry, font rasterization, WebDriver hardware event synthesis, or HTTP byte-stream decoding).
-- **Single Source of Truth**: The explicit, file-by-file JSON manifest at [`tests/fixtures/wpt-browser-only-manifest.json`](../../../tests/fixtures/wpt-browser-only-manifest.json) is the sole authority on excluded tests. No magic numbers or hardcoded count dictionaries are permitted in the codebase.
+- **Two-Tier Hybrid Architecture (Symbiotic Check-and-Balance)**:
+  Neither a heuristic classifier alone nor a static committee snapshot is an infallible authority. We operate a two-tier system:
+  1. **Tier 1 (Fast Runtime Sensor)**: [`scripts/wpt/node/core/classifier.ts`](../core/classifier.ts) dynamically tags subtest failure signatures during test runs (`pnpm run wpt:run`), providing assertion-level granularity without all-or-nothing file dropping.
+  2. **Tier 2 (Semantic Calibration Jury)**: The Delphi Consensus Workflow in this directory audits unclassified failure clusters across three specialized LLM perspectives (Spec Scrutineer, Hostile Gatekeeper Grizz, Systems Architect) to discover blind spots, calibrate classifier rules, and prevent static manifest drift.
+- **Dual Reporting Standard**: Always report both raw pass rates ($P / N$) and normalized feasible rates ($P / M$) side-by-side. Never hide behind a single adjusted number without displaying the underlying assertion counts ($P$, $N$, $E$).
 
 ---
 
@@ -18,12 +22,12 @@ This directory contains the tools and methodology used to establish, audit, and 
 
 | Metric | Symbol | Definition |
 | :--- | :---: | :--- |
-| **Total Tests** | $N$ | Total test assertion instances across the 8 tracked WPT CSS test suites. |
-| **Passing Tests** | $P$ | Verified passing assertion instances in pure Node.js (`pnpm run wpt:node`). |
-| **Browser-Only Exclusions** | $E$ | Test assertion instances consensus-agreed as physically impossible in pure Node.js. |
-| **Feasible Target** | $M$ | The achievable Node.js target: $$M = \max(P, N - E)$$ |
-| **Raw Pass Rate** | — | Percentage of all WPT tests passing: $$\text{Raw Score} = \frac{P}{N} \times 100$$ |
-| **Normalized Conformance** | — | Percentage of achievable pure-Node tests passing: $$\text{Normalized} = \min\left(100.00\%, \frac{P}{M} \times 100\right)$$ |
+| **Total Subtests** | $N$ | Total test assertion instances across the 8 tracked WPT CSS test suites. |
+| **Passing Subtests** | $P$ | Verified passing assertion instances in pure Node.js (`pnpm run wpt:node`). |
+| **Browser-Only Subtests** | $E$ | Test assertion instances consensus-agreed / detected as physically impossible in pure Node.js. |
+| **Feasible Target** | $M$ | The achievable Node.js target in subtest units: $$M = \max(P, N - E)$$ |
+| **Raw Pass Rate** | — | Percentage of all WPT subtests passing: $$\text{Raw Score} = \frac{P}{N} \times 100$$ |
+| **Normalized Conformance** | — | Percentage of achievable pure-Node subtests passing: $$\text{Normalized} = \min\left(100.00\%, \frac{P}{M} \times 100\right)$$ |
 
 ---
 
