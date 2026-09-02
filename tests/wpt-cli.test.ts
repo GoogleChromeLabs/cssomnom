@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { parseArgs } from 'node:util';
 
 import {
   VALID_SPECS,
@@ -1312,7 +1313,29 @@ describe('WPT CLI Core Modules', () => {
         await fetchWptFyiRun({ customFetch: mockEmptyFetch, quiet: true });
       }, /No WPT runs found on wpt.fyi/);
     });
+
+    test('supports --spec and --path aliases in cli parser', () => {
+      const RUN_OPTS = {
+        'filter-by-spec': { type: 'string', short: 's' },
+        'spec': { type: 'string' },
+        'filter-by-path': { type: 'string', short: 'p' },
+        'path': { type: 'string' },
+      } as const;
+
+      const res1 = parseArgs({ args: ['--spec=css-cascade', '--path=scope'], options: RUN_OPTS });
+      const spec1 = res1.values['filter-by-spec'] ?? res1.values.spec;
+      const path1 = res1.values['filter-by-path'] ?? res1.values.path;
+      assert.strictEqual(spec1, 'css-cascade');
+      assert.strictEqual(path1, 'scope');
+
+      const res2 = parseArgs({ args: ['--filter-by-spec=selectors', '--filter-by-path=focus'], options: RUN_OPTS });
+      const spec2 = res2.values['filter-by-spec'] ?? res2.values.spec;
+      const path2 = res2.values['filter-by-path'] ?? res2.values.path;
+      assert.strictEqual(spec2, 'selectors');
+      assert.strictEqual(path2, 'focus');
+    });
   });
 });
+
 
 
