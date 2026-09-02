@@ -207,6 +207,7 @@ exports[`Parser static methods 1`] = `
   "isCustomPropertyDeclaration",
   "isValidDashedIdent",
   "parseRuleInBlockText",
+  "parseRuleInScopeBlockText",
   "parseRuleText",
   "parseSelector",
   "parseSelectorAST",

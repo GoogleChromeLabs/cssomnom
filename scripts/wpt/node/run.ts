@@ -199,13 +199,8 @@ export function runWptFile(filePath: string): WptFileResult {
         return sandbox.navigator;
       }
       if (typeof prop === 'string') {
-        if (JS_INTRINSICS.has(prop)) {
-          if (contextRealm && prop in contextRealm) {
-            return Reflect.get(contextRealm, prop);
-          }
-          if (prop in globalThis) {
-            return (globalThis as unknown as Record<string, unknown>)[prop];
-          }
+        if (JS_INTRINSICS.has(prop) && contextRealm && prop in contextRealm) {
+          return Reflect.get(contextRealm, prop);
         }
         if (prop in sandbox) {
           return Reflect.get(sandbox, prop);
@@ -272,13 +267,8 @@ export function runWptFile(filePath: string): WptFileResult {
         return { value: windowProxy, writable: true, enumerable: false, configurable: true };
       }
       if (typeof prop === 'string') {
-        if (JS_INTRINSICS.has(prop)) {
-          if (contextRealm && prop in contextRealm) {
-            return { value: contextRealm[prop], writable: true, enumerable: false, configurable: true };
-          }
-          if (prop in globalThis) {
-            return { value: (globalThis as unknown as Record<string, unknown>)[prop], writable: true, enumerable: false, configurable: true };
-          }
+        if (JS_INTRINSICS.has(prop) && contextRealm && prop in contextRealm) {
+          return { value: contextRealm[prop], writable: true, enumerable: false, configurable: true };
         }
         if (prop in sandbox) {
           return { value: sandbox[prop], writable: true, enumerable: false, configurable: true };
@@ -363,12 +353,9 @@ export function runWptFile(filePath: string): WptFileResult {
     }
   }
 
-  // Copy JS intrinsics to sandbox
-  for (const name of JS_INTRINSICS) {
-    if (name in globalThis && !(name in sandbox)) {
-      sandbox[name] = (globalThis as unknown as Record<string, unknown>)[name];
-    }
-  }
+  // Copy global Matrix mocks
+  sandbox.DOMMatrix = (globalThis as unknown as Record<string, unknown>).DOMMatrix;
+  sandbox.DOMMatrixReadOnly = (globalThis as unknown as Record<string, unknown>).DOMMatrixReadOnly;
 
   // Copy Typed OM classes (omit CSSPositionValue per CSS Typed OM 1 spec)
   for (const [key, value] of Object.entries(TypedOM)) {

@@ -19,6 +19,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseStyleSheet } from '../src/parser.ts';
 import { CSSScopeRule, CSSGroupingRule } from '../src/CSSOM.ts';
+import { CSSImportRule } from '../src/rules/at-rules.ts';
 import { matches } from '../src/matcher.ts';
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { getCascadedStyle } from '../src/cascade.ts';
@@ -172,4 +173,37 @@ describe('Phase 118: :scope, @scope & Complex Relative Selectors', () => {
       assert.equal(decl.getPropertyValue('opacity'), '0.5');
     });
   });
+
+  describe('CSSImportRule scope serialization', () => {
+    it('serializes bare scope keyword when no start or end selector is specified', () => {
+      const rules = parseStyleSheet('@import url("test.css") scope;');
+      assert.equal(rules.length, 1);
+      const rule = rules[0] as CSSImportRule;
+      assert.equal(rule.isScoped, true);
+      assert.equal(rule.scopeStart, null);
+      assert.equal(rule.scopeEnd, null);
+      assert.equal(rule.cssText, '@import url("test.css") scope;');
+    });
+
+    it('serializes scope with start and end selectors', () => {
+      const rules = parseStyleSheet('@import url("test.css") scope((.a) to (.b));');
+      assert.equal(rules.length, 1);
+      const rule = rules[0] as CSSImportRule;
+      assert.equal(rule.isScoped, true);
+      assert.equal(rule.scopeStart, '.a');
+      assert.equal(rule.scopeEnd, '.b');
+      assert.equal(rule.cssText, '@import url("test.css") scope((.a) to (.b));');
+    });
+
+    it('serializes scope with only start selector', () => {
+      const rules = parseStyleSheet('@import url("test.css") scope((.a));');
+      assert.equal(rules.length, 1);
+      const rule = rules[0] as CSSImportRule;
+      assert.equal(rule.isScoped, true);
+      assert.equal(rule.scopeStart, '.a');
+      assert.equal(rule.scopeEnd, null);
+      assert.equal(rule.cssText, '@import url("test.css") scope((.a));');
+    });
+  });
 });
+

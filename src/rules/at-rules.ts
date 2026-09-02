@@ -632,7 +632,7 @@ export class CSSImportRule extends CSSRule {
         if (this._scopeEnd) scopeInner += ` to (${this._scopeEnd})`;
         text += ` scope(${scopeInner.trim()})`;
       } else {
-        text += ` scope()`;
+        text += ` scope`;
       }
     }
     const mediaStr = this.media.mediaText;

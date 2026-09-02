@@ -2887,10 +2887,9 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Added AST and parser support for `@scope` prelude (scoping root and scope limit) and nested rules (`CSSScopeRule`).
   - Implemented `@scope` rule filtering with scope root and scope limit evaluation, proximity calculation, and relative selector scoping in `src/cascade/rule-filter.ts`.
 - [x] **Unit Tests & WPT Conformance Verification**:
-  - Added 175 lines of unit tests in `tests/selectors-scope-relative.test.ts` (14/14 passed).
-  - Verified 27/27 `css-cascade/scope-*.html` WPT test files pass (100%).
-  - Cascade score surged from 183 / 497 (36.8%) to 278 / 465 (59.8%) (+23.0% gain!).
-  - Overall standards conformance reached 18,101 / 20,371 passed assertions across 1,761 test files (88.9%).
+  - Added unit tests in `tests/selectors-scope-relative.test.ts` (all passed).
+  - Verified `@scope` conformance across `css-cascade` (69/200 assertions pass across 48 scope test files, raising cascade suite conformance from 183 to 246 passed assertions without sham layout mocks).
+  - Verified `css-nesting` remains at 100.00% (117/117 subtests across 53 test files) after addressing `@font-face` nested group rule spec compliance.
   - Verified `pnpm run preflight` is 100% clean (0 type errors, 0 lint warnings, safe-exec clean, all unit tests passing).
   - Milestone commit: `4e6b251` (`feat(cascade): implement @scope, :scope, and relative selector matching`).
 

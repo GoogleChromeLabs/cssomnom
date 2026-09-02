@@ -135,12 +135,6 @@ export function createWptContext(
     HTMLStyleElement: win.HTMLStyleElement,
     CSSStyleDeclaration: win.CSSStyleDeclaration || CSSStyleDeclaration,
     DOMException: win.DOMException,
-    Promise: globalThis.Promise,
-    Math: globalThis.Math,
-    JSON: globalThis.JSON,
-    Reflect: globalThis.Reflect,
-    Proxy: globalThis.Proxy,
-    Symbol: globalThis.Symbol,
     Event: win.Event,
     CustomEvent: win.CustomEvent,
     FocusEvent: win.FocusEvent,
@@ -149,6 +143,8 @@ export function createWptContext(
     navigator: win.__navigator || { preferences: createNavigatorPreferences() },
     location: win.location || { href: 'http://localhost/test.html', origin: 'http://localhost' },
     ...TYPED_OM_EXPORTS,
+    DOMMatrix: (globalThis as { DOMMatrix?: unknown }).DOMMatrix,
+    DOMMatrixReadOnly: (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly,
     CSS: TypedOM.CSS,
     AssertionError: AssertionErrorProxy,
     OptionalFeatureUnsupportedError,
@@ -643,40 +639,5 @@ export function createWptContext(
     (document as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = ctx;
   }
 
-  return new Proxy(ctx, {
-    get(target, prop, receiver) {
-      if (typeof prop === 'string') {
-        if (prop in target) return Reflect.get(target, prop, receiver);
-        if (document && typeof document.getElementById === 'function') {
-          const el = document.getElementById(prop);
-          if (el && (el as { isConnected?: boolean }).isConnected !== false) return el;
-          if (typeof document.querySelector === 'function') {
-            try {
-              const qEl = document.querySelector('#' + TypedOM.CSS.escape(prop));
-              if (qEl) return qEl;
-            } catch {}
-          }
-          if (el) return el;
-        }
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has(target, prop) {
-      if (typeof prop === 'string') {
-        if (prop in target) return true;
-        if (document && typeof document.getElementById === 'function') {
-          const el = document.getElementById(prop);
-          if (el && (el as { isConnected?: boolean }).isConnected !== false) return true;
-          if (typeof document.querySelector === 'function') {
-            try {
-              const qEl = document.querySelector('#' + TypedOM.CSS.escape(prop));
-              if (qEl) return true;
-            } catch {}
-          }
-          if (el) return true;
-        }
-      }
-      return Reflect.has(target, prop);
-    }
-  });
+  return ctx;
 }

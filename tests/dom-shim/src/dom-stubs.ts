@@ -1320,20 +1320,16 @@ function patchDocumentPrototype(window: WindowType): void {
     docProto.caretPositionFromPoint = () => null;
   }
   if (!('elementsFromPoint' in docProto)) {
-    docProto.elementsFromPoint = function (this: Document, _x: number, _y: number) {
-      const buttons = Array.from(this.querySelectorAll('button'));
-      if (buttons.length > 0) {
-        const btn = buttons[buttons.length - 1];
-        return [btn, btn.parentElement || this.body || this.documentElement];
-      }
+    docProto.elementsFromPoint = function (this: Document, x: number, y: number) {
+      if (x < 0 || y < 0) return [];
       const target = this.activeElement || this.body || this.documentElement;
       return target ? [target] : [];
     };
   }
   if (!('elementFromPoint' in docProto)) {
-    docProto.elementFromPoint = function (this: Document, _x: number, _y: number) {
-      const buttons = Array.from(this.querySelectorAll('button'));
-      return buttons.length > 0 ? buttons[buttons.length - 1] : (this.activeElement || this.body || this.documentElement || null);
+    docProto.elementFromPoint = function (this: Document, x: number, y: number) {
+      if (x < 0 || y < 0) return null;
+      return this.activeElement || this.body || this.documentElement || null;
     };
   }
 

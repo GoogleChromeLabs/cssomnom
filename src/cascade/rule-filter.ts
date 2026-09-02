@@ -608,7 +608,7 @@ export function collectMatchedDeclarations(
           if (isScoped) {
             const startStr = scopeStart ? `(${scopeStart})` : null;
             const endStr = scopeEnd ? `(${scopeEnd})` : null;
-            const scopeRule = new CSSScopeRule(startStr, endStr, importedSheet.cssRules as unknown as Rule[], ParseHooks.consumeRule as unknown as (t: string) => Rule);
+            const scopeRule = new CSSScopeRule(startStr, endStr, importedSheet.cssRules as unknown as Rule[], ParseHooks.parseRuleInScopeBlock);
             (scopeRule as unknown as { _parentStyleSheet: unknown })._parentStyleSheet = (rule as CSSRule).parentStyleSheet || findParentStyleSheet(rule as CSSRule);
             walkRules([scopeRule], parentSelector, layerName, scopeNode, scopeProximity);
           } else {

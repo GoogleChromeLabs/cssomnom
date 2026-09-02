@@ -89,7 +89,7 @@ export class Parser {
 
   private static readonly NESTED_GROUP_AT_RULES = new Set([
     'media', 'supports', 'container', 'layer', 'scope', 'starting-style',
-    'keyframes', 'property', 'counter-style', 'font-feature-values', 'font-face', 'view-transition'
+    'keyframes', 'property', 'counter-style', 'font-feature-values', 'view-transition'
   ]);
 
   // css-nesting-1 § 3.3 #conditionals
@@ -1637,6 +1637,19 @@ export class Parser {
     return contents[0];
   }
 
+  // css-cascade-6 § 3 #scoped-styles
+  public static parseRuleInScopeBlockText(text: string): Rule {
+    const wrapped = `{ ${text} }`;
+    const tokens = tokenize(wrapped);
+    const parser = new Parser(tokens);
+    const block = parser.consumeBlock(parser.consumeToken());
+    const contents = parser.consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
+    if (contents.length !== 1) {
+      throw new DOMException('Syntax error', 'SyntaxError');
+    }
+    return contents[0];
+  }
+
 
 
   public static calculateSpecificity(selector: string | import('./types.ts').SelectorList): [number, number, number][] {
@@ -1909,16 +1922,7 @@ export function parseRuleInBlock(text: string, nested = true): Rule {
 }
 
 export function parseRuleInScopeBlock(text: string): Rule {
-  const wrapped = `{ ${text} }`;
-  const tokens = tokenize(wrapped);
-  const parser = new Parser(tokens);
-  const token = (parser as unknown as { consumeToken: () => Token }).consumeToken();
-  const block = (parser as unknown as { consumeBlock: (t: Token) => SimpleBlock }).consumeBlock(token);
-  const contents = (parser as unknown as { consumeBlockContents: (stream: unknown, nested: boolean, isNestedStyleRule: boolean, allowRelative: boolean) => Rule[] }).consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
-  if (contents.length !== 1) {
-    throw new DOMException('Syntax error', 'SyntaxError');
-  }
-  return contents[0];
+  return Parser.parseRuleInScopeBlockText(text);
 }
 
 export function assembleUnicodeRanges(values: ComponentValue[]): ComponentValue[] | null {
@@ -2044,6 +2048,8 @@ ParseHooks.parseStyleAttribute = (tokens) => new Parser(tokens).parseStyleAttrib
 ParseHooks.consumeRule = (tokens) => new Parser(tokens).consumeRule() as unknown as Rule;
 ParseHooks.consumeListOfRules = (tokens, topLevel) => new Parser(tokens).consumeListOfRules(topLevel);
 ParseHooks.parseRule = (text) => parseRule(text);
+ParseHooks.parseRuleInBlock = (text, nested) => Parser.parseRuleInBlockText(text, nested);
+ParseHooks.parseRuleInScopeBlock = (text) => Parser.parseRuleInScopeBlockText(text);
 ParseHooks.parseComponentValues = (tokens) => new Parser(tokens).parseComponentValues();
 ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
 ParseHooks.parseSelectorAST = (text, declaredNamespaces, allowRelative) => Parser.parseSelectorAST(text, declaredNamespaces, allowRelative);

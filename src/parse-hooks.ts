@@ -30,6 +30,12 @@ export const ParseHooks = {
   parseRule: (_text: string): Rule | null => {
     throw new Error('parseRule not injected');
   },
+  parseRuleInBlock: (_text: string, _nested?: boolean): Rule => {
+    throw new Error('parseRuleInBlock not injected');
+  },
+  parseRuleInScopeBlock: (_text: string): Rule => {
+    throw new Error('parseRuleInScopeBlock not injected');
+  },
   parseComponentValues: (_tokens: Token[]): ComponentValue[] => {
     throw new Error('parseComponentValues not injected');
   },
