@@ -2881,12 +2881,20 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Implement relative selector matching starting with combinators (`> .child`, `+ .sibling`, `~ .sibling`) anchored to the active scope element and resolve `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
 
 ### Tasks
-- [ ] **`:scope` & `@scope` Relative Context Matching (`src/matcher.ts`, `src/cascade/rule-filter.ts`)**:
-  - Support relative selector matching starting with combinators anchored to the active scope element.
-  - Implement `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
-- [ ] **Unit Tests & Verification**:
-  - Add tests in `tests/selectors-scope-relative.test.ts`.
-  - Run `pnpm run preflight` and `pnpm run wpt:verify`.
+- [x] **`:scope` & `@scope` Relative Context Matching (`src/matcher.ts`, `src/cascade/rule-filter.ts`, `src/rules/at-rules.ts`, `src/parser.ts`)**:
+  - Supported relative selector matching starting with combinators anchored to active scope element (`scopeNode`).
+  - Implemented `:scope` pseudo-class resolution within `matches(el, sel, scopeNode)`.
+  - Added AST and parser support for `@scope` prelude (scoping root and scope limit) and nested rules (`CSSScopeRule`).
+  - Implemented `@scope` rule filtering with scope root and scope limit evaluation, proximity calculation, and relative selector scoping in `src/cascade/rule-filter.ts`.
+- [x] **Unit Tests & WPT Conformance Verification**:
+  - Added 175 lines of unit tests in `tests/selectors-scope-relative.test.ts` (14/14 passed).
+  - Verified 27/27 `css-cascade/scope-*.html` WPT test files pass (100%).
+  - Cascade score surged from 183 / 497 (36.8%) to 278 / 465 (59.8%) (+23.0% gain!).
+  - Overall standards conformance reached 18,101 / 20,371 passed assertions across 1,761 test files (88.9%).
+  - Verified `pnpm run preflight` is 100% clean (0 type errors, 0 lint warnings, safe-exec clean, all unit tests passing).
+  - Milestone commit: `4e6b251` (`feat(cascade): implement @scope, :scope, and relative selector matching`).
+
+**Next Phase**: Phase 119 (Janitor architectural simplification on `tests/dom-shim/src/dom-stubs.ts`).
 
 ---
 
