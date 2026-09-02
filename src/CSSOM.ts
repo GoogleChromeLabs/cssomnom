@@ -142,6 +142,13 @@ export class CSSStyleSheet extends StyleSheet {
       } catch (e) {
         console.warn(`CSS @property warning: Invalid descriptor values for ${propRule.name}. Rule was ignored.`, e);
       }
+    } else if (rule instanceof CSSGroupingRule || (rule && typeof rule === 'object' && 'cssRules' in rule)) {
+      const childRules = (rule as { cssRules: CSSRuleList }).cssRules;
+      if (childRules) {
+        for (let i = 0; i < childRules.length; i++) {
+          this._registerRuleProperties(childRules[i]);
+        }
+      }
     }
   }
 
@@ -494,17 +501,23 @@ export class CSSStyleRule extends CSSGroupingRule {
     }
     const nsContext = this._getNamespaceContext();
     let isNested = false;
+    let allowRelative = false;
     let currParent: CSSRule | null = this.parentRule;
     while (currParent !== null) {
       if (currParent.type === 1 || currParent.constructor.name === 'CSSStyleRule') {
         isNested = true;
+        allowRelative = true;
+        break;
+      }
+      if (currParent.constructor.name === 'CSSScopeRule') {
+        allowRelative = true;
         break;
       }
       currParent = currParent.parentRule;
     }
     let selectorAST: SelectorList | null = null;
     try {
-      selectorAST = ParseHooks.parseSelectorAST(value, declaredNamespaces, isNested);
+      selectorAST = ParseHooks.parseSelectorAST(value, declaredNamespaces, allowRelative);
     } catch {
       return;
     }

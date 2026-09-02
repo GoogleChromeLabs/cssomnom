@@ -60,7 +60,7 @@ export function calculateSpecificity(selector: string | SelectorList, parentSpec
     const tokens = tokenize(selector);
     const parser = new Parser(tokens);
     const componentValues = parser.parseComponentValues();
-    const selectorParser = new SelectorParser(componentValues);
+    const selectorParser = new SelectorParser(componentValues, { allowRelative: true });
     list = selectorParser.parse();
   } else {
     list = selector;

@@ -189,6 +189,7 @@ export class CSSStartingStyleRule extends CSSGroupingRule {
   set cssText(_value: string) {}
 }
 
+// css-cascade-6 § 3.2 #the-cssscoperule-interface
 export class CSSScopeRule extends CSSGroupingRule {
   readonly startSelector: string | null;
   readonly endSelector: string | null;
@@ -197,6 +198,16 @@ export class CSSScopeRule extends CSSGroupingRule {
     super(rules, parseRuleInBlock);
     this.startSelector = startSelector;
     this.endSelector = endSelector;
+  }
+
+  get start(): string | null {
+    if (!this.startSelector) return null;
+    return this.startSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null;
+  }
+
+  get end(): string | null {
+    if (!this.endSelector) return null;
+    return this.endSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null;
   }
 
   get cssText() {
@@ -521,13 +532,27 @@ export class CSSImportRule extends CSSRule {
   private _styleSheet: CSSStyleSheet | null = null;
   private _layerName: string | null = null;
   private _supportsText: string | null = null;
+  private _scopeStart: string | null = null;
+  private _scopeEnd: string | null = null;
+  private _isScoped: boolean = false;
 
-  constructor(href: string, mediaText: string = '', layerName: string | null = null, supportsText: string | null = null) {
+  constructor(
+    href: string,
+    mediaText: string = '',
+    layerName: string | null = null,
+    supportsText: string | null = null,
+    scopeStart: string | null = null,
+    scopeEnd: string | null = null,
+    isScoped: boolean = false
+  ) {
     super();
     this._href = href;
     this._media = new MediaList(mediaText);
     this._layerName = layerName;
     this._supportsText = supportsText;
+    this._scopeStart = scopeStart;
+    this._scopeEnd = scopeEnd;
+    this._isScoped = isScoped || Boolean(scopeStart || scopeEnd);
   }
 
   // cssom-1 § 6.4.3 #dom-cssimportrule-href
@@ -574,6 +599,18 @@ export class CSSImportRule extends CSSRule {
     return this._supportsText;
   }
 
+  get scopeStart(): string | null {
+    return this._scopeStart;
+  }
+
+  get scopeEnd(): string | null {
+    return this._scopeEnd;
+  }
+
+  get isScoped(): boolean {
+    return this._isScoped;
+  }
+
   get [Symbol.toStringTag]() {
     return 'CSSImportRule';
   }
@@ -587,6 +624,16 @@ export class CSSImportRule extends CSSRule {
     }
     if (this.supportsText !== null) {
       text += ` supports(${this.supportsText})`;
+    }
+    if (this._isScoped) {
+      if (this._scopeStart || this._scopeEnd) {
+        let scopeInner = '';
+        if (this._scopeStart) scopeInner += `(${this._scopeStart})`;
+        if (this._scopeEnd) scopeInner += ` to (${this._scopeEnd})`;
+        text += ` scope(${scopeInner.trim()})`;
+      } else {
+        text += ` scope()`;
+      }
     }
     const mediaStr = this.media.mediaText;
     if (mediaStr) {

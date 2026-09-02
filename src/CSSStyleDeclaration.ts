@@ -482,16 +482,18 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const isImportant = normalizedPriority === 'important';
 
     // 3. If value is the empty string (or null), invoke removeProperty(property) and return.
-    if (value === null || value === '') {
+    if (value === null || value === '' || value === undefined) {
       this.removeProperty(property);
       return;
     }
+
+    const valueStr = typeof value === 'string' ? value : String(value);
 
     if (property.startsWith('--')) {
       if (!ParseHooks.isValidDashedIdent(property)) {
         return;
       }
-      const tokens = tokenize(value);
+      const tokens = tokenize(valueStr);
       if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
         return;
       }
@@ -501,7 +503,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       }
     }
 
-    const tokens = tokenize(value, property === 'unicode-range');
+    const tokens = tokenize(valueStr, property === 'unicode-range');
     if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
       return;
     }
@@ -514,7 +516,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
       const compVals = ParseHooks.parseComponentValues(tokens);
-      const hasVar = value.includes('var(') || value.includes('env(');
+      const hasVar = valueStr.includes('var(') || valueStr.includes('env(');
       if (!hasVar) {
         const expanded = shorthand.expand(compVals);
         if (expanded) {
@@ -535,7 +537,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         return;
       }
     } else if (!property.startsWith('--')) {
-      if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, value)) {
+      if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, valueStr)) {
         return;
       }
     }
@@ -557,7 +559,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       existing.value = componentValues;
       existing.important = isImportant;
       if (property.startsWith('--')) {
-        existing.raw = value ?? undefined;
+        existing.raw = valueStr ?? undefined;
       }
       
       const idx = this._declarations.indexOf(existing);
@@ -574,7 +576,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         name: property,
         value: componentValues,
         important: isImportant,
-        raw: property.startsWith('--') ? (value ?? undefined) : undefined,
+        raw: property.startsWith('--') ? (valueStr ?? undefined) : undefined,
       };
       this._declarations.push(decl);
       this._declMap.set(property, decl);

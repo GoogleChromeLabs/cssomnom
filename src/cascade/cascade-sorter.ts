@@ -70,6 +70,14 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
     return specDiff;
   }
 
+  // Compare Scope Proximity: css-cascade-6 § 3.3 #cascade-proximity
+  // The declaration with the fewest generational or sibling hops between scoping root and subject wins.
+  const proxA = a.scopeProximity ?? Infinity;
+  const proxB = b.scopeProximity ?? Infinity;
+  if (proxA !== proxB) {
+    return proxB - proxA; // smaller proximity wins (higher precedence)
+  }
+
   // Order of Appearance: css-cascade-5 § 6.1 #cascade-order (last declaration in document order wins)
   return a.sourceOrder - b.sourceOrder;
 }

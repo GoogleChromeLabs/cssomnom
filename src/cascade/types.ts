@@ -33,6 +33,7 @@ export interface MatchedDeclaration {
   isInline: boolean;
   layerOrder: number;
   specificity: Specificity;
+  scopeProximity?: number;
   sourceOrder: number;
   raw?: string;
 }

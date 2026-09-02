@@ -33,12 +33,12 @@ test('CSSScopeRule should have startSelector and endSelector properties', () => 
 
 test('CSSScopeRule should serialize correctly with both selectors', () => {
   const rule = new CSSScopeRule('(.start)', '(.end)', [], (_text: string) => ({} as Rule));
-  assert.strictEqual(rule.cssText, '@scope (.start) to (.end) { }');
+  assert.strictEqual(rule.cssText, '@scope (.start) to (.end) {\n}');
 });
 
 test('CSSScopeRule should serialize correctly with only start selector', () => {
   const rule = new CSSScopeRule('(.start)', null, [], (_text: string) => ({} as Rule));
-  assert.strictEqual(rule.cssText, '@scope (.start) { }');
+  assert.strictEqual(rule.cssText, '@scope (.start) {\n}');
 });
 
 test('CSSScopeRule should preserve implied nesting selector in nested @scope', () => {

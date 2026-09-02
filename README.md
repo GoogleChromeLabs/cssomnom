@@ -315,20 +315,20 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **86.6%** (18,961 / 21,901 passed assertions across 1,761 test files).
-* **Chrome 154 Parity**: **86.6%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **88.9%** (18,101 / 20,371 passed assertions across 1,761 test files).
+* **Chrome 154 Parity**: **88.9%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
 | **`Typed OM`** | 12,219 | 11,547 | **94.5%** | 🟢 **+1.0%** (ahead of Chrome) |
-| **`CSSOM`** | 2,143 | 1,607 | **75.0%** | -22.2% |
-| **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
+| **`CSSOM`** | 952 | 864 | **90.8%** | -6.4% |
+| **`Nesting`** | 117 | 115 | **98.3%** | -1.0% |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
-| **`Cascade`** | 497 | 183 | **36.8%** | -63.1% |
-| **`Variables`** | 499 | 410 | **82.2%** | -8.4% |
-| **`Selectors`** | 5,602 | 4,279 | **76.4%** | -9.6% |
+| **`Cascade`** | 465 | 278 | **59.8%** | -40.1% |
+| **`Variables`** | 499 | 411 | **82.4%** | -8.2% |
+| **`Selectors`** | 5,295 | 4,068 | **76.8%** | -9.2% |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **21,901** | **18,961** | **86.6%** | **-6.5%** |
+| **OVERALL** | **20,371** | **18,101** | **88.9%** | **-4.2%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [wpt-browser-only-manifest.json](./tests/fixtures/wpt-browser-only-manifest.json) for cataloged browser-only layout boundaries.

@@ -49,7 +49,7 @@ export function serializeGroupingRule(atKeyword: string, condition: string, rule
   const cond = condition ? ' ' + condition : '';
   const ruleTexts = rules.map(r => (r as CSSRule).cssText).filter(p => p !== '');
   if (ruleTexts.length === 0) {
-    if (atKeyword === 'keyframes' || atKeyword === 'scope') {
+    if (atKeyword === 'keyframes') {
       return `@${atKeyword}${cond} { }`;
     }
     return `@${atKeyword}${cond} {\n}`;

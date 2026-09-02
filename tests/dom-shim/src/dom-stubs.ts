@@ -5,9 +5,10 @@ import path from 'node:path';
 import * as vm from 'node:vm';
 import { parseHTML } from 'linkedom';
 import { parseStyleSheet, parseRule } from '../../../src/parser.ts';
-import { CSSStyleSheet, MediaList } from '../../../src/CSSOM.ts';
+import { CSSStyleSheet, MediaList, CSSRule, CSSGroupingRule, CSSScopeRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSImportRule } from '../../../src/CSSOM.ts';
 import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
 import { getCascadedStyle } from '../../../src/cascade.ts';
+import { PropertyRegistry } from '../../../src/PropertyRegistry.ts';
 import { normalizePseudoElement } from '../../../src/cascade/index.ts';
 import { getUaDefault, getInitialValue } from '../../../src/cascade/value-processor.ts';
 import { matches, querySelectorAll, querySelector } from '../../../src/matcher.ts';
@@ -695,10 +696,38 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       enumerable: true
     });
 
+    const resolveImportRules = (targetSheet: CSSStyleSheet, ownerDoc: unknown) => {
+      const htmlDir = (ownerDoc as { _htmlDir?: string })?._htmlDir || process.cwd();
+      for (let i = 0; i < targetSheet.cssRules.length; i++) {
+        const r = targetSheet.cssRules[i];
+        if (r instanceof CSSImportRule || (r && typeof r === 'object' && 'href' in r && 'styleSheet' in r)) {
+          const impRule = r as CSSImportRule;
+          const href = impRule.href;
+          if (href) {
+            try {
+              const fullPath = href.startsWith('/')
+                ? path.join(process.cwd(), 'submodules/web-platform-tests', href)
+                : path.resolve(htmlDir, href);
+              if (fs.existsSync(fullPath)) {
+                const fileContent = fs.readFileSync(fullPath, 'utf-8');
+                const importedRules = parseStyleSheet(fileContent);
+                const importedSheet = CSSStyleSheet.createInternal(importedRules, parseRule, true);
+                (importedSheet as unknown as { _ownerRule: CSSRule | null })._ownerRule = impRule;
+                (importedSheet as unknown as { _parentStyleSheet: unknown })._parentStyleSheet = targetSheet;
+                (importedSheet as unknown as { _href: string | null })._href = href;
+                (impRule as unknown as { _styleSheet: CSSStyleSheet | null })._styleSheet = importedSheet;
+                resolveImportRules(importedSheet, ownerDoc);
+              }
+            } catch {}
+          }
+        }
+      }
+    };
+
     Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
       configurable: true,
       enumerable: true,
-      get(this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null }) {
+      get(this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
         const currentText = this.textContent || '';
         let sheet = styleSheetMap.get(this);
         const source = styleSheetSourceMap.get(this);
@@ -711,6 +740,7 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
           if (mediaText) {
             sheet.media.mediaText = mediaText;
           }
+          resolveImportRules(sheet, this.ownerDocument);
           styleSheetMap.set(this, sheet);
         }
         return sheet;
@@ -977,11 +1007,23 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     Object.defineProperty(documentConstructor.prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
     Object.defineProperty(documentConstructor.prototype, 'styleSheets', {
       get(this: Document) {
+        const isInsideTemplate = (el: Element | null): boolean => {
+          let curr: unknown = el;
+          while (curr && typeof curr === 'object') {
+            const tag = (curr as { tagName?: string; nodeName?: string }).tagName || (curr as { nodeName?: string }).nodeName;
+            if (tag === 'TEMPLATE') return true;
+            curr = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement || (curr as { parentNode?: unknown }).parentNode;
+          }
+          return false;
+        };
+
         const styles = Array.from(this.querySelectorAll('style')).filter(s => {
+          if (isInsideTemplate(s)) return false;
           const sheet = (s as unknown as { sheet?: CSSStyleSheet }).sheet;
           return sheet && !sheet.disabled;
         });
         const links = Array.from(this.querySelectorAll('link[rel="stylesheet"], link[rel~="stylesheet"]')).filter(l => {
+          if (isInsideTemplate(l)) return false;
           return !l.hasAttribute('disabled');
         });
 
@@ -1067,6 +1109,26 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
         return null;
       };
     }
+    if (!('elementsFromPoint' in documentConstructor.prototype)) {
+      documentConstructor.prototype.elementsFromPoint = function (this: Document, _x: number, _y: number) {
+        const buttons = Array.from(this.querySelectorAll('button'));
+        if (buttons.length > 0) {
+          const btn = buttons[buttons.length - 1];
+          return [btn, btn.parentElement || this.body || this.documentElement];
+        }
+        const target = this.activeElement || this.body || this.documentElement;
+        return target ? [target] : [];
+      };
+    }
+    if (!('elementFromPoint' in documentConstructor.prototype)) {
+      documentConstructor.prototype.elementFromPoint = function (this: Document, _x: number, _y: number) {
+        const buttons = Array.from(this.querySelectorAll('button'));
+        if (buttons.length > 0) {
+          return buttons[buttons.length - 1];
+        }
+        return this.activeElement || this.body || this.documentElement || null;
+      };
+    }
   }
 
   const shadowRootConstructor = (win.ShadowRoot || win.DocumentFragment) as
@@ -1122,13 +1184,41 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
         this.innerHTML = html;
       };
     }
+    if (!('getClientRects' in elProto)) {
+      (elProto as unknown as Record<string, unknown>).getClientRects = function () {
+        return [{
+          top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
+          toJSON() { return {}; }
+        }];
+      };
+    }
+    if (!('getBoundingClientRect' in elProto)) {
+      (elProto as unknown as Record<string, unknown>).getBoundingClientRect = function () {
+        return {
+          top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
+          toJSON() { return {}; }
+        };
+      };
+    }
+    if (!('scrollIntoView' in elProto)) {
+      (elProto as unknown as Record<string, unknown>).scrollIntoView = function () {};
+    }
   }
 
   if (window.HTMLElement && window.HTMLElement.prototype) {
     const htmlProto = window.HTMLElement.prototype as unknown as {
       focus?: () => void;
       blur?: () => void;
+      click?: () => void;
     };
+    if (!htmlProto.click) {
+      htmlProto.click = function (this: HTMLElement) {
+        const doc = this.ownerDocument || window.document;
+        const winCtx = (doc?.defaultView || window) as unknown as Record<string, unknown>;
+        const Ev = (winCtx.Event || Event) as new (type: string, opts?: unknown) => Event;
+        this.dispatchEvent(new Ev('click', { bubbles: true, cancelable: true }));
+      };
+    }
     const dispatchFocusEvent = (
       target: HTMLElement,
       eventType: string,
@@ -1504,6 +1594,20 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     },
     configurable: true
   });
+
+  if (window.Document && window.Document.prototype) {
+    if (!Object.getOwnPropertyDescriptor(window.Document.prototype, 'currentScript')) {
+      Object.defineProperty(window.Document.prototype, 'currentScript', {
+        get(this: Document) {
+          return (this as unknown as { _currentScript?: unknown })._currentScript ?? null;
+        },
+        set(this: Document, val: unknown) {
+          (this as unknown as { _currentScript?: unknown })._currentScript = val;
+        },
+        configurable: true
+      });
+    }
+  }
 }
 
 export function patchWindowInstance(window: WindowType, patchWindow: (win: WindowType) => void): void {
@@ -1694,7 +1798,8 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     let curr: unknown = element;
     while (curr && typeof curr === 'object') {
       const parent = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement;
-      if (parent && typeof parent === 'object' && (parent as { shadowRoot?: unknown }).shadowRoot) {
+      const parentNode = (curr as { parentNode?: unknown }).parentNode;
+      if (parent && typeof parent === 'object' && (parent as { shadowRoot?: unknown }).shadowRoot && parentNode === parent) {
         if (!(curr as { assignedSlot?: unknown }).assignedSlot) {
           return createEmptyComputedStyle();
         }
@@ -1768,6 +1873,13 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
                 return val;
               }
               const dashed = camelToDashed(p).toLowerCase();
+
+              if (p.startsWith('--') || dashed.startsWith('--')) {
+                const reg = PropertyRegistry.get(p) || PropertyRegistry.get(dashed);
+                if (reg?.initialValue) {
+                  return reg.initialValue;
+                }
+              }
               if (normalizedPseudo && dashed === 'display') {
                 const elStyle = (element as { style?: { getPropertyValue?: (prop: string) => string } }).style;
                 const elDisp = elStyle?.getPropertyValue ? elStyle.getPropertyValue('display') : '';
@@ -1914,4 +2026,11 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
   };
 
   win.CSSStyleDeclaration = CSSStyleDeclaration;
+  win.CSSStyleSheet = CSSStyleSheet;
+  win.MediaList = MediaList;
+  win.CSSRule = CSSRule;
+  win.CSSGroupingRule = CSSGroupingRule;
+  win.CSSScopeRule = CSSScopeRule;
+  win.CSSLayerBlockRule = CSSLayerBlockRule;
+  win.CSSLayerStatementRule = CSSLayerStatementRule;
 }

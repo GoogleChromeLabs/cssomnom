@@ -345,6 +345,9 @@ export interface CSSImportRule extends CSSRule {
   readonly styleSheet: CSSStyleSheet | null;
   readonly layerName: string | null;
   readonly supportsText: string | null;
+  readonly scopeStart?: string | null;
+  readonly scopeEnd?: string | null;
+  readonly isScoped?: boolean;
 }
 
 export interface CSSNamespaceRule extends CSSRule {

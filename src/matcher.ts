@@ -182,20 +182,21 @@ export function querySelector(root: unknown, selector: string | ComplexSelector 
  * Matches a Complex Selector against an element using backtracking combinator evaluation.
  * selectors-4 § 17.3 #match-against-element
  */
-export function matchComplexSelector(element: DOMElement, complex: ComplexSelector, scope?: DOMElement): boolean {
+export function matchComplexSelector(element: DOMElement, complex: ComplexSelector, scope?: DOMElement, relativeAnchor?: DOMElement): boolean {
   const items = complex.items;
   if (items.length === 0) return false;
   const lastIndex = items.length - 1;
   if (items[lastIndex].type !== 'compound-selector') return false;
 
-  return matchComplexRecursive(element, items, lastIndex, scope);
+  return matchComplexRecursive(element, items, lastIndex, scope, relativeAnchor);
 }
 
 function matchComplexRecursive(
   element: DOMElement,
   items: (CompoundSelector | Combinator)[],
   itemIndex: number,
-  scope?: DOMElement
+  scope?: DOMElement,
+  relativeAnchor?: DOMElement
 ): boolean {
   const currentCompound = items[itemIndex] as CompoundSelector;
   if (!matchCompoundSelector(element, currentCompound, scope)) {
@@ -207,25 +208,34 @@ function matchComplexRecursive(
     return true;
   }
 
-  // Handle leading relative combinator inside :has()
+function getEffectiveParent(element: DOMElement): DOMElement | null {
+  if (element.parentElement) return element.parentElement;
+  if (element.parentNode && (element.parentNode as { host?: unknown }).host && isElement((element.parentNode as { host?: unknown }).host)) {
+    return (element.parentNode as { host?: unknown }).host as DOMElement;
+  }
+  return null;
+}
+
+  // Handle leading relative combinator inside :has() or relative selectors
   if (itemIndex === 1 && items[0].type === 'combinator') {
     const leadingComb = (items[0] as Combinator).value;
-    if (!scope) return true;
-    if (leadingComb === '>') return element.parentElement === scope;
-    if (leadingComb === '+') return element.previousElementSibling === scope;
+    const anchor = relativeAnchor || scope;
+    if (!anchor) return true;
+    if (leadingComb === '>') return getEffectiveParent(element) === anchor;
+    if (leadingComb === '+') return element.previousElementSibling === anchor;
     if (leadingComb === '~') {
       let sib = element.previousElementSibling;
       while (sib) {
-        if (sib === scope) return true;
+        if (sib === anchor) return true;
         sib = sib.previousElementSibling;
       }
       return false;
     }
     if (leadingComb === ' ') {
-      let parent = element.parentElement;
+      let parent = getEffectiveParent(element);
       while (parent) {
-        if (parent === scope) return true;
-        parent = parent.parentElement;
+        if (parent === anchor) return true;
+        parent = getEffectiveParent(parent);
       }
       return false;
     }
@@ -237,21 +247,23 @@ function matchComplexRecursive(
 
   // selectors-4 § 14.2 #child-combinators
   if (combinator.value === '>') {
-    if (!element.parentElement) return false;
-    return matchComplexRecursive(element.parentElement, items, prevCompoundIndex, scope);
+    const parent = getEffectiveParent(element);
+    if (!parent) return false;
+    if (relativeAnchor && element === relativeAnchor) return false;
+    return matchComplexRecursive(parent, items, prevCompoundIndex, scope, relativeAnchor);
   }
 
   // selectors-4 § 14.3 #adjacent-sibling-combinators
   if (combinator.value === '+') {
     if (!element.previousElementSibling) return false;
-    return matchComplexRecursive(element.previousElementSibling, items, prevCompoundIndex, scope);
+    return matchComplexRecursive(element.previousElementSibling, items, prevCompoundIndex, scope, relativeAnchor);
   }
 
   // selectors-4 § 14.4 #general-sibling-combinators
   if (combinator.value === '~') {
     let sib = element.previousElementSibling;
     while (sib) {
-      if (matchComplexRecursive(sib, items, prevCompoundIndex, scope)) return true;
+      if (matchComplexRecursive(sib, items, prevCompoundIndex, scope, relativeAnchor)) return true;
       sib = sib.previousElementSibling;
     }
     return false;
@@ -259,10 +271,13 @@ function matchComplexRecursive(
 
   // selectors-4 § 14.1 #descendant-combinators
   if (combinator.value === ' ') {
-    let parent = element.parentElement;
+    let parent = getEffectiveParent(element);
     while (parent) {
-      if (matchComplexRecursive(parent, items, prevCompoundIndex, scope)) return true;
-      parent = parent.parentElement;
+      if (relativeAnchor && parent === relativeAnchor) {
+        break;
+      }
+      if (matchComplexRecursive(parent, items, prevCompoundIndex, scope, relativeAnchor)) return true;
+      parent = getEffectiveParent(parent);
     }
     return false;
   }
@@ -503,7 +518,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   // selectors-4 § 4.5 #relational
   if (name === 'has') {
     if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
-      return matchHasPseudo(element, pseudo.argument);
+      return matchHasPseudo(element, pseudo.argument, scope);
     }
     return false;
   }
@@ -529,6 +544,20 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
       return element === element.ownerDocument.documentElement;
     }
     return !element.parentElement;
+  }
+
+  // selectors-4 § 14 #the-host-pseudo
+  if (name === 'host' || name === 'host-context') {
+    const isHost = Boolean((element as unknown as { shadowRoot?: unknown }).shadowRoot);
+    if (!isHost) return false;
+    if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
+      for (const complex of pseudo.argument.selectors) {
+        if (complex.type === 'invalid-selector') continue;
+        if (matchComplexSelector(element, complex)) return true;
+      }
+      return false;
+    }
+    return true;
   }
 
   // Siblings list calculation for child-indexed pseudo-classes
@@ -685,6 +714,23 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return true;
   }
 
+  // selectors-4 § 9.1 #the-hover-pseudo
+  if (name === 'hover') {
+    const doc = element.ownerDocument as { _hoverElement?: unknown } | null;
+    const hovered = doc?._hoverElement || (element as { _isHovered?: boolean })._isHovered;
+    if (!hovered) return false;
+    if (hovered === element) return true;
+    if (typeof (element as { contains?: (n: unknown) => boolean }).contains === 'function') {
+      return (element as { contains: (n: unknown) => boolean }).contains(hovered);
+    }
+    let cur = (hovered as DOMElement).parentElement || (hovered as DOMElement).parentNode;
+    while (cur) {
+      if (cur === element) return true;
+      cur = (cur as DOMElement).parentElement || (cur as DOMElement).parentNode;
+    }
+    return false;
+  }
+
   // selectors-4 § 9.3 #the-focus-pseudo
   if (name === 'focus') {
     const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
@@ -739,7 +785,8 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
  * Evaluates the relational :has() pseudo-class against relative and descendant selectors.
  * selectors-4 § 4.5 #relational
  */
-function matchHasPseudo(element: DOMElement, selectorList: SelectorList): boolean {
+function matchHasPseudo(element: DOMElement, selectorList: SelectorList, scope?: DOMElement): boolean {
+  const contextualScope = scope ?? element;
   for (const complex of selectorList.selectors) {
     if (complex.type === 'invalid-selector') continue;
     if (complex.items[0]?.type === 'combinator') {
@@ -747,28 +794,28 @@ function matchHasPseudo(element: DOMElement, selectorList: SelectorList): boolea
       if (comb === '>') {
         const children = Array.from(element.children || []) as DOMElement[];
         for (const child of children) {
-          if (matchComplexSelector(child, complex, element)) return true;
+          if (matchComplexSelector(child, complex, contextualScope, element)) return true;
         }
       } else if (comb === '+') {
         if (element.nextElementSibling) {
-          if (matchComplexSelector(element.nextElementSibling, complex, element)) return true;
+          if (matchComplexSelector(element.nextElementSibling, complex, contextualScope, element)) return true;
         }
       } else if (comb === '~') {
         let sib = element.nextElementSibling;
         while (sib) {
-          if (matchComplexSelector(sib, complex, element)) return true;
+          if (matchComplexSelector(sib, complex, contextualScope, element)) return true;
           sib = sib.nextElementSibling;
         }
       } else if (comb === ' ') {
         const descendants = getAllDescendants(element);
         for (const desc of descendants) {
-          if (matchComplexSelector(desc, complex, element)) return true;
+          if (matchComplexSelector(desc, complex, contextualScope, element)) return true;
         }
       }
     } else {
       const descendants = getAllDescendants(element);
       for (const desc of descendants) {
-        if (matchComplexSelector(desc, complex, element)) return true;
+        if (matchComplexSelector(desc, complex, contextualScope, element)) return true;
       }
     }
   }

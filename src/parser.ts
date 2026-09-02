@@ -60,7 +60,7 @@ export class Parser {
   ]);
 
   private static readonly AT_RULE_HANDLERS: Record<string, (parser: Parser, rule: ASTAtRule, block?: SimpleBlock, nested?: boolean) => Rule | null> = {
-    media: (parser, rule, block, nested) => block ? parser.handleMediaRule(rule, block, nested || false) : null,
+    media: (parser, rule, block, nested) => parser.handleGroupingAtRule(rule, block, nested || false, CSSMediaRule),
     'font-face': (parser, rule, block) => block ? parser.handleFontFaceRule(rule, block) : null,
     page: (parser, rule, block) => block ? parser.handlePageRule(rule, block) : null,
     property: (parser, rule, block) => block ? parser.handlePropertyRule(rule, block) : null,
@@ -88,7 +88,8 @@ export class Parser {
   }
 
   private static readonly NESTED_GROUP_AT_RULES = new Set([
-    'media', 'supports', 'container', 'layer', 'scope', 'starting-style'
+    'media', 'supports', 'container', 'layer', 'scope', 'starting-style',
+    'keyframes', 'property', 'counter-style', 'font-feature-values', 'font-face', 'view-transition'
   ]);
 
   // css-nesting-1 § 3.3 #conditionals
@@ -100,6 +101,7 @@ export class Parser {
     if (lower.startsWith('--')) return false;
     if (Parser.MARGIN_RULE_NAMES.has(lower)) return true;
     if (nested) {
+      if (lower.endsWith('-keyframes')) return true;
       return Parser.NESTED_GROUP_AT_RULES.has(lower);
     }
     return true;
@@ -389,13 +391,8 @@ export class Parser {
 
 
 
-  private consumeNestedRules(block: SimpleBlock, nested: boolean): Rule[] {
-    return this.consumeBlockContents(new ArrayComponentValueStream(block.value), nested);
-  }
-
-
-  private handleMediaRule(rule: ASTAtRule, block: SimpleBlock, nested: boolean): Rule | null {
-    return this.handleGroupingAtRule(rule, block, nested, CSSMediaRule);
+  private consumeNestedRules(block: SimpleBlock, isNestedStyleRule: boolean): Rule[] {
+    return this.consumeBlockContents(new ArrayComponentValueStream(block.value), isNestedStyleRule, isNestedStyleRule, false);
   }
 
   private handleGroupingAtRule(rule: ASTAtRule, block: SimpleBlock | undefined, nested: boolean, ctor: new (prelude: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) => Rule): Rule | null {
@@ -413,9 +410,9 @@ export class Parser {
   }
 
   // css-nesting-1 § 4.1 #nesting-at-scope (Issue 9740)
-  private handleScopeRule(rule: ASTAtRule, block?: SimpleBlock, nested: boolean = false): Rule | null {
+  private handleScopeRule(rule: ASTAtRule, block?: SimpleBlock, _nested: boolean = false): Rule | null {
     if (!block) return null;
-    const childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true, false);
+    const childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
     
     let startSelector: string | null = null;
     let endSelector: string | null = null;
@@ -428,7 +425,7 @@ export class Parser {
       const block = prelude[i] as SimpleBlock;
       try {
         new SelectorParser(block.value, {
-          allowRelative: nested,
+          allowRelative: true,
           declaredNamespaces: this.declaredNamespaces
         }).parse();
         startSelector = serialize(block.value).trim();
@@ -450,6 +447,7 @@ export class Parser {
         const block = prelude[i] as SimpleBlock;
         try {
           new SelectorParser(block.value, {
+            allowRelative: true,
             declaredNamespaces: this.declaredNamespaces
           }).parse();
           endSelector = serialize(block.value).trim();
@@ -463,7 +461,7 @@ export class Parser {
       }
     }
     
-    return new CSSScopeRule(startSelector, endSelector, childRules as unknown as Rule[], parseRuleInBlock);
+    return new CSSScopeRule(startSelector, endSelector, childRules as unknown as Rule[], parseRuleInScopeBlock);
   }
 
   private handleViewTransitionRule(rule: ASTAtRule, block: SimpleBlock): Rule {
@@ -730,6 +728,9 @@ export class Parser {
     let mediaText = '';
     let layerName: string | null = null;
     let supportsText: string | null = null;
+    let isScoped = false;
+    let scopeStart: string | null = null;
+    let scopeEnd: string | null = null;
     
     const prelude = rule.prelude;
     let i = 0;
@@ -754,33 +755,71 @@ export class Parser {
       }
     }
     
-    while(i < prelude.length && prelude[i].type === 'whitespace') i++;
-    
-    // Parse layer
-    if (i < prelude.length) {
+    // css-cascade-6 § 5 #at-import
+    // layer, scope, and supports can appear in any order before media queries
+    while (i < prelude.length) {
+      while (i < prelude.length && prelude[i].type === 'whitespace') i++;
+      if (i >= prelude.length) break;
+
       const val = prelude[i];
-      if (val.type === 'ident' && val.value.toLowerCase() === 'layer') {
+      if (layerName === null && val.type === 'ident' && val.value.toLowerCase() === 'layer') {
         layerName = '';
         i++;
-
-      } else if (val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'layer') {
+      } else if (layerName === null && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'layer') {
         layerName = serialize((val as CSSFunction).value).trim();
         i++;
-      }
-    }
-    
-    while(i < prelude.length && prelude[i].type === 'whitespace') i++;
-    
-    // Parse supports
-    if (i < prelude.length) {
-      const val = prelude[i];
-      if (val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'supports') {
+      } else if (supportsText === null && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'supports') {
         supportsText = serialize((val as CSSFunction).value).trim();
         i++;
+      } else if (!isScoped && val.type === 'ident' && val.value.toLowerCase() === 'scope') {
+        isScoped = true;
+        i++;
+      } else if (!isScoped && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'scope') {
+        isScoped = true;
+        const scopeArgs = (val as CSSFunction).value;
+        let k = 0;
+        while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
+        if (k < scopeArgs.length && scopeArgs[k].type === 'simple-block' && (scopeArgs[k] as SimpleBlock).associatedToken.type === '(') {
+          const b = scopeArgs[k] as SimpleBlock;
+          scopeStart = serialize(b.value).trim();
+          k++;
+        } else {
+          const startTokens: ComponentValue[] = [];
+          while (k < scopeArgs.length) {
+            const tok = scopeArgs[k];
+            if (tok.type === 'ident' && String(tok.value).toLowerCase() === 'to') break;
+            startTokens.push(tok);
+            k++;
+          }
+          const s = serialize(startTokens).trim();
+          if (s) scopeStart = s;
+        }
+
+        while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
+        if (k < scopeArgs.length && scopeArgs[k].type === 'ident' && String(scopeArgs[k].value).toLowerCase() === 'to') {
+          k++;
+          while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
+          if (k < scopeArgs.length && scopeArgs[k].type === 'simple-block' && (scopeArgs[k] as SimpleBlock).associatedToken.type === '(') {
+            const b = scopeArgs[k] as SimpleBlock;
+            scopeEnd = serialize(b.value).trim();
+            k++;
+          } else {
+            const endTokens = scopeArgs.slice(k);
+            const e = serialize(endTokens).trim();
+            if (e) scopeEnd = e;
+          }
+        }
+        if (scopeStart) {
+          scopeStart = scopeStart.replace(/^\(/, '').replace(/\)$/, '').trim();
+        }
+        if (scopeEnd) {
+          scopeEnd = scopeEnd.replace(/^\(/, '').replace(/\)$/, '').trim();
+        }
+        i++;
+      } else {
+        break;
       }
     }
-    
-    while(i < prelude.length && prelude[i].type === 'whitespace') i++;
     
     // The rest is media query list
     let remaining = '';
@@ -790,7 +829,7 @@ export class Parser {
     }
     mediaText = remaining.trim();
     
-    return new CSSImportRule(href, mediaText, layerName, supportsText);
+    return new CSSImportRule(href, mediaText, layerName, supportsText, scopeStart, scopeEnd, isScoped);
   }
 
   private handleNamespaceRule(rule: ASTAtRule): Rule {
@@ -932,7 +971,7 @@ export class Parser {
     return decls;
   }
 
-  private consumeBlockContents(stream: ComponentValueStream, nested: boolean = false, isNestedStyleRule: boolean = nested): Rule[] {
+  private consumeBlockContents(stream: ComponentValueStream, nested: boolean = false, isNestedStyleRule: boolean = nested, allowRelative: boolean = false): Rule[] {
     const rules: Rule[] = [];
     let decls: Declaration[] = [];
 
@@ -1008,7 +1047,7 @@ export class Parser {
           }
         } else {
           stream.position = pos;
-          const rule = this.consumeNestedQualifiedRuleFromStream(stream, isNestedStyleRule, 'semicolon');
+          const rule = this.consumeNestedQualifiedRuleFromStream(stream, isNestedStyleRule, 'semicolon', allowRelative);
           if (rule) {
             flushDecls();
             rules.push(rule);
@@ -1169,7 +1208,7 @@ export class Parser {
     return true;
   }
 
-  private consumeNestedQualifiedRuleFromStream(stream: ComponentValueStream, nested: boolean = true, stopToken?: string): Rule | null {
+  private consumeNestedQualifiedRuleFromStream(stream: ComponentValueStream, nested: boolean = true, stopToken?: string, allowRelative: boolean = nested): Rule | null {
     const prelude: ComponentValue[] = [];
     
     while (true) {
@@ -1190,7 +1229,7 @@ export class Parser {
 
         const block = val as SimpleBlock;
         const blockContents = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
-        const rule = this.createStyleRule(prelude, blockContents, nested);
+        const rule = this.createStyleRule(prelude, blockContents, nested, allowRelative);
         if (!rule) return null;
         return rule;
       } else {
@@ -1335,7 +1374,7 @@ export class Parser {
     return true;
   }
 
-  private createStyleRule(prelude: ComponentValue[], blockContents: Rule[], isNested: boolean = false): CSSStyleRule | null {
+  private createStyleRule(prelude: ComponentValue[], blockContents: Rule[], isNested: boolean = false, allowRelative: boolean = isNested): CSSStyleRule | null {
     const declarations: Declaration[] = [];
     const nestedRules: Rule[] = [];
     
@@ -1359,7 +1398,7 @@ export class Parser {
     } else {
       if (!this.isValidSelector(prelude)) return null;
       try {
-        selectorAST = new SelectorParser(prelude, { declaredNamespaces: this.declaredNamespaces }).parse();
+        selectorAST = new SelectorParser(prelude, { declaredNamespaces: this.declaredNamespaces, allowRelative }).parse();
       } catch (e) {
         return null;
       }
@@ -1597,6 +1636,8 @@ export class Parser {
     }
     return contents[0];
   }
+
+
 
   public static calculateSpecificity(selector: string | import('./types.ts').SelectorList): [number, number, number][] {
     return calculateSpecificity(selector);
@@ -1865,6 +1906,19 @@ export function parseStyleSheet(text: string): Rule[] {
 
 export function parseRuleInBlock(text: string, nested = true): Rule {
   return Parser.parseRuleInBlockText(text, nested);
+}
+
+export function parseRuleInScopeBlock(text: string): Rule {
+  const wrapped = `{ ${text} }`;
+  const tokens = tokenize(wrapped);
+  const parser = new Parser(tokens);
+  const token = (parser as unknown as { consumeToken: () => Token }).consumeToken();
+  const block = (parser as unknown as { consumeBlock: (t: Token) => SimpleBlock }).consumeBlock(token);
+  const contents = (parser as unknown as { consumeBlockContents: (stream: unknown, nested: boolean, isNestedStyleRule: boolean, allowRelative: boolean) => Rule[] }).consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
+  if (contents.length !== 1) {
+    throw new DOMException('Syntax error', 'SyntaxError');
+  }
+  return contents[0];
 }
 
 export function assembleUnicodeRanges(values: ComponentValue[]): ComponentValue[] | null {

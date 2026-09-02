@@ -101,9 +101,21 @@ export function createWptContext(
   const ctx: Record<string, unknown> = {
     // Expose elements with IDs as globals (must precede harness functions so IDs like id="test" don't clobber harness functions)
     ...(document.querySelectorAll ? Array.from(document.querySelectorAll('[id]')).reduce<Record<string, unknown>>((acc, el) => {
-      const id = el.getAttribute('id');
-      if (id) {
-        acc[id] = el;
+      let isInsideTemplate = false;
+      let curr: unknown = el;
+      while (curr && typeof curr === 'object') {
+        const tag = (curr as { tagName?: string; nodeName?: string }).tagName || (curr as { nodeName?: string }).nodeName;
+        if (tag === 'TEMPLATE') {
+          isInsideTemplate = true;
+          break;
+        }
+        curr = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement || (curr as { parentNode?: unknown }).parentNode;
+      }
+      if (!isInsideTemplate) {
+        const id = el.getAttribute('id');
+        if (id) {
+          acc[id] = el;
+        }
       }
       return acc;
     }, {}) : {}),
@@ -123,6 +135,12 @@ export function createWptContext(
     HTMLStyleElement: win.HTMLStyleElement,
     CSSStyleDeclaration: win.CSSStyleDeclaration || CSSStyleDeclaration,
     DOMException: win.DOMException,
+    Promise: globalThis.Promise,
+    Math: globalThis.Math,
+    JSON: globalThis.JSON,
+    Reflect: globalThis.Reflect,
+    Proxy: globalThis.Proxy,
+    Symbol: globalThis.Symbol,
     Event: win.Event,
     CustomEvent: win.CustomEvent,
     FocusEvent: win.FocusEvent,
@@ -131,11 +149,55 @@ export function createWptContext(
     navigator: win.__navigator || { preferences: createNavigatorPreferences() },
     location: win.location || { href: 'http://localhost/test.html', origin: 'http://localhost' },
     ...TYPED_OM_EXPORTS,
-    DOMMatrix: (globalThis as { DOMMatrix?: unknown }).DOMMatrix,
-    DOMMatrixReadOnly: (globalThis as { DOMMatrixReadOnly?: unknown }).DOMMatrixReadOnly,
     CSS: TypedOM.CSS,
     AssertionError: AssertionErrorProxy,
     OptionalFeatureUnsupportedError,
+
+    test_driver: {
+      bless: async (_intent: string, action?: Function) => {
+        if (typeof action === 'function') {
+          return action();
+        }
+        return null;
+      },
+      click: async (element: Element) => {
+        const doc = element.ownerDocument || window.document;
+        const winCtx = (doc?.defaultView || win || window) as { Event?: new (type: string, opts?: unknown) => Event };
+        const Ev = winCtx.Event || (win as unknown as { Event?: new (type: string, opts?: unknown) => Event }).Event || Event;
+        element.dispatchEvent(new Ev('click', { bubbles: true, cancelable: true }));
+        return Promise.resolve();
+      },
+      Actions: class {
+        private target: Element | null = null;
+        pointerMove(_x: number, _y: number, opts?: { origin?: Element }) {
+          if (opts?.origin && typeof opts.origin === 'object') {
+            this.target = opts.origin;
+          }
+          return this;
+        }
+        async send() {
+          if (this.target) {
+            const doc = this.target.ownerDocument || window.document;
+            (doc as { _hoverElement?: Element })._hoverElement = this.target;
+          }
+          return Promise.resolve();
+        }
+      }
+    },
+    test_driver_internal: {
+      click: async (element: Element) => {
+        const doc = element.ownerDocument || window.document;
+        const winCtx = (doc?.defaultView || win || window) as { Event?: new (type: string, opts?: unknown) => Event };
+        const Ev = winCtx.Event || (win as unknown as { Event?: new (type: string, opts?: unknown) => Event }).Event || Event;
+        element.dispatchEvent(new Ev('click', { bubbles: true, cancelable: true }));
+        return Promise.resolve();
+      },
+      bidi: {
+        log: {
+          entryAdded: async () => {}
+        }
+      }
+    },
 
     // Timers
     setTimeout: (cb: Function, delay?: number, ...args: unknown[]) => {
@@ -581,5 +643,40 @@ export function createWptContext(
     (document as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = ctx;
   }
 
-  return ctx;
+  return new Proxy(ctx, {
+    get(target, prop, receiver) {
+      if (typeof prop === 'string') {
+        if (prop in target) return Reflect.get(target, prop, receiver);
+        if (document && typeof document.getElementById === 'function') {
+          const el = document.getElementById(prop);
+          if (el && (el as { isConnected?: boolean }).isConnected !== false) return el;
+          if (typeof document.querySelector === 'function') {
+            try {
+              const qEl = document.querySelector('#' + TypedOM.CSS.escape(prop));
+              if (qEl) return qEl;
+            } catch {}
+          }
+          if (el) return el;
+        }
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has(target, prop) {
+      if (typeof prop === 'string') {
+        if (prop in target) return true;
+        if (document && typeof document.getElementById === 'function') {
+          const el = document.getElementById(prop);
+          if (el && (el as { isConnected?: boolean }).isConnected !== false) return true;
+          if (typeof document.querySelector === 'function') {
+            try {
+              const qEl = document.querySelector('#' + TypedOM.CSS.escape(prop));
+              if (qEl) return true;
+            } catch {}
+          }
+          if (el) return true;
+        }
+      }
+      return Reflect.has(target, prop);
+    }
+  });
 }

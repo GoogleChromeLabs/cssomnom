@@ -2890,7 +2890,37 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 119: WPT Feasibility Grounding (Option A: Runner Exclusions & Fair Denominator Alignment)
+## Phase 119: Janitor Architectural Simplification: `tests/dom-shim/src/dom-stubs.ts` & DOM Shim Layer
+**Goal**: Decompose and streamline the 1,918-line `dom-stubs.ts` monolith (Entropy score 1,054), eliminating defensive sediment and reversing historical accretion per `~/.gemini/STYLE.md` without altering DOM shim behavioral parity.
+
+### Tasks
+- [ ] **Outline Orchestration for `patchDomPrototypes` & `patchWindowInstance`**:
+  - Decompose 1,102-line `patchDomPrototypes` into clean, cohesive step functions:
+    - `patchNodeTreeMutations(window)`: consolidate mutation hooks (`appendChild`, `insertBefore`, `replaceChild`, `removeChild`, `remove`) and deduplicate the ~35 lines of repeated `activeElement`, stylesheet invalidation, and `load` event boilerplate.
+    - `patchIFramePrototype(window, patchWindow)`
+    - `patchDocumentElementNormalization(window)`
+    - `patchStyleElementPrototype(window)`
+    - `patchLinkElementPrototype(window)`
+    - `patchDocumentPrototype(window)`
+    - `patchElementPrototype(window)`
+    - `patchShadowRootPrototype(window)`
+  - Decompose 410-line `patchWindowInstance` into an outline:
+    - `patchWindowGlobals(window)`
+    - `patchWindowStyles(window)`
+    - `patchWindowFrameNavigation(window)`
+    - `patchWindowTimersAndObservers(window)`
+    - `patchWindowPreferences(window)`
+- [ ] **Simplify `ComputedStylePropertyMap.get()`**:
+  - Extract the 146-line nested method into pure, unnested transformation functions for opacity clamping, unit conversion (`unitToPixels`), calc tree simplification, and color normalizations.
+- [ ] **Reverse Defensive Accretion & TOCTOU**:
+  - Replace 42 empty `try {} catch {}` error-swallowing blocks with explicit boundary guards or standard fallback values.
+- [ ] **Verification**:
+  - Ensure 100% of unit tests pass via `pnpm test:node`.
+  - Ensure zero regressions on WPT test runner via `pnpm run wpt:verify`.
+
+---
+
+## Phase 120: WPT Feasibility Grounding (Option A: Runner Exclusions & Fair Denominator Alignment)
 **Goal**: Establish an honest, achievable Node.js conformance denominator by migrating physically browser-dependent tests (layout geometry, font metrics, 2D viewport coordinates, WebDriver hardware events, live animation timers, and HTTP charset byte streams) directly into `tests/wpt-node-config.json` `exclude` lists, preventing dual-bookkeeping manifest drift and ensuring the runner's total tests represent a fair target for pure Node.js.
 
 ### Tasks
@@ -2910,7 +2940,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## TODO: Phase 120: Automated Subtest-Level Feasibility Oracle (Option B Upgrade)
+## TODO: Phase 121: Automated Subtest-Level Feasibility Oracle (Option B Upgrade)
 **Goal**: Upgrade from file-level exclusions (Option A) to an automated, assertion-level feasibility oracle (Option B) that parses individual subtest failure signatures dynamically during test runs.
 
 ### Planned Tasks
@@ -2926,5 +2956,6 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Calculate achievable target dynamically per spec and overall:
     $$M = \text{Total Subtests } (N) - \text{Browser-Only Subtests } (E_{\text{detected}})$$
   - Re-include mixed test files (e.g. `getComputedStyle-*.html`) so valid pure-CSSOM assertions pass while layout-dependent assertions are subtracted from the fair denominator without discarding entire files.
+
 
 

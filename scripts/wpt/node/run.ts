@@ -90,7 +90,7 @@ const SAFE_HOST_APIS = new Set([
 ]);
 
 function getScriptContent(htmlDir: string, src: string): string {
-  if (src.startsWith('/resources/testharness')) {
+  if (src.startsWith('/resources/testharness') || src.startsWith('/resources/testdriver')) {
     return '';
   }
   
@@ -114,12 +114,38 @@ function getScriptContent(htmlDir: string, src: string): string {
   return '';
 }
 
+function attachDeclarativeShadowRoots(root: unknown): void {
+  if (!root || typeof root !== 'object' || typeof (root as { querySelectorAll?: Function }).querySelectorAll !== 'function') return;
+  const templates = (root as { querySelectorAll: (s: string) => ArrayLike<Element> }).querySelectorAll('template[shadowrootmode], template[shadowroot]');
+  for (const tmpl of Array.from(templates)) {
+    const parent = tmpl.parentElement;
+    if (!parent) continue;
+    const mode = (tmpl.getAttribute('shadowrootmode') || tmpl.getAttribute('shadowroot') || 'open') as 'open' | 'closed';
+    if (typeof (parent as unknown as { attachShadow: Function }).attachShadow === 'function') {
+      const shadow = (parent as unknown as { attachShadow: (opts: { mode: string }) => unknown }).attachShadow({ mode });
+      const content = (tmpl as unknown as { content?: DocumentFragment }).content;
+      if (content && content.childNodes.length > 0) {
+        while (content.firstChild) {
+          (shadow as Node).appendChild(content.firstChild);
+        }
+      } else {
+        while (tmpl.firstChild) {
+          (shadow as Node).appendChild(tmpl.firstChild);
+        }
+      }
+      tmpl.remove();
+      attachDeclarativeShadowRoots(shadow);
+    }
+  }
+}
+
 export function runWptFile(filePath: string): WptFileResult {
   const htmlContent = fs.readFileSync(filePath, 'utf-8');
   const dom = parseHTML(htmlContent);
   const win = dom.window;
   (dom.document as unknown as { _htmlDir?: string })._htmlDir = path.dirname(path.resolve(filePath));
   (win as unknown as { _htmlDir?: string })._htmlDir = path.dirname(path.resolve(filePath));
+  attachDeclarativeShadowRoots(dom.document);
   patchWindowForTypedOM(win);
 
   const tests: WptSandboxTest[] = [];
@@ -177,6 +203,9 @@ export function runWptFile(filePath: string): WptFileResult {
           if (contextRealm && prop in contextRealm) {
             return Reflect.get(contextRealm, prop);
           }
+          if (prop in globalThis) {
+            return (globalThis as unknown as Record<string, unknown>)[prop];
+          }
         }
         if (prop in sandbox) {
           return Reflect.get(sandbox, prop);
@@ -196,6 +225,13 @@ export function runWptFile(filePath: string): WptFileResult {
         }
         if (dom.document && typeof dom.document.getElementById === 'function') {
           const el = dom.document.getElementById(prop);
+          if (el && (el as { isConnected?: boolean }).isConnected !== false) return el;
+          if (typeof dom.document.querySelector === 'function') {
+            try {
+              const qEl = dom.document.querySelector('#' + TypedOM.CSS.escape(prop));
+              if (qEl) return qEl;
+            } catch {}
+          }
           if (el) return el;
         }
       }
@@ -209,7 +245,13 @@ export function runWptFile(filePath: string): WptFileResult {
         if (JS_INTRINSICS.has(prop)) return true;
         if (prop in sandbox) return true;
         if (SAFE_HOST_APIS.has(prop)) return true;
-        return (target[prop] !== undefined) || (Boolean(dom.document?.getElementById?.(prop)));
+        let hasEl = false;
+        try {
+          hasEl = Boolean(dom.document?.querySelector?.('#' + TypedOM.CSS.escape(prop)) || dom.document?.getElementById?.(prop));
+        } catch {
+          hasEl = Boolean(dom.document?.getElementById?.(prop));
+        }
+        return (target[prop] !== undefined) || hasEl;
       }
       return prop in sandbox;
     },
@@ -230,8 +272,13 @@ export function runWptFile(filePath: string): WptFileResult {
         return { value: windowProxy, writable: true, enumerable: false, configurable: true };
       }
       if (typeof prop === 'string') {
-        if (JS_INTRINSICS.has(prop) && contextRealm && prop in contextRealm) {
-          return { value: contextRealm[prop], writable: true, enumerable: false, configurable: true };
+        if (JS_INTRINSICS.has(prop)) {
+          if (contextRealm && prop in contextRealm) {
+            return { value: contextRealm[prop], writable: true, enumerable: false, configurable: true };
+          }
+          if (prop in globalThis) {
+            return { value: (globalThis as unknown as Record<string, unknown>)[prop], writable: true, enumerable: false, configurable: true };
+          }
         }
         if (prop in sandbox) {
           return { value: sandbox[prop], writable: true, enumerable: false, configurable: true };
@@ -247,8 +294,15 @@ export function runWptFile(filePath: string): WptFileResult {
         }
         if (dom.document && typeof dom.document.getElementById === 'function') {
           const el = dom.document.getElementById(prop);
-          if (el) {
-            return { value: el, writable: true, enumerable: false, configurable: true };
+          let chosen: unknown = el;
+          if (el && (el as { isConnected?: boolean }).isConnected === false && typeof dom.document.querySelector === 'function') {
+            try {
+              const qEl = dom.document.querySelector('#' + TypedOM.CSS.escape(prop));
+              if (qEl) chosen = qEl;
+            } catch {}
+          }
+          if (chosen) {
+            return { value: chosen, writable: true, enumerable: false, configurable: true };
           }
         }
       }
@@ -309,18 +363,20 @@ export function runWptFile(filePath: string): WptFileResult {
     }
   }
 
-  // Copy global Matrix mocks
-  sandbox.DOMMatrix = (globalThis as unknown as Record<string, unknown>).DOMMatrix;
-  sandbox.DOMMatrixReadOnly = (globalThis as unknown as Record<string, unknown>).DOMMatrixReadOnly;
+  // Copy JS intrinsics to sandbox
+  for (const name of JS_INTRINSICS) {
+    if (name in globalThis && !(name in sandbox)) {
+      sandbox[name] = (globalThis as unknown as Record<string, unknown>)[name];
+    }
+  }
 
   // Copy Typed OM classes (omit CSSPositionValue per CSS Typed OM 1 spec)
   for (const [key, value] of Object.entries(TypedOM)) {
     if (key !== 'CSSPositionValue') {
       sandbox[key] = value;
+      (winObj as Record<string, unknown>)[key] = value;
     }
   }
-
-
 
   const htmlDir = path.dirname(filePath);
   (dom.document as unknown as { _htmlDir?: string })._htmlDir = htmlDir;
@@ -359,7 +415,16 @@ export function runWptFile(filePath: string): WptFileResult {
 
       if (code.trim()) {
         const script = new vm.Script(code, { filename: filePath + `#script-${i}` });
-        script.runInContext(context);
+        (dom.document as unknown as { currentScript: unknown }).currentScript = scriptEl;
+        (sandbox.document as unknown as { currentScript: unknown }).currentScript = scriptEl;
+        (win.document as unknown as { currentScript: unknown }).currentScript = scriptEl;
+        try {
+          script.runInContext(context);
+        } finally {
+          (dom.document as unknown as { currentScript: unknown }).currentScript = null;
+          (sandbox.document as unknown as { currentScript: unknown }).currentScript = null;
+          (win.document as unknown as { currentScript: unknown }).currentScript = null;
+        }
       }
     }
   } catch (err) {

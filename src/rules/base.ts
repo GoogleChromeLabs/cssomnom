@@ -117,7 +117,7 @@ export class CSSGroupingRule extends CSSRule {
       throw new DOMException('Index size error', 'IndexSizeError');
     }
 
-    const isNested = this.constructor.name === 'CSSStyleRule' || this.parentRule !== null;
+    const isNested = this.constructor.name === 'CSSStyleRule' || this.constructor.name === 'CSSScopeRule' || this.parentRule !== null;
 
     // Check if the input rule is a top-level rule to validate hierarchy constraints
     let topRule: Rule | null = null;
