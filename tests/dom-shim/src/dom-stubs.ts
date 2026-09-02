@@ -5,7 +5,16 @@ import path from 'node:path';
 import * as vm from 'node:vm';
 import { parseHTML } from 'linkedom';
 import { parseStyleSheet, parseRule } from '../../../src/parser.ts';
-import { CSSStyleSheet, MediaList, CSSRule, CSSGroupingRule, CSSScopeRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSImportRule } from '../../../src/CSSOM.ts';
+import {
+  CSSStyleSheet,
+  MediaList,
+  CSSRule,
+  CSSGroupingRule,
+  CSSScopeRule,
+  CSSLayerBlockRule,
+  CSSLayerStatementRule,
+  CSSImportRule
+} from '../../../src/CSSOM.ts';
 import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
 import { getCascadedStyle } from '../../../src/cascade.ts';
 import { PropertyRegistry } from '../../../src/PropertyRegistry.ts';
@@ -21,6 +30,7 @@ import { privateToken } from '../../../src/typed-om/utils/validation.ts';
 import { setupIframePrototype } from './iframe-runner.ts';
 import type { MediaEnvironment, Rule } from '../../../src/types.ts';
 import type { WindowType } from './testharness-bridge.ts';
+
 const STANDARD_PROPS = [
   ...ALL_SHORTHAND_LONGHANDS.filter(p => !p.startsWith('-')),
   'direction',
@@ -46,6 +56,20 @@ const PROTECTED_HARNESS_NAMES = new Set([
   'SyntaxError', 'ReferenceError', 'URIError', 'EvalError', 'Map', 'Set',
   'WeakMap', 'WeakSet', 'RegExp', 'Date', 'Math', 'JSON', 'Symbol', 'BigInt'
 ]);
+
+const OPACITY_PROPERTIES = new Set(['opacity', 'fill-opacity', 'flood-opacity', 'stop-opacity']);
+const HEAD_ELEMENT_TAGS = new Set(['TITLE', 'META', 'LINK', 'STYLE', 'BASE']);
+
+const COLOR_NORMALIZATIONS: Record<string, Record<string, string>> = {
+  color: {
+    red: 'rgb(255, 0, 0)',
+    green: 'rgb(0, 128, 0)',
+    blue: 'rgb(0, 0, 255)'
+  },
+  background: {
+    blue: 'rgb(0, 0, 255) none repeat scroll 0% 0% / auto padding-box border-box'
+  }
+};
 
 export class FallbackRange {
   startContainer: unknown = null;
@@ -97,13 +121,152 @@ const attributeStyleMapCache = new WeakMap<object, TypedOM.StylePropertyMap>();
 const computedStyleMapCache = new WeakMap<object, ComputedStylePropertyMap>();
 const documentFontsMap = new WeakMap<object, FontFaceSet>();
 
+// ---------------------------------------------------------------------------
+// Pure Value Transformation Helpers (for ComputedStylePropertyMap & Layout)
+// ---------------------------------------------------------------------------
+
+function clampOpacity(property: string, rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
+  if (!OPACITY_PROPERTIES.has(property.toLowerCase())) return undefined;
+
+  if (rawVal instanceof TypedOM.CSSUnitValue) {
+    if (rawVal.unit === 'number') {
+      return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, rawVal.value)), 'number');
+    }
+    if (rawVal.unit === 'percent') {
+      return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, rawVal.value / 100)), 'number');
+    }
+  }
+  if (rawVal instanceof TypedOM.CSSMathSum) {
+    let total = 0;
+    for (const term of rawVal.values) {
+      if (term instanceof TypedOM.CSSUnitValue) {
+        total += term.unit === 'percent' ? term.value / 100 : term.value;
+      }
+    }
+    return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, total)), 'number');
+  }
+  return undefined;
+}
+
+function convertCanonicalUnits(rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
+  if (!(rawVal instanceof TypedOM.CSSUnitValue)) return undefined;
+
+  if (rawVal.unit in unitToPixels && rawVal.unit !== 'px') {
+    return new TypedOM.CSSUnitValue(rawVal.value * unitToPixels[rawVal.unit], 'px');
+  }
+  if (rawVal.unit === 'ms') {
+    return new TypedOM.CSSUnitValue(rawVal.value * 0.001, 's');
+  }
+  if (rawVal.unit === 'rad' || rawVal.unit === 'grad' || rawVal.unit === 'turn') {
+    return new TypedOM.CSSUnitValue(rawVal.value * (unitToRadians[rawVal.unit] / unitToRadians['deg']), 'deg');
+  }
+  return undefined;
+}
+
+function simplifyCalcExpression(rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
+  if (!(rawVal instanceof TypedOM.CSSMathSum)) return undefined;
+
+  const units = rawVal.values.map(v => (v instanceof TypedOM.CSSUnitValue ? v.unit : null));
+  if (!units.every((u): u is TypedOM.CSSUnit => u !== null)) return undefined;
+
+  if (units.every(u => u in unitToPixels || u === 'em' || u === 'rem')) {
+    let totalPx = 0;
+    for (const v of Array.from(rawVal.values) as TypedOM.CSSUnitValue[]) {
+      if (v.unit in unitToPixels) {
+        totalPx += v.value * unitToPixels[v.unit];
+      } else if (v.value !== 0) {
+        return undefined;
+      }
+    }
+    return new TypedOM.CSSUnitValue(totalPx, 'px');
+  }
+
+  if (units.every(u => u === 'percent')) {
+    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
+    return new TypedOM.CSSUnitValue(total, 'percent');
+  }
+
+  if (units.every(u => u === 's' || u === 'ms')) {
+    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce(
+      (acc, v) => acc + (v.unit === 'ms' ? v.value * 0.001 : v.value),
+      0
+    );
+    return new TypedOM.CSSUnitValue(total, 's');
+  }
+
+  if (units.every(u => u in unitToRadians)) {
+    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce(
+      (acc, v) => acc + v.value * (unitToRadians[v.unit] / unitToRadians['deg']),
+      0
+    );
+    return new TypedOM.CSSUnitValue(total, 'deg');
+  }
+
+  if (units.every(u => u === 'number')) {
+    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
+    return new TypedOM.CSSUnitValue(total, 'number');
+  }
+
+  return undefined;
+}
+
+function normalizeComputedColor(property: string, rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
+  const propLower = property.toLowerCase();
+  const replacements = COLOR_NORMALIZATIONS[propLower];
+  if (!replacements) return undefined;
+
+  const strVal = String(rawVal);
+  const replacement = replacements[strVal];
+  if (replacement) {
+    return TypedOM.CSSStyleValue.parse(propLower, replacement);
+  }
+  return undefined;
+}
+
+function convertCssLengthToPx(valStr: string): number | null {
+  const num = parseFloat(valStr);
+  if (isNaN(num)) return null;
+  if (valStr.endsWith('px')) return num;
+  if (valStr.endsWith('em') || valStr.endsWith('rem') || valStr.endsWith('ic')) return num * 16;
+  if (valStr.endsWith('ex') || valStr.endsWith('ch')) return num * 8;
+  if (valStr.endsWith('in')) return num * 96;
+  if (valStr.endsWith('cm')) return (num * 96) / 2.54;
+  if (valStr.endsWith('mm')) return (num * 96) / 25.4;
+  if (valStr.endsWith('pt')) return (num * 96) / 72;
+  if (valStr.endsWith('pc')) return (num * 96) / 6;
+  return null;
+}
+
+function getValidEncoding(label: string | null | undefined): string | null {
+  if (!label) return null;
+  try {
+    new TextDecoder(label);
+    return label;
+  } catch {
+    return null;
+  }
+}
+
 export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
   override get(property: string): TypedOM.CSSStyleValue | undefined {
-    let rawVal: TypedOM.CSSStyleValue | undefined;
+    const rawVal = this.getRawPropertyValue(property);
+    if (!rawVal) return undefined;
+
+    return (
+      clampOpacity(property, rawVal) ??
+      convertCanonicalUnits(rawVal) ??
+      simplifyCalcExpression(rawVal) ??
+      normalizeComputedColor(property, rawVal) ??
+      rawVal
+    );
+  }
+
+  private getRawPropertyValue(property: string): TypedOM.CSSStyleValue | undefined {
     if (this._element) {
       const el = this._element as { isConnected?: boolean; ownerDocument?: { contains?: (n: unknown) => boolean; documentElement?: unknown } };
       const isConnected = el.isConnected ?? (el.ownerDocument?.documentElement && el.ownerDocument.contains ? el.ownerDocument.contains(el) : false);
       if (!isConnected) return undefined;
+
       const cascaded = getCascadedStyle(this._element);
       let cascadedVal = cascaded.getPropertyValue(property);
       if (!cascadedVal) {
@@ -113,117 +276,13 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
       if (cascadedVal) {
         try {
           const parsed = TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
-          if (parsed.length > 0) rawVal = parsed[0];
+          if (parsed.length > 0) return parsed[0];
         } catch {
-          rawVal = new TypedOM.CSSStyleValue(cascadedVal, privateToken);
+          return new TypedOM.CSSStyleValue(cascadedVal, privateToken);
         }
       }
     }
-    if (!rawVal) {
-      rawVal = super.get(property);
-    }
-    if (!rawVal) return undefined;
-
-    // Opacity Clamping
-    const propLower = property.toLowerCase();
-    if (['opacity', 'fill-opacity', 'flood-opacity', 'stop-opacity'].includes(propLower)) {
-      if (rawVal instanceof TypedOM.CSSUnitValue) {
-        if (rawVal.unit === 'number') {
-          return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, rawVal.value)), 'number');
-        }
-        if (rawVal.unit === 'percent') {
-          return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, rawVal.value / 100)), 'number');
-        }
-      }
-      if (rawVal instanceof TypedOM.CSSMathSum) {
-        let total = 0;
-        for (const term of rawVal.values) {
-          if (term instanceof TypedOM.CSSUnitValue) {
-            if (term.unit === 'percent') {
-              total += term.value / 100;
-            } else {
-              total += term.value;
-            }
-          }
-        }
-        return new TypedOM.CSSUnitValue(Math.min(1, Math.max(0, total)), 'number');
-      }
-    }
-
-    // Absolute Lengths Conversion: cm, mm, in, pt, pc, q -> px (CSS Values 4 § 6.1)
-    if (rawVal instanceof TypedOM.CSSUnitValue) {
-      if (rawVal.unit in unitToPixels && rawVal.unit !== 'px') {
-        const pxVal = rawVal.value * unitToPixels[rawVal.unit];
-        return new TypedOM.CSSUnitValue(pxVal, 'px');
-      }
-      if (rawVal.unit === 'ms') {
-        return new TypedOM.CSSUnitValue(rawVal.value * 0.001, 's');
-      }
-      if (rawVal.unit === 'rad' || rawVal.unit === 'grad' || rawVal.unit === 'turn') {
-        const degVal = rawVal.value * (unitToRadians[rawVal.unit] / unitToRadians['deg']);
-        return new TypedOM.CSSUnitValue(degVal, 'deg');
-      }
-    }
-
-    // Calc tree simplification for computed styles
-    if (rawVal instanceof TypedOM.CSSMathSum) {
-      const units = rawVal.values.map(v => (v instanceof TypedOM.CSSUnitValue ? v.unit : null));
-      if (units.every(u => u !== null)) {
-        const uList = units as TypedOM.CSSUnit[];
-        if (uList.every(u => u in unitToPixels || u === 'em' || u === 'rem')) {
-          let totalPx = 0;
-          let allConvertible = true;
-          for (const v of Array.from(rawVal.values) as TypedOM.CSSUnitValue[]) {
-            if (v.unit in unitToPixels) {
-              totalPx += v.value * unitToPixels[v.unit];
-            } else if (v.value === 0) {
-              totalPx += 0;
-            } else {
-              allConvertible = false;
-              break;
-            }
-          }
-          if (allConvertible) {
-            return new TypedOM.CSSUnitValue(totalPx, 'px');
-          }
-        } else if (uList.every(u => u === 'percent')) {
-          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
-          return new TypedOM.CSSUnitValue(total, 'percent');
-        } else if (uList.every(u => u === 's' || u === 'ms')) {
-          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce(
-            (acc, v) => acc + (v.unit === 'ms' ? v.value * 0.001 : v.value),
-            0
-          );
-          return new TypedOM.CSSUnitValue(total, 's');
-        } else if (uList.every(u => u in unitToRadians)) {
-          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce(
-            (acc, v) => acc + v.value * (unitToRadians[v.unit] / unitToRadians['deg']),
-            0
-          );
-          return new TypedOM.CSSUnitValue(total, 'deg');
-        } else if (uList.every(u => u === 'number')) {
-          const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
-          return new TypedOM.CSSUnitValue(total, 'number');
-        }
-      }
-    }
-
-    // Color normalization
-    const strVal = String(rawVal);
-    if (propLower === 'color' && strVal === 'red') {
-      return TypedOM.CSSStyleValue.parse('color', 'rgb(255, 0, 0)');
-    }
-    if (propLower === 'color' && strVal === 'green') {
-      return TypedOM.CSSStyleValue.parse('color', 'rgb(0, 128, 0)');
-    }
-    if (propLower === 'color' && strVal === 'blue') {
-      return TypedOM.CSSStyleValue.parse('color', 'rgb(0, 0, 255)');
-    }
-    if (propLower === 'background' && strVal === 'blue') {
-      return TypedOM.CSSStyleValue.parse('background', 'rgb(0, 0, 255) none repeat scroll 0% 0% / auto padding-box border-box');
-    }
-
-    return rawVal;
+    return super.get(property);
   }
 
   override getAll(property: string): TypedOM.CSSStyleValue[] {
@@ -244,6 +303,10 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
     return super.getAll(property);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Preferences & Environment
+// ---------------------------------------------------------------------------
 
 export interface PreferenceItem<T extends string> {
   readonly validValues: readonly T[];
@@ -402,589 +465,184 @@ export function updateOwnerDocument(node: unknown, targetDoc: Document): void {
   }
 }
 
-let prototypesPatched = false;
+// ---------------------------------------------------------------------------
+// Mutation & Stylesheet Invalidation Helpers
+// ---------------------------------------------------------------------------
 
-export function patchDomPrototypes(window: WindowType, patchWindow: (win: WindowType) => void): void {
-  if (prototypesPatched) return;
-  prototypesPatched = true;
+function invalidateStyleElementSheet(n: unknown): void {
+  if (!n || typeof n !== 'object') return;
+  const obj = n as { nodeName?: string; tagName?: string; parentNode?: unknown };
+  if (obj.nodeName === 'STYLE' || obj.tagName === 'STYLE') {
+    styleSheetMap.set(obj, null);
+    styleSheetSourceMap.set(obj, null);
+  }
+  if (obj.parentNode && typeof obj.parentNode === 'object') {
+    const parentObj = obj.parentNode as { nodeName?: string; tagName?: string };
+    if (parentObj.nodeName === 'STYLE' || parentObj.tagName === 'STYLE') {
+      styleSheetMap.set(parentObj, null);
+      styleSheetSourceMap.set(parentObj, null);
+    }
+  }
+}
 
+function getTargetDocument(node: unknown): (Document & { activeElement?: unknown }) | null {
+  const n = node as { ownerDocument?: Document } | null;
+  return ((n && 'ownerDocument' in n && n.ownerDocument ? n.ownerDocument : n) as (Document & { activeElement?: unknown })) || null;
+}
+
+function dispatchNodeMutationEffects(
+  node: unknown,
+  doc: (Document & { activeElement?: unknown }) | null,
+  isRemoval: boolean,
+  window: WindowType
+): void {
+  if (!node || typeof node !== 'object') return;
+  invalidateStyleElementSheet(node);
+
+  if (doc?.activeElement) {
+    const shouldCheckActive = isRemoval || Boolean((node as { parentNode?: unknown }).parentNode);
+    if (shouldCheckActive) {
+      const active = doc.activeElement;
+      if (
+        active === node ||
+        (typeof (node as { contains?: (n: unknown) => boolean }).contains === 'function' &&
+          (node as { contains: (n: unknown) => boolean }).contains(active))
+      ) {
+        doc.activeElement = null;
+      }
+    }
+  }
+
+  if (isRemoval) return;
+
+  if (doc) {
+    updateOwnerDocument(node, doc);
+  }
+
+  const nodeEl = node as {
+    nodeName?: string;
+    getAttribute?: (name: string) => string | null;
+    hasAttribute?: (name: string) => boolean;
+    dispatchEvent?: (ev: Event) => boolean;
+  };
+  if (nodeEl.nodeName === 'LINK' || nodeEl.nodeName === 'IFRAME') {
+    if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute?.('rel') === 'stylesheet' && !nodeEl.hasAttribute?.('disabled'))) {
+      queueMicrotask(() => {
+        try {
+          if (nodeEl.dispatchEvent) {
+            const winContext = doc ? (doc as Document).defaultView || window : window;
+            const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+            nodeEl.dispatchEvent(new eventConstructor.Event('load'));
+          }
+        } catch {}
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Adopted StyleSheets Proxy & Accessor Helpers
+// ---------------------------------------------------------------------------
+
+interface ObservableAdoptedStyleSheetsHolder {
+  rawArray: CSSStyleSheet[];
+  proxy: CSSStyleSheet[];
+  validateSheet: (s: unknown) => void;
+}
+
+const adoptedStyleSheetsHolderMap = new WeakMap<object, ObservableAdoptedStyleSheetsHolder>();
+
+function getOrCreateAdoptedHolder(
+  owner: object & { ownerDocument?: Document },
+  window: WindowType
+): ObservableAdoptedStyleSheetsHolder {
+  let holder = adoptedStyleSheetsHolderMap.get(owner);
+  if (holder) return holder;
+
+  const rawArray: CSSStyleSheet[] = [];
   const win = window as unknown as Record<string, unknown>;
 
-  const invalidateStyleElementSheet = (n: unknown) => {
-    if (!n || typeof n !== 'object') return;
-    const obj = n as { nodeName?: string; tagName?: string; parentNode?: unknown };
-    if (obj.nodeName === 'STYLE' || obj.tagName === 'STYLE') {
-      styleSheetMap.set(obj, null);
-      styleSheetSourceMap.set(obj, null);
+  const validateSheet = (s: unknown) => {
+    const sObj = s as {
+      constructor?: { name?: string };
+      cssRules?: unknown;
+      _constructedFlag?: boolean;
+      _constructed?: boolean;
+      _isConstructed?: boolean;
+      isConstructed?: boolean;
+      ownerNode?: unknown;
+      ownerRule?: unknown;
+      _constructorDocument?: Document;
+    } | null;
+
+    const isSheet =
+      s instanceof CSSStyleSheet ||
+      (sObj !== null && typeof sObj === 'object' && (sObj.constructor?.name === 'CSSStyleSheet' || 'cssRules' in sObj));
+    if (!isSheet || !sObj) {
+      throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
     }
-    if (obj.parentNode && typeof obj.parentNode === 'object') {
-      const parentObj = obj.parentNode as { nodeName?: string; tagName?: string };
-      if (parentObj.nodeName === 'STYLE' || parentObj.tagName === 'STYLE') {
-        styleSheetMap.set(parentObj, null);
-        styleSheetSourceMap.set(parentObj, null);
-      }
+    const isConstructed = (sObj._constructedFlag ?? sObj._constructed ?? sObj._isConstructed ?? sObj.isConstructed) ?? false;
+    if (!isConstructed || sObj.ownerNode || sObj.ownerRule) {
+      throw new DOMException('Failed to set adoptedStyleSheets: member of list is not a constructed stylesheet', 'NotAllowedError');
+    }
+    const sheetDoc = sObj._constructorDocument;
+    const targetDoc = (owner instanceof (win.Document as unknown as { new (): Document })
+      ? owner
+      : owner.ownerDocument) as Document | undefined;
+    if (
+      (sheetDoc && targetDoc && sheetDoc !== targetDoc) ||
+      (win.CSSStyleSheet && sObj.constructor !== win.CSSStyleSheet && sObj.constructor?.name === 'CSSStyleSheet' && sObj.constructor !== CSSStyleSheet)
+    ) {
+      throw new DOMException('Failed to set adoptedStyleSheets: stylesheet was constructed in a different document', 'NotAllowedError');
     }
   };
 
-  // Node & Element prototype patches for cross-document migration, LINK, and IFRAME load events
-  // @ts-expect-error - Linkedom document types are incomplete
-  const dummyElForPatch = win.document?.createElement?.('div');
-  if (dummyElForPatch) {
-    let proto = Object.getPrototypeOf(dummyElForPatch);
-    while (proto) {
-      if (Object.prototype.hasOwnProperty.call(proto, 'appendChild')) {
-        const originalAppendChild = proto.appendChild as (node: unknown) => unknown;
-        proto.appendChild = function (this: unknown, node: unknown) {
-          const thisNode = this as { ownerDocument?: Document } | null;
-          invalidateStyleElementSheet(this);
-          invalidateStyleElementSheet(node);
-          const targetDoc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
-          if (targetDoc && node && typeof node === 'object') {
-            const n = node as { parentNode?: unknown };
-            if (n.parentNode && targetDoc.activeElement && (targetDoc.activeElement === node || (typeof (node as { contains?: (n: unknown) => boolean }).contains === 'function' && (node as { contains: (n: unknown) => boolean }).contains(targetDoc.activeElement)))) {
-              targetDoc.activeElement = null;
-            }
-            updateOwnerDocument(node, targetDoc);
-          }
-          const res = originalAppendChild.call(this, node);
-          const nodeEl = node as {
-            nodeName?: string;
-            getAttribute?: (name: string) => string | null;
-            dispatchEvent?: (ev: Event) => boolean;
-          } | null;
-          if (nodeEl && (nodeEl.nodeName === 'LINK' || nodeEl.nodeName === 'IFRAME')) {
-            if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet' && !(nodeEl as { hasAttribute?: (a: string) => boolean }).hasAttribute?.('disabled'))) {
-              queueMicrotask(() => {
-                try {
-                  if (nodeEl.dispatchEvent) {
-                    const doc = thisNode?.ownerDocument || thisNode;
-                    const winContext = doc ? (doc as Document).defaultView || window : window;
-                    const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
-                    nodeEl.dispatchEvent(new eventConstructor.Event('load'));
-                  }
-                } catch {}
-              });
-            }
-          }
-          return res;
+  const proxy = new Proxy(rawArray, {
+    get(target, prop, receiver) {
+      if (prop === 'push') {
+        return function (...items: unknown[]) {
+          for (const item of items) validateSheet(item);
+          return target.push(...(items as CSSStyleSheet[]));
         };
       }
-
-      if (Object.prototype.hasOwnProperty.call(proto, 'insertBefore')) {
-        const originalInsertBefore = proto.insertBefore as (node: unknown, child?: unknown) => unknown;
-        proto.insertBefore = function (this: unknown, node: unknown, child?: unknown) {
-          const thisNode = this as { ownerDocument?: Document } | null;
-          invalidateStyleElementSheet(this);
-          invalidateStyleElementSheet(node);
-          const targetDoc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
-          if (targetDoc && node && typeof node === 'object') {
-            const n = node as { parentNode?: unknown };
-            if (n.parentNode && targetDoc.activeElement && (targetDoc.activeElement === node || (typeof (node as { contains?: (n: unknown) => boolean }).contains === 'function' && (node as { contains: (n: unknown) => boolean }).contains(targetDoc.activeElement)))) {
-              targetDoc.activeElement = null;
-            }
-            updateOwnerDocument(node, targetDoc);
-          }
-          const res = child !== undefined ? originalInsertBefore.call(this, node, child) : originalInsertBefore.call(this, node);
-          const nodeEl = node as {
-            nodeName?: string;
-            getAttribute?: (name: string) => string | null;
-            dispatchEvent?: (ev: Event) => boolean;
-          } | null;
-          if (nodeEl && (nodeEl.nodeName === 'LINK' || nodeEl.nodeName === 'IFRAME')) {
-            if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute && nodeEl.getAttribute('rel') === 'stylesheet' && !(nodeEl as { hasAttribute?: (a: string) => boolean }).hasAttribute?.('disabled'))) {
-              queueMicrotask(() => {
-                try {
-                  if (nodeEl.dispatchEvent) {
-                    const doc = thisNode?.ownerDocument || thisNode;
-                    const winContext = doc ? (doc as Document).defaultView || window : window;
-                    const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
-                    nodeEl.dispatchEvent(new eventConstructor.Event('load'));
-                  }
-                } catch {}
-              });
-            }
-          }
-          return res;
+      if (prop === 'unshift') {
+        return function (...items: unknown[]) {
+          for (const item of items) validateSheet(item);
+          return target.unshift(...(items as CSSStyleSheet[]));
         };
       }
-
-      if (Object.prototype.hasOwnProperty.call(proto, 'replaceChild')) {
-        const originalReplaceChild = proto.replaceChild as (newChild: unknown, oldChild: unknown) => unknown;
-        proto.replaceChild = function (this: unknown, newChild: unknown, oldChild: unknown) {
-          const thisNode = this as { ownerDocument?: Document } | null;
-          invalidateStyleElementSheet(this);
-          invalidateStyleElementSheet(newChild);
-          invalidateStyleElementSheet(oldChild);
-          const targetDoc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as Document | null;
-          if (targetDoc && newChild && typeof newChild === 'object') {
-            updateOwnerDocument(newChild, targetDoc);
-          }
-          return originalReplaceChild.call(this, newChild, oldChild);
+      if (prop === 'splice') {
+        return function (start: number, deleteCount?: number, ...items: unknown[]) {
+          for (const item of items) validateSheet(item);
+          return deleteCount === undefined ? target.splice(start) : target.splice(start, deleteCount, ...(items as CSSStyleSheet[]));
         };
       }
-
-      if (Object.prototype.hasOwnProperty.call(proto, 'removeChild')) {
-        const originalRemoveChild = proto.removeChild as (child: unknown) => unknown;
-        proto.removeChild = function (this: unknown, child: unknown) {
-          const thisNode = this as { ownerDocument?: Document } | null;
-          invalidateStyleElementSheet(this);
-          invalidateStyleElementSheet(child);
-          const doc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
-          if (doc && doc.activeElement && child && typeof child === 'object') {
-            if (doc.activeElement === child || (typeof (child as { contains?: (n: unknown) => boolean }).contains === 'function' && (child as { contains: (n: unknown) => boolean }).contains(doc.activeElement))) {
-              doc.activeElement = null;
-            }
-          }
-          return originalRemoveChild.call(this, child);
-        };
+      return Reflect.get(target, prop, receiver);
+    },
+    set(target, prop, value, receiver) {
+      if (typeof prop === 'string' && !isNaN(Number(prop)) && Number(prop) >= 0) {
+        validateSheet(value);
       }
-
-      if (Object.prototype.hasOwnProperty.call(proto, 'remove')) {
-        const originalRemove = proto.remove as () => unknown;
-        proto.remove = function (this: unknown) {
-          const thisNode = this as { ownerDocument?: Document } | null;
-          invalidateStyleElementSheet(this);
-          const doc = (thisNode && 'ownerDocument' in thisNode && thisNode.ownerDocument ? thisNode.ownerDocument : thisNode) as (Document & { activeElement?: unknown }) | null;
-          if (doc && doc.activeElement && thisNode && typeof thisNode === 'object') {
-            if (doc.activeElement === thisNode || (typeof (thisNode as { contains?: (n: unknown) => boolean }).contains === 'function' && (thisNode as { contains: (n: unknown) => boolean }).contains(doc.activeElement))) {
-              doc.activeElement = null;
-            }
-          }
-          return originalRemove.call(this);
-        };
-      }
-
-      proto = Object.getPrototypeOf(proto);
+      return Reflect.set(target, prop, value, receiver);
     }
-  }
+  });
 
-  // HTMLIFrameElement prototype
-  const htmlIframeEl = win.HTMLIFrameElement as { prototype: Record<string, unknown> } | undefined;
-  if (htmlIframeEl) {
-    setupIframePrototype(htmlIframeEl.prototype, window, patchWindow);
-  }
+  holder = { rawArray, proxy, validateSheet };
+  adoptedStyleSheetsHolderMap.set(owner, holder);
+  return holder;
+}
 
-  // Normalize documentElement when document was parsed without an explicit <html> root
-  const winDoc = win.document as unknown as
-    | {
-        documentElement?: { tagName?: string };
-        createElement(tag: string): Element;
-        childNodes?: unknown[];
-        children?: Element[];
-        appendChild(el: Element): void;
-      }
-    | undefined;
-  if (winDoc && winDoc.documentElement && winDoc.documentElement.tagName !== 'HTML') {
-    const htmlEl = winDoc.createElement('html');
-    const headEl = winDoc.createElement('head');
-    const bodyEl = winDoc.createElement('body');
-    htmlEl.appendChild(headEl);
-    htmlEl.appendChild(bodyEl);
-
-    const allElements: Element[] = [];
-    const collectElements = (node: unknown) => {
-      const elNode = node as { childNodes?: ArrayLike<unknown> };
-      if (elNode && elNode.childNodes) {
-        for (const child of Array.from(elNode.childNodes)) {
-          const c = child as { nodeType?: number; tagName?: string };
-          if (c && c.nodeType === 1) {
-            const tag = c.tagName;
-            if (tag === 'HEAD' || tag === 'BODY') {
-              collectElements(child);
-            } else {
-              allElements.push(child as Element);
-            }
-          }
-        }
-      }
-    };
-    collectElements(winDoc);
-
-    for (const el of allElements) {
-      const tag = el.tagName;
-      if (tag === 'TITLE' || tag === 'META' || tag === 'LINK' || tag === 'STYLE' || tag === 'BASE') {
-        headEl.appendChild(el);
-      } else {
-        bodyEl.appendChild(el);
-      }
-    }
-
-    winDoc.appendChild(htmlEl);
-    Object.defineProperty(winDoc, 'documentElement', {
-      get() {
-        return htmlEl;
-      },
-      configurable: true
-    });
-    Object.defineProperty(winDoc, 'head', {
-      get() {
-        return headEl;
-      },
-      configurable: true
-    });
-    Object.defineProperty(winDoc, 'body', {
-      get() {
-        return bodyEl;
-      },
-      configurable: true
-    });
-  }
-
-  // HTMLStyleElement.prototype
-  const htmlStyleEl = win.HTMLStyleElement as { prototype: Record<string, unknown> } | undefined;
-  if (htmlStyleEl) {
-    const winWithConstructors = win as unknown as {
-      Node?: { prototype?: Record<string, unknown> };
-      Element?: { prototype?: Record<string, unknown> };
-    };
-    const origTextContentDesc =
-      Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'textContent') ||
-      (winWithConstructors.Node?.prototype
-        ? Object.getOwnPropertyDescriptor(winWithConstructors.Node.prototype, 'textContent')
-        : undefined);
-    const origInnerHTMLDesc =
-      Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'innerHTML') ||
-      (winWithConstructors.Element?.prototype
-        ? Object.getOwnPropertyDescriptor(winWithConstructors.Element.prototype, 'innerHTML')
-        : undefined);
-
-    if (origTextContentDesc?.set) {
-      const origSet = origTextContentDesc.set;
-      Object.defineProperty(htmlStyleEl.prototype, 'textContent', {
-        ...origTextContentDesc,
-        set(this: object & { childNodes?: unknown[]; hasChildNodes?: () => boolean; textContent?: string }, val) {
-          const hasChildren = (this.childNodes && this.childNodes.length > 0) || (typeof this.hasChildNodes === 'function' && this.hasChildNodes()) || Boolean(this.textContent);
-          const isNoOpEmpty = !hasChildren && (val === '' || val === null || val === undefined);
-          if (!isNoOpEmpty) {
-            styleSheetMap.set(this, null);
-            styleSheetSourceMap.set(this, null);
-          }
-          return origSet.call(this, val);
-        }
-      });
-    }
-
-    if (origInnerHTMLDesc?.set) {
-      const origSet = origInnerHTMLDesc.set;
-      Object.defineProperty(htmlStyleEl.prototype, 'innerHTML', {
-        ...origInnerHTMLDesc,
-        set(this: object & { childNodes?: unknown[]; hasChildNodes?: () => boolean; textContent?: string }, val) {
-          const hasChildren = (this.childNodes && this.childNodes.length > 0) || (typeof this.hasChildNodes === 'function' && this.hasChildNodes()) || Boolean(this.textContent);
-          const isNoOpEmpty = !hasChildren && (val === '' || val === null || val === undefined);
-          if (!isNoOpEmpty) {
-            styleSheetMap.set(this, null);
-            styleSheetSourceMap.set(this, null);
-          }
-          return origSet.call(this, val);
-        }
-      });
-    }
-
-    Object.defineProperty(htmlStyleEl.prototype, 'disabled', {
-      get(this: Element) {
-        const sheet = styleSheetMap.get(this);
-        if (!sheet) return false;
-        return sheet.disabled;
-      },
-      set(this: Element, val: boolean) {
-        const sheet = styleSheetMap.get(this);
-        if (sheet) {
-          sheet.disabled = Boolean(val);
-        }
-      },
-      configurable: true,
-      enumerable: true
-    });
-
-    const resolveImportRules = (targetSheet: CSSStyleSheet, ownerDoc: unknown) => {
-      const htmlDir = (ownerDoc as { _htmlDir?: string })?._htmlDir || process.cwd();
-      for (let i = 0; i < targetSheet.cssRules.length; i++) {
-        const r = targetSheet.cssRules[i];
-        if (r instanceof CSSImportRule || (r && typeof r === 'object' && 'href' in r && 'styleSheet' in r)) {
-          const impRule = r as CSSImportRule;
-          const href = impRule.href;
-          if (href) {
-            try {
-              const fullPath = href.startsWith('/')
-                ? path.join(process.cwd(), 'submodules/web-platform-tests', href)
-                : path.resolve(htmlDir, href);
-              if (fs.existsSync(fullPath)) {
-                const fileContent = fs.readFileSync(fullPath, 'utf-8');
-                const importedRules = parseStyleSheet(fileContent);
-                const importedSheet = CSSStyleSheet.createInternal(importedRules, parseRule, true);
-                (importedSheet as unknown as { _ownerRule: CSSRule | null })._ownerRule = impRule;
-                (importedSheet as unknown as { _parentStyleSheet: unknown })._parentStyleSheet = targetSheet;
-                (importedSheet as unknown as { _href: string | null })._href = href;
-                (impRule as unknown as { _styleSheet: CSSStyleSheet | null })._styleSheet = importedSheet;
-                resolveImportRules(importedSheet, ownerDoc);
-              }
-            } catch {}
-          }
-        }
-      }
-    };
-
-    Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
-      configurable: true,
-      enumerable: true,
-      get(this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
-        const currentText = this.textContent || '';
-        let sheet = styleSheetMap.get(this);
-        const source = styleSheetSourceMap.get(this);
-        if (!sheet || source !== currentText) {
-          styleSheetSourceMap.set(this, currentText);
-          const rules = parseStyleSheet(currentText);
-          sheet = CSSStyleSheet.createInternal(rules, parseRule);
-          (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
-          const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
-          if (mediaText) {
-            sheet.media.mediaText = mediaText;
-          }
-          resolveImportRules(sheet, this.ownerDocument);
-          styleSheetMap.set(this, sheet);
-        }
-        return sheet;
-      }
-    });
-  }
-
-  // HTMLLinkElement.prototype
-  const htmlLinkEl = win.HTMLLinkElement as { prototype: Record<string, unknown> } | undefined;
-  if (htmlLinkEl) {
-    Object.defineProperty(htmlLinkEl.prototype, 'disabled', {
-      get(this: Element) {
-        return this.hasAttribute('disabled');
-      },
-      set(this: Element, val: boolean) {
-        if (val) {
-          this.setAttribute('disabled', '');
-          const sheet = styleSheetMap.get(this);
-          if (sheet) {
-            (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
-          }
-        } else {
-          this.removeAttribute('disabled');
-          let sheet = styleSheetMap.get(this);
-          if (sheet) {
-            (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
-          }
-          queueMicrotask(() => {
-            try {
-              if (this.dispatchEvent) {
-                const doc = (this as unknown as { ownerDocument?: Document }).ownerDocument;
-                const winContext = doc ? (doc as Document).defaultView || window : window;
-                const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
-                this.dispatchEvent(new eventConstructor.Event('load'));
-              }
-            } catch {}
-          });
-        }
-      },
-      configurable: true,
-      enumerable: true
-    });
-
-    Object.defineProperty(htmlLinkEl.prototype, 'sheet', {
-      configurable: true,
-      enumerable: true,
-      get(this: object & { getAttribute?: (attr: string) => string | null; hasAttribute?: (attr: string) => boolean; ownerDocument?: Document }) {
-        if (this.hasAttribute && this.hasAttribute('disabled')) {
-          return null;
-        }
-        let sheet = styleSheetMap.get(this);
-        if (!sheet) {
-          let rules: Rule[] = [];
-          const href = this.getAttribute ? this.getAttribute('href') : null;
-          let originClean = true;
-          let resolvedHref: string | null = null;
-          if (href) {
-            const isData = href.startsWith('data:');
-            const isCrossOrigin = href.startsWith('http://www1.') || href.includes('redirect.py?location=http://www1.') || href.includes('/common/redirect.py');
-            const isLoadError = href.includes('malformed-http-response') || href.endsWith('.asis');
-
-            if (isCrossOrigin || isLoadError) {
-              originClean = false;
-            }
-
-            if (isData) {
-              const commaIdx = href.indexOf(',');
-              const cssData = commaIdx !== -1 ? decodeURIComponent(href.slice(commaIdx + 1)) : '';
-              rules = parseStyleSheet(cssData);
-            } else if (!isLoadError) {
-              try {
-                const htmlDir = (this.ownerDocument as unknown as { _htmlDir?: string })?._htmlDir || process.cwd();
-                const fullPath = href.startsWith('/')
-                  ? path.join(process.cwd(), 'submodules/web-platform-tests', href)
-                  : path.resolve(htmlDir, href);
-                const fileBuf = fs.readFileSync(fullPath);
-                let encoding = 'utf-8';
-                if (fileBuf.length >= 3 && fileBuf[0] === 0xef && fileBuf[1] === 0xbb && fileBuf[2] === 0xbf) {
-                  encoding = 'utf-8';
-                } else if (fileBuf.length >= 2 && fileBuf[0] === 0xfe && fileBuf[1] === 0xff) {
-                  encoding = 'utf-16be';
-                } else if (fileBuf.length >= 2 && fileBuf[0] === 0xff && fileBuf[1] === 0xfe) {
-                  encoding = 'utf-16le';
-                } else {
-                  const headAscii = fileBuf.subarray(0, 100).toString('latin1');
-                  const match = headAscii.match(/^@charset\s+"([^"]+)";/i);
-                  if (match) {
-                    try {
-                      new TextDecoder(match[1]);
-                      encoding = match[1];
-                    } catch {}
-                  } else {
-                    const linkCharset = this.getAttribute ? this.getAttribute('charset') : null;
-                    let validLinkCharset = false;
-                    if (linkCharset) {
-                      try {
-                        new TextDecoder(linkCharset);
-                        encoding = linkCharset;
-                        validLinkCharset = true;
-                      } catch {}
-                    }
-                    if (!validLinkCharset) {
-                      const doc = this.ownerDocument as unknown as { characterSet?: string; querySelector?: (s: string) => { getAttribute: (a: string) => string | null } | null };
-                      const docCharset = doc?.characterSet || doc?.querySelector?.('meta[charset]')?.getAttribute('charset');
-                      if (docCharset) {
-                        try {
-                          new TextDecoder(docCharset);
-                          encoding = docCharset;
-                        } catch {}
-                      }
-                    }
-                  }
-                }
-                const decoder = new TextDecoder(encoding);
-                const fileContent = decoder.decode(fileBuf);
-                rules = parseStyleSheet(fileContent);
-              } catch {}
-            }
-
-            const docBase = (this.ownerDocument as unknown as { baseURI?: string })?.baseURI || (typeof globalThis.location !== 'undefined' ? globalThis.location.href : 'http://localhost/test.html');
-            try {
-              resolvedHref = new URL(href, docBase).href;
-            } catch {
-              resolvedHref = href;
-            }
-          }
-          sheet = CSSStyleSheet.createInternal(rules, parseRule, originClean);
-          (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
-          if (resolvedHref) {
-            (sheet as unknown as { _href: string | null })._href = resolvedHref;
-          }
-          const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
-          if (mediaText) {
-            sheet.media.mediaText = mediaText;
-          }
-          styleSheetMap.set(this, sheet);
-        }
-        return sheet;
-      }
-    });
-  }
-
-  interface ObservableAdoptedStyleSheetsHolder {
-    rawArray: CSSStyleSheet[];
-    proxy: CSSStyleSheet[];
-    validateSheet: (s: unknown) => void;
-  }
-  const adoptedStyleSheetsHolderMap = new WeakMap<object, ObservableAdoptedStyleSheetsHolder>();
-
-  const getOrCreateAdoptedHolder = (owner: object & { ownerDocument?: Document }): ObservableAdoptedStyleSheetsHolder => {
-    let holder = adoptedStyleSheetsHolderMap.get(owner);
-    if (!holder) {
-      const rawArray: CSSStyleSheet[] = [];
-
-      const validateSheet = (s: unknown) => {
-        const sObj = s as {
-          constructor?: { name?: string };
-          cssRules?: unknown;
-          _constructedFlag?: boolean;
-          _constructed?: boolean;
-          _isConstructed?: boolean;
-          isConstructed?: boolean;
-          ownerNode?: unknown;
-          ownerRule?: unknown;
-          _constructorDocument?: Document;
-        } | null;
-
-        const isSheet =
-          s instanceof CSSStyleSheet ||
-          (sObj !== null && typeof sObj === 'object' && (sObj.constructor?.name === 'CSSStyleSheet' || 'cssRules' in sObj));
-        if (!isSheet || !sObj) {
-          throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
-        }
-        const isConstructed = (sObj._constructedFlag ?? sObj._constructed ?? sObj._isConstructed ?? sObj.isConstructed) ?? false;
-        if (!isConstructed || sObj.ownerNode || sObj.ownerRule) {
-          throw new DOMException('Failed to set adoptedStyleSheets: member of list is not a constructed stylesheet', 'NotAllowedError');
-        }
-        const sheetDoc = sObj._constructorDocument;
-        const targetDoc = (owner instanceof (win.Document as unknown as { new (): Document })
-          ? owner
-          : owner.ownerDocument) as Document | undefined;
-        if (
-          (sheetDoc && targetDoc && sheetDoc !== targetDoc) ||
-          (win.CSSStyleSheet && sObj.constructor !== win.CSSStyleSheet && sObj.constructor?.name === 'CSSStyleSheet' && sObj.constructor !== CSSStyleSheet)
-        ) {
-          throw new DOMException('Failed to set adoptedStyleSheets: stylesheet was constructed in a different document', 'NotAllowedError');
-        }
-      };
-
-      const proxy = new Proxy(rawArray, {
-        get(target, prop, receiver) {
-          if (prop === 'push') {
-            return function (...items: unknown[]) {
-              for (const item of items) {
-                validateSheet(item);
-              }
-              return target.push(...(items as CSSStyleSheet[]));
-            };
-          }
-          if (prop === 'unshift') {
-            return function (...items: unknown[]) {
-              for (const item of items) {
-                validateSheet(item);
-              }
-              return target.unshift(...(items as CSSStyleSheet[]));
-            };
-          }
-          if (prop === 'splice') {
-            return function (start: number, deleteCount?: number, ...items: unknown[]) {
-              for (const item of items) {
-                validateSheet(item);
-              }
-              if (deleteCount === undefined) {
-                return target.splice(start);
-              }
-              return target.splice(start, deleteCount, ...(items as CSSStyleSheet[]));
-            };
-          }
-          return Reflect.get(target, prop, receiver);
-        },
-        set(target, prop, value, receiver) {
-          if (typeof prop === 'string' && !isNaN(Number(prop)) && Number(prop) >= 0) {
-            validateSheet(value);
-          }
-          return Reflect.set(target, prop, value, receiver);
-        }
-      });
-
-      holder = { rawArray, proxy, validateSheet };
-      adoptedStyleSheetsHolderMap.set(owner, holder);
-    }
-    return holder;
-  };
-
-  const createAdoptedStyleSheetsAccessor = () => ({
+function createAdoptedStyleSheetsAccessor(window: WindowType) {
+  return {
     get(this: object & { ownerDocument?: Document }) {
-      return getOrCreateAdoptedHolder(this).proxy;
+      return getOrCreateAdoptedHolder(this, window).proxy;
     },
     set(this: object & { ownerDocument?: Document }, sheets: CSSStyleSheet[]) {
       if (!sheets || typeof (sheets as unknown as Iterable<unknown>)[Symbol.iterator] !== 'function') {
         throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
       }
       const arr = Array.from(sheets);
-      const holder = getOrCreateAdoptedHolder(this);
+      const holder = getOrCreateAdoptedHolder(this, window);
       for (const s of arr) {
         holder.validateSheet(s);
       }
@@ -1000,136 +658,707 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
     },
     configurable: true,
     enumerable: true
+  };
+}
+
+function isInsideTemplate(el: Element | null): boolean {
+  let curr: unknown = el;
+  while (curr && typeof curr === 'object') {
+    const tag = (curr as { tagName?: string; nodeName?: string }).tagName || (curr as { nodeName?: string }).nodeName;
+    if (tag === 'TEMPLATE') return true;
+    curr = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement || (curr as { parentNode?: unknown }).parentNode;
+  }
+  return false;
+}
+
+function collectStyleSheets(root: Document | DocumentFragment): StyleSheetListImpl {
+  const isDoc = 'documentElement' in root;
+  const styles = Array.from(root.querySelectorAll('style')).filter(s => {
+    if (isDoc && isInsideTemplate(s)) return false;
+    const sheet = (s as unknown as { sheet?: CSSStyleSheet }).sheet;
+    return sheet && (!isDoc || !sheet.disabled);
+  });
+  const linkSelector = isDoc ? 'link[rel="stylesheet"], link[rel~="stylesheet"]' : 'link[rel="stylesheet"]';
+  const links = Array.from(root.querySelectorAll(linkSelector)).filter(l => {
+    if (isDoc && isInsideTemplate(l)) return false;
+    return !l.hasAttribute('disabled');
   });
 
-  const documentConstructor = win.Document as { prototype: Record<string, unknown> } | undefined;
-  if (documentConstructor) {
-    Object.defineProperty(documentConstructor.prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
-    Object.defineProperty(documentConstructor.prototype, 'styleSheets', {
-      get(this: Document) {
-        const isInsideTemplate = (el: Element | null): boolean => {
-          let curr: unknown = el;
-          while (curr && typeof curr === 'object') {
-            const tag = (curr as { tagName?: string; nodeName?: string }).tagName || (curr as { nodeName?: string }).nodeName;
-            if (tag === 'TEMPLATE') return true;
-            curr = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement || (curr as { parentNode?: unknown }).parentNode;
-          }
-          return false;
-        };
-
-        const styles = Array.from(this.querySelectorAll('style')).filter(s => {
-          if (isInsideTemplate(s)) return false;
-          const sheet = (s as unknown as { sheet?: CSSStyleSheet }).sheet;
-          return sheet && !sheet.disabled;
-        });
-        const links = Array.from(this.querySelectorAll('link[rel="stylesheet"], link[rel~="stylesheet"]')).filter(l => {
-          if (isInsideTemplate(l)) return false;
-          return !l.hasAttribute('disabled');
-        });
-
-        const list = new StyleSheetListImpl();
-        for (const styleEl of styles) {
-          if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-            list.push(styleEl.sheet as unknown as CSSStyleSheet);
-          }
-        }
-        for (const linkEl of links) {
-          if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-            list.push(linkEl.sheet as unknown as CSSStyleSheet);
-          }
-        }
-        return list;
-      },
-      configurable: true
-    });
-
-    if (!('open' in documentConstructor.prototype)) {
-      documentConstructor.prototype.open = function (this: Document) {
-        if (this.documentElement) {
-          this.documentElement.innerHTML = '<head></head><body></body>';
-        }
-      };
-    }
-    if (!('write' in documentConstructor.prototype)) {
-      documentConstructor.prototype.write = function (this: Document, text: string) {
-        if (this.documentElement) {
-          this.documentElement.innerHTML = text;
-        }
-      };
-    }
-    if (!('close' in documentConstructor.prototype)) {
-      documentConstructor.prototype.close = function () {};
-    }
-
-    // Document.prototype.adoptNode
-    const origAdoptNode = documentConstructor.prototype.adoptNode as ((node: unknown) => unknown) | undefined;
-    documentConstructor.prototype.adoptNode = function (this: Document, node: unknown) {
-      if (node && typeof node === 'object') {
-        const n = node as { parentNode?: { removeChild?: (child: unknown) => void } };
-        if (n.parentNode && typeof n.parentNode.removeChild === 'function') {
-          n.parentNode.removeChild(n);
-        }
-        updateOwnerDocument(node, this);
-      }
-      if (origAdoptNode) {
-        return origAdoptNode.call(this, node);
-      }
-      return node;
-    };
-
-    Object.defineProperty(documentConstructor.prototype, 'fonts', {
-      get(this: object) {
-        let fonts = documentFontsMap.get(this);
-        if (!fonts) {
-          fonts = {
-            ready: Promise.resolve(),
-            addEventListener() {},
-            removeEventListener() {},
-            check() {
-              return true;
-            },
-            load() {
-              return Promise.resolve([]);
-            }
-          } as unknown as FontFaceSet;
-          documentFontsMap.set(this, fonts);
-        }
-        return fonts;
-      },
-      configurable: true
-    });
-
-    if (!('caretRangeFromPoint' in documentConstructor.prototype)) {
-      documentConstructor.prototype.caretRangeFromPoint = function (_x: number, _y: number) {
-        return null;
-      };
-    }
-    if (!('caretPositionFromPoint' in documentConstructor.prototype)) {
-      documentConstructor.prototype.caretPositionFromPoint = function (_x: number, _y: number) {
-        return null;
-      };
-    }
-    if (!('elementsFromPoint' in documentConstructor.prototype)) {
-      documentConstructor.prototype.elementsFromPoint = function (this: Document, _x: number, _y: number) {
-        const buttons = Array.from(this.querySelectorAll('button'));
-        if (buttons.length > 0) {
-          const btn = buttons[buttons.length - 1];
-          return [btn, btn.parentElement || this.body || this.documentElement];
-        }
-        const target = this.activeElement || this.body || this.documentElement;
-        return target ? [target] : [];
-      };
-    }
-    if (!('elementFromPoint' in documentConstructor.prototype)) {
-      documentConstructor.prototype.elementFromPoint = function (this: Document, _x: number, _y: number) {
-        const buttons = Array.from(this.querySelectorAll('button'));
-        if (buttons.length > 0) {
-          return buttons[buttons.length - 1];
-        }
-        return this.activeElement || this.body || this.documentElement || null;
-      };
+  const list = new StyleSheetListImpl();
+  for (const styleEl of styles) {
+    if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
+      list.push(styleEl.sheet as unknown as CSSStyleSheet);
     }
   }
+  for (const linkEl of links) {
+    if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
+      list.push(linkEl.sheet as unknown as CSSStyleSheet);
+    }
+  }
+  return list;
+}
+
+// ---------------------------------------------------------------------------
+// Element ID & Style Mutation Helpers
+// ---------------------------------------------------------------------------
+
+function registerElementId(el: Element, id: string, win: WindowType): void {
+  if (!id || PROTECTED_HARNESS_NAMES.has(id)) return;
+  const winContext = el.ownerDocument?.defaultView || win;
+  const sb =
+    (winContext as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
+    (el.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
+  if (sb) {
+    try { sb[id] = el; } catch {}
+  }
+  if (winContext) {
+    try { (winContext as unknown as Record<string, unknown>)[id] = el; } catch {}
+  }
+}
+
+const elementStyleMap = new WeakMap<Element, CSSStyleDeclaration>();
+const lastSeenAttrMap = new WeakMap<Element, string | null>();
+let isSyncingStyle = false;
+
+function getOrCreateElementStyle(el: Element): CSSStyleDeclaration {
+  let decl = elementStyleMap.get(el);
+  const styleAttr = typeof el.getAttribute === 'function' ? el.getAttribute('style') : null;
+  if (!decl) {
+    decl = new CSSStyleDeclaration();
+    if (styleAttr) {
+      decl.cssText = styleAttr;
+    }
+    lastSeenAttrMap.set(el, styleAttr);
+    decl._onChange = (force?: boolean) => {
+      if (isSyncingStyle) return;
+      isSyncingStyle = true;
+      try {
+        const text = decl!.cssText;
+        const lastSeen = lastSeenAttrMap.get(el);
+        if (!force && lastSeen === text) {
+          return;
+        }
+        lastSeenAttrMap.set(el, text);
+        if (text || (typeof el.hasAttribute === 'function' && el.hasAttribute('style'))) {
+          el.setAttribute('style', text);
+        }
+      } finally {
+        isSyncingStyle = false;
+      }
+    };
+    elementStyleMap.set(el, decl);
+  } else {
+    const lastSeen = lastSeenAttrMap.get(el);
+    if (lastSeen !== undefined && lastSeen !== styleAttr && !isSyncingStyle) {
+      lastSeenAttrMap.set(el, styleAttr);
+      isSyncingStyle = true;
+      try {
+        decl.cssText = styleAttr || '';
+      } finally {
+        isSyncingStyle = false;
+      }
+    }
+  }
+  return decl;
+}
+
+function patchElementStyle(targetProto: Record<string, unknown>, window: WindowType): void {
+  if (targetProto.__isStylePatched) return;
+  targetProto.__isStylePatched = true;
+
+  Object.defineProperty(targetProto, 'style', {
+    get(this: Element) {
+      return getOrCreateElementStyle(this);
+    },
+    set(this: Element, value: string) {
+      if (typeof value === 'string') {
+        const style = getOrCreateElementStyle(this);
+        style.cssText = value;
+      }
+    },
+    configurable: true
+  });
+
+  const origSetAttribute = targetProto.setAttribute as ((name: string, value: string) => void) | undefined;
+  if (origSetAttribute) {
+    targetProto.setAttribute = function (this: Element, name: string, value: string) {
+      if (name === 'id' && typeof value === 'string') {
+        registerElementId(this, value, window);
+      }
+      if (name === 'style' && !isSyncingStyle) {
+        isSyncingStyle = true;
+        try {
+          const decl = getOrCreateElementStyle(this);
+          decl.cssText = value;
+          lastSeenAttrMap.set(this, value);
+        } finally {
+          isSyncingStyle = false;
+        }
+      }
+      return origSetAttribute.call(this, name, value);
+    };
+  }
+
+  const origRemoveAttribute = targetProto.removeAttribute as ((name: string) => void) | undefined;
+  if (origRemoveAttribute) {
+    targetProto.removeAttribute = function (this: Element, name: string) {
+      if (name === 'style' && !isSyncingStyle) {
+        isSyncingStyle = true;
+        try {
+          const decl = getOrCreateElementStyle(this);
+          decl.cssText = '';
+          lastSeenAttrMap.set(this, null);
+        } finally {
+          isSyncingStyle = false;
+        }
+      }
+      return origRemoveAttribute.call(this, name);
+    };
+  }
+}
+
+function dispatchFocusEvent(
+  target: HTMLElement,
+  eventType: string,
+  options: { bubbles?: boolean; cancelable?: boolean; composed?: boolean },
+  window: WindowType
+): void {
+  const doc = (target.ownerDocument || window.document) as (Document & { __sandbox?: Record<string, unknown> }) | null;
+  const winCtx = (doc?.defaultView || window) as unknown as Record<string, unknown>;
+  const FocusEv = (winCtx.FocusEvent || winCtx.Event || Event) as new (type: string, opts?: unknown) => Event;
+  const ev = new FocusEv(eventType, options);
+
+  const handlerProp = `on${eventType}`;
+  const onAttr = target.getAttribute ? target.getAttribute(handlerProp) : null;
+  const fn = (target as unknown as Record<string, unknown>)[handlerProp];
+
+  if (typeof fn === 'function') {
+    try {
+      fn.call(target, ev);
+    } catch {}
+  } else if (typeof onAttr === 'string' && onAttr.trim()) {
+    try {
+      const sandbox = (winCtx.__sandbox || doc?.__sandbox || winCtx) as Record<string, unknown>;
+      if (vm.isContext(sandbox)) {
+        vm.runInContext(onAttr, sandbox);
+      } else {
+        const scriptFn = new Function(
+          'event',
+          `with (this.ownerDocument?.defaultView || window) { with (this.ownerDocument || document) { with (this) { ${onAttr} } } }`
+        );
+        scriptFn.call(target, ev);
+      }
+    } catch {
+      try {
+        const evalFn = winCtx.eval as ((code: string) => unknown) | undefined;
+        if (typeof evalFn === 'function') {
+          evalFn(onAttr);
+        }
+      } catch {}
+    }
+  }
+
+  if (typeof target.dispatchEvent === 'function') {
+    try {
+      target.dispatchEvent(ev);
+    } catch {}
+  }
+}
+
+// ---------------------------------------------------------------------------
+// patchDomPrototypes Sub-Helpers
+// ---------------------------------------------------------------------------
+
+function patchNodeTreeMutations(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const dummyEl = (win.document as { createElement?: (tag: string) => Element })?.createElement?.('div');
+  if (!dummyEl) return;
+
+  let proto = Object.getPrototypeOf(dummyEl);
+  while (proto) {
+    if (Object.prototype.hasOwnProperty.call(proto, 'appendChild')) {
+      const originalAppendChild = proto.appendChild as (node: unknown) => unknown;
+      proto.appendChild = function (this: unknown, node: unknown) {
+        invalidateStyleElementSheet(this);
+        const doc = getTargetDocument(this);
+        dispatchNodeMutationEffects(node, doc, false, window);
+        return originalAppendChild.call(this, node);
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(proto, 'insertBefore')) {
+      const originalInsertBefore = proto.insertBefore as (node: unknown, child?: unknown) => unknown;
+      proto.insertBefore = function (this: unknown, node: unknown, child?: unknown) {
+        invalidateStyleElementSheet(this);
+        const doc = getTargetDocument(this);
+        dispatchNodeMutationEffects(node, doc, false, window);
+        return child !== undefined ? originalInsertBefore.call(this, node, child) : originalInsertBefore.call(this, node);
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(proto, 'replaceChild')) {
+      const originalReplaceChild = proto.replaceChild as (newChild: unknown, oldChild: unknown) => unknown;
+      proto.replaceChild = function (this: unknown, newChild: unknown, oldChild: unknown) {
+        invalidateStyleElementSheet(this);
+        const doc = getTargetDocument(this);
+        dispatchNodeMutationEffects(oldChild, doc, true, window);
+        dispatchNodeMutationEffects(newChild, doc, false, window);
+        return originalReplaceChild.call(this, newChild, oldChild);
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(proto, 'removeChild')) {
+      const originalRemoveChild = proto.removeChild as (child: unknown) => unknown;
+      proto.removeChild = function (this: unknown, child: unknown) {
+        invalidateStyleElementSheet(this);
+        const doc = getTargetDocument(this);
+        dispatchNodeMutationEffects(child, doc, true, window);
+        return originalRemoveChild.call(this, child);
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(proto, 'remove')) {
+      const originalRemove = proto.remove as () => unknown;
+      proto.remove = function (this: unknown) {
+        const doc = getTargetDocument(this);
+        dispatchNodeMutationEffects(this, doc, true, window);
+        return originalRemove.call(this);
+      };
+    }
+
+    proto = Object.getPrototypeOf(proto);
+  }
+}
+
+function patchIFramePrototype(window: WindowType, patchWindow: (win: WindowType) => void): void {
+  const win = window as unknown as Record<string, unknown>;
+  const htmlIframeEl = win.HTMLIFrameElement as { prototype: Record<string, unknown> } | undefined;
+  if (htmlIframeEl) {
+    setupIframePrototype(htmlIframeEl.prototype, window, patchWindow);
+  }
+}
+
+function patchDocumentElementNormalization(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const winDoc = win.document as unknown as
+    | {
+        documentElement?: { tagName?: string };
+        createElement(tag: string): Element;
+        childNodes?: unknown[];
+        children?: Element[];
+        appendChild(el: Element): void;
+      }
+    | undefined;
+
+  if (!winDoc?.documentElement || winDoc.documentElement.tagName === 'HTML') {
+    return;
+  }
+
+  const htmlEl = winDoc.createElement('html');
+  const headEl = winDoc.createElement('head');
+  const bodyEl = winDoc.createElement('body');
+  htmlEl.appendChild(headEl);
+  htmlEl.appendChild(bodyEl);
+
+  const allElements: Element[] = [];
+  const collectElements = (node: unknown) => {
+    const elNode = node as { childNodes?: ArrayLike<unknown> };
+    if (elNode?.childNodes) {
+      for (const child of Array.from(elNode.childNodes)) {
+        const c = child as { nodeType?: number; tagName?: string };
+        if (c?.nodeType === 1) {
+          if (c.tagName === 'HEAD' || c.tagName === 'BODY') {
+            collectElements(child);
+          } else {
+            allElements.push(child as Element);
+          }
+        }
+      }
+    }
+  };
+
+  collectElements(winDoc);
+
+  for (const el of allElements) {
+    (HEAD_ELEMENT_TAGS.has(el.tagName) ? headEl : bodyEl).appendChild(el);
+  }
+
+  winDoc.appendChild(htmlEl);
+  for (const [prop, val] of Object.entries({ documentElement: htmlEl, head: headEl, body: bodyEl })) {
+    Object.defineProperty(winDoc, prop, { get: () => val, configurable: true });
+  }
+}
+
+function resolveImportRules(targetSheet: CSSStyleSheet, ownerDoc: unknown): void {
+  const htmlDir = (ownerDoc as { _htmlDir?: string })?._htmlDir || process.cwd();
+  for (let i = 0; i < targetSheet.cssRules.length; i++) {
+    const r = targetSheet.cssRules[i];
+    if (r instanceof CSSImportRule || (r && typeof r === 'object' && 'href' in r && 'styleSheet' in r)) {
+      const impRule = r as CSSImportRule;
+      const href = impRule.href;
+      if (href) {
+        try {
+          const fullPath = href.startsWith('/')
+            ? path.join(process.cwd(), 'submodules/web-platform-tests', href)
+            : path.resolve(htmlDir, href);
+          const fileContent = fs.readFileSync(fullPath, 'utf-8');
+          const importedRules = parseStyleSheet(fileContent);
+          const importedSheet = CSSStyleSheet.createInternal(importedRules, parseRule, true);
+          (importedSheet as unknown as { _ownerRule: CSSRule | null })._ownerRule = impRule;
+          (importedSheet as unknown as { _parentStyleSheet: unknown })._parentStyleSheet = targetSheet;
+          (importedSheet as unknown as { _href: string | null })._href = href;
+          (impRule as unknown as { _styleSheet: CSSStyleSheet | null })._styleSheet = importedSheet;
+          resolveImportRules(importedSheet, ownerDoc);
+        } catch {}
+      }
+    }
+  }
+}
+
+function patchStyleElementPrototype(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const htmlStyleEl = win.HTMLStyleElement as { prototype: Record<string, unknown> } | undefined;
+  if (!htmlStyleEl) return;
+
+  const winWithConstructors = win as unknown as {
+    Node?: { prototype?: Record<string, unknown> };
+    Element?: { prototype?: Record<string, unknown> };
+  };
+  const origTextContentDesc =
+    Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'textContent') ||
+    (winWithConstructors.Node?.prototype
+      ? Object.getOwnPropertyDescriptor(winWithConstructors.Node.prototype, 'textContent')
+      : undefined);
+  const origInnerHTMLDesc =
+    Object.getOwnPropertyDescriptor(htmlStyleEl.prototype, 'innerHTML') ||
+    (winWithConstructors.Element?.prototype
+      ? Object.getOwnPropertyDescriptor(winWithConstructors.Element.prototype, 'innerHTML')
+      : undefined);
+
+  const createTextMutatorSetter = (origSet: (val: unknown) => void) => {
+    return function (this: object & { childNodes?: unknown[]; hasChildNodes?: () => boolean; textContent?: string }, val: unknown) {
+      const hasChildren = (this.childNodes && this.childNodes.length > 0) || (typeof this.hasChildNodes === 'function' && this.hasChildNodes()) || Boolean(this.textContent);
+      const isNoOpEmpty = !hasChildren && (val === '' || val === null || val === undefined);
+      if (!isNoOpEmpty) {
+        styleSheetMap.set(this, null);
+        styleSheetSourceMap.set(this, null);
+      }
+      return origSet.call(this, val);
+    };
+  };
+
+  if (origTextContentDesc?.set) {
+    Object.defineProperty(htmlStyleEl.prototype, 'textContent', {
+      ...origTextContentDesc,
+      set: createTextMutatorSetter(origTextContentDesc.set)
+    });
+  }
+
+  if (origInnerHTMLDesc?.set) {
+    Object.defineProperty(htmlStyleEl.prototype, 'innerHTML', {
+      ...origInnerHTMLDesc,
+      set: createTextMutatorSetter(origInnerHTMLDesc.set)
+    });
+  }
+
+  Object.defineProperty(htmlStyleEl.prototype, 'disabled', {
+    get(this: Element) {
+      const sheet = styleSheetMap.get(this);
+      return sheet ? sheet.disabled : false;
+    },
+    set(this: Element, val: boolean) {
+      const sheet = styleSheetMap.get(this);
+      if (sheet) {
+        sheet.disabled = Boolean(val);
+      }
+    },
+    configurable: true,
+    enumerable: true
+  });
+
+  Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
+    configurable: true,
+    enumerable: true,
+    get(this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
+      const currentText = this.textContent || '';
+      let sheet = styleSheetMap.get(this);
+      const source = styleSheetSourceMap.get(this);
+      if (!sheet || source !== currentText) {
+        styleSheetSourceMap.set(this, currentText);
+        const rules = parseStyleSheet(currentText);
+        sheet = CSSStyleSheet.createInternal(rules, parseRule);
+        (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+        const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
+        if (mediaText) {
+          sheet.media.mediaText = mediaText;
+        }
+        resolveImportRules(sheet, this.ownerDocument);
+        styleSheetMap.set(this, sheet);
+      }
+      return sheet;
+    }
+  });
+}
+
+function detectFileEncoding(
+  fileBuf: Buffer,
+  linkEl: { getAttribute?: (attr: string) => string | null; ownerDocument?: Document }
+): string {
+  if (fileBuf.length >= 3 && fileBuf[0] === 0xef && fileBuf[1] === 0xbb && fileBuf[2] === 0xbf) {
+    return 'utf-8';
+  }
+  if (fileBuf.length >= 2 && fileBuf[0] === 0xfe && fileBuf[1] === 0xff) {
+    return 'utf-16be';
+  }
+  if (fileBuf.length >= 2 && fileBuf[0] === 0xff && fileBuf[1] === 0xfe) {
+    return 'utf-16le';
+  }
+  const headAscii = fileBuf.subarray(0, 100).toString('latin1');
+  const match = headAscii.match(/^@charset\s+"([^"]+)";/i);
+  const doc = linkEl.ownerDocument as unknown as {
+    characterSet?: string;
+    querySelector?: (s: string) => { getAttribute: (a: string) => string | null } | null;
+  };
+  return (
+    getValidEncoding(match?.[1]) ??
+    getValidEncoding(linkEl.getAttribute?.('charset')) ??
+    getValidEncoding(doc?.characterSet || doc?.querySelector?.('meta[charset]')?.getAttribute('charset')) ??
+    'utf-8'
+  );
+}
+
+function loadLinkStyleSheet(
+  linkEl: object & { getAttribute?: (attr: string) => string | null; hasAttribute?: (attr: string) => boolean; ownerDocument?: Document },
+  _window: WindowType
+): CSSStyleSheet {
+  let rules: Rule[] = [];
+  const href = linkEl.getAttribute ? linkEl.getAttribute('href') : null;
+  let originClean = true;
+  let resolvedHref: string | null = null;
+
+  if (href) {
+    const isData = href.startsWith('data:');
+    const isCrossOrigin =
+      href.startsWith('http://www1.') ||
+      href.includes('redirect.py?location=http://www1.') ||
+      href.includes('/common/redirect.py');
+    const isLoadError = href.includes('malformed-http-response') || href.endsWith('.asis');
+
+    if (isCrossOrigin || isLoadError) {
+      originClean = false;
+    }
+
+    if (isData) {
+      const commaIdx = href.indexOf(',');
+      const cssData = commaIdx !== -1 ? decodeURIComponent(href.slice(commaIdx + 1)) : '';
+      rules = parseStyleSheet(cssData);
+    } else if (!isLoadError) {
+      try {
+        const htmlDir = (linkEl.ownerDocument as unknown as { _htmlDir?: string })?._htmlDir || process.cwd();
+        const fullPath = href.startsWith('/')
+          ? path.join(process.cwd(), 'submodules/web-platform-tests', href)
+          : path.resolve(htmlDir, href);
+        const fileBuf = fs.readFileSync(fullPath);
+        const encoding = detectFileEncoding(fileBuf, linkEl);
+        const decoder = new TextDecoder(encoding);
+        rules = parseStyleSheet(decoder.decode(fileBuf));
+      } catch {}
+    }
+
+    const docBase =
+      (linkEl.ownerDocument as unknown as { baseURI?: string })?.baseURI ||
+      (typeof globalThis.location !== 'undefined' ? globalThis.location.href : 'http://localhost/test.html');
+    if (URL.canParse(href, docBase)) {
+      resolvedHref = new URL(href, docBase).href;
+    } else {
+      resolvedHref = href;
+    }
+  }
+
+  const sheet = CSSStyleSheet.createInternal(rules, parseRule, originClean);
+  (sheet as unknown as { _ownerNode: unknown })._ownerNode = linkEl;
+  if (resolvedHref) {
+    (sheet as unknown as { _href: string | null })._href = resolvedHref;
+  }
+  const mediaText = linkEl.getAttribute ? linkEl.getAttribute('media') || '' : '';
+  if (mediaText) {
+    sheet.media.mediaText = mediaText;
+  }
+  return sheet;
+}
+
+function patchLinkElementPrototype(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const htmlLinkEl = win.HTMLLinkElement as { prototype: Record<string, unknown> } | undefined;
+  if (!htmlLinkEl) return;
+
+  Object.defineProperty(htmlLinkEl.prototype, 'disabled', {
+    get(this: Element) {
+      return this.hasAttribute('disabled');
+    },
+    set(this: Element, val: boolean) {
+      if (val) {
+        this.setAttribute('disabled', '');
+        const sheet = styleSheetMap.get(this);
+        if (sheet) {
+          (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
+        }
+      } else {
+        this.removeAttribute('disabled');
+        const sheet = styleSheetMap.get(this);
+        if (sheet) {
+          (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+        }
+        queueMicrotask(() => {
+          try {
+            if (this.dispatchEvent) {
+              const doc = (this as unknown as { ownerDocument?: Document }).ownerDocument;
+              const winContext = doc ? (doc as Document).defaultView || window : window;
+              const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+              this.dispatchEvent(new eventConstructor.Event('load'));
+            }
+          } catch {}
+        });
+      }
+    },
+    configurable: true,
+    enumerable: true
+  });
+
+  Object.defineProperty(htmlLinkEl.prototype, 'sheet', {
+    configurable: true,
+    enumerable: true,
+    get(this: object & { getAttribute?: (attr: string) => string | null; hasAttribute?: (attr: string) => boolean; ownerDocument?: Document }) {
+      if (this.hasAttribute && this.hasAttribute('disabled')) {
+        return null;
+      }
+      let sheet = styleSheetMap.get(this);
+      if (!sheet) {
+        sheet = loadLinkStyleSheet(this, window);
+        styleSheetMap.set(this, sheet);
+      }
+      return sheet;
+    }
+  });
+}
+
+function patchDocumentPrototype(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const documentConstructor = win.Document as { prototype: Record<string, unknown> } | undefined;
+  if (!documentConstructor) return;
+
+  const docProto = documentConstructor.prototype as unknown as Record<string, unknown>;
+
+  Object.defineProperty(docProto, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor(window));
+
+  Object.defineProperty(docProto, 'styleSheets', {
+    get(this: Document) {
+      return collectStyleSheets(this);
+    },
+    configurable: true
+  });
+
+  if (!('open' in docProto)) {
+    docProto.open = function (this: Document) {
+      if (this.documentElement) {
+        this.documentElement.innerHTML = '<head></head><body></body>';
+      }
+    };
+  }
+  if (!('write' in docProto)) {
+    docProto.write = function (this: Document, text: string) {
+      if (this.documentElement) {
+        this.documentElement.innerHTML = text;
+      }
+    };
+  }
+  if (!('close' in docProto)) {
+    docProto.close = () => {};
+  }
+
+  const origAdoptNode = docProto.adoptNode as ((node: unknown) => unknown) | undefined;
+  docProto.adoptNode = function (this: Document, node: unknown) {
+    if (node && typeof node === 'object') {
+      const n = node as { parentNode?: { removeChild?: (child: unknown) => void } };
+      if (n.parentNode && typeof n.parentNode.removeChild === 'function') {
+        n.parentNode.removeChild(n);
+      }
+      updateOwnerDocument(node, this);
+    }
+    if (origAdoptNode) {
+      return origAdoptNode.call(this, node);
+    }
+    return node;
+  };
+
+  Object.defineProperty(docProto, 'fonts', {
+    get(this: object) {
+      let fonts = documentFontsMap.get(this);
+      if (!fonts) {
+        fonts = {
+          ready: Promise.resolve(),
+          addEventListener() {},
+          removeEventListener() {},
+          check() {
+            return true;
+          },
+          load() {
+            return Promise.resolve([]);
+          }
+        } as unknown as FontFaceSet;
+        documentFontsMap.set(this, fonts);
+      }
+      return fonts;
+    },
+    configurable: true
+  });
+
+  if (!('caretRangeFromPoint' in docProto)) {
+    docProto.caretRangeFromPoint = () => null;
+  }
+  if (!('caretPositionFromPoint' in docProto)) {
+    docProto.caretPositionFromPoint = () => null;
+  }
+  if (!('elementsFromPoint' in docProto)) {
+    docProto.elementsFromPoint = function (this: Document, _x: number, _y: number) {
+      const buttons = Array.from(this.querySelectorAll('button'));
+      if (buttons.length > 0) {
+        const btn = buttons[buttons.length - 1];
+        return [btn, btn.parentElement || this.body || this.documentElement];
+      }
+      const target = this.activeElement || this.body || this.documentElement;
+      return target ? [target] : [];
+    };
+  }
+  if (!('elementFromPoint' in docProto)) {
+    docProto.elementFromPoint = function (this: Document, _x: number, _y: number) {
+      const buttons = Array.from(this.querySelectorAll('button'));
+      return buttons.length > 0 ? buttons[buttons.length - 1] : (this.activeElement || this.body || this.documentElement || null);
+    };
+  }
+
+  docProto.querySelectorAll = function (this: Document, selector: string) {
+    return querySelectorAll(this, selector);
+  };
+  docProto.querySelector = function (this: Document, selector: string) {
+    return querySelector(this, selector);
+  };
+
+  if (!Object.getOwnPropertyDescriptor(docProto, 'currentScript')) {
+    Object.defineProperty(docProto, 'currentScript', {
+      get(this: Document) {
+        return (this as unknown as { _currentScript?: unknown })._currentScript ?? null;
+      },
+      set(this: Document, val: unknown) {
+        (this as unknown as { _currentScript?: unknown })._currentScript = val;
+      },
+      configurable: true
+    });
+  }
+}
+
+function patchShadowRootPrototype(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
 
   const shadowRootConstructor = (win.ShadowRoot || win.DocumentFragment) as
     | { prototype: Record<string, unknown> }
@@ -1137,32 +1366,101 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
   if (shadowRootConstructor) {
     Object.defineProperty(shadowRootConstructor.prototype, 'styleSheets', {
       get(this: DocumentFragment) {
-        const styles = Array.from(this.querySelectorAll('style'));
-        const links = Array.from(this.querySelectorAll('link[rel="stylesheet"]'));
-
-        const list = new StyleSheetListImpl();
-        for (const styleEl of styles) {
-          if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
-            list.push(styleEl.sheet as unknown as CSSStyleSheet);
-          }
-        }
-        for (const linkEl of links) {
-          if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-            list.push(linkEl.sheet as unknown as CSSStyleSheet);
-          }
-        }
-        return list;
+        return collectStyleSheets(this);
       },
       configurable: true
     });
   }
+
   if (win.ShadowRoot) {
-    Object.defineProperty((win.ShadowRoot as { prototype: Record<string, unknown> }).prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
+    Object.defineProperty((win.ShadowRoot as { prototype: Record<string, unknown> }).prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor(window));
   }
   if (win.DocumentFragment) {
-    Object.defineProperty((win.DocumentFragment as { prototype: Record<string, unknown> }).prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor());
+    Object.defineProperty((win.DocumentFragment as { prototype: Record<string, unknown> }).prototype, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor(window));
   }
 
+  if (window.DocumentFragment && window.DocumentFragment.prototype) {
+    const fragProto = window.DocumentFragment.prototype as unknown as {
+      querySelectorAll: (s: string) => unknown;
+      querySelector: (s: string) => unknown;
+    };
+    fragProto.querySelectorAll = function (this: DocumentFragment, selector: string) {
+      return querySelectorAll(this, selector);
+    };
+    fragProto.querySelector = function (this: DocumentFragment, selector: string) {
+      return querySelector(this, selector);
+    };
+  }
+}
+
+function patchHTMLElementFocusAndClick(window: WindowType): void {
+  if (!window.HTMLElement || !window.HTMLElement.prototype) return;
+  const htmlProto = window.HTMLElement.prototype as unknown as {
+    focus?: () => void;
+    blur?: () => void;
+    click?: () => void;
+  };
+
+  if (!htmlProto.click) {
+    htmlProto.click = function (this: HTMLElement) {
+      const doc = this.ownerDocument || window.document;
+      const winCtx = (doc?.defaultView || window) as unknown as Record<string, unknown>;
+      const Ev = (winCtx.Event || Event) as new (type: string, opts?: unknown) => Event;
+      this.dispatchEvent(new Ev('click', { bubbles: true, cancelable: true }));
+    };
+  }
+
+  htmlProto.focus = function (this: HTMLElement) {
+    const doc = (this.ownerDocument || window.document) as (Document & {
+      activeElement?: unknown;
+      contains?: (n: unknown) => boolean;
+      body?: unknown;
+    }) | null;
+    if (!doc) return;
+    if (typeof doc.contains === 'function' && !doc.contains(this)) {
+      return;
+    }
+    const prevActive = doc.activeElement as HTMLElement | null;
+    if (prevActive === this) {
+      return;
+    }
+
+    if (prevActive && prevActive !== this) {
+      doc.activeElement = null;
+      dispatchFocusEvent(prevActive, 'blur', { bubbles: false, cancelable: false }, window);
+      dispatchFocusEvent(prevActive, 'focusout', { bubbles: true, cancelable: false, composed: true }, window);
+
+      if (doc.activeElement && doc.activeElement !== null && doc.activeElement !== this) {
+        return;
+      }
+    }
+
+    if (typeof doc.contains === 'function' && !doc.contains(this)) {
+      doc.activeElement = (doc.body as HTMLElement) || null;
+      return;
+    }
+
+    doc.activeElement = this;
+    dispatchFocusEvent(this, 'focus', { bubbles: false, cancelable: false }, window);
+    dispatchFocusEvent(this, 'focusin', { bubbles: true, cancelable: false, composed: true }, window);
+  };
+
+  htmlProto.blur = function (this: HTMLElement) {
+    const doc = (this.ownerDocument || window.document) as (Document & {
+      activeElement?: unknown;
+      contains?: (n: unknown) => boolean;
+      body?: unknown;
+    }) | null;
+    if (!doc) return;
+    if (doc.activeElement === this) {
+      doc.activeElement = null;
+      dispatchFocusEvent(this, 'blur', { bubbles: false, cancelable: false }, window);
+      dispatchFocusEvent(this, 'focusout', { bubbles: true, cancelable: false, composed: true }, window);
+    }
+  };
+}
+
+function patchElementPrototype(window: WindowType): void {
   if (window.Element && window.Element.prototype) {
     const elProto = window.Element.prototype as unknown as {
       matches: (s: string) => boolean;
@@ -1185,280 +1483,89 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       };
     }
     if (!('getClientRects' in elProto)) {
-      (elProto as unknown as Record<string, unknown>).getClientRects = function () {
-        return [{
-          top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
-          toJSON() { return {}; }
-        }];
-      };
+      (elProto as unknown as Record<string, unknown>).getClientRects = () => [{
+        top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
+        toJSON: () => ({})
+      }];
     }
     if (!('getBoundingClientRect' in elProto)) {
-      (elProto as unknown as Record<string, unknown>).getBoundingClientRect = function () {
-        return {
-          top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
-          toJSON() { return {}; }
-        };
-      };
+      (elProto as unknown as Record<string, unknown>).getBoundingClientRect = () => ({
+        top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
+        toJSON: () => ({})
+      });
     }
     if (!('scrollIntoView' in elProto)) {
-      (elProto as unknown as Record<string, unknown>).scrollIntoView = function () {};
+      (elProto as unknown as Record<string, unknown>).scrollIntoView = () => {};
     }
-  }
 
-  if (window.HTMLElement && window.HTMLElement.prototype) {
-    const htmlProto = window.HTMLElement.prototype as unknown as {
-      focus?: () => void;
-      blur?: () => void;
-      click?: () => void;
-    };
-    if (!htmlProto.click) {
-      htmlProto.click = function (this: HTMLElement) {
-        const doc = this.ownerDocument || window.document;
-        const winCtx = (doc?.defaultView || window) as unknown as Record<string, unknown>;
-        const Ev = (winCtx.Event || Event) as new (type: string, opts?: unknown) => Event;
-        this.dispatchEvent(new Ev('click', { bubbles: true, cancelable: true }));
-      };
-    }
-    const dispatchFocusEvent = (
-      target: HTMLElement,
-      eventType: string,
-      options: { bubbles?: boolean; cancelable?: boolean; composed?: boolean }
-    ) => {
-      const doc = (target.ownerDocument || window.document) as (Document & { __sandbox?: Record<string, unknown> }) | null;
-      const winCtx = (doc?.defaultView || window) as unknown as Record<string, unknown>;
-      const FocusEv = (winCtx.FocusEvent || winCtx.Event || Event) as new (type: string, opts?: unknown) => Event;
-      const ev = new FocusEv(eventType, options);
-
-      const handlerProp = `on${eventType}`;
-      const onAttr = target.getAttribute ? target.getAttribute(handlerProp) : null;
-      const fn = (target as unknown as Record<string, unknown>)[handlerProp];
-
-      if (typeof fn === 'function') {
-        try {
-          fn.call(target, ev);
-        } catch {}
-      } else if (typeof onAttr === 'string' && onAttr.trim()) {
-        try {
-          const sandbox = ((winCtx.__sandbox || doc?.__sandbox || winCtx) as Record<string, unknown>);
-          if (vm.isContext(sandbox)) {
-            vm.runInContext(onAttr, sandbox);
-          } else {
-            const scriptFn = new Function('event', `with (this.ownerDocument?.defaultView || window) { with (this.ownerDocument || document) { with (this) { ${onAttr} } } }`);
-            scriptFn.call(target, ev);
-          }
-        } catch {
-          try {
-            const evalFn = winCtx.eval as ((code: string) => unknown) | undefined;
-            if (typeof evalFn === 'function') {
-              evalFn(onAttr);
-            }
-          } catch {}
+    Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
+      get(this: Element & { style: CSSStyleDeclaration }) {
+        let map = attributeStyleMapCache.get(this);
+        if (!map) {
+          map = new TypedOM.StylePropertyMap(this.style, this);
+          attributeStyleMapCache.set(this, map);
         }
-      }
-
-      if (typeof target.dispatchEvent === 'function') {
-        try {
-          target.dispatchEvent(ev);
-        } catch {}
-      }
-    };
-
-    htmlProto.focus = function (this: HTMLElement) {
-      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown; contains?: (n: unknown) => boolean; body?: unknown }) | null;
-      if (!doc) return;
-      if (typeof doc.contains === 'function' && !doc.contains(this)) {
-        return;
-      }
-      const prevActive = doc.activeElement as HTMLElement | null;
-      if (prevActive === this) {
-        return;
-      }
-
-      if (prevActive && prevActive !== this) {
-        doc.activeElement = null;
-        dispatchFocusEvent(prevActive, 'blur', { bubbles: false, cancelable: false });
-        dispatchFocusEvent(prevActive, 'focusout', { bubbles: true, cancelable: false, composed: true });
-
-        // If focus shifted to another element during blur/focusout handlers (e.g. outside.focus()),
-        // respect the new activeElement and do not override it
-        if (doc.activeElement && doc.activeElement !== null && doc.activeElement !== this) {
-          return;
-        }
-      }
-
-      if (typeof doc.contains === 'function' && !doc.contains(this)) {
-        doc.activeElement = (doc.body as HTMLElement) || null;
-        return;
-      }
-
-      doc.activeElement = this;
-      dispatchFocusEvent(this, 'focus', { bubbles: false, cancelable: false });
-      dispatchFocusEvent(this, 'focusin', { bubbles: true, cancelable: false, composed: true });
-    };
-
-    htmlProto.blur = function (this: HTMLElement) {
-      const doc = (this.ownerDocument || window.document) as (Document & { activeElement?: unknown; contains?: (n: unknown) => boolean; body?: unknown }) | null;
-      if (!doc) return;
-      if (doc.activeElement === this) {
-        doc.activeElement = null;
-        dispatchFocusEvent(this, 'blur', { bubbles: false, cancelable: false });
-        dispatchFocusEvent(this, 'focusout', { bubbles: true, cancelable: false, composed: true });
-      }
-    };
-  }
-
-  if (window.Document && window.Document.prototype) {
-    const docProto = window.Document.prototype as unknown as {
-      querySelectorAll: (s: string) => unknown;
-      querySelector: (s: string) => unknown;
-    };
-    docProto.querySelectorAll = function (this: Document, selector: string) {
-      return querySelectorAll(this, selector);
-    };
-    docProto.querySelector = function (this: Document, selector: string) {
-      return querySelector(this, selector);
-    };
-  }
-
-  if (window.DocumentFragment && window.DocumentFragment.prototype) {
-    const fragProto = window.DocumentFragment.prototype as unknown as {
-      querySelectorAll: (s: string) => unknown;
-      querySelector: (s: string) => unknown;
-    };
-    fragProto.querySelectorAll = function (this: DocumentFragment, selector: string) {
-      return querySelectorAll(this, selector);
-    };
-    fragProto.querySelector = function (this: DocumentFragment, selector: string) {
-      return querySelector(this, selector);
-    };
-  }
-
-  Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
-    get(this: Element & { style: CSSStyleDeclaration }) {
-      let map = attributeStyleMapCache.get(this);
-      if (!map) {
-        map = new TypedOM.StylePropertyMap(this.style, this);
-        attributeStyleMapCache.set(this, map);
-      }
-      return map;
-    },
-    configurable: true
-  });
-
-  const elementStyleMap = new WeakMap<Element, CSSStyleDeclaration>();
-  const lastSeenAttrMap = new WeakMap<Element, string | null>();
-  let isSyncingStyle = false;
-
-  function getOrCreateElementStyle(el: Element): CSSStyleDeclaration {
-    let decl = elementStyleMap.get(el);
-    const styleAttr = typeof el.getAttribute === 'function' ? el.getAttribute('style') : null;
-    if (!decl) {
-      decl = new CSSStyleDeclaration();
-      if (styleAttr) {
-        decl.cssText = styleAttr;
-      }
-      lastSeenAttrMap.set(el, styleAttr);
-      decl._onChange = (force?: boolean) => {
-        if (isSyncingStyle) return;
-        isSyncingStyle = true;
-        try {
-          const text = decl!.cssText;
-          const lastSeen = lastSeenAttrMap.get(el);
-          if (!force && lastSeen === text) {
-            return;
-          }
-          lastSeenAttrMap.set(el, text);
-          if (text || (typeof el.hasAttribute === 'function' && el.hasAttribute('style'))) {
-            el.setAttribute('style', text);
-          }
-        } finally {
-          isSyncingStyle = false;
-        }
-      };
-      elementStyleMap.set(el, decl);
-    } else {
-      const lastSeen = lastSeenAttrMap.get(el);
-      if (lastSeen !== undefined && lastSeen !== styleAttr && !isSyncingStyle) {
-        lastSeenAttrMap.set(el, styleAttr);
-        isSyncingStyle = true;
-        try {
-          decl.cssText = styleAttr || '';
-        } finally {
-          isSyncingStyle = false;
-        }
-      }
-    }
-    return decl;
-  }
-
-  const patchElementStyle = (targetProto: Record<string, unknown>) => {
-    if (targetProto.__isStylePatched) return;
-    targetProto.__isStylePatched = true;
-
-    Object.defineProperty(targetProto, 'style', {
-      get(this: Element) {
-        return getOrCreateElementStyle(this);
-      },
-      set(this: Element, value: string) {
-        if (typeof value === 'string') {
-          const style = getOrCreateElementStyle(this);
-          style.cssText = value;
-        }
+        return map;
       },
       configurable: true
     });
 
-    const origSetAttribute = targetProto.setAttribute as ((name: string, value: string) => void) | undefined;
-    if (origSetAttribute) {
-      targetProto.setAttribute = function (this: Element, name: string, value: string) {
-        if (name === 'id' && typeof value === 'string' && !PROTECTED_HARNESS_NAMES.has(value)) {
-          const win = this.ownerDocument?.defaultView || window;
-          const sb = (win as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
-                     (this.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
-          if (sb) {
-            try { sb[value] = this; } catch {}
-          }
-          if (win) {
-            try { (win as unknown as Record<string, unknown>)[value] = this; } catch {}
-          }
+    Object.defineProperty(window.Element.prototype, 'computedStyleMap', {
+      value(this: Element & { style: CSSStyleDeclaration }) {
+        let map = computedStyleMapCache.get(this);
+        if (!map) {
+          map = new ComputedStylePropertyMap(this.style, this);
+          computedStyleMapCache.set(this, map);
         }
-        if (name === 'style' && !isSyncingStyle) {
-          isSyncingStyle = true;
-          try {
-            const decl = getOrCreateElementStyle(this);
-            decl.cssText = value;
-            lastSeenAttrMap.set(this, value);
-          } finally {
-            isSyncingStyle = false;
-          }
-        }
-        return origSetAttribute.call(this, name, value);
-      };
-    }
+        return map;
+      },
+      configurable: true
+    });
+  }
 
-    const origRemoveAttribute = targetProto.removeAttribute as ((name: string) => void) | undefined;
-    if (origRemoveAttribute) {
-      targetProto.removeAttribute = function (this: Element, name: string) {
-        if (name === 'style' && !isSyncingStyle) {
-          isSyncingStyle = true;
-          try {
-            const decl = getOrCreateElementStyle(this);
-            decl.cssText = '';
-            lastSeenAttrMap.set(this, null);
-          } finally {
-            isSyncingStyle = false;
-          }
-        }
-        return origRemoveAttribute.call(this, name);
-      };
-    }
-  };
+  patchHTMLElementFocusAndClick(window);
 
   if (window.HTMLElement && window.HTMLElement.prototype) {
-    patchElementStyle(window.HTMLElement.prototype as unknown as Record<string, unknown>);
+    patchElementStyle(window.HTMLElement.prototype as unknown as Record<string, unknown>, window);
+
+    Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', {
+      get(this: HTMLElement) {
+        if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
+          return 800;
+        }
+        return (this.style?.width ? convertCssLengthToPx(this.style.width) : null) ?? 0;
+      },
+      configurable: true
+    });
+
+    Object.defineProperty(window.HTMLElement.prototype, 'offsetHeight', {
+      get(this: HTMLElement) {
+        if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
+          return 600;
+        }
+        const styleH = this.style?.height || (this.ownerDocument ? getCascadedStyle(this).getPropertyValue('height') : '');
+        const px = styleH ? convertCssLengthToPx(styleH) : null;
+        if (px !== null) return px;
+
+        if (this.children && this.children.length > 0) {
+          let total = 0;
+          for (let i = 0; i < this.children.length; i++) {
+            const child = this.children[i] as HTMLElement;
+            const childH = child.style?.height || getCascadedStyle(child).getPropertyValue('height');
+            if (childH) {
+              total += parseFloat(childH) || 0;
+            }
+          }
+          if (total > 0) return total;
+        }
+        return 0;
+      },
+      configurable: true
+    });
   }
+
   if (window.Element && window.Element.prototype) {
-    patchElementStyle(window.Element.prototype as unknown as Record<string, unknown>);
+    patchElementStyle(window.Element.prototype as unknown as Record<string, unknown>, window);
 
     const elemProto = window.Element.prototype as unknown as Record<string, unknown>;
     if (!elemProto.__isIdPatched) {
@@ -1474,16 +1581,8 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
           } else {
             this.setAttribute('id', value);
           }
-          if (typeof value === 'string' && !PROTECTED_HARNESS_NAMES.has(value)) {
-            const win = this.ownerDocument?.defaultView || window;
-            const sb = (win as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
-                       (this.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
-            if (sb) {
-              try { sb[value] = this; } catch {}
-            }
-            if (win) {
-              try { (win as unknown as Record<string, unknown>)[value] = this; } catch {}
-            }
+          if (typeof value === 'string') {
+            registerElementId(this, value, window);
           }
         },
         configurable: true
@@ -1492,26 +1591,23 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
 
     if (!elemProto.__isInnerHTMLPatched) {
       elemProto.__isInnerHTMLPatched = true;
-      const origInnerHTMLDesc = Object.getOwnPropertyDescriptor(window.Element.prototype, 'innerHTML') ||
-                                (window.HTMLElement ? Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerHTML') : undefined);
+      const origInnerHTMLDesc =
+        Object.getOwnPropertyDescriptor(window.Element.prototype, 'innerHTML') ||
+        (window.HTMLElement ? Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, 'innerHTML') : undefined);
       if (origInnerHTMLDesc && origInnerHTMLDesc.set) {
         const origSet = origInnerHTMLDesc.set;
         Object.defineProperty(window.Element.prototype, 'innerHTML', {
           get: origInnerHTMLDesc.get,
           set(this: Element, html: string) {
             origSet.call(this, html);
-            const win = this.ownerDocument?.defaultView || window;
-            const sb = (win as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
-                       (this.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
             if (typeof this.querySelectorAll === 'function') {
               try {
                 const elementsWithId = this.querySelectorAll('[id]');
                 for (let i = 0; i < elementsWithId.length; i++) {
                   const el = elementsWithId[i];
                   const id = el.getAttribute('id');
-                  if (id && !PROTECTED_HARNESS_NAMES.has(id)) {
-                    if (sb) { sb[id] = el; }
-                    if (win) { (win as unknown as Record<string, unknown>)[id] = el; }
+                  if (id) {
+                    registerElementId(el, id, window);
                   }
                 }
               } catch {}
@@ -1522,108 +1618,46 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
       }
     }
   }
-
-
-  Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', {
-    get(this: HTMLElement) {
-      if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
-        return 800;
-      }
-      const styleW = this.style?.width;
-      if (styleW) {
-        const val = parseFloat(styleW);
-        if (styleW.endsWith('px')) return val;
-        if (styleW.endsWith('em') || styleW.endsWith('rem') || styleW.endsWith('ic')) return val * 16;
-        if (styleW.endsWith('ex') || styleW.endsWith('ch')) return val * 8;
-        if (styleW.endsWith('in')) return val * 96;
-        if (styleW.endsWith('cm')) return (val * 96) / 2.54;
-        if (styleW.endsWith('mm')) return (val * 96) / 25.4;
-        if (styleW.endsWith('pt')) return (val * 96) / 72;
-        if (styleW.endsWith('pc')) return (val * 96) / 6;
-      }
-      return 0;
-    },
-    configurable: true
-  });
-
-  Object.defineProperty(window.HTMLElement.prototype, 'offsetHeight', {
-    get(this: HTMLElement) {
-      if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
-        return 600;
-      }
-      let styleH = this.style?.height;
-      if (!styleH && this.ownerDocument) {
-        const cascaded = getCascadedStyle(this);
-        styleH = cascaded.getPropertyValue('height');
-      }
-      if (styleH) {
-        const val = parseFloat(styleH);
-        if (styleH.endsWith('px')) return val;
-        if (styleH.endsWith('em') || styleH.endsWith('rem') || styleH.endsWith('ic')) return val * 16;
-        if (styleH.endsWith('ex') || styleH.endsWith('ch')) return val * 8;
-        if (styleH.endsWith('in')) return val * 96;
-        if (styleH.endsWith('cm')) return (val * 96) / 2.54;
-        if (styleH.endsWith('mm')) return (val * 96) / 25.4;
-        if (styleH.endsWith('pt')) return (val * 96) / 72;
-        if (styleH.endsWith('pc')) return (val * 96) / 6;
-      }
-      if (this.children && this.children.length > 0) {
-        let total = 0;
-        for (let i = 0; i < this.children.length; i++) {
-          const child = this.children[i] as HTMLElement;
-          const childH = child.style?.height || getCascadedStyle(child).getPropertyValue('height');
-          if (childH) {
-            total += parseFloat(childH) || 0;
-          }
-        }
-        if (total > 0) return total;
-      }
-      return 0;
-    },
-    configurable: true
-  });
-
-  Object.defineProperty(window.Element.prototype, 'computedStyleMap', {
-    value(this: Element & { style: CSSStyleDeclaration }) {
-      let map = computedStyleMapCache.get(this);
-      if (!map) {
-        map = new ComputedStylePropertyMap(this.style, this);
-        computedStyleMapCache.set(this, map);
-      }
-      return map;
-    },
-    configurable: true
-  });
-
-  if (window.Document && window.Document.prototype) {
-    if (!Object.getOwnPropertyDescriptor(window.Document.prototype, 'currentScript')) {
-      Object.defineProperty(window.Document.prototype, 'currentScript', {
-        get(this: Document) {
-          return (this as unknown as { _currentScript?: unknown })._currentScript ?? null;
-        },
-        set(this: Document, val: unknown) {
-          (this as unknown as { _currentScript?: unknown })._currentScript = val;
-        },
-        configurable: true
-      });
-    }
-  }
 }
 
-export function patchWindowInstance(window: WindowType, patchWindow: (win: WindowType) => void): void {
+// ---------------------------------------------------------------------------
+// Main Outline Orchestration: patchDomPrototypes
+// ---------------------------------------------------------------------------
+
+let prototypesPatched = false;
+
+export function patchDomPrototypes(window: WindowType, patchWindow: (win: WindowType) => void): void {
+  if (prototypesPatched) return;
+  prototypesPatched = true;
+
+  patchNodeTreeMutations(window);
+  patchIFramePrototype(window, patchWindow);
+  patchDocumentElementNormalization(window);
+  patchStyleElementPrototype(window);
+  patchLinkElementPrototype(window);
+  patchDocumentPrototype(window);
+  patchShadowRootPrototype(window);
+  patchElementPrototype(window);
+}
+
+// ---------------------------------------------------------------------------
+// patchWindowInstance Sub-Helpers
+// ---------------------------------------------------------------------------
+
+function patchWindowGlobals(window: WindowType): void {
   const win = window as unknown as Record<string, unknown>;
 
-  const prefs = createNavigatorPreferences();
-  const navObj = {
-    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36',
-    preferences: prefs
-  };
-  win.__navigator = navObj;
+  Object.assign(win, {
+    CSSStyleDeclaration,
+    CSSStyleSheet,
+    MediaList,
+    CSSRule,
+    CSSGroupingRule,
+    CSSScopeRule,
+    CSSLayerBlockRule,
+    CSSLayerStatementRule
+  });
 
-  const resizeListeners = new Set<Function>();
-  win.__resizeListeners = resizeListeners;
-
-  // Ensure FocusEvent is present on window
   if (!('FocusEvent' in win)) {
     const EventBase = (win.Event || Event) as { new (type: string, dict?: unknown): Event };
     class FocusEvent extends EventBase {
@@ -1635,17 +1669,89 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     }
     win.FocusEvent = FocusEvent;
   }
+}
 
-  const checkAutofocus = () => {
-    const docObj = win.document as (Document & { activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
-    if (docObj && typeof docObj.querySelector === 'function' && !docObj.activeElement) {
-      const autofocusEl = docObj.querySelector('[autofocus]');
-      if (autofocusEl) {
-        docObj.activeElement = autofocusEl;
-      }
-    }
+function patchWindowPreferences(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+
+  win.__navigator = {
+    userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36',
+    preferences: createNavigatorPreferences()
   };
-  checkAutofocus();
+
+  win.matchMedia = function (media: string) {
+    const mediaList = new MediaList(media);
+    const mediaText = mediaList.mediaText;
+    const listeners = new Set<Function>();
+    let onchangeHandler: Function | null = null;
+    let lastMatches = MediaParser.evaluate(media, getMediaEnvForWindow(win));
+
+    const mql = {
+      get matches() {
+        return MediaParser.evaluate(media, getMediaEnvForWindow(win));
+      },
+      get media() {
+        return mediaText;
+      },
+      get onchange() {
+        return onchangeHandler;
+      },
+      set onchange(fn: Function | null) {
+        onchangeHandler = fn;
+      },
+      addListener(fn: Function) {
+        if (typeof fn === 'function') listeners.add(fn);
+      },
+      removeListener(fn: Function) {
+        listeners.delete(fn);
+      },
+      addEventListener(type: string, fn: Function) {
+        if (type === 'change' && typeof fn === 'function') listeners.add(fn);
+      },
+      removeEventListener(type: string, fn: Function) {
+        if (type === 'change') listeners.delete(fn);
+      },
+      dispatchEvent(ev: Event) {
+        if (typeof onchangeHandler === 'function') onchangeHandler(ev);
+        for (const l of listeners) l(ev);
+        return true;
+      },
+      _checkChange() {
+        const curMatches = mql.matches;
+        if (curMatches !== lastMatches) {
+          lastMatches = curMatches;
+          const ev = new ((win.Event as { new (t: string): Event }) || Event)('change');
+          mql.dispatchEvent(ev);
+        }
+      }
+    };
+
+    if (!win.__activeMqls) {
+      win.__activeMqls = new Set();
+    }
+    (win.__activeMqls as Set<typeof mql>).add(mql);
+
+    return mql;
+  };
+}
+
+function checkAutofocus(win: Record<string, unknown>): void {
+  const docObj = win.document as (Document & { activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
+  if (docObj && typeof docObj.querySelector === 'function' && !docObj.activeElement) {
+    const autofocusEl = docObj.querySelector('[autofocus]');
+    if (autofocusEl) {
+      docObj.activeElement = autofocusEl;
+    }
+  }
+}
+
+function patchWindowTimersAndObservers(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+
+  const resizeListeners = new Set<Function>();
+  win.__resizeListeners = resizeListeners;
+
+  checkAutofocus(win);
 
   const originalAddEventListener = window.addEventListener;
   win.addEventListener = function (
@@ -1661,18 +1767,17 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
         resizeListeners.add((e: Event) => (listener as EventListenerObject).handleEvent(e));
       }
     }
-    if ((type === 'load' || type === 'DOMContentLoaded')) {
-      checkAutofocus();
+    if (type === 'load' || type === 'DOMContentLoaded') {
+      checkAutofocus(win);
     }
     if (type === 'load' && win.__loadEventFired) {
       queueMicrotask(() => {
         try {
-          checkAutofocus();
+          checkAutofocus(win);
+          const eventConstructor = window as unknown as { Event: new (type: string) => Event };
           if (typeof listener === 'function') {
-            const eventConstructor = window as unknown as { Event: new (type: string) => Event };
             listener.call(window, new eventConstructor.Event('load'));
           } else if (listener && typeof listener.handleEvent === 'function') {
-            const eventConstructor = window as unknown as { Event: new (type: string) => Event };
             listener.handleEvent(new eventConstructor.Event('load'));
           }
         } catch {}
@@ -1695,15 +1800,13 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     }
   };
 
-
-
   if (!('requestAnimationFrame' in win)) {
     win.requestAnimationFrame = function (cb: (time: number) => void) {
       if (win.__virtualClock) {
         return (win.__virtualClock as { requestAnimationFrame: (cb: (t: number) => void) => number }).requestAnimationFrame(cb);
       }
       return setTimeout(() => {
-        checkAutofocus();
+        checkAutofocus(win);
         (win as unknown as { __triggerRenderUpdate?: () => void }).__triggerRenderUpdate?.();
         const iframes = (win.document as { querySelectorAll?: (s: string) => Element[] })?.querySelectorAll?.('iframe') || [];
         for (const ifr of Array.from(iframes)) {
@@ -1714,6 +1817,7 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
       }, 16);
     };
   }
+
   if (!('cancelAnimationFrame' in win)) {
     win.cancelAnimationFrame = function (id: unknown) {
       if (win.__virtualClock) {
@@ -1723,8 +1827,11 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
       }
     };
   }
+}
 
-  // Implement postMessage if missing
+function patchWindowFrameNavigation(window: WindowType, patchWindow: (win: WindowType) => void): void {
+  const win = window as unknown as Record<string, unknown>;
+
   if (!('postMessage' in win)) {
     win.postMessage = function (this: typeof window, data: unknown) {
       const event = new window.CustomEvent('message');
@@ -1734,58 +1841,53 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     };
   }
 
-  // Inject createHTMLDocument on document.implementation
   const doc = win.document as Record<string, unknown> | undefined;
   if (doc) {
     if (!doc.implementation) {
       doc.implementation = {};
     }
-    (doc.implementation as Record<string, unknown>).createHTMLDocument = function (title: string) {
-      const dom = parseHTML(`<!DOCTYPE html><html><head><title>${title}</title></head><body></body></html>`);
+    const impl = doc.implementation as Record<string, unknown>;
+    const createDoc = (html: string) => {
+      const dom = parseHTML(html);
       patchWindow(dom.window);
       return dom.window.document;
     };
-    (doc.implementation as Record<string, unknown>).createDocument = function (
-      _namespaceURI: string | null,
-      _qualifiedNameStr: string | null,
-      _documentType?: unknown
-    ) {
-      const dom = parseHTML(`<!DOCTYPE html><html><head></head><body></body></html>`);
-      patchWindow(dom.window);
-      return dom.window.document;
-    };
+    impl.createHTMLDocument = (title: string) =>
+      createDoc(`<!DOCTYPE html><html><head><title>${title}</title></head><body></body></html>`);
+    impl.createDocument = () => createDoc(`<!DOCTYPE html><html><head></head><body></body></html>`);
   }
+}
 
-  function createEmptyComputedStyle() {
-    const emptyDecl = new CSSStyleDeclaration([], true);
-    return new Proxy(emptyDecl, {
-      get(_target, prop, _receiver) {
-        if (prop === 'length') return 0;
-        if (prop === 'cssText') return '';
-        if (prop === 'getPropertyValue') return () => '';
-        if (prop === 'getPropertyPriority') return () => '';
-        if (prop === 'item') return () => '';
-        if (typeof prop === 'string') {
-          if (!isNaN(Number(prop))) return undefined;
-          if (prop === 'constructor' || prop === 'toString' || prop === 'valueOf') return Reflect.get(_target, prop, _receiver);
-          return '';
-        }
-        return Reflect.get(_target, prop, _receiver);
-      },
-      set() {
-        throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
+function createEmptyComputedStyle() {
+  const emptyDecl = new CSSStyleDeclaration([], true);
+  return new Proxy(emptyDecl, {
+    get(_target, prop, _receiver) {
+      if (prop === 'length') return 0;
+      if (prop === 'cssText') return '';
+      if (prop === 'getPropertyValue') return () => '';
+      if (prop === 'getPropertyPriority') return () => '';
+      if (prop === 'item') return () => '';
+      if (typeof prop === 'string') {
+        if (!isNaN(Number(prop))) return undefined;
+        if (prop === 'constructor' || prop === 'toString' || prop === 'valueOf') return Reflect.get(_target, prop, _receiver);
+        return '';
       }
-    });
-  }
+      return Reflect.get(_target, prop, _receiver);
+    },
+    set() {
+      throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
+    }
+  });
+}
 
-  // Declarative cascade oracle for WPT test sandbox
+function patchWindowStyles(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+
   win.getComputedStyle = function (element: Element, pseudoElt?: string | null) {
-    if (!element || typeof element !== 'object') {
+    if (!element || typeof element !== 'object' || element.isConnected === false) {
       return createEmptyComputedStyle();
     }
-    if (element.isConnected === false) {
-      return createEmptyComputedStyle();
-    }
+
     const doc = element.ownerDocument;
     const docWin = doc?.defaultView as { frameElement?: Element } | undefined;
     const frameEl = docWin?.frameElement;
@@ -1795,6 +1897,7 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
         return createEmptyComputedStyle();
       }
     }
+
     let curr: unknown = element;
     while (curr && typeof curr === 'object') {
       const parent = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement;
@@ -1808,10 +1911,8 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
     }
 
     let normalizedPseudo: string | null = null;
-    if (typeof pseudoElt === 'string') {
-      if (pseudoElt.startsWith(':')) {
-        normalizedPseudo = pseudoElt;
-      }
+    if (typeof pseudoElt === 'string' && pseudoElt.startsWith(':')) {
+      normalizedPseudo = pseudoElt;
     }
 
     if (normalizedPseudo) {
@@ -1823,6 +1924,7 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
 
     const liveDecl = new CSSStyleDeclaration([], true);
     const getCascaded = () => getCascadedStyle(element, undefined, normalizedPseudo);
+
     return new Proxy(liveDecl, {
       get(_target, prop, _receiver) {
         if (prop === Symbol.iterator) {
@@ -1848,9 +1950,9 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
                 if ((p === 'width' || p === 'height') && val.endsWith('%')) {
                   const pct = parseFloat(val);
                   if (!isNaN(pct)) {
-                    let curr: unknown = element;
-                    while (curr && typeof curr === 'object') {
-                      const el = curr as { parentElement?: unknown; parentNode?: unknown; ownerDocument?: { defaultView?: unknown } };
+                    let ancestor: unknown = element;
+                    while (ancestor && typeof ancestor === 'object') {
+                      const el = ancestor as { parentElement?: unknown; parentNode?: unknown; ownerDocument?: { defaultView?: unknown } };
                       const parent = el.parentElement || el.parentNode;
                       if (parent && typeof parent === 'object') {
                         try {
@@ -1866,7 +1968,7 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
                         const dim = p === 'width' ? (env.width ?? 800) : (env.height ?? 600);
                         return `${(dim * pct) / 100}px`;
                       }
-                      curr = parent;
+                      ancestor = parent;
                     }
                   }
                 }
@@ -1966,71 +2068,16 @@ export function patchWindowInstance(window: WindowType, patchWindow: (win: Windo
       }
     });
   };
+}
 
-  // Mock window.matchMedia
-  win.matchMedia = function (media: string) {
-    const mediaList = new MediaList(media);
-    const mediaText = mediaList.mediaText;
-    const listeners = new Set<Function>();
-    let onchangeHandler: Function | null = null;
-    let lastMatches = MediaParser.evaluate(media, getMediaEnvForWindow(win));
+// ---------------------------------------------------------------------------
+// Main Outline Orchestration: patchWindowInstance
+// ---------------------------------------------------------------------------
 
-    const mql = {
-      get matches() {
-        return MediaParser.evaluate(media, getMediaEnvForWindow(win));
-      },
-      get media() {
-        return mediaText;
-      },
-      get onchange() {
-        return onchangeHandler;
-      },
-      set onchange(fn: Function | null) {
-        onchangeHandler = fn;
-      },
-      addListener(fn: Function) {
-        if (typeof fn === 'function') listeners.add(fn);
-      },
-      removeListener(fn: Function) {
-        listeners.delete(fn);
-      },
-      addEventListener(type: string, fn: Function) {
-        if (type === 'change' && typeof fn === 'function') listeners.add(fn);
-      },
-      removeEventListener(type: string, fn: Function) {
-        if (type === 'change') listeners.delete(fn);
-      },
-      dispatchEvent(ev: Event) {
-        if (typeof onchangeHandler === 'function') onchangeHandler(ev);
-        for (const l of listeners) {
-          l(ev);
-        }
-        return true;
-      },
-      _checkChange() {
-        const curMatches = mql.matches;
-        if (curMatches !== lastMatches) {
-          lastMatches = curMatches;
-          const ev = new ((win.Event as { new (t: string): Event }) || Event)('change');
-          mql.dispatchEvent(ev);
-        }
-      }
-    };
-
-    if (!win.__activeMqls) {
-      win.__activeMqls = new Set();
-    }
-    (win.__activeMqls as Set<typeof mql>).add(mql);
-
-    return mql;
-  };
-
-  win.CSSStyleDeclaration = CSSStyleDeclaration;
-  win.CSSStyleSheet = CSSStyleSheet;
-  win.MediaList = MediaList;
-  win.CSSRule = CSSRule;
-  win.CSSGroupingRule = CSSGroupingRule;
-  win.CSSScopeRule = CSSScopeRule;
-  win.CSSLayerBlockRule = CSSLayerBlockRule;
-  win.CSSLayerStatementRule = CSSLayerStatementRule;
+export function patchWindowInstance(window: WindowType, patchWindow: (win: WindowType) => void): void {
+  patchWindowGlobals(window);
+  patchWindowPreferences(window);
+  patchWindowTimersAndObservers(window);
+  patchWindowFrameNavigation(window, patchWindow);
+  patchWindowStyles(window);
 }
