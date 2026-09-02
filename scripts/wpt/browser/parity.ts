@@ -109,7 +109,7 @@ export function normalizeWptPath(p: string): string {
 export function resolveSpecFromPath(normPath: string): string {
   const clean = normPath.replace(/^css\//, '');
   for (const spec of VALID_SPECS) {
-    if (clean.startsWith(spec) || normPath.startsWith(spec)) {
+    if (clean === spec || clean.startsWith(`${spec}/`) || normPath === spec || normPath.startsWith(`${spec}/`)) {
       return spec;
     }
   }

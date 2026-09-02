@@ -29,6 +29,7 @@ export interface FetchWptFyiOptions {
   runId?: number | string;
   cachePath?: string;
   spec?: string;
+  allSpecs?: boolean;
   dryRun?: boolean;
   maxCount?: number;
   quiet?: boolean;
@@ -173,8 +174,9 @@ export async function fetchWptFyiRun(options: FetchWptFyiOptions = {}): Promise<
     throw new Error('Unexpected response format from wpt.fyi API.');
   }
 
-  const browserVersion = run.browser_version || 'upstream';
-  const browserDisplayName = `Upstream ${run.browser_name || 'Chrome'} ${browserVersion}`.trim();
+  const browserVersion = run.browser_version || '';
+  const browserName = run.browser_name ? run.browser_name.charAt(0).toUpperCase() + run.browser_name.slice(1) : 'Chrome';
+  const browserDisplayName = `${browserName} ${browserVersion}`.trim();
   const downloadUrl = run.raw_results_url || run.results_url;
 
   if (!downloadUrl) {
@@ -198,13 +200,13 @@ export async function fetchWptFyiRun(options: FetchWptFyiOptions = {}): Promise<
 
   let report = normalizeWptFyiData(rawReportJson, browserDisplayName);
 
-  // Optional spec domain filtering
-  if (options.spec) {
-    const targetSpec = options.spec;
+  // Spec domain filtering: filter to requested spec or default to in-scope VALID_SPECS
+  if (!options.allSpecs) {
+    const allowedSpecs = new Set<string>(options.spec ? [options.spec] : VALID_SPECS);
     report.results = report.results.filter((r) => {
       const norm = normalizeWptPath(r.test);
       const spec = resolveSpecFromPath(norm);
-      return spec === targetSpec;
+      return allowedSpecs.has(spec);
     });
   }
 
