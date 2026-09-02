@@ -12,6 +12,7 @@ export const VALID_SPECS = [
   'mediaqueries',
   'css-syntax',
   'css-nesting',
+  'css-cascade',
 ] as const satisfies readonly SpecName[];
 
 export const SPEC_DISPLAY_NAMES: Record<string, string> = {
@@ -22,6 +23,7 @@ export const SPEC_DISPLAY_NAMES: Record<string, string> = {
   'css-variables': 'Variables',
   'selectors': 'Selectors',
   'mediaqueries': 'Media Queries',
+  'css-cascade': 'Cascade',
 };
 
 export const SPEC_ORDER: readonly SpecName[] = [
@@ -29,10 +31,40 @@ export const SPEC_ORDER: readonly SpecName[] = [
   'cssom',
   'css-nesting',
   'css-syntax',
+  'css-cascade',
   'css-variables',
   'selectors',
   'mediaqueries',
 ];
+
+export interface DomainGroup {
+  id: string;
+  displayName: string;
+  specs: readonly SpecName[];
+}
+
+export const DOMAIN_GROUPS: readonly DomainGroup[] = [
+  {
+    id: 'typed-om',
+    displayName: 'Typed OM',
+    specs: ['css-typed-om'],
+  },
+  {
+    id: 'core-cssom',
+    displayName: 'Core CSSOM',
+    specs: ['cssom', 'css-syntax', 'css-nesting'],
+  },
+  {
+    id: 'cascade-values',
+    displayName: 'Cascade & Values',
+    specs: ['css-cascade', 'css-variables'],
+  },
+  {
+    id: 'selectors-mq',
+    displayName: 'Selectors & MQ',
+    specs: ['selectors', 'mediaqueries'],
+  },
+] as const;
 
 export interface ManifestEntry {
   file: string;
@@ -65,20 +97,6 @@ export function isBrowserOnlyFile(spec: string, relativeFilePath: string, manife
   const normalized = relativeFilePath.replace(/^submodules\/web-platform-tests\//, '');
   return entries.some(e => e.file === normalized);
 }
-
-export const DEFAULT_REFERENCE_STATS: Record<string, { pass: number; total: number }> = {
-  'css-typed-om': { pass: 10690, total: 11230 },
-  'cssom': { pass: 883, total: 922 },
-  'css-syntax': { pass: 392, total: 398 },
-  'css-nesting': { pass: 93, total: 94 },
-  'css-variables': { pass: 465, total: 534 },
-  'selectors': { pass: 3865, total: 4156 },
-  'mediaqueries': { pass: 392, total: 416 },
-};
-
-export const DEFAULT_REFERENCE_BROWSER = 'Chrome 153.0.8008.0';
-export const DEFAULT_REFERENCE_MILESTONE = '153';
-
 export function getConfigPath(cwd = process.cwd()): string {
   return path.resolve(cwd, 'tests/wpt-node-config.json');
 }

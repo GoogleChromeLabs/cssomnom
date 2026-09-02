@@ -73,13 +73,14 @@ import type { TestRunDataset, ParsedFileResult } from '../scripts/wpt/node/core/
 describe('WPT CLI Core Modules', () => {
   describe('core/config.ts', () => {
     test('enumerates valid specs and metadata', () => {
-      assert.strictEqual(VALID_SPECS.length, 7);
+      assert.strictEqual(VALID_SPECS.length, 8);
       assert.ok(validateSpecName('css-typed-om'));
       assert.ok(validateSpecName('selectors'));
       assert.ok(validateSpecName('cssom'));
+      assert.ok(validateSpecName('css-cascade'));
       assert.ok(!validateSpecName('non-existent-spec'));
 
-      assert.strictEqual(SPEC_ORDER.length, 7);
+      assert.strictEqual(SPEC_ORDER.length, 8);
       for (const spec of SPEC_ORDER) {
         assert.ok(SPEC_DISPLAY_NAMES[spec], `Display name missing for ${spec}`);
       }
@@ -313,7 +314,7 @@ describe('WPT CLI Core Modules', () => {
       const row = formatProgressRow(dataset, '1234567');
       assert.ok(row.startsWith('| 2026-08-13 20:00:00 | `1234567` |'));
       assert.ok(row.includes('11000/12219'));
-      assert.ok(row.includes('600/923'));
+      assert.ok(row.includes('1115/1438'));
       assert.ok(row.includes('16332/18769'));
       assert.ok(row.includes('87.02%'));
       assert.ok(row.includes('**87.02%**'));
@@ -330,8 +331,8 @@ describe('WPT CLI Core Modules', () => {
           '',
           '### Historical Conformance Progress Log',
           '',
-          '| Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Pass Rate |',
-          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |',
+          '| Date & Time (UTC) | Commit | Typed OM | Core CSSOM | Cascade & Values | Selectors & MQ | Overall | Pass Rate |',
+          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |',
           '',
         ].join('\n');
         fs.writeFileSync(testProgressPath, initialContent, 'utf-8');
@@ -398,9 +399,9 @@ describe('WPT CLI Core Modules', () => {
           '',
           '### Historical Conformance Progress Log',
           '',
-          '| Date & Time (UTC) | Commit | Typed OM | CSSOM | Nesting | Syntax | Variables | Selectors | MQ | Overall | Pass Rate |',
-          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |',
-          '| 2026-08-13 19:00:00 | `pending*` | 500/12219 | 100/923 | 50/117 | 100/398 | 50/548 | 200/4147 | 100/417 | 1100/18769 | 5.86% | **5.86%** |',
+          '| Date & Time (UTC) | Commit | Typed OM | Core CSSOM | Cascade & Values | Selectors & MQ | Overall | Pass Rate |',
+          '| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |',
+          '| 2026-08-13 19:00:00 | `pending*` | 500/12219 | 250/1438 | 50/548 | 300/4564 | 1100/18769 | **5.86%** |',
           '',
         ].join('\n');
         fs.writeFileSync(testProgressPath, contentWithPending, 'utf-8');

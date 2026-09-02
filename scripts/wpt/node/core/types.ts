@@ -7,7 +7,8 @@ export type SpecName =
   | 'css-variables'
   | 'mediaqueries'
   | 'css-syntax'
-  | 'css-nesting';
+  | 'css-nesting'
+  | 'css-cascade';
 
 export interface SpecConfig {
   path: string;

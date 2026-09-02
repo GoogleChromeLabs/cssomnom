@@ -43,6 +43,24 @@
     "mediaqueries": {
       "path": "submodules/web-platform-tests/css/mediaqueries",
       "exclude": []
+    },
+    "css-cascade": {
+      "path": "submodules/web-platform-tests/css/css-cascade",
+      "exclude": [
+        "submodules/web-platform-tests/css/css-cascade/all-prop-001.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-002.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-inherit-color.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-initial-color.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-initial-visited.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-initial-xml.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-revert-color.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-revert-layer-noop.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-revert-layer.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-revert-noop.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-revert-visited.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-unset-color.html",
+        "submodules/web-platform-tests/css/css-cascade/all-prop-unset-visited.html"
+      ]
     }
   }
 }

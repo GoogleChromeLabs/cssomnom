@@ -6,14 +6,40 @@ import {
   getProgressPath,
   SPEC_ORDER,
   SPEC_DISPLAY_NAMES,
+  DOMAIN_GROUPS,
 } from './config.ts';
 import { addGitNote, getGitNotesLog, execGit } from '../safe-child-process.ts';
-import type { TestRunDataset } from './types.ts';
+import type { TestRunDataset, SpecName } from './types.ts';
 
 export interface ReferenceBaselineStats {
   browser: string;
   milestone: string;
   specs: Record<string, { pass: number; total: number }>;
+}
+
+export interface ComparisonMetrics {
+  rows: {
+    spec: SpecName;
+    displayName: string;
+    nodePassing: number;
+    nodeTarget: number;
+    nodeRate: number;
+    refPassing: number;
+    refTotal: number;
+    refRate: number;
+    delta: number;
+    deltaCell: string;
+  }[];
+  totals: {
+    nodePassing: number;
+    nodeTarget: number;
+    nodeRate: number;
+    refPassing: number;
+    refTotal: number;
+    refRate: number;
+    delta: number;
+    deltaCell: string;
+  };
 }
 
 export function loadReferenceBaselineStats(reportPath?: string): ReferenceBaselineStats | null {
@@ -24,7 +50,8 @@ export function loadReferenceBaselineStats(reportPath?: string): ReferenceBaseli
 
   try {
     const data = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
-    const browserStr = typeof data.browser === 'string' ? data.browser : 'Chrome';
+    const rawBrowser = typeof data.browser === 'string' ? data.browser : 'Chrome';
+    const browserStr = rawBrowser.replace(/^upstream\s+/i, '').replace(/^chrome\b/i, 'Chrome');
     const milestoneMatch = browserStr.match(/(?:chrome|chromium)\s+(\d+)/i);
     const milestone = milestoneMatch ? milestoneMatch[1] : '';
 
@@ -39,7 +66,7 @@ export function loadReferenceBaselineStats(reportPath?: string): ReferenceBaseli
         const clean = testPath.replace(/^css\//, '');
         let matchedSpec: string | null = null;
         for (const spec of SPEC_ORDER) {
-          if (clean.startsWith(spec) || testPath.startsWith(spec)) {
+          if (clean === spec || clean.startsWith(`${spec}/`) || testPath === spec || testPath.startsWith(`${spec}/`)) {
             matchedSpec = spec;
             break;
           }
@@ -73,8 +100,76 @@ export function loadReferenceBaselineStats(reportPath?: string): ReferenceBaseli
   return null;
 }
 
+export function computeComparisonMetrics(dataset: TestRunDataset, ref: ReferenceBaselineStats | null): ComparisonMetrics {
+  let totalNodePass = 0;
+  let totalNodeTarget = 0;
+  let totalRefPass = 0;
+  let totalRefTotal = 0;
+
+  const rows = SPEC_ORDER.map(spec => {
+    const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
+    const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
+    const target = summary.total;
+    const nodePassing = summary.passing;
+    totalNodePass += nodePassing;
+    totalNodeTarget += target;
+
+    const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
+    const refSpec = ref?.specs[spec] ?? { pass: 0, total: 0 };
+    totalRefPass += refSpec.pass;
+    totalRefTotal += refSpec.total;
+
+    const refRate = refSpec.total > 0 ? (refSpec.pass / refSpec.total) * 100 : 0;
+    const delta = nodeRate - refRate;
+
+    let deltaCell = 'N/A';
+    if (refSpec.total > 0) {
+      if (delta > 0) {
+        deltaCell = `🟢 **+${delta.toFixed(1)}%**`;
+      } else if (delta === 0) {
+        deltaCell = `🟢 **0.0%**`;
+      } else {
+        deltaCell = `${delta.toFixed(1)}%`;
+      }
+    }
+
+    return {
+      spec,
+      displayName,
+      nodePassing,
+      nodeTarget: target,
+      nodeRate,
+      refPassing: refSpec.pass,
+      refTotal: refSpec.total,
+      refRate,
+      delta,
+      deltaCell,
+    };
+  });
+
+  const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
+  const overallRefRate = totalRefTotal > 0 ? (totalRefPass / totalRefTotal) * 100 : 0;
+  const overallDelta = overallNodeRate - overallRefRate;
+  const overallDeltaCell = overallDelta >= 0 ? `🟢 **+${overallDelta.toFixed(1)}%**` : `**${overallDelta.toFixed(1)}%**`;
+
+  return {
+    rows,
+    totals: {
+      nodePassing: totalNodePass,
+      nodeTarget: totalNodeTarget,
+      nodeRate: overallNodeRate,
+      refPassing: totalRefPass,
+      refTotal: totalRefTotal,
+      refRate: overallRefRate,
+      delta: overallDelta,
+      deltaCell: overallDeltaCell,
+    },
+  };
+}
+
 export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceReportPath?: string): string {
   const ref = loadReferenceBaselineStats(referenceReportPath);
+  const metrics = computeComparisonMetrics(dataset, ref);
   const lines: string[] = [];
 
   if (ref) {
@@ -88,49 +183,15 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     lines.push(`| Spec Domain | **cssomnom** | ${chromeLabel} (\`wpt.fyi\`) | Parity vs Chrome |`);
     lines.push('| :--- | :---: | :---: | :---: |');
 
-    let totalNodePass = 0;
-    let totalNodeTarget = 0;
-    let totalRefPass = 0;
-    let totalRefTotal = 0;
-
-    for (const spec of SPEC_ORDER) {
-      const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
-      const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = summary.total;
-      const nodePassing = summary.passing;
-      totalNodePass += nodePassing;
-      totalNodeTarget += target;
-
-      const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
-      const nodeCell = `${nodePassing.toLocaleString()} / ${target.toLocaleString()} (**${nodeRate.toFixed(1)}%**)`;
-
-      const refSpec = ref.specs[spec] ?? { pass: 0, total: 0 };
-      totalRefPass += refSpec.pass;
-      totalRefTotal += refSpec.total;
-
-      const refRate = refSpec.total > 0 ? (refSpec.pass / refSpec.total) * 100 : 0;
-      const refCell = refSpec.total > 0 ? `${refSpec.pass.toLocaleString()} / ${refSpec.total.toLocaleString()} (${refRate.toFixed(1)}%)` : 'N/A';
-
-      const delta = nodeRate - refRate;
-      const deltaCell = delta >= 0
-        ? `🟢 **+${delta.toFixed(1)}%**`
-        : `${delta.toFixed(1)}%`;
-
-      lines.push(`| **\`${displayName}\`** | ${nodeCell} | ${refCell} | ${deltaCell} |`);
+    for (const r of metrics.rows) {
+      const nodeCell = `${r.nodePassing.toLocaleString()} / ${r.nodeTarget.toLocaleString()} (**${r.nodeRate.toFixed(1)}%**)`;
+      const refCell = r.refTotal > 0 ? `${r.refPassing.toLocaleString()} / ${r.refTotal.toLocaleString()} (${r.refRate.toFixed(1)}%)` : 'N/A';
+      lines.push(`| **\`${r.displayName}\`** | ${nodeCell} | ${refCell} | ${r.deltaCell} |`);
     }
 
-    const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
-    const overallNodeCell = `**${totalNodePass.toLocaleString()} / ${totalNodeTarget.toLocaleString()} (${overallNodeRate.toFixed(1)}%)**`;
-
-    const overallRefRate = totalRefTotal > 0 ? (totalRefPass / totalRefTotal) * 100 : 0;
-    const overallRefCell = `**${totalRefPass.toLocaleString()} / ${totalRefTotal.toLocaleString()} (${overallRefRate.toFixed(1)}%)**`;
-
-    const overallDelta = overallNodeRate - overallRefRate;
-    const overallDeltaCell = overallDelta >= 0
-      ? `🟢 **+${overallDelta.toFixed(1)}%**`
-      : `**${overallDelta.toFixed(1)}%**`;
-
-    lines.push(`| **OVERALL** | ${overallNodeCell} | ${overallRefCell} | ${overallDeltaCell} |`);
+    const overallNodeCell = `**${metrics.totals.nodePassing.toLocaleString()} / ${metrics.totals.nodeTarget.toLocaleString()} (${metrics.totals.nodeRate.toFixed(1)}%)**`;
+    const overallRefCell = `**${metrics.totals.refPassing.toLocaleString()} / ${metrics.totals.refTotal.toLocaleString()} (${metrics.totals.refRate.toFixed(1)}%)**`;
+    lines.push(`| **OVERALL** | ${overallNodeCell} | ${overallRefCell} | ${metrics.totals.deltaCell} |`);
   } else {
     lines.push('### Feasibility & Baseline Conformance');
     lines.push('');
@@ -141,23 +202,11 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     lines.push('| Spec Domain | Target Tests | **cssomnom** | Pass Rate |');
     lines.push('| :--- | :---: | :---: | :---: |');
 
-    let totalNodePass = 0;
-    let totalNodeTarget = 0;
-
-    for (const spec of SPEC_ORDER) {
-      const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
-      const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-      const target = summary.total;
-      const nodePassing = summary.passing;
-      totalNodePass += nodePassing;
-      totalNodeTarget += target;
-
-      const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
-      lines.push(`| **\`${displayName}\`** | ${target.toLocaleString()} | ${nodePassing.toLocaleString()} | **${nodeRate.toFixed(1)}%** |`);
+    for (const r of metrics.rows) {
+      lines.push(`| **\`${r.displayName}\`** | ${r.nodeTarget.toLocaleString()} | ${r.nodePassing.toLocaleString()} | **${r.nodeRate.toFixed(1)}%** |`);
     }
 
-    const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
-    lines.push(`| **OVERALL** | **${totalNodeTarget.toLocaleString()}** | **${totalNodePass.toLocaleString()}** | **${overallNodeRate.toFixed(1)}%** |`);
+    lines.push(`| **OVERALL** | **${metrics.totals.nodeTarget.toLocaleString()}** | **${metrics.totals.nodePassing.toLocaleString()}** | **${metrics.totals.nodeRate.toFixed(1)}%** |`);
   }
 
   return lines.join('\n');
@@ -167,13 +216,20 @@ export function formatProgressRow(dataset: TestRunDataset, commitStr: string): s
   const rowParts = [dataset.timestamp, `\`${commitStr}\``];
   let rowTotalPass = 0;
   let rowTotalTarget = 0;
-  for (const key of SPEC_ORDER) {
-    const summary = dataset.specSummaries[key] ?? { passing: 0, total: 0 };
-    const target = summary.total;
-    rowTotalPass += summary.passing;
-    rowTotalTarget += target;
-    rowParts.push(`${summary.passing}/${target}`);
+
+  for (const group of DOMAIN_GROUPS) {
+    let groupPass = 0;
+    let groupTarget = 0;
+    for (const spec of group.specs) {
+      const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
+      groupPass += summary.passing;
+      groupTarget += summary.total;
+    }
+    rowTotalPass += groupPass;
+    rowTotalTarget += groupTarget;
+    rowParts.push(`${groupPass}/${groupTarget}`);
   }
+
   const totalTests = rowTotalTarget > 0 ? rowTotalTarget : dataset.totalTests;
   const passRate = totalTests > 0 ? ((dataset.totalPassing / totalTests) * 100).toFixed(2) : '0.00';
   rowParts.push(`${dataset.totalPassing}/${totalTests}`, `**${passRate}%**`);
@@ -243,13 +299,13 @@ export function syncProgressFromNotes(progressPath = getProgressPath()): void {
     if (!row || !row.includes('|')) break;
 
     const cells = row.split('|').map(s => s.trim());
-    if (cells.length < 12) continue;
+    if (cells.length < 9) continue;
 
     const dateStr = cells[1];
     const commitCell = cells[2];
     if (!/pending|unknown|\*/i.test(commitCell)) continue;
 
-    const overallCell = cells[10];
+    const overallCell = cells[cells.length - 3];
     const passingInCell = overallCell ? parseInt(overallCell.split('/')[0], 10) : NaN;
 
     let matchedHash: string | null = null;
@@ -283,62 +339,28 @@ export function syncProgressFromNotes(progressPath = getProgressPath()): void {
 
 export function formatReadmeSummaryTable(dataset: TestRunDataset, referenceReportPath?: string): string {
   const ref = loadReferenceBaselineStats(referenceReportPath);
+  const metrics = computeComparisonMetrics(dataset, ref);
   const lines: string[] = [];
-
-  let totalNodePass = 0;
-  let totalNodeTarget = 0;
-  let totalRefPass = 0;
-  let totalRefTotal = 0;
-
-  const rows: string[] = [];
-
-  for (const spec of SPEC_ORDER) {
-    const displayName = SPEC_DISPLAY_NAMES[spec] ?? spec;
-    const summary = dataset.specSummaries[spec] ?? { passing: 0, total: 0 };
-    const target = summary.total;
-    const nodePassing = summary.passing;
-    totalNodePass += nodePassing;
-    totalNodeTarget += target;
-
-    const nodeRate = target > 0 ? (nodePassing / target) * 100 : 0;
-    const refSpec = ref?.specs[spec] ?? { pass: 0, total: 0 };
-    totalRefPass += refSpec.pass;
-    totalRefTotal += refSpec.total;
-
-    const refRate = refSpec.total > 0 ? (refSpec.pass / refSpec.total) * 100 : 0;
-    const delta = nodeRate - refRate;
-
-    let deltaCell = 'N/A';
-    if (refSpec.total > 0) {
-      if (delta > 0) {
-        deltaCell = `🟢 **+${delta.toFixed(1)}%** (ahead of Chrome)`;
-      } else if (delta === 0) {
-        deltaCell = `🟢 **0.0%** (full parity)`;
-      } else {
-        deltaCell = `${delta.toFixed(1)}%`;
-      }
-    }
-
-    rows.push(`| **\`${displayName}\`** | ${target.toLocaleString()} | ${nodePassing.toLocaleString()} | **${nodeRate.toFixed(1)}%** | ${deltaCell} |`);
-  }
-
-  const overallNodeRate = totalNodeTarget > 0 ? (totalNodePass / totalNodeTarget) * 100 : 0;
-  const overallRefRate = totalRefTotal > 0 ? (totalRefPass / totalRefTotal) * 100 : 0;
-  const overallDelta = overallNodeRate - overallRefRate;
-  const overallDeltaCell = overallDelta >= 0 ? `🟢 **+${overallDelta.toFixed(1)}%**` : `**${overallDelta.toFixed(1)}%**`;
 
   const totalFiles = dataset.totalFiles > 0 ? dataset.totalFiles : 1687;
 
-  lines.push(`* **W3C Standards Conformance**: **${overallNodeRate.toFixed(1)}%** (${totalNodePass.toLocaleString()} / ${totalNodeTarget.toLocaleString()} passed assertions across ${totalFiles.toLocaleString()} test files).`);
-  if (ref && totalRefTotal > 0) {
+  lines.push(`* **W3C Standards Conformance**: **${metrics.totals.nodeRate.toFixed(1)}%** (${metrics.totals.nodePassing.toLocaleString()} / ${metrics.totals.nodeTarget.toLocaleString()} passed assertions across ${totalFiles.toLocaleString()} test files).`);
+  if (ref && metrics.totals.refTotal > 0) {
     const chromeLabel = ref.milestone ? `Chrome ${ref.milestone}` : 'Chrome';
-    lines.push(`* **${chromeLabel} Parity**: **${overallNodeRate.toFixed(1)}%** pass rate across ${totalRefTotal.toLocaleString()} common subtests evaluated against official [\`wpt.fyi\`](https://wpt.fyi) runs.`);
+    lines.push(`* **${chromeLabel} Parity**: **${metrics.totals.nodeRate.toFixed(1)}%** pass rate across ${metrics.totals.refTotal.toLocaleString()} common subtests evaluated against official [\`wpt.fyi\`](https://wpt.fyi) runs.`);
   }
   lines.push('');
-  lines.push('| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 153 |');
+  const chromeHeader = ref?.milestone ? `Chrome ${ref.milestone}` : 'Chrome 153';
+  lines.push(`| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs ${chromeHeader} |`);
   lines.push('| :--- | :---: | :---: | :---: | :---: |');
-  lines.push(...rows);
-  lines.push(`| **OVERALL** | **${totalNodeTarget.toLocaleString()}** | **${totalNodePass.toLocaleString()}** | **${overallNodeRate.toFixed(1)}%** | ${overallDeltaCell} |`);
+
+  for (const r of metrics.rows) {
+    const parityNote = r.refTotal > 0 && r.delta > 0 ? ' (ahead of Chrome)' : (r.refTotal > 0 && r.delta === 0 ? ' (full parity)' : '');
+    const parityCell = r.deltaCell === 'N/A' ? 'N/A' : `${r.deltaCell}${parityNote}`;
+    lines.push(`| **\`${r.displayName}\`** | ${r.nodeTarget.toLocaleString()} | ${r.nodePassing.toLocaleString()} | **${r.nodeRate.toFixed(1)}%** | ${parityCell} |`);
+  }
+
+  lines.push(`| **OVERALL** | **${metrics.totals.nodeTarget.toLocaleString()}** | **${metrics.totals.nodePassing.toLocaleString()}** | **${metrics.totals.nodeRate.toFixed(1)}%** | ${metrics.totals.deltaCell} |`);
 
   return lines.join('\n');
 }
