@@ -18,7 +18,7 @@ This directory contains the tools and methodology used to establish, audit, and 
 
 | Metric | Symbol | Definition |
 | :--- | :---: | :--- |
-| **Total Tests** | $N$ | Total test assertion instances across the 7 tracked WPT CSS test suites. |
+| **Total Tests** | $N$ | Total test assertion instances across the 8 tracked WPT CSS test suites. |
 | **Passing Tests** | $P$ | Verified passing assertion instances in pure Node.js (`pnpm run wpt:node`). |
 | **Browser-Only Exclusions** | $E$ | Test assertion instances consensus-agreed as physically impossible in pure Node.js. |
 | **Feasible Target** | $M$ | The achievable Node.js target: $$M = \max(P, N - E)$$ |
@@ -73,7 +73,7 @@ When updating or re-evaluating the feasibility baseline, follow this 6-step pipe
 ```
 
 ### Step 1: Extract Live Failure Dataset
-Crawl all 7 WPT suites and categorize remaining failures into structured clusters:
+Crawl all 8 WPT suites and categorize remaining failures into structured clusters:
 ```bash
 node scripts/wpt/node/feasibility/export_dataset.ts
 ```
@@ -108,9 +108,9 @@ node scripts/wpt/node/feasibility/audit.ts
 ```
 
 ### Step 6: Synchronize Historical Conformance Log
-Rebaseline the historical log and baseline summary table in `wpt-progress.md`:
+Update the baseline summary table and conformance progress in `wpt-progress.md`:
 ```bash
-node scripts/baselines/rebaseline_wpt_history.ts
+pnpm run wpt:progress
 ```
 
 ---

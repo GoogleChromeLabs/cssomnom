@@ -312,7 +312,7 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 
 ## Web Platform Test (WPT) Conformance & Parity
 
-`cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 7 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, and Typed OM).
+`cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
 * **W3C Standards Conformance**: **87.0%** (18,778 / 21,580 passed assertions across 1,687 test files).

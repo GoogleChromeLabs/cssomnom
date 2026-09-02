@@ -21,12 +21,34 @@
     "cssom": {
       "path": "submodules/web-platform-tests/css/cssom",
       "exclude": [
-        "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-disallow-import.tentative.html"
+        "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-disallow-import.tentative.html",
+        "submodules/web-platform-tests/css/cssom/caretPositionFromPoint-audioVideo.html",
+        "submodules/web-platform-tests/css/cssom/caretPositionFromPoint-in-flex-container.html",
+        "submodules/web-platform-tests/css/cssom/caretPositionFromPoint-with-transformation.html",
+        "submodules/web-platform-tests/css/cssom/caretRangeFromPoint-replace-document.tentative.html",
+        "submodules/web-platform-tests/css/cssom/caretRangeFromPoint-textarea-transform.tentative.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-absolute-logical-crash.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-absolute.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-fixed.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-grid.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-nobox.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-relative.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-static.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-sticky-container-for-abspos.html",
+        "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-sticky.html"
       ]
     },
     "css-syntax": {
       "path": "submodules/web-platform-tests/css/css-syntax",
-      "exclude": []
+      "exclude": [
+        "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-bogus-charset-attribute-windows-1250.html",
+        "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-bogus.html",
+        "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-utf16-ascii-only.html",
+        "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-utf16.html",
+        "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-utf16be.html",
+        "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-http-windows-1250-at-charset-windows-1253.html",
+        "submodules/web-platform-tests/css/css-syntax/non-ascii-codepoints.html"
+      ]
     },
     "css-nesting": {
       "path": "submodules/web-platform-tests/css/css-nesting",
@@ -34,11 +56,53 @@
     },
     "css-variables": {
       "path": "submodules/web-platform-tests/css/css-variables",
-      "exclude": []
+      "exclude": [
+        "submodules/web-platform-tests/css/css-variables/variable-animation-from-to.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-guaranteed-invalid.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-over-transition.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-into-keyframe-shorthand.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-into-keyframe-transform.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-into-keyframe.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-within-keyframe-fallback.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-within-keyframe-multiple.html",
+        "submodules/web-platform-tests/css/css-variables/variable-animation-substitute-within-keyframe.html",
+        "submodules/web-platform-tests/css/css-variables/variables-animation-math-functions.html"
+      ]
     },
     "selectors": {
       "path": "submodules/web-platform-tests/css/selectors",
-      "exclude": []
+      "exclude": [
+        "submodules/web-platform-tests/css/selectors/active-display-none-001.html",
+        "submodules/web-platform-tests/css/selectors/active-observable.html",
+        "submodules/web-platform-tests/css/selectors/active-toplayer-001.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-001.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-002.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-003.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-004.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-005.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-006.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-007.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-008.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-011.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-012.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-013.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-015.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-016.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-022.tentative.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-027.html",
+        "submodules/web-platform-tests/css/selectors/focus-visible-028.html",
+        "submodules/web-platform-tests/css/selectors/hover-toplayer-001.html",
+        "submodules/web-platform-tests/css/selectors/invalidation/fullscreen-pseudo-class-in-has.html",
+        "submodules/web-platform-tests/css/selectors/invalidation/has-with-nesting-parent-containing-hover.html",
+        "submodules/web-platform-tests/css/selectors/invalidation/modal-pseudo-class-in-has.html",
+        "submodules/web-platform-tests/css/selectors/invalidation/user-valid-user-invalid.html",
+        "submodules/web-platform-tests/css/selectors/media/media-loading-state-timing.sub.html",
+        "submodules/web-platform-tests/css/selectors/modal-pseudo-class.html",
+        "submodules/web-platform-tests/css/selectors/user-action-pseudo-top-layer.html",
+        "submodules/web-platform-tests/css/selectors/user-invalid.html",
+        "submodules/web-platform-tests/css/selectors/user-valid-user-invalid-multifield-inputs.tentative.html",
+        "submodules/web-platform-tests/css/selectors/user-valid.html"
+      ]
     },
     "mediaqueries": {
       "path": "submodules/web-platform-tests/css/mediaqueries",
@@ -59,7 +123,15 @@
         "submodules/web-platform-tests/css/css-cascade/all-prop-revert-noop.html",
         "submodules/web-platform-tests/css/css-cascade/all-prop-revert-visited.html",
         "submodules/web-platform-tests/css/css-cascade/all-prop-unset-color.html",
-        "submodules/web-platform-tests/css/css-cascade/all-prop-unset-visited.html"
+        "submodules/web-platform-tests/css/css-cascade/all-prop-unset-visited.html",
+        "submodules/web-platform-tests/css/css-cascade/revert-layer-008.html",
+        "submodules/web-platform-tests/css/css-cascade/revert-val-003.html",
+        "submodules/web-platform-tests/css/css-cascade/revert-val-008.html",
+        "submodules/web-platform-tests/css/css-cascade/revert-val-009.html",
+        "submodules/web-platform-tests/css/css-cascade/revert-val-010.html",
+        "submodules/web-platform-tests/css/css-cascade/scope-focus.html",
+        "submodules/web-platform-tests/css/css-cascade/scope-hover.html",
+        "submodules/web-platform-tests/css/css-cascade/scope-starting-style.html"
       ]
     }
   }

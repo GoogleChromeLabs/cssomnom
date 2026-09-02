@@ -1,6 +1,6 @@
 # WPT Multi-Spec Conformance Progress Log
 
-This file tracks the conformance progress of the CSSOM / Typed OM implementations across 7 major W3C Web Platform Tests (WPT) spec suites in pure Node.js (`pnpm run wpt:node:progress`).
+This file tracks the conformance progress of the CSSOM / Typed OM implementations across 8 major W3C Web Platform Tests (WPT) spec suites in pure Node.js (`pnpm run wpt:node:progress`).
 
 ### Feasibility & Cross-Engine Baseline Comparison
 

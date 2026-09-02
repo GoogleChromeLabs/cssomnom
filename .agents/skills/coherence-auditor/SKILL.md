@@ -30,7 +30,7 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
        - `CONTRIBUTING.md`
      - Verify taxonomy, workflow, and abbreviation consistency across docs:
        - **Subagent Personas & Quality Loop**: Ensure references to `champ` (Developer), `codex_reviewer_cmd` (Reviewer), `Grizz` (Gatekeeper), and `scrutineer` (Spec Auditor) in `LOOP.md`, `AGENTS.md`, and `PLAN.md` match exact names and roles.
-       - **Spec Modules & Submodule References**: Validate spec names (`CSSOM Level 1`, `CSS Syntax Level 3`, `CSS Values Level 4`, `CSS Nesting Level 1`, `CSS Typed OM Level 1 & 2`, `CSS Logical Properties Level 1`, `Houdini`) and their underlying submodule paths (`submodules/csswg-drafts/`, `submodules/css-houdini-drafts/`).
+       - **Spec Modules & Submodule References**: Validate spec names (`CSSOM Level 1`, `CSS Syntax Level 3`, `CSS Values Level 4`, `CSS Nesting Level 1`, `CSS Cascade Level 5 & 6`, `CSS Conditional Level 3 & 4`, `CSS Typed OM Level 1 & 2`, `CSS Logical Properties Level 1`, `Houdini`) and their underlying submodule paths (`submodules/csswg-drafts/`, `submodules/css-houdini-drafts/`).
        - **Architecture & Spec Boundaries**:
          - Audit `README.md § Architecture & Spec Boundaries` against actual codebase exports in `src/index.ts` and `tests/api-surface.test.ts`.
          - Ensure documented standard CSSOM / Houdini interfaces, Bridge utilities, intentional spec deviations, and non-goals (e.g. no `getComputedStyle()`) are factually accurate, up to date, and omit no methods or deviations.

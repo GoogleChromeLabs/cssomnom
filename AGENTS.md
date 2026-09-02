@@ -17,6 +17,10 @@ Relevant Specifications:
 - CSS Variables: `submodules/csswg-drafts/css-variables-1/Overview.bs`
 - CSS Logical: `submodules/csswg-drafts/css-logical-1/Overview.bs`
 - Media Queries: `submodules/csswg-drafts/mediaqueries-4/Overview.bs`
+- CSS Cascade: `submodules/csswg-drafts/css-cascade-5/Overview.bs` (and `css-cascade-6/Overview.bs`)
+- CSS Conditional: `submodules/csswg-drafts/css-conditional-3/Overview.bs` (and `css-conditional-4/Overview.bs`)
+- CSS Namespaces: `submodules/csswg-drafts/css-namespaces-3/Overview.bs`
+- CSS Style Attributes: `submodules/csswg-drafts/css-style-attr-1/Overview.src.html`
 - CSS Properties and Values API (Houdini): `submodules/css-houdini-drafts/css-properties-values-api/Overview.bs`
 - CSS Typed OM 2 (Houdini): `submodules/css-houdini-drafts/css-typed-om-2/Overview.bs`
 

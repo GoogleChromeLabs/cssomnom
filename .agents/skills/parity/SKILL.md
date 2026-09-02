@@ -87,9 +87,13 @@ Before modifying code, ALWAYS open and inspect the Bikeshed source files (`.bs`)
 * **CSSOM**: `submodules/csswg-drafts/cssom-1/Overview.bs`
 * **CSS Syntax**: `submodules/csswg-drafts/css-syntax-3/Overview.bs`
 * **CSS Values & Sizing**: `submodules/csswg-drafts/css-values-4/Overview.bs`
+* **CSS Nesting**: `submodules/csswg-drafts/css-nesting-1/Overview.bs`
+* **CSS Cascade**: `submodules/csswg-drafts/css-cascade-5/Overview.bs` (and `css-cascade-6/Overview.bs`)
 * **CSS Typed OM**: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
 * **CSS Variables**: `submodules/csswg-drafts/css-variables-1/Overview.bs`
 * **Selectors**: `submodules/csswg-drafts/selectors-4/Overview.bs`
+* **Media Queries**: `submodules/csswg-drafts/mediaqueries-4/Overview.bs`
+* **CSS Conditional**: `submodules/csswg-drafts/css-conditional-3/Overview.bs`
 
 ### Step 3: Red/Green TDD
 1. **Red**: Write an isolated unit test in `tests/<domain>.test.ts` reproducing the exact failure before touching `src/`.

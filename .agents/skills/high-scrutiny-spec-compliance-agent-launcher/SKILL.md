@@ -14,7 +14,9 @@ This skill is used to launch a comprehensive compliance audit of the CSSOM parse
     *   **Values & Typed OM Auditor**: Reads `css-values-4/Overview.bs`, `css-typed-om-1/Overview.bs`, and `css-typed-om-2/Overview.bs` (Houdini).
     *   **Properties & Variables Auditor**: Reads `css-variables-1/Overview.bs` and `css-properties-values-api/Overview.bs` (Houdini).
     *   **Nesting Auditor**: Reads `css-nesting-1/Overview.bs`.
+    *   **Cascade Auditor**: Reads `css-cascade-5/Overview.bs` and `css-cascade-6/Overview.bs` -> `src/cascade/` and `src/CSSOM.ts`.
     *   **Media Queries Auditor**: Reads `mediaqueries-4/Overview.bs`.
+    *   **Conditional Auditor**: Reads `css-conditional-3/Overview.bs` -> `src/MediaParser.ts` and `src/CSSOM.ts`.
     *   **Logical Properties Auditor**: Reads `css-logical-1/Overview.bs`.
     > [!IMPORTANT]
     > **Tooling Requirement**: Spawned subagents MUST have access to file reading tools (e.g., `view_file`, `list_dir`) to read specs and source files. If the default environment restricts them, explicitly provision them via `tool_names` in `define_subagent` or use a subagent type known to possess these capabilities.

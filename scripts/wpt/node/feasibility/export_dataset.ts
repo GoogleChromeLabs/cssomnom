@@ -229,7 +229,7 @@ async function main() {
   const clustersMap = new Map<string, FailureClusterItem>();
   const concurrency = Math.min(16, Math.max(1, os.availableParallelism() - 1));
 
-  console.log(`Starting detailed failure extraction across all 7 WPT specs (concurrency: ${concurrency})...`);
+  console.log(`Starting detailed failure extraction across all in-scope WPT specs (concurrency: ${concurrency})...`);
 
   for (const [specName, specInfo] of Object.entries<{ path: string; exclude: string[] }>(config.specs)) {
     const specFiles = crawlDirectory(path.resolve(process.cwd(), specInfo.path))
