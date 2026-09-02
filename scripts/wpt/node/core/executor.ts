@@ -60,16 +60,19 @@ export async function executeWptTests(
   const specSummaries: Record<string, SpecSummary> = {};
   let totalPassing = 0;
   let totalTests = 0;
+  let totalBrowserOnly = 0;
 
   for (const res of fileResults) {
     if (!specSummaries[res.spec]) {
-      specSummaries[res.spec] = { passing: 0, total: 0, files: 0 };
+      specSummaries[res.spec] = { passing: 0, total: 0, browserOnly: 0, files: 0 };
     }
     specSummaries[res.spec].passing += res.passing;
     specSummaries[res.spec].total += res.total;
+    specSummaries[res.spec].browserOnly = (specSummaries[res.spec].browserOnly ?? 0) + (res.browserOnlyCount ?? 0);
     specSummaries[res.spec].files += 1;
     totalPassing += res.passing;
     totalTests += res.total;
+    totalBrowserOnly += (res.browserOnlyCount ?? 0);
   }
 
   const { commitHash, isDirty } = getGitCommitInfo();
@@ -82,6 +85,7 @@ export async function executeWptTests(
     specSummaries,
     totalPassing,
     totalTests,
+    totalBrowserOnly,
     totalFiles: fileResults.length,
     fileResults,
   };

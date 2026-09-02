@@ -13,7 +13,20 @@ import {
   CSSScopeRule,
   CSSLayerBlockRule,
   CSSLayerStatementRule,
-  CSSImportRule
+  CSSImportRule,
+  CSSConditionRule,
+  CSSMediaRule,
+  CSSSupportsRule,
+  CSSContainerRule,
+  CSSStartingStyleRule,
+  CSSFontFaceRule,
+  CSSKeyframesRule,
+  CSSKeyframeRule,
+  CSSPageRule,
+  CSSPropertyRule,
+  CSSNamespaceRule,
+  CSSMarginRule,
+  CSSStyleRule
 } from '../../../src/CSSOM.ts';
 import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
 import { getCascadedStyle } from '../../../src/cascade.ts';
@@ -1651,7 +1664,21 @@ function patchWindowGlobals(window: WindowType): void {
     CSSGroupingRule,
     CSSScopeRule,
     CSSLayerBlockRule,
-    CSSLayerStatementRule
+    CSSLayerStatementRule,
+    CSSImportRule,
+    CSSConditionRule,
+    CSSMediaRule,
+    CSSSupportsRule,
+    CSSContainerRule,
+    CSSStartingStyleRule,
+    CSSFontFaceRule,
+    CSSKeyframesRule,
+    CSSKeyframeRule,
+    CSSPageRule,
+    CSSPropertyRule,
+    CSSNamespaceRule,
+    CSSMarginRule,
+    CSSStyleRule
   });
 
   if (!('FocusEvent' in win)) {

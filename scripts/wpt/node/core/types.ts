@@ -33,6 +33,8 @@ export interface ParsedSubtest {
   actual?: string;
   errorType?: string;
   rawError?: string;
+  isBrowserOnly?: boolean;
+  browserCategory?: string;
 }
 
 export interface ParsedFileResult {
@@ -40,6 +42,7 @@ export interface ParsedFileResult {
   spec: string;
   passing: number;
   total: number;
+  browserOnlyCount?: number;
   passingSubtests: string[];
   failedSubtests: string[];
   subtests: ParsedSubtest[];
@@ -52,6 +55,7 @@ export interface ParsedFileResult {
 export interface SpecSummary {
   passing: number;
   total: number;
+  browserOnly?: number;
   files: number;
 }
 
@@ -62,6 +66,7 @@ export interface TestRunDataset {
   specSummaries: Record<string, SpecSummary>;
   totalPassing: number;
   totalTests: number;
+  totalBrowserOnly?: number;
   totalFiles: number;
   fileResults: ParsedFileResult[];
 }

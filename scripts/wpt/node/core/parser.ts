@@ -1,6 +1,7 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 
 import * as fs from 'node:fs';
+import { classifySubtestFeasibility } from './classifier.ts';
 import type { ParsedFileResult, ParsedSubtest, FailureCluster, ExpectationDiffItem, BaselineAuditReport } from './types.ts';
 
 export function classifyError(raw: string): { errorType: string; cleanMessage: string } {
@@ -87,7 +88,25 @@ export function parseRunnerOutput(
         if (trimmed.startsWith('- ')) expected = trimmed.substring(2).trim();
         if (actual !== undefined && expected !== undefined) break;
       }
-      subtests.push({ name, status: 'FAIL', error: cleanMessage, errorType, rawError: rawErr, actual, expected });
+      const classification = classifySubtestFeasibility({
+        name,
+        error: cleanMessage,
+        rawError: rawErr,
+        actual,
+        expected,
+        file: meta.file,
+      });
+      subtests.push({
+        name,
+        status: 'FAIL',
+        error: cleanMessage,
+        errorType,
+        rawError: rawErr,
+        actual,
+        expected,
+        isBrowserOnly: classification.isBrowserOnly,
+        browserCategory: classification.category,
+      });
     }
   }
 
@@ -109,7 +128,33 @@ export function parseRunnerOutput(
     if (!summaryMatch) total = Math.max(total, countDeclaredTests(meta.filePath));
   }
 
-  return { file: meta.file, spec: meta.spec, passing, total, passingSubtests, failedSubtests, subtests, loadError, durationMs: meta.durationMs, peakRssMb: meta.peakRssMb, status: meta.status };
+  let browserOnlyCount = subtests.filter(s => s.isBrowserOnly).length;
+  if (subtests.length === 0 && (loadError || meta.status !== 'OK')) {
+    const fileClassification = classifySubtestFeasibility({
+      name: meta.file,
+      error: loadError,
+      rawError: merged,
+      file: meta.file,
+    });
+    if (fileClassification.isBrowserOnly) {
+      browserOnlyCount = total;
+    }
+  }
+
+  return {
+    file: meta.file,
+    spec: meta.spec,
+    passing,
+    total,
+    browserOnlyCount,
+    passingSubtests,
+    failedSubtests,
+    subtests,
+    loadError,
+    durationMs: meta.durationMs,
+    peakRssMb: meta.peakRssMb,
+    status: meta.status,
+  };
 }
 
 export function clusterFailures(fileResults: ParsedFileResult[]): FailureCluster[] {

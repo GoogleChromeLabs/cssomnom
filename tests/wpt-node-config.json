@@ -7,7 +7,6 @@
         "submodules/web-platform-tests/css/css-typed-om/cycle-in-unparsed-value-crash.html",
         "submodules/web-platform-tests/css/css-typed-om/idlharness.html",
         "submodules/web-platform-tests/css/css-typed-om/stylevalue-normalization/normalize-image.html",
-        "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/declared/declared.tentative.html",
         "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/background-position.html",
         "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/object-position.html",
         "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/offset-anchor.html",
@@ -21,12 +20,6 @@
     "cssom": {
       "path": "submodules/web-platform-tests/css/cssom",
       "exclude": [
-        "submodules/web-platform-tests/css/cssom/CSSStyleSheet-constructable-disallow-import.tentative.html",
-        "submodules/web-platform-tests/css/cssom/caretPositionFromPoint-audioVideo.html",
-        "submodules/web-platform-tests/css/cssom/caretPositionFromPoint-in-flex-container.html",
-        "submodules/web-platform-tests/css/cssom/caretPositionFromPoint-with-transformation.html",
-        "submodules/web-platform-tests/css/cssom/caretRangeFromPoint-replace-document.tentative.html",
-        "submodules/web-platform-tests/css/cssom/caretRangeFromPoint-textarea-transform.tentative.html",
         "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-absolute-logical-crash.html",
         "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-absolute.html",
         "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-fixed.html",

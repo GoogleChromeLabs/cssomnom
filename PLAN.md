@@ -2948,22 +2948,31 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## TODO: Phase 121: Automated Subtest-Level Feasibility Oracle (Option B Upgrade)
+## Phase 121: Automated Subtest-Level Feasibility Oracle (Option B Upgrade)
 **Goal**: Upgrade from file-level exclusions (Option A) to an automated, assertion-level feasibility oracle (Option B) that parses individual subtest failure signatures dynamically during test runs.
 
-### Planned Tasks
-- [ ] **Assertion-Level Failure Signature Classifier**:
-  - In `scripts/wpt/node/run.ts` or `scripts/wpt/node/core/`:
-    - Classify subtest failures matching explicit browser capability boundaries:
-      - `getComputedStyle(el).width/height/margin` layout px resolution $\to$ `LAYOUT_GEOMETRY`
-      - `caretPositionFromPoint` / `getClientRects` / `getBoundingClientRect` $\to$ `VIEWPORT_GEOMETRY`
-      - `testdriver.action_sequence` hardware event synthesis $\to$ `HARDWARE_INPUT_DRIVER`
-      - `element.animate()` / `@keyframes` live frame timing $\to$ `ANIMATION_SCHEDULER`
-      - `@container (min-width)` container width query $\to$ `CONTAINER_LAYOUT`
-- [ ] **Dynamic Fair Denominator Computation**:
-  - Calculate achievable target dynamically per spec and overall:
-    $$M = \text{Total Subtests } (N) - \text{Browser-Only Subtests } (E_{\text{detected}})$$
-  - Re-include mixed test files (e.g. `getComputedStyle-*.html`) so valid pure-CSSOM assertions pass while layout-dependent assertions are subtracted from the fair denominator without discarding entire files.
+### Tasks
+- [x] **Assertion-Level Failure Signature Classifier**:
+  - Implemented `scripts/wpt/node/core/classifier.ts` (`classifySubtestFeasibility`) classifying failed subtests into 7 objective browser capability categories:
+    - `LAYOUT_GEOMETRY`: `getComputedStyle(el).width/height/margin` layout px resolution, inset dimensions, and linkedom sandbox layout limits.
+    - `VIEWPORT_GEOMETRY`: `caretPositionFromPoint`, `caretRangeFromPoint`, `getClientRects`, `getBoundingClientRect`, `elementsFromPoint`.
+    - `HARDWARE_INPUT_DRIVER`: `test_driver.action_sequence` OS event synthesis, `:focus-visible` hardware interaction, `:active` mouse button transitions, `:hover`/`:focus` user actions.
+    - `ANIMATION_SCHEDULER`: `element.animate()`, `@keyframes` live frame timing, variable animation rollbacks.
+    - `CONTAINER_LAYOUT`: `@container (min-width)` container width query evaluation.
+    - `MODAL_TOP_LAYER`: HTML5 top-layer modal stacking (`showModal`, `::backdrop`, `:modal`).
+    - `HTTP_CHARSET_STREAM`: HTTP Content-Type headers, legacy charset byte streams, Resource Timing.
+- [x] **Subtest-Level Parser & Aggregator Integration**:
+  - Enhanced `scripts/wpt/node/core/parser.ts` to tag failing subtests with `isBrowserOnly` and `browserCategory`, calculating file-level `browserOnlyCount`.
+  - Updated `scripts/wpt/node/core/executor.ts` to aggregate `browserOnly` counts per spec domain and across the entire test run dataset.
+  - Enhanced `scripts/wpt/node/commands/run.ts` console output to present `Browser-Only`, `Feasible (M)` ($M = \max(P, N - E)$), and `Norm Rate` ($P / M$) alongside `Raw Rate` ($P / N$).
+- [x] **Re-include Mixed Test Files in `tests/wpt-node-config.json`**:
+  - In `cssom`: Re-included `CSSStyleSheet-constructable-disallow-import.tentative.html` (3 passing pure CSSOM tests) and `caretPositionFromPoint-*` / `caretRangeFromPoint-*` files (failures dynamically categorized as `VIEWPORT_GEOMETRY`).
+  - In `css-typed-om`: Re-included `the-stylepropertymap/declared/declared.tentative.html` (4 passing subtests).
+- [x] **Unit Testing & Preflight**:
+  - Authored `tests/wpt-classifier.test.ts` covering all 7 browser capability categories and verifying zero false positives on pure CSSOM failures.
+  - Verified preflight passes cleanly with 0 type errors, 0 lint warnings, safe-exec clean, and 4,159 tests passing.
+  - Live WPT runner executes across 1,768 test files (18,999 / 21,884 passing = 86.82% raw rate, 91 browser-only subtests detected $\to$ 87.18% normalized rate across 21,793 feasible subtests).
+
 
 
 

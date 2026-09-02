@@ -46,19 +46,41 @@ export async function runCommand(options: RunCommandOptions = {}): Promise<TestR
   if (options.json) {
     console.log(JSON.stringify(dataset, null, 2));
   } else {
-    console.log('\n================================================================================');
-    console.log('📊 WPT Multi-Spec Conformance Summary');
-    console.log('================================================================================');
-    console.log('| Spec Domain     | Passing / Total | Raw Pass Rate | Files |');
-    console.log('| :-------------- | :-------------: | :-----------: | :---: |');
+    console.log('\n============================================================================================');
+    console.log('📊 WPT Multi-Spec Conformance Summary (Automated Subtest Feasibility Oracle)');
+    console.log('============================================================================================');
+    console.log('| Spec Domain     | Pass / Total    | Browser-Only | Feasible (M) | Raw Rate | Norm Rate | Files |');
+    console.log('| :-------------- | :-------------: | :----------: | :----------: | :------: | :-------: | :---: |');
     for (const [spec, sum] of Object.entries(dataset.specSummaries)) {
-      const rate = sum.total > 0 ? ((sum.passing / sum.total) * 100).toFixed(2) + '%' : '0.00%';
-      console.log(`| ${spec.padEnd(15)} | ${(sum.passing + '/' + sum.total).padStart(15)} | ${rate.padStart(13)} | ${sum.files.toString().padStart(5)} |`);
+      const browserOnly = sum.browserOnly ?? 0;
+      const feasible = Math.max(sum.passing, sum.total - browserOnly);
+      const rawRate = sum.total > 0 ? ((sum.passing / sum.total) * 100).toFixed(2) + '%' : '0.00%';
+      const normRate = feasible > 0 ? ((sum.passing / feasible) * 100).toFixed(2) + '%' : '100.00%';
+      console.log(
+        `| ${spec.padEnd(15)} ` +
+        `| ${(sum.passing + '/' + sum.total).padStart(15)} ` +
+        `| ${browserOnly.toString().padStart(12)} ` +
+        `| ${feasible.toString().padStart(12)} ` +
+        `| ${rawRate.padStart(8)} ` +
+        `| ${normRate.padStart(9)} ` +
+        `| ${sum.files.toString().padStart(5)} |`
+      );
     }
-    console.log('--------------------------------------------------------------------------------');
-    const grandRate = dataset.totalTests > 0 ? ((dataset.totalPassing / dataset.totalTests) * 100).toFixed(2) + '%' : '0.00%';
-    console.log(`| OVERALL         | ${(dataset.totalPassing + '/' + dataset.totalTests).padStart(15)} | ${grandRate.padStart(13)} | ${dataset.totalFiles.toString().padStart(5)} |`);
-    console.log('================================================================================\n');
+    console.log('--------------------------------------------------------------------------------------------');
+    const totalBrowserOnly = dataset.totalBrowserOnly ?? 0;
+    const totalFeasible = Math.max(dataset.totalPassing, dataset.totalTests - totalBrowserOnly);
+    const grandRawRate = dataset.totalTests > 0 ? ((dataset.totalPassing / dataset.totalTests) * 100).toFixed(2) + '%' : '0.00%';
+    const grandNormRate = totalFeasible > 0 ? ((dataset.totalPassing / totalFeasible) * 100).toFixed(2) + '%' : '100.00%';
+    console.log(
+      `| OVERALL         ` +
+      `| ${(dataset.totalPassing + '/' + dataset.totalTests).padStart(15)} ` +
+      `| ${totalBrowserOnly.toString().padStart(12)} ` +
+      `| ${totalFeasible.toString().padStart(12)} ` +
+      `| ${grandRawRate.padStart(8)} ` +
+      `| ${grandNormRate.padStart(9)} ` +
+      `| ${dataset.totalFiles.toString().padStart(5)} |`
+    );
+    console.log('============================================================================================\n');
   }
 
   const limit = options.limit ?? 20;
