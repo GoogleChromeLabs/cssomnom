@@ -315,19 +315,20 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **87.0%** (18,778 / 21,580 passed assertions across 1,687 test files).
-* **Chrome 153 Parity**: **87.0%** pass rate across 29,354 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **86.6%** (18,961 / 21,901 passed assertions across 1,761 test files).
+* **Chrome 154 Parity**: **86.6%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
-| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 153 |
+| Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
-| **`Typed OM`** | 12,219 | 11,547 | **94.5%** | 🟢 **+0.5%** (ahead of Chrome) |
-| **`CSSOM`** | 2,161 | 1,607 | **74.4%** | -21.4% |
+| **`Typed OM`** | 12,219 | 11,547 | **94.5%** | 🟢 **+1.0%** (ahead of Chrome) |
+| **`CSSOM`** | 2,143 | 1,607 | **75.0%** | -22.2% |
 | **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
-| **`Syntax`** | 414 | 406 | **98.1%** | -0.3% |
-| **`Variables`** | 561 | 410 | **73.1%** | -17.4% |
-| **`Selectors`** | 5,691 | 4,279 | **75.2%** | -10.8% |
+| **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
+| **`Cascade`** | 497 | 183 | **36.8%** | -63.1% |
+| **`Variables`** | 499 | 410 | **82.2%** | -8.4% |
+| **`Selectors`** | 5,602 | 4,279 | **76.4%** | -9.6% |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **21,580** | **18,778** | **87.0%** | **-5.9%** |
+| **OVERALL** | **21,901** | **18,961** | **86.6%** | **-6.5%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [wpt-browser-only-manifest.json](./tests/fixtures/wpt-browser-only-manifest.json) for cataloged browser-only layout boundaries.
