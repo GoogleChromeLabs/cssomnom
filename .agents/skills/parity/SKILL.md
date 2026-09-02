@@ -27,7 +27,7 @@ graph TD
 | **`VERIFIED_CONFORMANCE`** | PASS | PASS | PASS | **True positive conformance**. Both Node and Blink agree on standard spec behavior. |
 | **`POLYFILL_IMPROVEMENT`** | PASS | PASS | FAIL | **Polyfill superiority**. `cssomnom` implements latest modern spec behavior (e.g. relaxed nesting, Syntax 3 escaping) where upstream Blink has legacy bugs. |
 | **`VERIFIED_SPEC_GAP`** | FAIL | FAIL | PASS | **High-priority implementation gap**. Genuine bugs/missing features in `cssomnom` that must be fixed. |
-| **`FEASIBILITY_BOUNDARY`** | FAIL | FAIL | FAIL | **Ecosystem boundary**. Tests asserting 2D geometry, GPU rasterization, or WebDriver input that are physically impossible in pure AST/DOM. Kept in [`wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json). |
+| **`FEASIBILITY_BOUNDARY`** | FAIL | FAIL | FAIL | **Ecosystem boundary**. Tests asserting 2D geometry, GPU rasterization, or WebDriver input that are physically impossible in pure AST/DOM. Classified dynamically per [`scripts/wpt/node/README.md`](file:///usr/local/google/home/paulirish/code/cssom/scripts/wpt/node/README.md). |
 | **`OVER_MOCKING_FALSE_POSITIVE`** | PASS | FAIL | FAIL | **Over-permissive shim bug**. Stubs in `tests/dom-shim/` or loose typechecks passing by accident. Must tighten WebIDL validation! |
 
 ---

@@ -176,8 +176,7 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     const chromeLabel = ref.milestone ? `Chrome ${ref.milestone}` : 'Chrome';
     lines.push('### Feasibility & Cross-Engine Baseline Comparison');
     lines.push('');
-    lines.push('> [!NOTE]');
-    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent tests requiring GPU rasterization or 2D window layout are cataloged in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent capabilities are classified dynamically at assertion level per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md).');
     lines.push(`> - **Reference Engine**: Comparison numbers represent official unpolyfilled **${ref.browser}** test runs from [\`wpt.fyi\`](https://wpt.fyi) across matching test suites.`);
     lines.push('');
     lines.push(`| Spec Domain | **cssomnom** | ${chromeLabel} (\`wpt.fyi\`) | Parity vs Chrome |`);
@@ -196,7 +195,7 @@ export function formatBaselineSummaryTable(dataset: TestRunDataset, referenceRep
     lines.push('### Feasibility & Baseline Conformance');
     lines.push('');
     lines.push('> [!NOTE]');
-    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent tests requiring GPU rasterization or 2D window layout are cataloged in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).');
+    lines.push('> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent capabilities are classified dynamically at assertion level per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md).');
     lines.push('> - To populate cross-engine reference metrics from `wpt.fyi`, run `pnpm run wpt fetch-upstream`.');
     lines.push('');
     lines.push('| Spec Domain | Target Tests | **cssomnom** | Pass Rate |');

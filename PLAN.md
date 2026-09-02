@@ -2980,15 +2980,26 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 122: Delphi-Classifier Calibration & Conformance Wave
-**Goal**: Run a calibration audit between the Delphi consensus committee and the live classifier across remaining failure clusters, then target high-frequency pure-CSSOM conformance gaps in `selectors` and `css-cascade`.
+## Phase 122: Feasibility Architecture Unification & Canonical Documentation
+**Goal**: Resolve the competing dual-manifest and dual-implementation dichotomy by establishing a single source of truth: delete the static file-level manifest and obsolete feasibility scripts, keep `tests/wpt-node-config.json` as the sole configuration file, and document the complete denominator calculation and triage workflow in `scripts/wpt/node/README.md`.
 
 ### Tasks
-- [ ] **Cross-Calibration Audit**:
-  - Run `export_dataset.ts` on the 2,885 failing subtests to identify any unclassified browser-dependent clusters or false-positive classifier rules.
-  - Audit the 58 remaining files in `tests/wpt-node-config.json` `exclude` to determine which can safely run under Option B subtest classification.
-- [ ] **Targeted Conformance Remediation**:
-  - Triage the top failure cluster in `selectors` and `css-cascade` to implement normative spec algorithms and advance passing assertions past 19,000.
+- [x] **Aggressive Pruning & Cohesion**:
+  - Trashed static snapshot `tests/fixtures/wpt-browser-only-manifest.json` (647 lines).
+  - Trashed obsolete feasibility scripts in `scripts/wpt/node/feasibility/` (`audit.ts`, `compare_votes.ts`, `export_dataset.ts`, `generate_manifest.ts`, `README.md`) and historical baseline rebaseline script `scripts/baselines/rebaseline_wpt_history.ts`.
+  - Removed dead manifest loader helpers and types from `scripts/wpt/node/core/config.ts` and updated tests in `tests/wpt-cli.test.ts`.
+- [x] **Canonical Architecture & Denominator Guide**:
+  - Authored `scripts/wpt/node/README.md` documenting:
+    - Conformance principles and anti-greenwashing invariants.
+    - Single unified architecture: `tests/wpt-node-config.json` (runner blockers), `scripts/wpt/node/core/classifier.ts` (7 browser capability categories), `scripts/wpt/node/commands/cluster.ts` (`pnpm run wpt:cluster`), and `tests/wpt-classifier.test.ts` (executable CI ground truth).
+    - Mathematical definitions: $N, P, E, M$, raw score vs. normalized score, and the dimensional purity invariant ($P, N, E, M$ in subtests).
+    - The 7 objective browser capability boundaries: `LAYOUT_GEOMETRY`, `VIEWPORT_GEOMETRY`, `HARDWARE_INPUT_DRIVER`, `ANIMATION_SCHEDULER`, `CONTAINER_LAYOUT`, `MODAL_TOP_LAYER`, `HTTP_CHARSET_STREAM`.
+    - Triage & calibration workflow: Step 1 (Cluster Failures via `pnpm run wpt:cluster`), Step 2 (Three-perspective deliberation), Step 3 (Codifying consensus into unit tests).
+    - Historical lessons: the static manifest flaw, the dimensional subtraction flaw, and why dynamic subtest classification won.
+- [x] **Synchronize Documentation & Skills**:
+  - Updated `README.md`, `wpt-progress.md`, `MAINTENANCE.md`, `docs/conformance-parity-report.md`, and `.agents/skills/parity/SKILL.md` to reference `scripts/wpt/node/README.md`.
+- [x] **Verification**:
+  - `pnpm run preflight` passes cleanly: 0 type errors, 0 lint warnings, safe-exec guard clean, and all 4,159 unit tests passing.
 
 
 

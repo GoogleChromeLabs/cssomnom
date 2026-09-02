@@ -70,7 +70,7 @@ The Cross-Browser Differential Parity Oracle compares `cssomnom` execution in pu
 ### ⚪ Tier 4: Feasibility Boundaries (248 Assertions / 1.4%)
 - **Status**: Fails in both `cssomnom` (Node.js) and Upstream Chrome (Blink).
 - **Net Meaning**: Upstream contested tests, unsupported draft specifications, or browser-only layout constraints (e.g. layout viewport geometry, caret coordinates).
-- **Recommendation**: These should remain classified under `tests/fixtures/wpt-browser-only-manifest.json` rather than spending development cycles writing synthetic mocks.
+- **Recommendation**: These should remain classified under the feasibility oracle ([`scripts/wpt/node/README.md`](../scripts/wpt/node/README.md)) rather than spending development cycles writing synthetic mocks.
 
 ---
 

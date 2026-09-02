@@ -331,7 +331,7 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 | **OVERALL** | **21,727** | **18,855** | **86.8%** | **-6.3%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
-> See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [wpt-browser-only-manifest.json](./tests/fixtures/wpt-browser-only-manifest.json) for cataloged browser-only layout boundaries.
+> See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.
 
 ## Development
 

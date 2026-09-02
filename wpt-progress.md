@@ -4,8 +4,7 @@ This file tracks the conformance progress of the CSSOM / Typed OM implementation
 
 ### Feasibility & Cross-Engine Baseline Comparison
 
-> [!NOTE]
-> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent tests requiring GPU rasterization or 2D window layout are cataloged in [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+> - **WPT Conformance ($P / T$)**: Evaluates `cssomnom` in pure Node.js across all in-scope W3C test suites ($T$). Physically browser-dependent capabilities are classified dynamically at assertion level per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md).
 > - **Reference Engine**: Comparison numbers represent official unpolyfilled **Chrome 154.0.8037.0** test runs from [`wpt.fyi`](https://wpt.fyi) across matching test suites.
 
 | Spec Domain | **cssomnom** | Chrome 154 (`wpt.fyi`) | Parity vs Chrome |

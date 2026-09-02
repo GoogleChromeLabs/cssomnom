@@ -45,12 +45,15 @@ pnpm run fixtures:generate
 ```
 This runs `node scripts/external_suites/extract_all.ts`.
 
-**4. Revise Feasibility Manifest:**
-When WPT test files are added, modified, or removed in `submodules/web-platform-tests/`, follow the Delphi Consensus Workflow documented in [`scripts/wpt/node/feasibility/README.md`](./scripts/wpt/node/feasibility/README.md) to audit and update [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json).
+**4. Triage Feasibility & Failure Clusters:**
+When WPT test files are added, modified, or removed in `submodules/web-platform-tests/`, inspect failure clusters and feasibility boundaries per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md).
 
 ```bash
-# Run feasibility audit
-node scripts/wpt/node/feasibility/audit.ts
+# Cluster failures across all active suites
+pnpm run wpt:cluster
+
+# Run full WPT test suite
+pnpm run wpt:run
 ```
 
 **5. Run Tests & Update Progress:**
@@ -59,7 +62,7 @@ node scripts/wpt/node/feasibility/audit.ts
 pnpm run preflight
 
 # Update WPT conformance progress table
-pnpm run wpt:node:progress
+pnpm run wpt:progress
 ```
 
 ## Spec Compliance Maintenance
@@ -72,23 +75,20 @@ When specifications are updated in the submodules, we need to ensure our impleme
 3.  **Implement Changes**: If the spec introduced new parsing rules or modified existing ones, update the implementation accordingly.
 4.  **Verify**: Run tests to ensure no regressions.
 
-## WPT Submodule Upgrades & Feasibility Manifest Auditing
+## WPT Submodule Upgrades & Feasibility Auditing
 
 When `submodules/web-platform-tests/` is upgraded:
 
-1.  **Anti-Greenwashing Invariant**: Never exclude tests merely because they fail or require complex AST handling. Tests are excluded *only* when physically impossible in pure headless Node.js (e.g. 2D coordinate hit-testing, layout rasterization, live WebDriver hardware input events).
-2.  **Delphi Consensus Protocol**: Re-run the Delphi review workflow documented in [`scripts/wpt/node/feasibility/README.md`](./scripts/wpt/node/feasibility/README.md) to audit any new test failures:
+1.  **Anti-Greenwashing Invariant**: Never exclude tests merely because they fail or require complex AST handling. Tests are excluded in `tests/wpt-node-config.json` *only* for runner blockers (reftests, VM loader crashes, indefinite timeouts).
+2.  **Cluster Triage & Feasibility Classification**: Run the failure clustering tool and audit any new failure patterns per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md):
     ```bash
-    # 1. Export current failure clusters
-    node scripts/wpt/node/feasibility/export_dataset.ts
+    # 1. Cluster current failures
+    pnpm run wpt:cluster
 
-    # 2. Reconcile subagent votes & regenerate manifest
-    node scripts/wpt/node/feasibility/generate_manifest.ts
-
-    # 3. Verify feasibility metrics
-    node scripts/wpt/node/feasibility/audit.ts
+    # 2. Verify and test classifier rules
+    pnpm test:node
     ```
-3.  **Synchronize Baseline Tables**: Update [`tests/fixtures/wpt-browser-only-manifest.json`](./tests/fixtures/wpt-browser-only-manifest.json) and verify that the feasibility baseline in [`wpt-progress.md`](./wpt-progress.md) matches the updated manifest counts.
+3.  **Synchronize Progress**: Run `pnpm run wpt:progress` to update the historical conformance progress log.
 
 ## Spec Compliance Auditing via Subagents
 
