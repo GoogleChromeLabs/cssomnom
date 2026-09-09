@@ -179,6 +179,7 @@ export interface SimpleBlock {
   associatedToken: Token;
   value: ComponentValue[];
   endIndex?: number;
+  isClosed?: boolean;
 }
 
 export interface CSSFunction {

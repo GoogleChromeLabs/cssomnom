@@ -33,7 +33,33 @@ import { getCascadedStyle } from './cascade.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { PropertyRegistry, matchesSyntax } from './PropertyRegistry.ts';
 
+/**
+ * Extracts the start offset of a component value (Token or SimpleBlock).
+ */
+export function getComponentValueStartIndex(item?: ComponentValue): number | undefined {
+  if (!item) return undefined;
+  if (item.type === 'simple-block') {
+    return item.associatedToken?.startIndex;
+  }
+  if ('startIndex' in item && typeof item.startIndex === 'number') {
+    return item.startIndex;
+  }
+  return undefined;
+}
 
+/**
+ * Extracts the end offset of a component value (Token or SimpleBlock).
+ */
+export function getComponentValueEndIndex(item?: ComponentValue): number | undefined {
+  if (!item) return undefined;
+  if (item.type === 'simple-block') {
+    return item.endIndex ?? item.associatedToken?.endIndex;
+  }
+  if ('endIndex' in item && typeof item.endIndex === 'number') {
+    return item.endIndex;
+  }
+  return undefined;
+}
 
 /**
  * Skeleton Parser for CSSOM.
@@ -354,13 +380,13 @@ export class Parser {
         if (handler) {
           const res = handler(this, rule, undefined, nested);
           if (res && res instanceof CSSRule && !res.location) {
-            res.location = { start, end };
+            res._location = { start, end };
           }
           return res;
         }
         if (nested) return null;
         const atRule = new CSSAtRule(rule.name, rule.prelude);
-        atRule.location = { start, end };
+        atRule._location = { start, end };
         return atRule;
       } else if (next.type === '}') {
         if (nested) return null;
@@ -370,7 +396,7 @@ export class Parser {
         const block = this.consumeBlock(this.consumeToken());
         const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
         const bodyStart = block.associatedToken.endIndex;
-        const bodyEnd = block.endIndex !== undefined ? block.endIndex - 1 : undefined;
+        const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
         const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
 
         if (!this.isSupportedAtRule(atRuleName, nested)) return null;
@@ -379,7 +405,7 @@ export class Parser {
         if (handler) {
           const res = handler(this, rule, block, nested);
           if (res && res instanceof CSSRule && !res.location) {
-            res.location = location;
+            res._location = location;
           }
           return res;
         }
@@ -400,7 +426,7 @@ export class Parser {
         }
         
         const atRule = new CSSAtRule(rule.name, rule.prelude, block);
-        atRule.location = location;
+        atRule._location = location;
         return atRule;
       } else {
         rule.prelude.push(this.consumeComponentValue());
@@ -598,11 +624,11 @@ export class Parser {
           const selectorText = normalizedParts.join(', ');
           const declarations = this.consumeDeclarationsFromBlockContents(blockVal.value);
           const keyframeRule = new CSSKeyframeRule(selectorText, declarations);
-          const kfStart = (prelude[0] as Token)?.startIndex ?? blockVal.associatedToken.startIndex ?? 0;
+          const kfStart = getComponentValueStartIndex(prelude[0]) ?? blockVal.associatedToken.startIndex ?? 0;
           const kfEnd = blockVal.endIndex ?? blockVal.associatedToken.startIndex ?? kfStart;
           const kfBodyStart = blockVal.associatedToken.endIndex;
-          const kfBodyEnd = blockVal.endIndex !== undefined ? blockVal.endIndex - 1 : undefined;
-          keyframeRule.location = { start: kfStart, end: kfEnd, bodyStart: kfBodyStart, bodyEnd: kfBodyEnd };
+          const kfBodyEnd = blockVal.endIndex !== undefined ? (blockVal.isClosed ? blockVal.endIndex - 1 : blockVal.endIndex) : undefined;
+          keyframeRule._location = { start: kfStart, end: kfEnd, bodyStart: kfBodyStart, bodyEnd: kfBodyEnd };
           keyframeRules.push(keyframeRule);
         }
       } else {
@@ -963,11 +989,23 @@ export class Parser {
           return null;
         }
         const blockToken = this.consumeToken(); // Consume '{'
-        const start = (prelude[0] as Token)?.startIndex ?? blockToken.startIndex ?? 0;
+        const start = getComponentValueStartIndex(prelude[0]) ?? blockToken.startIndex ?? 0;
         const stream = new LazyComponentValueStream(() => this.consumeComponentValue(), '}');
         const blockContents = this.consumeBlockContents(stream, true);
         const term = stream.terminator as Token | null;
-        const end = term ? (term.endIndex ?? (term.startIndex !== undefined ? term.startIndex + 1 : start)) : (blockToken.endIndex ?? blockToken.startIndex ?? start);
+        let end: number;
+        if (term) {
+          end = term.endIndex ?? (term.startIndex !== undefined ? term.startIndex + 1 : start);
+        } else {
+          const eofPos = this.nextToken.startIndex ?? this.nextToken.endIndex;
+          if (eofPos !== undefined) {
+            end = eofPos;
+          } else {
+            const buffered = stream.slice(0, stream.position);
+            const lastEnd = buffered.length > 0 ? getComponentValueEndIndex(buffered[buffered.length - 1]) : undefined;
+            end = lastEnd ?? (blockToken.endIndex ?? blockToken.startIndex ?? start);
+          }
+        }
         const bodyStart = blockToken.endIndex;
         const bodyEnd = term ? (term.startIndex ?? end) : end;
         const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
@@ -1270,10 +1308,10 @@ export class Parser {
 
         const block = val as SimpleBlock;
         const blockContents = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
-        const start = (prelude[0] as Token)?.startIndex ?? block.associatedToken.startIndex ?? 0;
+        const start = getComponentValueStartIndex(prelude[0]) ?? block.associatedToken.startIndex ?? 0;
         const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
         const bodyStart = block.associatedToken.endIndex;
-        const bodyEnd = block.endIndex !== undefined ? block.endIndex - 1 : undefined;
+        const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
         const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
         const rule = this.createStyleRule(prelude, blockContents, nested, allowRelative, location);
         if (!rule) return null;
@@ -1309,13 +1347,13 @@ export class Parser {
           const handledRule = handler(this, rule, undefined, nested);
           if (!handledRule) return null;
           if (handledRule instanceof CSSRule && !handledRule.location) {
-            handledRule.location = { start, end };
+            handledRule._location = { start, end };
           }
           return handledRule;
         }
         if (nested) return null;
         const atRule = new CSSAtRule(rule.name, rule.prelude);
-        atRule.location = { start, end };
+        atRule._location = { start, end };
         return atRule;
       } else if (val.type === 'EOF' || val.type === '}') {
         const end = (val as Token).startIndex ?? start;
@@ -1325,20 +1363,20 @@ export class Parser {
           const handledRule = handler(this, rule, undefined, nested);
           if (!handledRule) return null;
           if (handledRule instanceof CSSRule && !handledRule.location) {
-            handledRule.location = { start, end };
+            handledRule._location = { start, end };
           }
           return handledRule;
         }
         if (nested) return null;
         const atRule = new CSSAtRule(rule.name, rule.prelude);
-        atRule.location = { start, end };
+        atRule._location = { start, end };
         return atRule;
       } else if (val.type === 'simple-block' && (val as SimpleBlock).associatedToken.type === '{') {
         stream.next();
         const block = val as SimpleBlock;
         const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
         const bodyStart = block.associatedToken.endIndex;
-        const bodyEnd = block.endIndex !== undefined ? block.endIndex - 1 : undefined;
+        const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
         const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
 
         if (!this.isSupportedAtRule(atRuleName, nested)) return null;
@@ -1348,7 +1386,7 @@ export class Parser {
           const handledRule = handler(this, rule, block, nested);
           if (!handledRule) return null;
           if (handledRule instanceof CSSRule && !handledRule.location) {
-            handledRule.location = location;
+            handledRule._location = location;
           }
           return handledRule;
         }
@@ -1356,7 +1394,7 @@ export class Parser {
         rule.childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), nested);
         const cssRules = rule.childRules.map(r => r as CSSRule);
         const atRule = new CSSAtRule(rule.name, rule.prelude, block, cssRules);
-        atRule.location = location;
+        atRule._location = location;
         return atRule;
       } else {
         rule.prelude.push(stream.next());
@@ -1476,7 +1514,7 @@ export class Parser {
     }
     const rule = new CSSStyleRule(selectorText, declarations, nestedRules, parseRuleInBlock, selectorAST);
     if (location) {
-      rule.location = location;
+      rule._location = location;
     }
     return rule;
   }
@@ -1597,10 +1635,12 @@ export class Parser {
       const next = this.nextToken;
       if (next.type === mirror) {
         block.endIndex = next.endIndex ?? next.startIndex;
+        block.isClosed = true;
         this.discardToken();
         return block;
       } else if (next.type === 'EOF') {
         block.endIndex = next.startIndex;
+        block.isClosed = false;
         this.reportError('Unexpected EOF in block', next);
         return block;
       } else {

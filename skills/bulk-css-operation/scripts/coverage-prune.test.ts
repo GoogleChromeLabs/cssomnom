@@ -84,7 +84,7 @@ describe('coverage-prune: Coverage-guided CSS dead-code pruner', () => {
   });
 
   describe('Complex Case: modern.css (container queries, nested rules, @layer, :root)', () => {
-    const fixtureUrl = new URL('../../../../tests/fixtures/modern.css', import.meta.url);
+    const fixtureUrl = new URL('../../../tests/fixtures/modern.css', import.meta.url);
     const modernCss = readFileSync(fixtureUrl, 'utf8');
 
     it('prunes unused rules while preserving covered component and :root custom properties', () => {

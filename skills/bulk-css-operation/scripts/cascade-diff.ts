@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-import { CSSStyleSheet } from '../../../../src/index.ts';
-import { calculateSpecificity, compareSpecificity } from '../../../../src/specificity.ts';
+import { CSSStyleSheet } from '../../../src/index.ts';
+import { calculateSpecificity, compareSpecificity } from '../../../src/specificity.ts';
 import { extractRuleRecords, type RuleRecord } from './ast-diff.ts';
 
 export interface CascadeConflict {

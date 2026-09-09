@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-import { CSSStyleSheet, getCascadedStyle } from '../../../../src/index.ts';
-import type { DOMElement } from '../../../../src/matcher.ts';
+import { CSSStyleSheet, getCascadedStyle } from '../../../src/index.ts';
+import type { DOMElement } from '../../../src/matcher.ts';
 
 export interface DomSampleDifference {
   elementDescription: string;

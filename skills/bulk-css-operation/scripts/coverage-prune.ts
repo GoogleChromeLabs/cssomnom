@@ -20,12 +20,19 @@ import {
   CSSRule,
   CSSStyleRule,
   CSSGroupingRule,
+  CSSMediaRule,
+  CSSSupportsRule,
+  CSSContainerRule,
+  CSSLayerBlockRule,
   CSSKeyframesRule,
   CSSFontFaceRule,
   CSSPropertyRule,
   CSSImportRule,
   CSSNamespaceRule,
-} from '../../../../src/index.ts';
+  CSSStartingStyleRule,
+  CSSScopeRule,
+  CSSPageRule,
+} from '../../../src/index.ts';
 
 export interface CoverageRange {
   start: number;
@@ -57,15 +64,58 @@ function isCovered(start: number, end: number, ranges: CoverageRange[]): boolean
 }
 
 /**
- * Extracts the rule header (selector or at-rule prelude) verbatim from source text.
+ * Extracts the canonical rule header (selector or at-rule prelude) cleanly.
  */
 function getRuleHeader(rule: CSSRule, source: string): string {
+  if (rule instanceof CSSStyleRule) {
+    return rule.selectorText;
+  }
+  if (rule instanceof CSSMediaRule) {
+    return `@media ${rule.conditionText}`;
+  }
+  if (rule instanceof CSSSupportsRule) {
+    return `@supports ${rule.conditionText}`;
+  }
+  if (rule instanceof CSSContainerRule) {
+    return `@container ${rule.conditionText}`;
+  }
+  if (rule instanceof CSSLayerBlockRule) {
+    return rule.name ? `@layer ${rule.name}` : '@layer';
+  }
+  if (rule instanceof CSSKeyframesRule) {
+    return `@keyframes ${rule.name}`;
+  }
+  if (rule instanceof CSSFontFaceRule) {
+    return '@font-face';
+  }
+  if (rule instanceof CSSPropertyRule) {
+    return `@property ${rule.name}`;
+  }
+  if (rule instanceof CSSStartingStyleRule) {
+    return '@starting-style';
+  }
+  if (rule instanceof CSSScopeRule) {
+    const start = rule.start ? `(${rule.start})` : '';
+    const end = rule.end ? ` to (${rule.end})` : '';
+    const prelude = `${start}${end}`.trim();
+    return prelude ? `@scope ${prelude}` : '@scope';
+  }
+  if (rule instanceof CSSPageRule) {
+    return rule.selectorText ? `@page ${rule.selectorText}` : '@page';
+  }
+  if (rule instanceof CSSImportRule || rule instanceof CSSNamespaceRule) {
+    return rule.cssText.replace(/;$/, '').trim();
+  }
   const loc = rule.location;
   if (!loc) return '';
   if (loc.bodyStart !== undefined) {
-    return source.slice(loc.start, loc.bodyStart).replace(/\s*\{$/, '').trim();
+    const braceIdx = source.lastIndexOf('{', loc.bodyStart);
+    const headerEnd = braceIdx >= loc.start ? braceIdx : loc.bodyStart;
+    return source.slice(loc.start, headerEnd).trim();
   }
-  return source.slice(loc.start, loc.end).trim();
+  const semiIdx = source.lastIndexOf(';', loc.end);
+  const headerEnd = semiIdx >= loc.start ? semiIdx : loc.end;
+  return source.slice(loc.start, headerEnd).trim();
 }
 
 /**
@@ -90,17 +140,7 @@ function getChildRules(rule: CSSRule): CSSRule[] {
  * Checks if a rule is a grouping rule with nested child rules that can be pruned individually.
  */
 function isGroupingRule(rule: CSSRule): boolean {
-  if (
-    rule instanceof CSSKeyframesRule ||
-    rule instanceof CSSFontFaceRule ||
-    rule instanceof CSSPropertyRule
-  ) {
-    return false;
-  }
-  if ('cssRules' in rule && rule.cssRules) {
-    return getChildRules(rule).length > 0;
-  }
-  return false;
+  return rule instanceof CSSGroupingRule && getChildRules(rule).length > 0;
 }
 
 /**
@@ -132,8 +172,7 @@ export function pruneUnusedCss(
     // 1. Mandatory preserves for meta at-rules
     if (
       rule instanceof CSSImportRule ||
-      rule instanceof CSSNamespaceRule ||
-      rule.constructor.name === 'CSSCharsetRule'
+      rule instanceof CSSNamespaceRule
     ) {
       retainedRules.push(header);
       retainedSet.add(rule);

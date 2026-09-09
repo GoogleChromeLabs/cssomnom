@@ -26,15 +26,12 @@ import type { CSSStyleSheet } from '../CSSOM.ts';
 export class CSSRule {
   private _parentRule: CSSRule | null = null;
   private _parentStyleSheet: CSSStyleSheet | null = null;
-  private _location?: RuleSourceLocation;
+  /** @internal */
+  _location?: RuleSourceLocation;
 
   // Tooling extension: original character offsets from source CSS
   get location(): RuleSourceLocation | undefined {
     return this._location;
-  }
-
-  set location(loc: RuleSourceLocation | undefined) {
-    this._location = loc;
   }
 
   // cssom-1 § 6.4 #dom-cssrule-parentrule

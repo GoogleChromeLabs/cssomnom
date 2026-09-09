@@ -20,7 +20,7 @@ import {
   CSSStyleRule,
   CSSGroupingRule,
   type CSSRuleList,
-} from '../../../../src/index.ts';
+} from '../../../src/index.ts';
 
 export interface RuleRecord {
   context: string;

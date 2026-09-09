@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { diffCssAst } from './ast-diff.ts';
 import { checkCascadeInversions } from './cascade-diff.ts';
 import { diffComputedStyles } from './computed-diff.ts';
-import type { DOMElement } from '../../../../src/matcher.ts';
+import type { DOMElement } from '../../../src/matcher.ts';
 
 describe('bulk-css-operation: verification scripts', () => {
   describe('Level 1: diffCssAst', () => {
@@ -209,7 +209,7 @@ describe('bulk-css-operation: verification scripts', () => {
   });
 
   describe('Comprehensive fixture verification: modern.css', () => {
-    const fixtureUrl = new URL('../../../../tests/fixtures/modern.css', import.meta.url);
+    const fixtureUrl = new URL('../../../tests/fixtures/modern.css', import.meta.url);
     const original = readFileSync(fixtureUrl, 'utf-8');
     const lines = original.split('\n');
     // Split cleanly into 3 modular files at top-level rule boundaries
