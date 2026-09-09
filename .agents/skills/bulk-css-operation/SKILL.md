@@ -75,23 +75,32 @@ Beyond simple file splitting, this skill addresses 6 primary operations:
 
 ## 2. The Verification Pipeline
  
- ### Stage 1: AST Rule & Declaration Diffing (`diffCssAst`)
+### Stage 1: AST Rule & Declaration Diffing (`diffCssAst`)
  
- Stage 1 parses both the original stylesheet(s) and refactored stylesheet(s) with `CSSStyleSheet` / `ParseHooks`, recursively normalizes rules into comparable keys, and detects missing or extra rules/declarations.
+Stage 1 parses both the original stylesheet(s) and refactored stylesheet(s) with `CSSStyleSheet` / `ParseHooks`, recursively normalizes rules into comparable keys, and asserts that **no rules, selectors, or declarations were dropped, added, or corrupted**:
  
- **Rule Comparison Format**:
- `[Context (e.g. @media/@layer)] > Selector { property: value [!important]; }`
+**Rule Comparison Format**:
+`[Context (e.g. @media/@layer)] > Selector { property: value [!important]; }`
  
- Use the AST diff script at [`.agents/skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
+Use the AST diff script at [`.agents/skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
  
- ```typescript
- import { diffCssAst } from './.agents/skills/bulk-css-operation/scripts/ast-diff.ts';
- 
- const result = diffCssAst(originalCss, [modularFileA, modularFileB]);
- if (!result.valid) {
-   console.error('AST diff check failed:', result.errors);
- }
- ```
+```typescript
+import { diffCssAst } from './.agents/skills/bulk-css-operation/scripts/ast-diff.ts';
+
+// Assert that a refactor (e.g. splitting, reordering, formatting) preserves 100% of the AST
+const result = diffCssAst(originalCss, [modularFileA, modularFileB]);
+if (!result.valid) {
+  console.error('AST diff check failed:', result.errors);
+}
+
+assert.equal(result.valid, true);
+assert.equal(result.errors.length, 0);
+assert.equal(result.beforeCount, result.afterCount);
+```
+
+**What this asserts**:
+- **Tolerates**: Harmless syntactic shifts (whitespace formatting, comment changes, distribution across multiple modular files, declaration order within blocks).
+- **Catches**: Missing or extra selectors/rules, altered property values, dropped `!important` flags, or parser syntax errors.
  
  ---
  
@@ -134,11 +143,14 @@ Beyond simple file splitting, this skill addresses 6 primary operations:
 
 ## 3. Automated Skill Tests
 
-All 3 verification scripts are tested within this skill directory at [`.agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts).
+All verification and transformation scripts are tested directly within this skill directory:
+- [`.agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts) (AST diffing, cascade order checks, computed style diffing)
+- [`.agents/skills/bulk-css-operation/scripts/coverage-prune.test.ts`](./scripts/coverage-prune.test.ts) (Coverage-guided dead-code pruner across simple and complex stylesheets)
 
 Run tests directly via Node:
 ```bash
 node --test .agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts
+node --test .agents/skills/bulk-css-operation/scripts/coverage-prune.test.ts
 ```
 
 ---
