@@ -82,10 +82,10 @@ Stage 1 parses both the original stylesheet(s) and refactored stylesheet(s) with
 **Rule Comparison Format**:
 `[Context (e.g. @media/@layer)] > Selector { property: value [!important]; }`
  
-Use the AST diff script at [`.agents/skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
+Use the AST diff script at [`skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
  
 ```typescript
-import { diffCssAst } from './.agents/skills/bulk-css-operation/scripts/ast-diff.ts';
+import { diffCssAst } from './skills/bulk-css-operation/scripts/ast-diff.ts';
 
 // Assert that a refactor (e.g. splitting, reordering, formatting) preserves 100% of the AST
 const result = diffCssAst(originalCss, [modularFileA, modularFileB]);
@@ -104,16 +104,16 @@ assert.equal(result.beforeCount, result.afterCount);
  
  ---
  
- ### Stage 2: Cascade & Source-Order Conflict Detection (`checkCascadeInversions`)
+ ### Stage 2: Cascade & Source-Order Conflict Detection (`checkCascadeConflicts`)
  
  When splitting a single stylesheet into multiple files, rule order within the cascade can shift. A reordering is only problematic if two rules match overlapping elements and define conflicting CSS properties at identical specificity.
  
- Use the cascade conflict detector at [`.agents/skills/bulk-css-operation/scripts/cascade-diff.ts`](./scripts/cascade-diff.ts):
+ Use the cascade conflict detector at [`skills/bulk-css-operation/scripts/cascade-diff.ts`](./scripts/cascade-diff.ts):
  
  ```typescript
- import { checkCascadeInversions } from './.agents/skills/bulk-css-operation/scripts/cascade-diff.ts';
+ import { checkCascadeConflicts } from './skills/bulk-css-operation/scripts/cascade-diff.ts';
  
- const cascadeResult = checkCascadeInversions(originalCss, [modularFileA, modularFileB]);
+ const cascadeResult = checkCascadeConflicts(originalCss, [modularFileA, modularFileB]);
  if (!cascadeResult.valid) {
    for (const conflict of cascadeResult.conflicts) {
      console.warn(conflict.description);
@@ -127,10 +127,10 @@ assert.equal(result.beforeCount, result.afterCount);
  
  When performing structural selector changes (e.g. converting BEM `.block__elem--mod` to modular utility classes `.flex .items-center`), AST diffing cannot prove equivalence because the selectors themselves differ.
  
- Use the DOM computed style diff tool at [`.agents/skills/bulk-css-operation/scripts/computed-diff.ts`](./scripts/computed-diff.ts):
+ Use the DOM computed style diff tool at [`skills/bulk-css-operation/scripts/computed-diff.ts`](./scripts/computed-diff.ts):
  
  ```typescript
- import { diffComputedStyles } from './.agents/skills/bulk-css-operation/scripts/computed-diff.ts';
+ import { diffComputedStyles } from './skills/bulk-css-operation/scripts/computed-diff.ts';
  
  // Sample representative DOM elements from application fixtures / JSDOM / linkedom
  const domResult = diffComputedStyles(sampledElements, originalCss, refactoredCss);
@@ -144,13 +144,13 @@ assert.equal(result.beforeCount, result.afterCount);
 ## 3. Automated Skill Tests
 
 All verification and transformation scripts are tested directly within this skill directory:
-- [`.agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts) (AST diffing, cascade order checks, computed style diffing)
-- [`.agents/skills/bulk-css-operation/scripts/coverage-prune.test.ts`](./scripts/coverage-prune.test.ts) (Coverage-guided dead-code pruner across simple and complex stylesheets)
+- [`skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts) (AST diffing, cascade order checks, computed style diffing)
+- [`skills/bulk-css-operation/scripts/coverage-prune.test.ts`](./scripts/coverage-prune.test.ts) (Coverage-guided dead-code pruner across simple and complex stylesheets)
 
 Run tests directly via Node:
 ```bash
-node --test .agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts
-node --test .agents/skills/bulk-css-operation/scripts/coverage-prune.test.ts
+node --test skills/bulk-css-operation/scripts/bulk-css-operation.test.ts
+node --test skills/bulk-css-operation/scripts/coverage-prune.test.ts
 ```
 
 ---
@@ -170,7 +170,7 @@ node --test .agents/skills/bulk-css-operation/scripts/coverage-prune.test.ts
     - Run Stage 1 `diffCssAst`.
     - If missing declarations or syntax errors are reported, inspect the exact failure and repair.
  4. **Inspect Source Order & Cascade**:
-    - Check if any same-specificity rules were reversed across files using `checkCascadeInversions`.
+    - Check if any same-specificity rules were reversed across files using `checkCascadeConflicts`.
     - If necessary, adjust stylesheet import order in the entry point.
  5. **Commit Cleanly**:
     - Run `pnpm run preflight` to ensure no repository regressions.
