@@ -17,6 +17,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { verifyStylesheetParity } from './verify-parity.ts';
 import { verifyCascadeOrder } from './verify-cascade.ts';
 import { sampleDomParity } from './sample-dom.ts';
@@ -204,6 +205,37 @@ describe('bulk-css-operation: verification scripts', () => {
       assert.equal(result.differences[0].property, 'color');
       assert.equal(result.differences[0].beforeValue, 'rgb(0, 0, 255)');
       assert.equal(result.differences[0].afterValue, 'rgb(0, 128, 0)');
+    });
+  });
+
+  describe('Comprehensive fixture verification: modern.css', () => {
+    const original = readFileSync('tests/fixtures/modern.css', 'utf-8');
+    const lines = original.split('\n');
+    // Split cleanly into 3 modular files at top-level rule boundaries
+    const file1 = lines.slice(0, 141).join('\n');
+    const file2 = lines.slice(141, 286).join('\n');
+    const file3 = lines.slice(286).join('\n');
+
+    it('verifies 1-to-N modularization parity across 50+ modern CSS rules', () => {
+      const result = verifyStylesheetParity(original, [file1, file2, file3]);
+      assert.equal(result.valid, true);
+      assert.equal(result.errors.length, 0);
+      assert.ok(result.beforeCount >= 50);
+      assert.equal(result.beforeCount, result.afterCount);
+    });
+
+    it('verifies cascade order invariant preservation on modular split', () => {
+      const result = verifyCascadeOrder(original, [file1, file2, file3]);
+      assert.equal(result.valid, true);
+      assert.equal(result.conflicts.length, 0);
+    });
+
+    it('catches accidental omission or corruption within large stylesheet', () => {
+      const corruptedFile2 = file2.replace('.accordion-content {', '.accordion-content-typo {');
+      const result = verifyStylesheetParity(original, [file1, corruptedFile2, file3]);
+      assert.equal(result.valid, false);
+      assert.ok(result.errors.some(e => e.includes('MISSING RULE') && e.includes('.accordion-content')));
+      assert.ok(result.errors.some(e => e.includes('UNEXPECTED RULE') && e.includes('.accordion-content-typo')));
     });
   });
 });
