@@ -749,7 +749,7 @@ function collectStyleSheets(root: Document | DocumentFragment): StyleSheetListIm
 export function registerElementId(el: Element, id: string, win?: WindowType): void {
   if (!id || PROTECTED_HARNESS_NAMES.has(id) || id in Object.prototype) return;
   const doc = el.ownerDocument || (win?.document as Document);
-  const winContext = (doc?.defaultView || win) as unknown as Record<string, unknown>;
+  const winContext = (win || doc?.defaultView) as unknown as Record<string, unknown>;
   const sb =
     (winContext as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
     (doc as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
@@ -760,7 +760,11 @@ export function registerElementId(el: Element, id: string, win?: WindowType): vo
       if (!desc || desc.configurable) {
         Object.defineProperty(target, id, {
           get() {
-            return (doc && typeof doc.getElementById === 'function') ? doc.getElementById(id) : el;
+            if (doc && typeof doc.getElementById === 'function') {
+              const matched = doc.getElementById(id);
+              if (matched) return matched;
+            }
+            return undefined;
           },
           set(v: unknown) {
             Object.defineProperty(target, id, {
@@ -794,7 +798,7 @@ export function unregisterElementId(el: Element, id: string, win?: WindowType): 
     const existing = doc.getElementById(id);
     if (existing) return;
   }
-  const winContext = (doc?.defaultView || win) as unknown as Record<string, unknown>;
+  const winContext = (win || doc?.defaultView) as unknown as Record<string, unknown>;
   const sb =
     (winContext as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
     (doc as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
@@ -992,8 +996,9 @@ function patchNodeTreeMutations(window: WindowType): void {
       proto.appendChild = function (this: unknown, node: unknown) {
         invalidateStyleElementSheet(this);
         const doc = getTargetDocument(this);
+        const res = originalAppendChild.call(this, node);
         dispatchNodeMutationEffects(node, doc, false, window);
-        return originalAppendChild.call(this, node);
+        return res;
       };
     }
 
@@ -1002,8 +1007,9 @@ function patchNodeTreeMutations(window: WindowType): void {
       proto.insertBefore = function (this: unknown, node: unknown, child?: unknown) {
         invalidateStyleElementSheet(this);
         const doc = getTargetDocument(this);
+        const res = child !== undefined ? originalInsertBefore.call(this, node, child) : originalInsertBefore.call(this, node);
         dispatchNodeMutationEffects(node, doc, false, window);
-        return child !== undefined ? originalInsertBefore.call(this, node, child) : originalInsertBefore.call(this, node);
+        return res;
       };
     }
 
@@ -1013,8 +1019,9 @@ function patchNodeTreeMutations(window: WindowType): void {
         invalidateStyleElementSheet(this);
         const doc = getTargetDocument(this);
         dispatchNodeMutationEffects(oldChild, doc, true, window);
+        const res = originalReplaceChild.call(this, newChild, oldChild);
         dispatchNodeMutationEffects(newChild, doc, false, window);
-        return originalReplaceChild.call(this, newChild, oldChild);
+        return res;
       };
     }
 

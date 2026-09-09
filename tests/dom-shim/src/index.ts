@@ -13,6 +13,6 @@ export * from './iframe-runner.ts';
  * Outline Orchestrator for augmenting a LinkeDOM window with CSSOM / Typed OM capabilities.
  */
 export function patchWindowForTypedOM(window: WindowType): void {
-  patchWindowInstance(window, patchWindowForTypedOM);
   patchDomPrototypes(window, patchWindowForTypedOM);
+  patchWindowInstance(window, patchWindowForTypedOM);
 }

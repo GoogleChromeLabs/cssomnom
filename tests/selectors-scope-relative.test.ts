@@ -268,19 +268,22 @@ describe('Phase 118: :scope, @scope & Complex Relative Selectors', () => {
       const doc = dom.document;
       patchWindowForTypedOM(win);
 
-      const winObj = win as unknown as Record<string, unknown>;
-      assert.equal(winObj.item1, doc.getElementById('item1'));
-      assert.equal(winObj.item2, doc.getElementById('item2'));
+      const winObj = win as unknown as Record<string, { id?: string } | undefined>;
+      assert.ok(winObj.item1 === doc.getElementById('item1'));
+      assert.equal(winObj.item1?.id, 'item1');
+      assert.ok(winObj.item2 === doc.getElementById('item2'));
+      assert.equal(winObj.item2?.id, 'item2');
 
       // Dynamic element addition
       const div3 = doc.createElement('div');
       div3.id = 'item3';
       doc.body.appendChild(div3);
-      assert.equal(winObj.item3, div3);
+      assert.ok(winObj.item3 === div3);
+      assert.equal(winObj.item3?.id, 'item3');
 
       // Dynamic element removal
       div3.remove();
-      assert.equal(winObj.item3, undefined);
+      assert.strictEqual(winObj.item3, undefined);
     });
   });
 });
