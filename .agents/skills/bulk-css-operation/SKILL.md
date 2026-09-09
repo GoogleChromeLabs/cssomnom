@@ -1,6 +1,13 @@
 ---
 name: bulk-css-operation
-description: Safely perform bulk CSS operations (modularizing, consolidating, tokenizing, pruning) with AST set-difference verification, cascade ordering invariant checks, and DOM-grounded sampling using cssom.
+description: >-
+  Safely performs bulk CSS transformations (modularizing monolithic stylesheets,
+  consolidating bundles, migrating to tokens or variables, pruning dead selectors,
+  and unnesting) with AST set-difference verification, cascade ordering invariant
+  checks, and DOM-grounded sampling. Use when splitting monolithic stylesheets,
+  merging CSS files, restructuring nesting, migrating design tokens, or pruning
+  unused CSS rules across a codebase. Don't use for single-rule or cosmetic CSS fixes,
+  general HTML/JS refactoring without stylesheet changes, or running test suites.
 ---
 
 # Bulk CSS Operations with CSSOM
