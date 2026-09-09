@@ -75,12 +75,12 @@ Level 1 parses both the original stylesheet(s) and refactored stylesheet(s) with
 **Canonical Rule Key Format**:
 `[Scope / At-Rule Context] > Selector { property: value [!important]; }`
 
-Use the pre-built verification script located at [`.agents/skills/bulk-css-operation/scripts/verify-parity.ts`](./scripts/verify-parity.ts):
+Use the AST diff script at [`.agents/skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
 
 ```typescript
-import { verifyStylesheetParity } from './scripts/verify-parity.ts';
+import { diffCssAst } from './scripts/ast-diff.ts';
 
-const result = verifyStylesheetParity(originalCss, [modularFileA, modularFileB]);
+const result = diffCssAst(originalCss, [modularFileA, modularFileB]);
 if (!result.valid) {
   console.error('Parity check failed:', result.errors);
 }
@@ -92,12 +92,12 @@ if (!result.valid) {
 
 When splitting a single file into multiple modular files, rule order within the cascade often shifts. A reordering is **only dangerous** if two rules match overlapping elements and define conflicting properties at identical specificity.
 
-Use the cascade conflict detector at [`.agents/skills/bulk-css-operation/scripts/verify-cascade.ts`](./scripts/verify-cascade.ts):
+Use the cascade conflict detector at [`.agents/skills/bulk-css-operation/scripts/cascade-diff.ts`](./scripts/cascade-diff.ts):
 
 ```typescript
-import { verifyCascadeOrder } from './scripts/verify-cascade.ts';
+import { checkCascadeInversions } from './scripts/cascade-diff.ts';
 
-const cascadeResult = verifyCascadeOrder(originalCss, [modularFileA, modularFileB]);
+const cascadeResult = checkCascadeInversions(originalCss, [modularFileA, modularFileB]);
 if (!cascadeResult.valid) {
   for (const conflict of cascadeResult.conflicts) {
     console.warn(conflict.description);
@@ -111,13 +111,13 @@ if (!cascadeResult.valid) {
 
 When performing structural selector changes (e.g. converting BEM `.block__elem--mod` to modular utility classes `.flex .items-center`), static AST set-difference cannot prove equivalence because the selectors themselves differ.
 
-Use the DOM sampling oracle at [`.agents/skills/bulk-css-operation/scripts/sample-dom.ts`](./scripts/sample-dom.ts):
+Use the DOM computed style diff tool at [`.agents/skills/bulk-css-operation/scripts/computed-diff.ts`](./scripts/computed-diff.ts):
 
 ```typescript
-import { sampleDomParity } from './scripts/sample-dom.ts';
+import { diffComputedStyles } from './scripts/computed-diff.ts';
 
 // Sample representative DOM elements from application fixtures / JSDOM / linkedom
-const domResult = sampleDomParity(sampledElements, originalCss, refactoredCss);
+const domResult = diffComputedStyles(sampledElements, originalCss, refactoredCss);
 if (!domResult.valid) {
   console.error('DOM computed style differences detected:', domResult.differences);
 }

@@ -35,7 +35,7 @@ export interface DomSampleResult {
  * Level 3 Verification: Evaluates computed cascaded styles for a sample set of DOM elements
  * against before and after stylesheets.
  */
-export function sampleDomParity(
+export function diffComputedStyles(
   elements: DOMElement[],
   beforeCss: string | string[],
   afterCss: string | string[]
@@ -88,3 +88,7 @@ export function sampleDomParity(
     differences,
   };
 }
+
+/** Backward compatibility alias */
+export const sampleDomParity = diffComputedStyles;
+

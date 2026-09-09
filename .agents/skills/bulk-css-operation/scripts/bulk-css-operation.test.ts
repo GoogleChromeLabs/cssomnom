@@ -18,13 +18,19 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { verifyStylesheetParity } from './verify-parity.ts';
-import { verifyCascadeOrder } from './verify-cascade.ts';
-import { sampleDomParity } from './sample-dom.ts';
+import { diffCssAst, verifyStylesheetParity } from './ast-diff.ts';
+import { checkCascadeInversions, verifyCascadeOrder } from './cascade-diff.ts';
+import { diffComputedStyles, sampleDomParity } from './computed-diff.ts';
 import type { DOMElement } from '../../../../src/matcher.ts';
 
 describe('bulk-css-operation: verification scripts', () => {
-  describe('Level 1: verifyStylesheetParity', () => {
+  it('exports backward compatibility aliases', () => {
+    assert.equal(verifyStylesheetParity, diffCssAst);
+    assert.equal(verifyCascadeOrder, checkCascadeInversions);
+    assert.equal(sampleDomParity, diffComputedStyles);
+  });
+
+  describe('Level 1: diffCssAst', () => {
     it('passes on identical stylesheets regardless of rule reordering or whitespace', () => {
       const before = `
         /* Monolithic original */

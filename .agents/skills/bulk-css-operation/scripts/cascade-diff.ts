@@ -17,7 +17,7 @@
 
 import { CSSStyleSheet } from '../../../../src/index.ts';
 import { calculateSpecificity, compareSpecificity } from '../../../../src/specificity.ts';
-import { extractRuleRecords, type RuleRecord } from './verify-parity.ts';
+import { extractRuleRecords, type RuleRecord } from './ast-diff.ts';
 
 export interface CascadeConflict {
   selectorA: string;
@@ -60,7 +60,7 @@ function canSelectorsOverlap(selA: string, selB: string): boolean {
  * Level 2 Verification: Detects whether source order between competing rules
  * (rules with identical specificity defining identical properties) was swapped.
  */
-export function verifyCascadeOrder(
+export function checkCascadeInversions(
   beforeCss: string | string[],
   afterCss: string | string[]
 ): CascadeCheckResult {
@@ -147,3 +147,7 @@ export function verifyCascadeOrder(
     conflicts,
   };
 }
+
+/** Backward compatibility alias */
+export const verifyCascadeOrder = checkCascadeInversions;
+

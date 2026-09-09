@@ -29,12 +29,14 @@ export interface RuleRecord {
   originalIndex: number;
 }
 
-export interface ParityResult {
+export interface AstDiffResult {
   valid: boolean;
   beforeCount: number;
   afterCount: number;
   errors: string[];
 }
+
+export type ParityResult = AstDiffResult;
 
 /**
  * Recursively extracts normalized rule records from a CSSRuleList.
@@ -82,10 +84,10 @@ export function extractRuleRecords(
  * Level 1 Verification: Compares two stylesheets (or sets of stylesheets)
  * for exact rule and declaration AST set-difference parity.
  */
-export function verifyStylesheetParity(
+export function diffCssAst(
   beforeCss: string | string[],
   afterCss: string | string[]
-): ParityResult {
+): AstDiffResult {
   const beforeText = Array.isArray(beforeCss) ? beforeCss.join('\n') : beforeCss;
   const afterText = Array.isArray(afterCss) ? afterCss.join('\n') : afterCss;
 
@@ -171,3 +173,7 @@ export function verifyStylesheetParity(
     errors,
   };
 }
+
+/** Backward compatibility alias */
+export const verifyStylesheetParity = diffCssAst;
+
