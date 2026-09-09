@@ -526,10 +526,41 @@ function dispatchNodeMutationEffects(
     }
   }
 
-  if (isRemoval) return;
+  if (isRemoval) {
+    const el = node as Element;
+    if (typeof el.getAttribute === 'function') {
+      const id = el.getAttribute('id');
+      if (id) unregisterElementId(el, id, window);
+      if (typeof el.querySelectorAll === 'function') {
+        try {
+          const childEls = el.querySelectorAll('[id]');
+          for (let i = 0; i < childEls.length; i++) {
+            const childId = childEls[i].getAttribute('id');
+            if (childId) unregisterElementId(childEls[i], childId, window);
+          }
+        } catch {}
+      }
+    }
+    return;
+  }
 
   if (doc) {
     updateOwnerDocument(node, doc);
+  }
+
+  const addedEl = node as Element;
+  if (typeof addedEl.getAttribute === 'function') {
+    const id = addedEl.getAttribute('id');
+    if (id) registerElementId(addedEl, id, window);
+    if (typeof addedEl.querySelectorAll === 'function') {
+      try {
+        const childEls = addedEl.querySelectorAll('[id]');
+        for (let i = 0; i < childEls.length; i++) {
+          const childId = childEls[i].getAttribute('id');
+          if (childId) registerElementId(childEls[i], childId, window);
+        }
+      } catch {}
+    }
   }
 
   const nodeEl = node as {
@@ -715,17 +746,74 @@ function collectStyleSheets(root: Document | DocumentFragment): StyleSheetListIm
 // Element ID & Style Mutation Helpers
 // ---------------------------------------------------------------------------
 
-function registerElementId(el: Element, id: string, win: WindowType): void {
-  if (!id || PROTECTED_HARNESS_NAMES.has(id)) return;
-  const winContext = el.ownerDocument?.defaultView || win;
+export function registerElementId(el: Element, id: string, win?: WindowType): void {
+  if (!id || PROTECTED_HARNESS_NAMES.has(id) || id in Object.prototype) return;
+  const doc = el.ownerDocument || (win?.document as Document);
+  const winContext = (doc?.defaultView || win) as unknown as Record<string, unknown>;
   const sb =
     (winContext as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
-    (el.ownerDocument as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
+    (doc as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
+
+  const defineGetter = (target: Record<string, unknown>) => {
+    try {
+      const desc = Object.getOwnPropertyDescriptor(target, id);
+      if (!desc || desc.configurable) {
+        Object.defineProperty(target, id, {
+          get() {
+            return (doc && typeof doc.getElementById === 'function') ? doc.getElementById(id) : el;
+          },
+          set(v: unknown) {
+            Object.defineProperty(target, id, {
+              value: v,
+              writable: true,
+              configurable: true,
+              enumerable: true
+            });
+          },
+          configurable: true,
+          enumerable: true
+        });
+      }
+    } catch {
+      try { target[id] = el; } catch {}
+    }
+  };
+
+  if (sb && !(id in Object.prototype)) {
+    defineGetter(sb);
+  }
+  if (winContext && !(id in Object.prototype)) {
+    defineGetter(winContext);
+  }
+}
+
+export function unregisterElementId(el: Element, id: string, win?: WindowType): void {
+  if (!id || PROTECTED_HARNESS_NAMES.has(id)) return;
+  const doc = el.ownerDocument || (win?.document as Document);
+  if (doc && typeof doc.getElementById === 'function') {
+    const existing = doc.getElementById(id);
+    if (existing) return;
+  }
+  const winContext = (doc?.defaultView || win) as unknown as Record<string, unknown>;
+  const sb =
+    (winContext as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
+    (doc as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
+
   if (sb) {
-    try { sb[id] = el; } catch {}
+    try {
+      const desc = Object.getOwnPropertyDescriptor(sb, id);
+      if (desc?.configurable) {
+        delete sb[id];
+      }
+    } catch {}
   }
   if (winContext) {
-    try { (winContext as unknown as Record<string, unknown>)[id] = el; } catch {}
+    try {
+      const desc = Object.getOwnPropertyDescriptor(winContext, id);
+      if (desc?.configurable) {
+        delete winContext[id];
+      }
+    } catch {}
   }
 }
 
@@ -796,6 +884,10 @@ function patchElementStyle(targetProto: Record<string, unknown>, window: WindowT
   if (origSetAttribute) {
     targetProto.setAttribute = function (this: Element, name: string, value: string) {
       if (name === 'id' && typeof value === 'string') {
+        const oldId = typeof this.getAttribute === 'function' ? this.getAttribute('id') : null;
+        if (oldId && oldId !== value) {
+          unregisterElementId(this, oldId, window);
+        }
         registerElementId(this, value, window);
       }
       if (name === 'style' && !isSyncingStyle) {
@@ -815,6 +907,12 @@ function patchElementStyle(targetProto: Record<string, unknown>, window: WindowT
   const origRemoveAttribute = targetProto.removeAttribute as ((name: string) => void) | undefined;
   if (origRemoveAttribute) {
     targetProto.removeAttribute = function (this: Element, name: string) {
+      if (name === 'id') {
+        const oldId = typeof this.getAttribute === 'function' ? this.getAttribute('id') : null;
+        if (oldId) {
+          unregisterElementId(this, oldId, window);
+        }
+      }
       if (name === 'style' && !isSyncingStyle) {
         isSyncingStyle = true;
         try {
@@ -1585,10 +1683,14 @@ function patchElementPrototype(window: WindowType): void {
           return origIdDesc?.get ? origIdDesc.get.call(this) : (this.getAttribute('id') || '');
         },
         set(this: Element, value: string) {
+          const oldId = this.getAttribute('id');
           if (origIdDesc?.set) {
             origIdDesc.set.call(this, value);
           } else {
             this.setAttribute('id', value);
+          }
+          if (oldId && oldId !== value) {
+            unregisterElementId(this, oldId, window);
           }
           if (typeof value === 'string') {
             registerElementId(this, value, window);
@@ -2097,10 +2199,27 @@ function patchWindowStyles(window: WindowType): void {
 // Main Outline Orchestration: patchWindowInstance
 // ---------------------------------------------------------------------------
 
+function patchWindowNamedElements(window: WindowType): void {
+  const doc = window.document;
+  if (doc && typeof doc.querySelectorAll === 'function') {
+    try {
+      const elementsWithId = doc.querySelectorAll('[id]');
+      for (let i = 0; i < elementsWithId.length; i++) {
+        const el = elementsWithId[i];
+        const id = el.getAttribute('id');
+        if (id) {
+          registerElementId(el, id, window);
+        }
+      }
+    } catch {}
+  }
+}
+
 export function patchWindowInstance(window: WindowType, patchWindow: (win: WindowType) => void): void {
   patchWindowGlobals(window);
   patchWindowPreferences(window);
   patchWindowTimersAndObservers(window);
   patchWindowFrameNavigation(window, patchWindow);
   patchWindowStyles(window);
+  patchWindowNamedElements(window);
 }

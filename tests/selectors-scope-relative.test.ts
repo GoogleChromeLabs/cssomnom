@@ -24,6 +24,7 @@ import { matches } from '../src/matcher.ts';
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { getCascadedStyle } from '../src/cascade.ts';
 import { parseHTML } from 'linkedom';
+import { patchWindowForTypedOM } from './dom-shim/src/index.ts';
 
 describe('Phase 118: :scope, @scope & Complex Relative Selectors', () => {
   describe('CSSScopeRule WebIDL and Serialization', () => {
@@ -203,6 +204,83 @@ describe('Phase 118: :scope, @scope & Complex Relative Selectors', () => {
       assert.equal(rule.scopeStart, '.a');
       assert.equal(rule.scopeEnd, null);
       assert.equal(rule.cssText, '@import url("test.css") scope((.a));');
+    });
+  });
+  describe('CSSScopeRule Prelude Validation & Pseudo-Element Rejection', () => {
+    // css-cascade-6 § 3.1 #scope-syntax
+    it('rejects pseudo-elements in scoping root and limit preludes', () => {
+      assert.equal(parseStyleSheet('@scope (div::before) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (div::after) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (div:before) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (.a) to (div::before) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (.a) to (div::after) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (.a) to (div:after) {}').length, 0);
+    });
+
+    it('rejects malformed preludes with trailing garbage or missing to-blocks', () => {
+      assert.equal(parseStyleSheet('@scope div {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (.a) unknown (.c) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (.a) to unknown (.c) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (.a) 1px (.c) {}').length, 0);
+      assert.equal(parseStyleSheet('@scope to {}').length, 0);
+      assert.equal(parseStyleSheet('@scope (.a) from (.c) {}').length, 0);
+    });
+  });
+
+  describe('Scope Root Exclusion without :scope', () => {
+    // css-cascade-6 § 3 #scoped-styles
+    it('does not match scope root element unless :scope is explicitly in selector', () => {
+      const { document } = parseHTML(`
+        <div class="a">
+          <span>nested text</span>
+        </div>
+      `);
+
+      const sheetNoScope = parseStyleSheet(`
+        @scope (.a) {
+          .a { color: green; }
+        }
+      `);
+
+      const rootEl = document.querySelector('.a')!;
+      const styleNoScope = getCascadedStyle(rootEl, sheetNoScope);
+      assert.equal(styleNoScope.getPropertyValue('color'), 'rgb(0, 0, 0)');
+
+      const sheetWithScope = parseStyleSheet(`
+        @scope (.a) {
+          :scope { color: green; }
+        }
+      `);
+
+      const styleWithScope = getCascadedStyle(rootEl, sheetWithScope);
+      assert.equal(styleWithScope.getPropertyValue('color'), 'rgb(0, 128, 0)');
+    });
+  });
+
+  describe('DOM Shim Named Element Access on Window', () => {
+    // html § 7.3.3 #named-access-on-the-window-object
+    it('exposes element IDs directly on window and updates on DOM mutation', () => {
+      const dom = parseHTML(`
+        <div id="item1"></div>
+        <div id="item2"></div>
+      `);
+      const win = dom.window;
+      const doc = dom.document;
+      patchWindowForTypedOM(win);
+
+      const winObj = win as unknown as Record<string, unknown>;
+      assert.equal(winObj.item1, doc.getElementById('item1'));
+      assert.equal(winObj.item2, doc.getElementById('item2'));
+
+      // Dynamic element addition
+      const div3 = doc.createElement('div');
+      div3.id = 'item3';
+      doc.body.appendChild(div3);
+      assert.equal(winObj.item3, div3);
+
+      // Dynamic element removal
+      div3.remove();
+      assert.equal(winObj.item3, undefined);
     });
   });
 });

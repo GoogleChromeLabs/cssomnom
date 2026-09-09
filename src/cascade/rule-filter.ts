@@ -152,10 +152,23 @@ export function collectStyleSheetsAndRules(
     return !isAlternate;
   };
 
+  const isInsideTemplate = (el: unknown): boolean => {
+    let curr: unknown = el;
+    while (curr && typeof curr === 'object') {
+      const tag = (curr as { tagName?: string; nodeName?: string }).tagName || (curr as { nodeName?: string }).nodeName;
+      if (tag === 'TEMPLATE') return true;
+      curr = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement || (curr as { parentNode?: unknown }).parentNode;
+    }
+    return false;
+  };
+
   const addSheetRules = (sheet: unknown) => {
     if (!sheet) return;
     const node = ((sheet as { ownerNode?: unknown }).ownerNode || sheet) as { isConnected?: boolean };
     if (node && typeof node.isConnected === 'boolean' && !node.isConnected) {
+      return;
+    }
+    if (isInsideTemplate(node)) {
       return;
     }
     const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
@@ -209,7 +222,7 @@ export function collectStyleSheetsAndRules(
       }
     }
     if (typeof rootObj.querySelectorAll === 'function') {
-      const styleTags = rootObj.querySelectorAll('style');
+      const styleTags = Array.from(rootObj.querySelectorAll('style')).filter(s => !isInsideTemplate(s));
       determinePreferredTitle(styleTags);
       for (let i = 0; i < styleTags.length; i++) {
         const tag = styleTags[i];

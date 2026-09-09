@@ -4,6 +4,7 @@
 
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM, createWptContext, format_value, type WptSandboxTest } from '../../../tests/wpt-shim.ts';
+import { registerElementId } from '../../../tests/dom-shim/src/dom-stubs.ts';
 import assert from 'node:assert/strict';
 import * as vm from 'node:vm';
 import * as fs from 'node:fs';
@@ -371,6 +372,19 @@ export function runWptFile(filePath: string): WptFileResult {
   (winObj as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = sandbox;
   if (dom.document) {
     (dom.document as unknown as { __sandbox?: Record<string, unknown> }).__sandbox = sandbox;
+  }
+
+  if (dom.document && typeof dom.document.querySelectorAll === 'function') {
+    try {
+      const elementsWithId = dom.document.querySelectorAll('[id]');
+      for (let i = 0; i < elementsWithId.length; i++) {
+        const el = elementsWithId[i];
+        const id = el.getAttribute('id');
+        if (id) {
+          registerElementId(el, id, win);
+        }
+      }
+    } catch {}
   }
 
   const context = vm.createContext(sandbox);

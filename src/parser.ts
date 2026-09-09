@@ -426,6 +426,7 @@ export class Parser {
       try {
         new SelectorParser(block.value, {
           allowRelative: true,
+          forbidPseudo: true,
           declaredNamespaces: this.declaredNamespaces
         }).parse();
         startSelector = serialize(block.value).trim();
@@ -448,6 +449,7 @@ export class Parser {
         try {
           new SelectorParser(block.value, {
             allowRelative: true,
+            forbidPseudo: true,
             declaredNamespaces: this.declaredNamespaces
           }).parse();
           endSelector = serialize(block.value).trim();
@@ -458,7 +460,14 @@ export class Parser {
           endSelector = `(${endSelector})`;
         }
         i++;
+      } else {
+        return null;
       }
+    }
+    
+    while (i < prelude.length && prelude[i].type === 'whitespace') i++;
+    if (i < prelude.length) {
+      return null;
     }
     
     return new CSSScopeRule(startSelector, endSelector, childRules as unknown as Rule[], parseRuleInScopeBlock);
