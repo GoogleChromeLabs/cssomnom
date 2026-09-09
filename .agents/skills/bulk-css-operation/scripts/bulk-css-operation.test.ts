@@ -18,18 +18,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { diffCssAst, verifyStylesheetParity } from './ast-diff.ts';
-import { checkCascadeInversions, verifyCascadeOrder } from './cascade-diff.ts';
-import { diffComputedStyles, sampleDomParity } from './computed-diff.ts';
+import { diffCssAst } from './ast-diff.ts';
+import { checkCascadeInversions } from './cascade-diff.ts';
+import { diffComputedStyles } from './computed-diff.ts';
 import type { DOMElement } from '../../../../src/matcher.ts';
 
 describe('bulk-css-operation: verification scripts', () => {
-  it('exports backward compatibility aliases', () => {
-    assert.equal(verifyStylesheetParity, diffCssAst);
-    assert.equal(verifyCascadeOrder, checkCascadeInversions);
-    assert.equal(sampleDomParity, diffComputedStyles);
-  });
-
   describe('Level 1: diffCssAst', () => {
     it('passes on identical stylesheets regardless of rule reordering or whitespace', () => {
       const before = `
@@ -58,7 +52,7 @@ describe('bulk-css-operation: verification scripts', () => {
         }
       `;
 
-      const result = verifyStylesheetParity(before, [file1, file2]);
+      const result = diffCssAst(before, [file1, file2]);
       assert.equal(result.valid, true);
       assert.equal(result.errors.length, 0);
       assert.equal(result.beforeCount, 3);
@@ -74,7 +68,7 @@ describe('bulk-css-operation: verification scripts', () => {
         .card { border: 1px solid #ccc; }
       `;
 
-      const result = verifyStylesheetParity(before, after);
+      const result = diffCssAst(before, after);
       assert.equal(result.valid, false);
       assert.ok(result.errors.some(e => e.includes('MISSING RULE') && e.includes('.card-header')));
     });
@@ -87,7 +81,7 @@ describe('bulk-css-operation: verification scripts', () => {
         .alert { color: red; display: flex; }
       `;
 
-      const result = verifyStylesheetParity(before, after);
+      const result = diffCssAst(before, after);
       assert.equal(result.valid, false);
       assert.ok(result.errors.some(e => e.includes("property 'color'") && e.includes('important')));
       assert.ok(result.errors.some(e => e.includes("property 'display'") && e.includes('block') && e.includes('flex')));
@@ -97,13 +91,13 @@ describe('bulk-css-operation: verification scripts', () => {
       const before = `.a { color: red; }`;
       const after = `.a { color: red; } .b { color: blue; }`;
 
-      const result = verifyStylesheetParity(before, after);
+      const result = diffCssAst(before, after);
       assert.equal(result.valid, false);
       assert.ok(result.errors.some(e => e.includes('UNEXPECTED RULE') && e.includes('.b')));
     });
   });
 
-  describe('Level 2: verifyCascadeOrder', () => {
+  describe('Level 2: checkCascadeInversions', () => {
     it('passes when rule order between competing selectors is preserved', () => {
       const before = `
         .btn { color: blue; }
@@ -114,7 +108,7 @@ describe('bulk-css-operation: verification scripts', () => {
         .btn-primary { color: red; }
       `;
 
-      const result = verifyCascadeOrder(before, after);
+      const result = checkCascadeInversions(before, after);
       assert.equal(result.valid, true);
       assert.equal(result.conflicts.length, 0);
     });
@@ -130,7 +124,7 @@ describe('bulk-css-operation: verification scripts', () => {
         .btn { color: blue; }
       `;
 
-      const result = verifyCascadeOrder(before, after);
+      const result = checkCascadeInversions(before, after);
       assert.equal(result.valid, false);
       assert.equal(result.conflicts.length, 1);
       assert.equal(result.conflicts[0].selectorA, '.btn');
@@ -151,12 +145,12 @@ describe('bulk-css-operation: verification scripts', () => {
         #main-button { color: red; }
       `;
 
-      const result = verifyCascadeOrder(before, after);
+      const result = checkCascadeInversions(before, after);
       assert.equal(result.valid, true);
     });
   });
 
-  describe('Level 3: sampleDomParity', () => {
+  describe('Level 3: diffComputedStyles', () => {
     it('verifies computed style parity on synthetic DOM elements', () => {
       const before = `
         button { background: white; }
@@ -180,7 +174,7 @@ describe('bulk-css-operation: verification scripts', () => {
         ownerDocument: { contentType: 'text/html' } as unknown as Document,
       };
 
-      const result = sampleDomParity([element], before, after);
+      const result = diffComputedStyles([element], before, after);
       assert.equal(result.valid, true);
       assert.equal(result.differences.length, 0);
       assert.equal(result.totalElementsTested, 1);
@@ -205,7 +199,7 @@ describe('bulk-css-operation: verification scripts', () => {
         ownerDocument: { contentType: 'text/html' } as unknown as Document,
       };
 
-      const result = sampleDomParity([element], before, after);
+      const result = diffComputedStyles([element], before, after);
       assert.equal(result.valid, false);
       assert.equal(result.differences.length, 1);
       assert.equal(result.differences[0].property, 'color');
@@ -224,7 +218,7 @@ describe('bulk-css-operation: verification scripts', () => {
     const file3 = lines.slice(286).join('\n');
 
     it('verifies 1-to-N modularization parity across 50+ modern CSS rules', () => {
-      const result = verifyStylesheetParity(original, [file1, file2, file3]);
+      const result = diffCssAst(original, [file1, file2, file3]);
       assert.equal(result.valid, true);
       assert.equal(result.errors.length, 0);
       assert.ok(result.beforeCount >= 50);
@@ -232,14 +226,14 @@ describe('bulk-css-operation: verification scripts', () => {
     });
 
     it('verifies cascade order invariant preservation on modular split', () => {
-      const result = verifyCascadeOrder(original, [file1, file2, file3]);
+      const result = checkCascadeInversions(original, [file1, file2, file3]);
       assert.equal(result.valid, true);
       assert.equal(result.conflicts.length, 0);
     });
 
     it('catches accidental omission or corruption within large stylesheet', () => {
       const corruptedFile2 = file2.replace('.accordion-content {', '.accordion-content-typo {');
-      const result = verifyStylesheetParity(original, [file1, corruptedFile2, file3]);
+      const result = diffCssAst(original, [file1, corruptedFile2, file3]);
       assert.equal(result.valid, false);
       assert.ok(result.errors.some(e => e.includes('MISSING RULE') && e.includes('.accordion-content')));
       assert.ok(result.errors.some(e => e.includes('UNEXPECTED RULE') && e.includes('.accordion-content-typo')));

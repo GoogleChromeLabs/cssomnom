@@ -89,6 +89,3 @@ export function diffComputedStyles(
   };
 }
 
-/** Backward compatibility alias */
-export const sampleDomParity = diffComputedStyles;
-

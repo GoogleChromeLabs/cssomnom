@@ -36,8 +36,6 @@ export interface AstDiffResult {
   errors: string[];
 }
 
-export type ParityResult = AstDiffResult;
-
 /**
  * Recursively extracts normalized rule records from a CSSRuleList.
  */
@@ -173,7 +171,4 @@ export function diffCssAst(
     errors,
   };
 }
-
-/** Backward compatibility alias */
-export const verifyStylesheetParity = diffCssAst;
 

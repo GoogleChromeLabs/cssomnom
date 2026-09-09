@@ -148,6 +148,3 @@ export function checkCascadeInversions(
   };
 }
 
-/** Backward compatibility alias */
-export const verifyCascadeOrder = checkCascadeInversions;
-
