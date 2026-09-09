@@ -3001,6 +3001,22 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - [x] **Verification**:
   - `pnpm run preflight` passes cleanly: 0 type errors, 0 lint warnings, safe-exec guard clean, and all 4,159 unit tests passing.
 
+---
 
+## Phase 123: Coverage-Guided CSS Pruning Audit & 3-Tier Confidence Architecture
+**Goal**: Perform a deep audit of the Puppeteer/CDP CSS coverage pruning prototype, eliminate data-loss bugs and range-swallowing flaws, and implement a 3-Tier confidence architecture with a human-in-the-loop review queue and `@cssom-review` diff annotations.
 
-
+### Tasks
+- [x] **CDP & Coverage Semantics Audit**:
+  - Investigated Puppeteer vs raw CDP coverage mechanisms: utilized Puppeteer's sweep-line disjoint range resolution while auditing CDP quirks.
+  - Spawned skeptical reviewer subagent to empirically test grouping at-rules (`@layer`), CSS Nesting (`.parent { .used { ... } }`), cascade statement rules (`@layer reset, base;`), asset tracking (`@keyframes`, `@font-face`), and dynamic user states (`:hover`, `:focus`, `@media print`).
+  - Uncovered 4 critical bugs and 5 major edge cases (data loss dropping declarations between nested rules in `serializeKeptSlice`, `@layer` range swallowing child rules, statement rule deletion destroying cascade order, and all-or-nothing asset deletion).
+- [x] **3-Tier Confidence & Triage Architecture**:
+  - **Tier 1 (High-Confidence Auto-Cuts)**: 0% hit rules with no active base elements safely stripped.
+  - **Tier 2 (Guaranteed Auto-Preserves)**: Structural at-rules (`@layer statement`, `@charset`, `@namespace`, `@import`), environmental media (`print`, `prefers-color-scheme`), design tokens (`:root`, `html`, `[data-theme]`), active `:hover`/`:focus` where base element is active, and referenced `@keyframes`/`@font-face`.
+  - **Tier 3 (Ambiguous Triage Queue / In-file Review Annotations)**: Unreferenced assets, dynamic state pseudo-classes (`:checked`, `:disabled`), and interactive pseudo-classes without an active base element rule. Supported `--annotateReviewRules` mode to comment out ambiguous rules in-place with `@cssom-review` tags for ergonomic `git diff` triage.
+- [x] **Regression Test Suite & Verification**:
+  - Converted audit scorecard into a comprehensive regression test suite at `skills/bulk-css-operation/scripts/audit-scorecard.test.ts`.
+  - Updated `skills/bulk-css-operation/scripts/coverage-prune.test.ts` and `skills/bulk-css-operation/SKILL.md`.
+  - Cleaned up temporary diagnostic scripts (`audit-cdp-grouping.ts`, `audit-cdp-semantics.ts`, `cdp-helper.ts`).
+  - Verified `pnpm run preflight` passes cleanly: 0 type errors, 0 lint warnings, safe-exec guard clean, and all unit tests passing.
