@@ -215,7 +215,8 @@ describe('bulk-css-operation: verification scripts', () => {
   });
 
   describe('Comprehensive fixture verification: modern.css', () => {
-    const original = readFileSync('tests/fixtures/modern.css', 'utf-8');
+    const fixtureUrl = new URL('../../../../tests/fixtures/modern.css', import.meta.url);
+    const original = readFileSync(fixtureUrl, 'utf-8');
     const lines = original.split('\n');
     // Split cleanly into 3 modular files at top-level rule boundaries
     const file1 = lines.slice(0, 141).join('\n');

@@ -85,7 +85,7 @@ Level 1 parses both the original stylesheet(s) and refactored stylesheet(s) with
 Use the AST diff script at [`.agents/skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
 
 ```typescript
-import { diffCssAst } from './scripts/ast-diff.ts';
+import { diffCssAst } from './.agents/skills/bulk-css-operation/scripts/ast-diff.ts';
 
 const result = diffCssAst(originalCss, [modularFileA, modularFileB]);
 if (!result.valid) {
@@ -102,7 +102,7 @@ When splitting a single file into multiple modular files, rule order within the 
 Use the cascade conflict detector at [`.agents/skills/bulk-css-operation/scripts/cascade-diff.ts`](./scripts/cascade-diff.ts):
 
 ```typescript
-import { checkCascadeInversions } from './scripts/cascade-diff.ts';
+import { checkCascadeInversions } from './.agents/skills/bulk-css-operation/scripts/cascade-diff.ts';
 
 const cascadeResult = checkCascadeInversions(originalCss, [modularFileA, modularFileB]);
 if (!cascadeResult.valid) {
@@ -121,7 +121,7 @@ When performing structural selector changes (e.g. converting BEM `.block__elem--
 Use the DOM computed style diff tool at [`.agents/skills/bulk-css-operation/scripts/computed-diff.ts`](./scripts/computed-diff.ts):
 
 ```typescript
-import { diffComputedStyles } from './scripts/computed-diff.ts';
+import { diffComputedStyles } from './.agents/skills/bulk-css-operation/scripts/computed-diff.ts';
 
 // Sample representative DOM elements from application fixtures / JSDOM / linkedom
 const domResult = diffComputedStyles(sampledElements, originalCss, refactoredCss);
@@ -155,10 +155,10 @@ When tasked with a bulk CSS operation:
    - If splitting files, write standard ES module imports or CSS `@import` entry points as needed.
 3. **Run AST Difference Verification**:
    - Concatenate or bundle the new files into an aggregate in-memory string.
-   - Run the Level 1 `verifyStylesheetParity` script.
+   - Run the Level 1 `diffCssAst` script.
    - If missing declarations or syntax errors are reported, inspect the exact failure line and repair.
 4. **Inspect Source Order & Cascade**:
-   - Check if any identical-specificity rules have been reversed across separate files.
+   - Check if any identical-specificity rules have been reversed across separate files using `checkCascadeInversions`.
    - If necessary, adjust file import order in the entry point stylesheet.
 5. **Commit Cleanly**:
    - Run `pnpm run preflight` to ensure no repository regressions.
