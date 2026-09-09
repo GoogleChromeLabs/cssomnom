@@ -15,8 +15,17 @@
  * limitations under the License.
  */
 
-import { tokenize } from '../../../../src/tokenizer.ts';
-import type { Token } from '../../../../src/types.ts';
+import {
+  parse,
+  CSSRule,
+  CSSStyleRule,
+  CSSGroupingRule,
+  CSSKeyframesRule,
+  CSSFontFaceRule,
+  CSSPropertyRule,
+  CSSImportRule,
+  CSSNamespaceRule,
+} from '../../../../src/index.ts';
 
 export interface CoverageRange {
   start: number;
@@ -35,279 +44,6 @@ export interface PruneOptions {
   preserveFontFaces?: boolean;
 }
 
-interface ParsedRuleNode {
-  type: 'style-rule' | 'at-rule';
-  name?: string;
-  header: string;
-  prelude: string;
-  startIndex: number;
-  endIndex: number;
-  headerEnd: number;
-  bodyStartIndex?: number;
-  bodyEndIndex?: number;
-  children: ParsedRuleNode[];
-  isGrouping: boolean;
-  isSpecialPreserve?: boolean;
-  isRootOrCustomProp?: boolean;
-  hasCustomProperties?: boolean;
-}
-
-/**
- * Checks whether the token stream at pos would begin a nested rule or grouping at-rule
- * (i.e. reaches '{' before ';' or '}' or 'EOF').
- */
-function wouldStartRule(tokens: Token[], startPos: number): boolean {
-  let p = startPos;
-  while (p < tokens.length && tokens[p].type === 'whitespace') p++;
-  if (p >= tokens.length) return false;
-  if (tokens[p].type === 'at-keyword') return true;
-
-  while (p < tokens.length) {
-    const t = tokens[p];
-    if (t.type === '{') return true;
-    if (t.type === 'semicolon' || t.type === '}' || t.type === 'EOF') return false;
-    if (t.type === '(' || t.type === '[') {
-      const close = t.type === '(' ? ')' : ']';
-      p++;
-      let d = 1;
-      while (p < tokens.length && d > 0) {
-        if (tokens[p].type === t.type) d++;
-        else if (tokens[p].type === close) d--;
-        p++;
-      }
-      continue;
-    }
-    p++;
-  }
-  return false;
-}
-
-const GROUPING_AT_RULES = new Set([
-  'media',
-  'supports',
-  'container',
-  'layer',
-  'scope',
-  'starting-style',
-]);
-
-/**
- * Parses the raw CSS into a hierarchy of rule nodes annotated with exact source indices.
- */
-function parseCssRuleTree(tokens: Token[], source: string): ParsedRuleNode[] {
-  let pos = 0;
-
-  function skipWhitespace() {
-    while (pos < tokens.length && tokens[pos].type === 'whitespace') pos++;
-  }
-
-  function parseSingleRule(): ParsedRuleNode | null {
-    skipWhitespace();
-    if (pos >= tokens.length || tokens[pos].type === 'EOF') return null;
-
-    const startTok = tokens[pos];
-    const startIndex = startTok.startIndex ?? 0;
-
-    if (startTok.type === 'at-keyword') {
-      const name = (startTok.value || '').toLowerCase();
-      pos++; // consume at-keyword
-
-      // Consume prelude until ';' or '{'
-      while (
-        pos < tokens.length &&
-        tokens[pos].type !== 'semicolon' &&
-        tokens[pos].type !== '{' &&
-        tokens[pos].type !== 'EOF'
-      ) {
-        if (tokens[pos].type === '(' || tokens[pos].type === '[') {
-          const closeType = tokens[pos].type === '(' ? ')' : ']';
-          pos++;
-          let d = 1;
-          while (pos < tokens.length && d > 0) {
-            if (tokens[pos].type === '(' || tokens[pos].type === '[') d++;
-            else if (tokens[pos].type === closeType) d--;
-            pos++;
-          }
-          continue;
-        }
-        pos++;
-      }
-
-      if (pos >= tokens.length || tokens[pos].type === 'EOF') return null;
-
-      // Semicolon-terminated at-rule (e.g. @charset, @import, @namespace, @layer a, b;)
-      if (tokens[pos].type === 'semicolon') {
-        const endIndex = tokens[pos].endIndex ?? startIndex;
-        const headerEnd = endIndex;
-        pos++; // consume ';'
-        return {
-          type: 'at-rule',
-          name,
-          header: source.slice(startIndex, endIndex),
-          prelude: source.slice(startIndex, endIndex),
-          startIndex,
-          endIndex,
-          headerEnd,
-          children: [],
-          isGrouping: false,
-          isSpecialPreserve: ['charset', 'import', 'namespace'].includes(name),
-        };
-      }
-
-      // Block-delimited at-rule
-      if (tokens[pos].type === '{') {
-        const headerEnd = tokens[pos].startIndex ?? startIndex;
-        pos++; // consume '{'
-        const bodyStartIndex = tokens[pos - 1].endIndex ?? headerEnd;
-        const children: ParsedRuleNode[] = [];
-        const isGrouping = GROUPING_AT_RULES.has(name);
-
-        if (isGrouping) {
-          while (pos < tokens.length && tokens[pos].type !== '}' && tokens[pos].type !== 'EOF') {
-            skipWhitespace();
-            if (tokens[pos].type === '}' || tokens[pos].type === 'EOF') break;
-            if (wouldStartRule(tokens, pos)) {
-              const child = parseSingleRule();
-              if (child) children.push(child);
-              else pos++;
-            } else {
-              // skip declaration inside grouping rule
-              while (
-                pos < tokens.length &&
-                tokens[pos].type !== 'semicolon' &&
-                tokens[pos].type !== '}' &&
-                tokens[pos].type !== '{'
-              ) {
-                pos++;
-              }
-              if (tokens[pos]?.type === 'semicolon') pos++;
-            }
-          }
-        } else {
-          // Leaf at-rule block (e.g. @keyframes, @font-face, @property, @page)
-          let depth = 1;
-          while (pos < tokens.length && depth > 0) {
-            if (tokens[pos].type === '{') depth++;
-            else if (tokens[pos].type === '}') {
-              depth--;
-              if (depth === 0) break;
-            }
-            pos++;
-          }
-        }
-
-        let endIndex = pos < tokens.length ? (tokens[pos].endIndex ?? source.length) : source.length;
-        let bodyEndIndex = pos < tokens.length ? (tokens[pos].startIndex ?? source.length) : source.length;
-        if (pos < tokens.length && tokens[pos].type === '}') {
-          endIndex = tokens[pos].endIndex ?? endIndex;
-          pos++;
-        }
-
-        const prelude = source.slice(startIndex, headerEnd).trim();
-        const ruleText = source.slice(startIndex, endIndex);
-
-        return {
-          type: 'at-rule',
-          name,
-          header: prelude,
-          prelude,
-          startIndex,
-          endIndex,
-          headerEnd,
-          bodyStartIndex,
-          bodyEndIndex,
-          children,
-          isGrouping,
-          isSpecialPreserve: ['keyframes', 'font-face', 'property'].includes(name) || name.endsWith('-keyframes'),
-          hasCustomProperties: ruleText.includes('--'),
-        };
-      }
-    } else {
-      // Qualified rule (Style rule)
-      while (pos < tokens.length && tokens[pos].type !== '{' && tokens[pos].type !== 'EOF') {
-        if (tokens[pos].type === '(' || tokens[pos].type === '[') {
-          const closeType = tokens[pos].type === '(' ? ')' : ']';
-          pos++;
-          let d = 1;
-          while (pos < tokens.length && d > 0) {
-            if (tokens[pos].type === '(' || tokens[pos].type === '[') d++;
-            else if (tokens[pos].type === closeType) d--;
-            pos++;
-          }
-          continue;
-        }
-        pos++;
-      }
-
-      if (pos >= tokens.length || tokens[pos].type !== '{') return null;
-
-      const headerEnd = tokens[pos].startIndex ?? startIndex;
-      pos++; // consume '{'
-      const bodyStartIndex = tokens[pos - 1].endIndex ?? headerEnd;
-      const children: ParsedRuleNode[] = [];
-
-      while (pos < tokens.length && tokens[pos].type !== '}' && tokens[pos].type !== 'EOF') {
-        skipWhitespace();
-        if (tokens[pos].type === '}' || tokens[pos].type === 'EOF') break;
-        if (wouldStartRule(tokens, pos)) {
-          const child = parseSingleRule();
-          if (child) children.push(child);
-          else pos++;
-        } else {
-          // declaration
-          while (
-            pos < tokens.length &&
-            tokens[pos].type !== 'semicolon' &&
-            tokens[pos].type !== '}' &&
-            tokens[pos].type !== '{'
-          ) {
-            pos++;
-          }
-          if (tokens[pos]?.type === 'semicolon') pos++;
-        }
-      }
-
-      let endIndex = pos < tokens.length ? (tokens[pos].endIndex ?? source.length) : source.length;
-      let bodyEndIndex = pos < tokens.length ? (tokens[pos].startIndex ?? source.length) : source.length;
-      if (pos < tokens.length && tokens[pos].type === '}') {
-        endIndex = tokens[pos].endIndex ?? endIndex;
-        pos++;
-      }
-
-      const prelude = source.slice(startIndex, headerEnd).trim();
-      const ruleText = source.slice(startIndex, endIndex);
-      const isRoot = prelude === ':root' || prelude.includes(':root');
-      const hasCustomProps = ruleText.includes('--');
-
-      return {
-        type: 'style-rule',
-        header: prelude,
-        prelude,
-        startIndex,
-        endIndex,
-        headerEnd,
-        bodyStartIndex,
-        bodyEndIndex,
-        children,
-        isGrouping: children.length > 0,
-        isRootOrCustomProp: isRoot || hasCustomProps,
-        hasCustomProperties: hasCustomProps,
-      };
-    }
-    return null;
-  }
-
-  const rootRules: ParsedRuleNode[] = [];
-  while (pos < tokens.length && tokens[pos].type !== 'EOF') {
-    skipWhitespace();
-    if (pos >= tokens.length || tokens[pos].type === 'EOF') break;
-    const r = parseSingleRule();
-    if (r) rootRules.push(r);
-    else pos++;
-  }
-  return rootRules;
-}
-
 /**
  * Determines whether any range intersects with [start, end).
  */
@@ -321,7 +57,54 @@ function isCovered(start: number, end: number, ranges: CoverageRange[]): boolean
 }
 
 /**
- * Coverage-guided CSS dead-code pruner prototype.
+ * Extracts the rule header (selector or at-rule prelude) verbatim from source text.
+ */
+function getRuleHeader(rule: CSSRule, source: string): string {
+  const loc = rule.location;
+  if (!loc) return '';
+  if (loc.bodyStart !== undefined) {
+    return source.slice(loc.start, loc.bodyStart).replace(/\s*\{$/, '').trim();
+  }
+  return source.slice(loc.start, loc.end).trim();
+}
+
+/**
+ * Returns prunable child CSS rules that have source locations.
+ */
+function getChildRules(rule: CSSRule): CSSRule[] {
+  if ('cssRules' in rule && rule.cssRules) {
+    const list = (rule as CSSGroupingRule).cssRules;
+    const children: CSSRule[] = [];
+    for (let i = 0; i < list.length; i++) {
+      const item = list[i];
+      if (item.location) {
+        children.push(item);
+      }
+    }
+    return children;
+  }
+  return [];
+}
+
+/**
+ * Checks if a rule is a grouping rule with nested child rules that can be pruned individually.
+ */
+function isGroupingRule(rule: CSSRule): boolean {
+  if (
+    rule instanceof CSSKeyframesRule ||
+    rule instanceof CSSFontFaceRule ||
+    rule instanceof CSSPropertyRule
+  ) {
+    return false;
+  }
+  if ('cssRules' in rule && rule.cssRules) {
+    return getChildRules(rule).length > 0;
+  }
+  return false;
+}
+
+/**
+ * Coverage-guided CSS dead-code pruner.
  *
  * Takes raw CSS stylesheet text and coverage ranges produced by Chrome DevTools / Puppeteer
  * (`CSS.startRuleUsageTracking` / `CSS.stopRuleUsageTracking`) and strips unused rules while
@@ -336,110 +119,123 @@ export function pruneUnusedCss(
   const preserveKeyframes = options?.preserveKeyframes ?? true;
   const preserveFontFaces = options?.preserveFontFaces ?? true;
 
-  const tokens = tokenize(css);
-  const ruleTree = parseCssRuleTree(tokens, css);
-
+  const sheet = parse(css);
   const removedRules: string[] = [];
   const retainedRules: string[] = [];
+  const retainedSet = new Set<CSSRule>();
 
-  // Identify custom property names defined in :root or top-level rules
-  // If preserveRootCustomProperties is true, any rule containing :root or defining --* is preserved
-  function evaluateRuleUsage(rule: ParsedRuleNode): boolean {
+  function evaluateRuleUsage(rule: CSSRule): boolean {
+    const loc = rule.location;
+    if (!loc) return false;
+    const header = getRuleHeader(rule, css);
+
     // 1. Mandatory preserves for meta at-rules
-    if (rule.type === 'at-rule' && ['charset', 'import', 'namespace'].includes(rule.name || '')) {
-      retainedRules.push(rule.header);
+    if (
+      rule instanceof CSSImportRule ||
+      rule instanceof CSSNamespaceRule ||
+      rule.constructor.name === 'CSSCharsetRule'
+    ) {
+      retainedRules.push(header);
+      retainedSet.add(rule);
       return true;
     }
 
     // 2. Options-based preservation: @keyframes
-    if (
-      preserveKeyframes &&
-      rule.type === 'at-rule' &&
-      (rule.name === 'keyframes' || (rule.name || '').endsWith('-keyframes'))
-    ) {
-      retainedRules.push(rule.header);
+    if (preserveKeyframes && rule instanceof CSSKeyframesRule) {
+      retainedRules.push(header);
+      retainedSet.add(rule);
       return true;
     }
 
     // 3. Options-based preservation: @font-face
-    if (preserveFontFaces && rule.type === 'at-rule' && rule.name === 'font-face') {
-      retainedRules.push(rule.header);
+    if (preserveFontFaces && rule instanceof CSSFontFaceRule) {
+      retainedRules.push(header);
+      retainedSet.add(rule);
       return true;
     }
 
     // 4. Options-based preservation: :root / custom properties
     if (preserveRootCustomProperties) {
-      if (rule.type === 'at-rule' && rule.name === 'property') {
-        retainedRules.push(rule.header);
+      if (rule instanceof CSSPropertyRule) {
+        retainedRules.push(header);
+        retainedSet.add(rule);
         return true;
       }
-      if (rule.type === 'style-rule' && (rule.header.includes(':root') || rule.header === ':root')) {
-        retainedRules.push(rule.header);
+      if (rule instanceof CSSStyleRule && (header === ':root' || header.includes(':root'))) {
+        retainedRules.push(header);
+        retainedSet.add(rule);
         return true;
       }
     }
 
-    // 5. Grouping rules: used if any child is used, or if condition itself is covered
-    if (rule.isGrouping && rule.children.length > 0) {
+    // 5. Grouping rules: used if any child is used, or if rule itself is covered
+    if (isGroupingRule(rule)) {
+      const children = getChildRules(rule);
       let anyChildUsed = false;
-      for (const child of rule.children) {
+      for (const child of children) {
         if (evaluateRuleUsage(child)) {
           anyChildUsed = true;
         }
       }
-      if (anyChildUsed) {
-        retainedRules.push(rule.header);
+      const selfCovered = isCovered(loc.start, loc.bodyStart ?? loc.end, coverageRanges);
+      if (anyChildUsed || selfCovered) {
+        retainedRules.push(header);
+        retainedSet.add(rule);
         return true;
       }
-      removedRules.push(rule.header);
+      removedRules.push(header);
       return false;
     }
 
-    // 6. Normal rules: covered if range intersects [startIndex, endIndex)
-    const used = isCovered(rule.startIndex, rule.endIndex, coverageRanges);
+    // 6. Normal rules: covered if range intersects [start, end)
+    const used = isCovered(loc.start, loc.end, coverageRanges);
     if (used) {
-      retainedRules.push(rule.header);
+      retainedRules.push(header);
+      retainedSet.add(rule);
       return true;
     } else {
-      removedRules.push(rule.header);
+      removedRules.push(header);
       return false;
     }
   }
 
-  // Pre-evaluate all rules to populate retained/removed sets
-  for (const rootRule of ruleTree) {
-    evaluateRuleUsage(rootRule);
+  // Evaluate all top-level rules
+  for (let i = 0; i < sheet.cssRules.length; i++) {
+    evaluateRuleUsage(sheet.cssRules[i]);
   }
 
   // Recursive slice/splicing to preserve comments and layout accurately
-  function serializeKeptSlice(rule: ParsedRuleNode): string {
+  function serializeKeptSlice(rule: CSSRule): string {
+    const loc = rule.location!;
+    const children = isGroupingRule(rule) ? getChildRules(rule) : [];
+
     // If not a grouping rule with children, return verbatim original text
-    if (!rule.isGrouping || rule.children.length === 0) {
-      return css.slice(rule.startIndex, rule.endIndex);
+    if (children.length === 0 || loc.bodyStart === undefined || loc.bodyEnd === undefined) {
+      return css.slice(loc.start, loc.end);
     }
 
-    // If grouping rule, preserve the header up to bodyStartIndex ('{')
-    const headerPrefix = css.slice(rule.startIndex, rule.bodyStartIndex!);
-    const closingSuffix = css.slice(rule.bodyEndIndex!, rule.endIndex);
+    // If grouping rule, preserve the header up to bodyStart ('{')
+    const headerPrefix = css.slice(loc.start, loc.bodyStart);
+    const closingSuffix = css.slice(loc.bodyEnd, loc.end);
 
     let innerContent = '';
-    let lastPos = rule.bodyStartIndex!;
+    let lastPos = loc.bodyStart;
 
-    for (const child of rule.children) {
-      const childUsed = retainedRules.includes(child.header);
-      if (childUsed) {
-        // Retain whitespace/comments between lastPos and child.startIndex
-        innerContent += css.slice(lastPos, child.startIndex);
+    for (const child of children) {
+      const childLoc = child.location!;
+      if (retainedSet.has(child)) {
+        // Retain whitespace/comments between lastPos and child.start
+        innerContent += css.slice(lastPos, childLoc.start);
         innerContent += serializeKeptSlice(child);
-        lastPos = child.endIndex;
+        lastPos = childLoc.end;
       } else {
-        // Skip child text, but preserve lastPos at child.endIndex
-        lastPos = child.endIndex;
+        // Skip child text, move lastPos to child.end
+        lastPos = childLoc.end;
       }
     }
 
-    // Retain any trailing whitespace/comments between last child and closing brace
-    innerContent += css.slice(lastPos, rule.bodyEndIndex!);
+    // Retain trailing whitespace/comments between last child and closing brace
+    innerContent += css.slice(lastPos, loc.bodyEnd);
 
     return `${headerPrefix}${innerContent}${closingSuffix}`;
   }
@@ -448,14 +244,17 @@ export function pruneUnusedCss(
   let prunedCss = '';
   let lastPos = 0;
 
-  for (const rootRule of ruleTree) {
-    const isRetained = retainedRules.includes(rootRule.header);
-    if (isRetained) {
-      prunedCss += css.slice(lastPos, rootRule.startIndex);
+  for (let i = 0; i < sheet.cssRules.length; i++) {
+    const rootRule = sheet.cssRules[i];
+    const loc = rootRule.location;
+    if (!loc) continue;
+
+    if (retainedSet.has(rootRule)) {
+      prunedCss += css.slice(lastPos, loc.start);
       prunedCss += serializeKeptSlice(rootRule);
-      lastPos = rootRule.endIndex;
+      lastPos = loc.end;
     } else {
-      lastPos = rootRule.endIndex;
+      lastPos = loc.end;
     }
   }
 

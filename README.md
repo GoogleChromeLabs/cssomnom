@@ -207,6 +207,7 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **Structured Tree Accessors**: `CSSStyleRule.prototype.selectorAST` and `MediaList.prototype.mediaQueriesAST` expose parsed selector and media query structures directly on CSSOM objects for tooling integration.
 - **Synchronous `CSSStyleSheet.prototype.replace()`**: While the CSSOM-1 specification specifies parallel parsing for `replace()`, our implementation executes parsing synchronously via `replaceSync()` and returns `Promise.resolve(this)`.
 - **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
+- **Source Location Tracking (`CSSRule.prototype.location`)**: Parsed CSS rules expose their 0-based character offsets (`{ start: number, end: number, bodyStart?: number, bodyEnd?: number }`) relative to the original source text via a non-enumerable `location` property on `CSSRule.prototype`, enabling source maps, DevTools coverage pruning, and refactoring tools without breaking standard IDL enumeration or serialization.
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
 
 ---

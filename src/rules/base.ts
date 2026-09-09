@@ -16,7 +16,7 @@
  */
 
 import { ParseHooks } from '../parse-hooks.ts';
-import type { Declaration, Rule, ASTAtRule } from '../types.ts';
+import type { Declaration, Rule, ASTAtRule, RuleSourceLocation } from '../types.ts';
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { deleteRuleFromArray } from '../utils.ts';
 import { CSSRuleList } from './collections.ts';
@@ -26,6 +26,16 @@ import type { CSSStyleSheet } from '../CSSOM.ts';
 export class CSSRule {
   private _parentRule: CSSRule | null = null;
   private _parentStyleSheet: CSSStyleSheet | null = null;
+  private _location?: RuleSourceLocation;
+
+  // Tooling extension: original character offsets from source CSS
+  get location(): RuleSourceLocation | undefined {
+    return this._location;
+  }
+
+  set location(loc: RuleSourceLocation | undefined) {
+    this._location = loc;
+  }
 
   // cssom-1 § 6.4 #dom-cssrule-parentrule
   get parentRule(): CSSRule | null {

@@ -113,6 +113,8 @@ export class LazyComponentValueStream implements ComponentValueStream {
   private index: number = 0;
   private done: boolean = false;
 
+  public terminator: ComponentValue | null = null;
+
   constructor(fetchNext: () => ComponentValue, mirrorToken: string) {
     this.fetchNext = fetchNext;
     this.mirrorToken = mirrorToken;
@@ -139,6 +141,7 @@ export class LazyComponentValueStream implements ComponentValueStream {
     const val = this.fetchNext();
     
     if (val.type === this.mirrorToken) {
+      this.terminator = val;
       this.done = true;
       return { type: 'EOF', value: '' };
     }
