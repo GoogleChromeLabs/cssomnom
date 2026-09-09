@@ -1,10 +1,10 @@
 ---
 name: bulk-css-operation
 description: >-
-  Safely performs bulk CSS transformations (modularizing monolithic stylesheets,
-  consolidating bundles, migrating to tokens or variables, pruning dead selectors,
-  and unnesting) with AST set-difference verification, cascade ordering invariant
-  checks, and DOM-grounded sampling. Use when splitting monolithic stylesheets,
+  Safely performs bulk CSS transformations (splitting stylesheets into modules,
+  consolidating bundles, migrating to variables, pruning dead selectors,
+  and unnesting) with AST diffing, cascade order conflict checks,
+  and computed style DOM sampling. Use when splitting monolithic stylesheets,
   merging CSS files, restructuring nesting, migrating design tokens, or pruning
   unused CSS rules across a codebase. Don't use for single-rule or cosmetic CSS fixes,
   general HTML/JS refactoring without stylesheet changes, or running test suites.
@@ -12,123 +12,123 @@ description: >-
 
 # Bulk CSS Operations with CSSOM
 
-This skill guides agents in safely executing large-scale, bulk transformations across CSS codebases using `cssom` (`cssomnom`) to guarantee syntax correctness, rule integrity, and semantic equivalence.
+This skill guides agents in safely executing large-scale transformations across CSS codebases using `cssom` (`cssomnom`) to verify syntax correctness, rule integrity, and cascade order.
 
-## Core Problem & The Verification Ladder
+## Core Problem & The Verification Stages
 
-When performing bulk CSS refactoring (e.g., decomposing a 3,000-line monolithic stylesheet into 15 domain-scoped modular files, or converting hex codes to design tokens), text regexes and string find-and-replace often introduce subtle, catastrophic bugs:
+When performing bulk CSS refactoring (e.g., decomposing a monolithic stylesheet into multiple domain-scoped files, or converting hex codes to design tokens), text search-and-replace frequently introduces subtle bugs:
 - Dropped rules, selectors, or `@media` blocks.
 - Unintended cascade reordering (changing specificity or source-order ties).
 - Syntax parsing errors, malformed declarations, or invalid escapes.
-- Dead declarations or accidentally modified `!important` flags.
+- Dropped declarations or accidentally modified `!important` flags.
 
-Attempting to resolve semantic equivalence by computing cascaded styles across arbitrary, unbounded selector space is an ill-defined problem without a concrete DOM (since selectors match an infinite set of theoretical elements). Instead, verify changes using the **3-Tier Verification Ladder**:
+Because selectors can match arbitrary HTML elements, static analysis cannot guarantee visual equivalence across all possible DOMs. Instead, verify changes using 3 progressive verification checks:
 
 ```
 +-------------------------------------------------------------------------+
-| Level 3: DOM-Grounded Oracle Sampling (Element Matched & Cascaded Style)|
-| Target: When selectors or classnames change. Sample authentic HTML DOMs.|
+| Stage 3: Computed Style Sampling (Element-Level DOM Comparison)         |
+| When selectors or classnames change. Compares getComputedStyle() on DOM.|
 +-------------------------------------------------------------------------+
                                     ^
 +-------------------------------------------------------------------------+
-| Level 2: Cascade & Source-Order Conflict Invariants                     |
-| Target: Detect source-order swaps between overlapping, competing rules. |
+| Stage 2: Cascade & Source-Order Conflict Detection                      |
+| Detects source-order reversals between competing rules that share props.|
 +-------------------------------------------------------------------------+
                                     ^
 +-------------------------------------------------------------------------+
-| Level 1: Static AST Rule & Declaration Set-Difference (Zero-DOM)        |
-| Target: 100% rule, selector, at-rule context, and declaration match.    |
+| Stage 1: AST Rule & Declaration Diffing (Syntax & Structure Check)      |
+| Compares rule selectors, at-rule blocks, and declaration properties.    |
 +-------------------------------------------------------------------------+
 ```
 
 ---
 
-## 1. High-Impact Bulk CSS Operations
+## 1. Common Bulk CSS Operations
 
-Beyond simple file splitting, this skill addresses 6 primary classes of bulk CSS transformations:
+Beyond simple file splitting, this skill addresses 6 primary operations:
 
-1. **Monolith Modularization (1 to N Files)**:
-   - Splitting a large monolithic file (e.g. `styles.css`) into component-level files (e.g. `src/css/{layout,buttons,modal,tables}.css`).
+1. **Splitting Monoliths into Modules**:
+   - Splitting a large stylesheet (e.g. `styles.css`) into component files (e.g. `src/css/{layout,buttons,modal,tables}.css`).
    - *Key Risk*: Splitting rules into separate files can invert source order and break cascade tie-breakers.
 
-2. **De-modularization & Inlining (N to 1 File)**:
-   - Flattening `@import` trees or merging modular files into a unified bundle without relying on opaque build tooling.
-   - *Key Risk*: Altered `@layer` statement precedence or `@import` placement rules.
+2. **Bundling & Inlining Modules**:
+   - Inlining `@import` trees or combining modular stylesheets into a single bundle.
+   - *Key Risk*: Altered `@layer` order or invalid `@import` placement.
 
-3. **Design Token & CSS Variable Migration**:
-   - Bulk replacing hardcoded hex/rgb colors, spacing units, and fonts with CSS custom properties (`var(--color-brand-primary)`).
-   - *Key Risk*: Altering declaration values or referencing unregistered/undefined custom properties without fallback values.
+3. **Design Token & Variable Migration**:
+   - Bulk replacing hardcoded hex/rgb colors, spacing units, and fonts with CSS variables (`var(--color-primary)`).
+   - *Key Risk*: Typoing variable names or omitting fallbacks for undefined properties.
 
-4. **CSS Nesting Restructuring (Unnesting or Modern Nesting)**:
-   - Modernizing legacy SASS/PostCSS nesting into native CSS Nesting Level 1 (`&`), or flattening native nested rules into explicit qualified selectors.
-   - *Key Risk*: Incorrect specificity calculations (native `&` wraps the selector in `:is(...)`, modifying specificity dynamics compared to preprocessor string concatenation).
+4. **Nesting Refactoring (Unnesting or Modern Nesting)**:
+   - Modernizing legacy Sass/PostCSS nesting to native CSS Nesting (`&`), or flattening nested rules into top-level selectors.
+   - *Key Risk*: Specificity changes (native `&` wraps the parent selector in `:is(...)`, unlike preprocessor string concatenation).
 
-5. **CSS Logical Properties Migration**:
-   - Migrating directional properties (`margin-left`, `right`, `padding-left`, `border-top`) to internationalized logical equivalents (`margin-inline-start`, `inset-inline-end`, `padding-inline-start`).
-   - *Key Risk*: Overriding physical properties unintentionally when both exist in the cascade.
+5. **Logical Properties Migration**:
+   - Migrating directional properties (`margin-left`, `right`, `padding-left`, `border-top`) to logical equivalents (`margin-inline-start`, `inset-inline-end`, `padding-inline-start`).
+   - *Key Risk*: Specificity ties or partial overrides when physical and logical properties co-exist.
 
 6. **Dead Code & Unused Selector Pruning**:
-   - Cross-referencing parsed CSS selectors against an application's JSX/HTML template ASTs to remove obsolete rules.
-   - *Key Risk*: Removing rules used dynamically by runtime class string templates.
+   - Using DevTools/Puppeteer CSS coverage ranges or static template scanning to remove unused rules.
+   - *Key Risk*: Accidentally removing rules needed for dynamic runtime classes or shared variables.
 
 ---
 
 ## 2. The Verification Pipeline
-
-### Level 1: Static AST Set-Difference (Mandatory)
-
-Level 1 parses both the original stylesheet(s) and refactored stylesheet(s) with `CSSStyleSheet` / `ParseHooks`, recursively flattens the rules into canonical keys, and computes set differences.
-
-**Canonical Rule Key Format**:
-`[Scope / At-Rule Context] > Selector { property: value [!important]; }`
-
-Use the AST diff script at [`.agents/skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
-
-```typescript
-import { diffCssAst } from './.agents/skills/bulk-css-operation/scripts/ast-diff.ts';
-
-const result = diffCssAst(originalCss, [modularFileA, modularFileB]);
-if (!result.valid) {
-  console.error('Parity check failed:', result.errors);
-}
-```
-
----
-
-### Level 2: Cascade & Source-Order Invariant Checking
-
-When splitting a single file into multiple modular files, rule order within the cascade often shifts. A reordering is **only dangerous** if two rules match overlapping elements and define conflicting properties at identical specificity.
-
-Use the cascade conflict detector at [`.agents/skills/bulk-css-operation/scripts/cascade-diff.ts`](./scripts/cascade-diff.ts):
-
-```typescript
-import { checkCascadeInversions } from './.agents/skills/bulk-css-operation/scripts/cascade-diff.ts';
-
-const cascadeResult = checkCascadeInversions(originalCss, [modularFileA, modularFileB]);
-if (!cascadeResult.valid) {
-  for (const conflict of cascadeResult.conflicts) {
-    console.warn(conflict.description);
-  }
-}
-```
-
----
-
-### Level 3: DOM-Grounded Oracle Sampling
-
-When performing structural selector changes (e.g. converting BEM `.block__elem--mod` to modular utility classes `.flex .items-center`), static AST set-difference cannot prove equivalence because the selectors themselves differ.
-
-Use the DOM computed style diff tool at [`.agents/skills/bulk-css-operation/scripts/computed-diff.ts`](./scripts/computed-diff.ts):
-
-```typescript
-import { diffComputedStyles } from './.agents/skills/bulk-css-operation/scripts/computed-diff.ts';
-
-// Sample representative DOM elements from application fixtures / JSDOM / linkedom
-const domResult = diffComputedStyles(sampledElements, originalCss, refactoredCss);
-if (!domResult.valid) {
-  console.error('DOM computed style differences detected:', domResult.differences);
-}
-```
+ 
+ ### Stage 1: AST Rule & Declaration Diffing (`diffCssAst`)
+ 
+ Stage 1 parses both the original stylesheet(s) and refactored stylesheet(s) with `CSSStyleSheet` / `ParseHooks`, recursively normalizes rules into comparable keys, and detects missing or extra rules/declarations.
+ 
+ **Rule Comparison Format**:
+ `[Context (e.g. @media/@layer)] > Selector { property: value [!important]; }`
+ 
+ Use the AST diff script at [`.agents/skills/bulk-css-operation/scripts/ast-diff.ts`](./scripts/ast-diff.ts):
+ 
+ ```typescript
+ import { diffCssAst } from './.agents/skills/bulk-css-operation/scripts/ast-diff.ts';
+ 
+ const result = diffCssAst(originalCss, [modularFileA, modularFileB]);
+ if (!result.valid) {
+   console.error('AST diff check failed:', result.errors);
+ }
+ ```
+ 
+ ---
+ 
+ ### Stage 2: Cascade & Source-Order Conflict Detection (`checkCascadeInversions`)
+ 
+ When splitting a single stylesheet into multiple files, rule order within the cascade can shift. A reordering is only problematic if two rules match overlapping elements and define conflicting CSS properties at identical specificity.
+ 
+ Use the cascade conflict detector at [`.agents/skills/bulk-css-operation/scripts/cascade-diff.ts`](./scripts/cascade-diff.ts):
+ 
+ ```typescript
+ import { checkCascadeInversions } from './.agents/skills/bulk-css-operation/scripts/cascade-diff.ts';
+ 
+ const cascadeResult = checkCascadeInversions(originalCss, [modularFileA, modularFileB]);
+ if (!cascadeResult.valid) {
+   for (const conflict of cascadeResult.conflicts) {
+     console.warn(conflict.description);
+   }
+ }
+ ```
+ 
+ ---
+ 
+ ### Stage 3: Computed Style Sampling (`diffComputedStyles`)
+ 
+ When performing structural selector changes (e.g. converting BEM `.block__elem--mod` to modular utility classes `.flex .items-center`), AST diffing cannot prove equivalence because the selectors themselves differ.
+ 
+ Use the DOM computed style diff tool at [`.agents/skills/bulk-css-operation/scripts/computed-diff.ts`](./scripts/computed-diff.ts):
+ 
+ ```typescript
+ import { diffComputedStyles } from './.agents/skills/bulk-css-operation/scripts/computed-diff.ts';
+ 
+ // Sample representative DOM elements from application fixtures / JSDOM / linkedom
+ const domResult = diffComputedStyles(sampledElements, originalCss, refactoredCss);
+ if (!domResult.valid) {
+   console.error('DOM computed style differences detected:', domResult.differences);
+ }
+ ```
 
 ---
 
@@ -144,22 +144,22 @@ node --test .agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts
 ---
 
 ## 4. Agent Execution Playbook
-
-When tasked with a bulk CSS operation:
-
-1. **Baseline Invariant Capture**:
-   - Parse all source CSS files before making any edits.
-   - Record total rule count, at-rule count, and unique selector set.
-2. **Execute File Operations**:
-   - Create modular files or apply transformations.
-   - If splitting files, write standard ES module imports or CSS `@import` entry points as needed.
-3. **Run AST Difference Verification**:
-   - Concatenate or bundle the new files into an aggregate in-memory string.
-   - Run the Level 1 `diffCssAst` script.
-   - If missing declarations or syntax errors are reported, inspect the exact failure line and repair.
-4. **Inspect Source Order & Cascade**:
-   - Check if any identical-specificity rules have been reversed across separate files using `checkCascadeInversions`.
-   - If necessary, adjust file import order in the entry point stylesheet.
-5. **Commit Cleanly**:
-   - Run `pnpm run preflight` to ensure no repository regressions.
-   - Commit the refactor with a crisp, descriptive message (e.g. `css: split monolithic styles.css into modular domain stylesheets`).
+ 
+ When tasked with a bulk CSS operation:
+ 
+ 1. **Capture Baseline Metrics**:
+    - Parse all source stylesheets before making edits.
+    - Note total rule count, at-rule count, and unique selector list.
+ 2. **Execute File Operations**:
+    - Split files, bundle modules, or apply migrations.
+    - If splitting files, write standard ES module imports or CSS `@import` entry points as needed.
+ 3. **Run AST Diffing**:
+    - Combine the new files in memory.
+    - Run Stage 1 `diffCssAst`.
+    - If missing declarations or syntax errors are reported, inspect the exact failure and repair.
+ 4. **Inspect Source Order & Cascade**:
+    - Check if any same-specificity rules were reversed across files using `checkCascadeInversions`.
+    - If necessary, adjust stylesheet import order in the entry point.
+ 5. **Commit Cleanly**:
+    - Run `pnpm run preflight` to ensure no repository regressions.
+    - Commit the refactor with a crisp, descriptive message (e.g. `css: split monolithic styles.css into modular domain stylesheets`).
