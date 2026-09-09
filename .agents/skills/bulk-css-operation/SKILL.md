@@ -75,133 +75,14 @@ Level 1 parses both the original stylesheet(s) and refactored stylesheet(s) with
 **Canonical Rule Key Format**:
 `[Scope / At-Rule Context] > Selector { property: value [!important]; }`
 
-#### Level 1 Verification Script
-
-Save and run this script using pure Node (`node script.ts`):
+Use the pre-built verification script located at [`.agents/skills/bulk-css-operation/scripts/verify-parity.ts`](./scripts/verify-parity.ts):
 
 ```typescript
-import { CSSStyleSheet, CSSRule, CSSStyleRule, CSSGroupingRule } from 'cssomnom';
+import { verifyStylesheetParity } from './scripts/verify-parity.ts';
 
-interface RuleRecord {
-  context: string;
-  selector: string;
-  declarations: Map<string, { value: string; priority: string }>;
-}
-
-function extractRuleRecords(
-  rules: CSSRuleList,
-  parentContext = ''
-): RuleRecord[] {
-  const records: RuleRecord[] = [];
-
-  for (let i = 0; i < rules.length; i++) {
-    const rule = rules[i];
-
-    if (rule instanceof CSSStyleRule) {
-      const decls = new Map<string, { value: string; priority: string }>();
-      const style = rule.style;
-      for (let j = 0; j < style.length; j++) {
-        const prop = style.item(j);
-        decls.set(prop, {
-          value: style.getPropertyValue(prop).trim(),
-          priority: style.getPropertyPriority(prop).trim(),
-        });
-      }
-
-      records.push({
-        context: parentContext,
-        selector: rule.selectorText.trim(),
-        declarations: decls,
-      });
-    } else if (rule instanceof CSSGroupingRule || 'cssRules' in rule) {
-      // Grouping rules: @media, @supports, @layer, @scope, etc.
-      const grouping = rule as CSSGroupingRule;
-      const header = (rule as { cssText?: string }).cssText?.split('{')[0]?.trim() || '@group';
-      const nestedContext = parentContext ? `${parentContext} > ${header}` : header;
-      records.push(...extractRuleRecords(grouping.cssRules, nestedContext));
-    }
-  }
-
-  return records;
-}
-
-export function verifyStylesheetParity(beforeCss: string, afterCss: string) {
-  const sheetBefore = new CSSStyleSheet();
-  sheetBefore.replaceSync(beforeCss);
-
-  const sheetAfter = new CSSStyleSheet();
-  sheetAfter.replaceSync(afterCss);
-
-  const beforeRecords = extractRuleRecords(sheetBefore.cssRules);
-  const afterRecords = extractRuleRecords(sheetAfter.cssRules);
-
-  console.log(`Before: ${beforeRecords.length} style rules parsed`);
-  console.log(`After:  ${afterRecords.length} style rules parsed`);
-
-  const errors: string[] = [];
-
-  // 1. Check for missing or duplicate rules
-  const makeKey = (r: RuleRecord) => `${r.context} ::: ${r.selector}`;
-  const beforeMap = new Map<string, RuleRecord[]>();
-  const afterMap = new Map<string, RuleRecord[]>();
-
-  for (const r of beforeRecords) {
-    const key = makeKey(r);
-    const list = beforeMap.get(key) || [];
-    list.push(r);
-    beforeMap.set(key, list);
-  }
-
-  for (const r of afterRecords) {
-    const key = makeKey(r);
-    const list = afterMap.get(key) || [];
-    list.push(r);
-    afterMap.set(key, list);
-  }
-
-  // Verify all keys in Before exist in After with matching counts
-  for (const [key, bList] of beforeMap.entries()) {
-    const aList = afterMap.get(key);
-    if (!aList) {
-      errors.push(`MISSING RULE: ${key} was dropped in refactored CSS`);
-      continue;
-    }
-    if (aList.length !== bList.length) {
-      errors.push(`OCCURRENCE MISMATCH: ${key} occurs ${bList.length} times before, but ${aList.length} times after`);
-    }
-
-    // Compare declarations across occurrences
-    for (let idx = 0; idx < Math.min(bList.length, aList.length); idx++) {
-      const bDecls = bList[idx].declarations;
-      const aDecls = aList[idx].declarations;
-
-      for (const [prop, bVal] of bDecls.entries()) {
-        const aVal = aDecls.get(prop);
-        if (!aVal) {
-          errors.push(`MISSING DECLARATION: ${key} [${idx}] missing property '${prop}'`);
-        } else if (aVal.value !== bVal.value || aVal.priority !== bVal.priority) {
-          errors.push(`DECLARATION MISMATCH: ${key} [${idx}] property '${prop}': '${bVal.value}' (${bVal.priority}) !== '${aVal.value}' (${aVal.priority})`);
-        }
-      }
-
-      for (const prop of aDecls.keys()) {
-        if (!bDecls.has(prop)) {
-          errors.push(`EXTRA DECLARATION: ${key} [${idx}] contains unexpected added property '${prop}'`);
-        }
-      }
-    }
-  }
-
-  for (const key of afterMap.keys()) {
-    if (!beforeMap.has(key)) {
-      errors.push(`UNEXPECTED RULE: ${key} was added in refactored CSS`);
-    }
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors,
-  };
+const result = verifyStylesheetParity(originalCss, [modularFileA, modularFileB]);
+if (!result.valid) {
+  console.error('Parity check failed:', result.errors);
 }
 ```
 
@@ -211,13 +92,18 @@ export function verifyStylesheetParity(beforeCss: string, afterCss: string) {
 
 When splitting a single file into multiple modular files, rule order within the cascade often shifts. A reordering is **only dangerous** if two rules match overlapping elements and define conflicting properties at identical specificity.
 
-#### Detecting Cascade Inversions
+Use the cascade conflict detector at [`.agents/skills/bulk-css-operation/scripts/verify-cascade.ts`](./scripts/verify-cascade.ts):
 
-To detect if modularization reversed rule order for conflicting selectors:
-1. Identify all pairs of selectors $(R_1, R_2)$ in the original stylesheet where $Index(R_1) < Index(R_2)$.
-2. Check if $Specificity(R_1) == Specificity(R_2)$ and both rules define at least one common CSS property.
-3. Check if $R_1$ and $R_2$ can overlap (e.g., both are class selectors `.btn` and `.primary`, or tag/class combinations).
-4. If $Index_{after}(R_1) > Index_{after}(R_2)$, flag a potential **Cascade Ordering Inversion**.
+```typescript
+import { verifyCascadeOrder } from './scripts/verify-cascade.ts';
+
+const cascadeResult = verifyCascadeOrder(originalCss, [modularFileA, modularFileB]);
+if (!cascadeResult.valid) {
+  for (const conflict of cascadeResult.conflicts) {
+    console.warn(conflict.description);
+  }
+}
+```
 
 ---
 
@@ -225,44 +111,32 @@ To detect if modularization reversed rule order for conflicting selectors:
 
 When performing structural selector changes (e.g. converting BEM `.block__elem--mod` to modular utility classes `.flex .items-center`), static AST set-difference cannot prove equivalence because the selectors themselves differ.
 
-Use `getCascadedStyle(element, rules)` against authentic DOM trees:
+Use the DOM sampling oracle at [`.agents/skills/bulk-css-operation/scripts/sample-dom.ts`](./scripts/sample-dom.ts):
 
 ```typescript
-import { CSSStyleSheet, getCascadedStyle } from 'cssomnom';
+import { sampleDomParity } from './scripts/sample-dom.ts';
 
-// Load both stylesheets
-const beforeSheet = new CSSStyleSheet();
-beforeSheet.replaceSync(originalCss);
-
-const afterSheet = new CSSStyleSheet();
-afterSheet.replaceSync(modularizedCss);
-
-// Sample representative DOM elements from application fixtures
-function sampleElementEquivalence(element: HTMLElement) {
-  const beforeStyle = getCascadedStyle(element, beforeSheet.cssRules);
-  const afterStyle = getCascadedStyle(element, afterSheet.cssRules);
-
-  const diffs: string[] = [];
-  const allProps = new Set<string>();
-
-  for (let i = 0; i < beforeStyle.length; i++) allProps.add(beforeStyle.item(i));
-  for (let i = 0; i < afterStyle.length; i++) allProps.add(afterStyle.item(i));
-
-  for (const prop of allProps) {
-    const bVal = beforeStyle.getPropertyValue(prop);
-    const aVal = afterStyle.getPropertyValue(prop);
-    if (bVal !== aVal) {
-      diffs.push(`Property '${prop}' differs on <${element.tagName.toLowerCase()} class="${element.className}">: '${bVal}' vs '${aVal}'`);
-    }
-  }
-
-  return diffs;
+// Sample representative DOM elements from application fixtures / JSDOM / linkedom
+const domResult = sampleDomParity(sampledElements, originalCss, refactoredCss);
+if (!domResult.valid) {
+  console.error('DOM computed style differences detected:', domResult.differences);
 }
 ```
 
 ---
 
-## 3. Agent Execution Playbook
+## 3. Automated Skill Tests
+
+All 3 verification scripts are tested within this skill directory at [`.agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts).
+
+Run tests directly via Node:
+```bash
+node --test .agents/skills/bulk-css-operation/scripts/bulk-css-operation.test.ts
+```
+
+---
+
+## 4. Agent Execution Playbook
 
 When tasked with a bulk CSS operation:
 
