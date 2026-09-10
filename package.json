@@ -52,7 +52,7 @@
     "build": "tsup && tsup --config tsup.browser.config.ts && tsc -p tsconfig.build.json",
     "prepublishOnly": "pnpm run preflight && pnpm run build",
     "test": "pnpm run preflight",
-    "test:node": "node --test --test-reporter=dot 'tests/**/*.test.ts'",
+    "test:node": "node --test --test-reporter=dot 'tests/**/*.test.ts' 'skills/**/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "check:safe-exec": "node scripts/ci/check-safe-exec.ts",

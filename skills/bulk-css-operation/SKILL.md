@@ -141,21 +141,7 @@ assert.equal(result.beforeCount, result.afterCount);
 
 ---
 
-## 3. Automated Skill Tests
-
-All verification and transformation scripts are tested directly within this skill directory:
-- [`skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts) (AST diffing, cascade order checks, cascaded style diffing)
-- [`skills/bulk-css-operation/scripts/coverage-prune.test.ts`](./scripts/coverage-prune.test.ts) (Coverage-guided dead-code pruner across simple and complex stylesheets)
-- [`skills/bulk-css-operation/scripts/audit-scorecard.test.ts`](./scripts/audit-scorecard.test.ts) (Regression test suite covering CDP range isolation, AST asset references, and review triage)
-
-Run tests directly via Node:
-```bash
-node --test skills/bulk-css-operation/scripts/*.test.ts
-```
-
----
-
-## 4. Agent Execution Playbook
+## 3. Agent Execution Playbook
  
  When tasked with a bulk CSS operation:
  
