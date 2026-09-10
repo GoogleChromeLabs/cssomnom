@@ -173,6 +173,34 @@ for (const item of result.reviewQueue) {
 }
 ```
 
+**Live Coverage Collection (`collectLiveCssCoverage`)**:
+To extract live coverage ranges directly from headless Chrome via CDP without external dependencies:
+
+```typescript
+import { collectLiveCssCoverage } from './skills/bulk-css-operation/scripts/live-coverage-collector.ts';
+
+// Navigates headless Chrome, starts CSS rule tracking, and returns 3-Tier pruned stylesheets
+const results = await collectLiveCssCoverage({ html: pageHtml }, {
+  pruneOptions: {
+    preserveRootCustomProperties: true,
+    preserveKeyframes: true,
+    preserveFontFaces: true,
+    preserveInteractivePseudoClasses: true,
+    preserveEnvironmentalMediaQueries: true,
+    annotateReviewRules: true,
+  },
+});
+
+for (const { url, pruneResult } of results) {
+  console.log(`${url}: pruned ${pruneResult.removedRules.length} rules, retained ${pruneResult.retainedRules.length}`);
+}
+```
+
+Or run the CLI runner directly on an HTML file or live URL:
+```bash
+node skills/bulk-css-operation/scripts/run-coverage-prune.ts [path/to/page.html | https://example.com]
+```
+
 **Ergonomics for Review (`annotateReviewRules`)**:
 When `annotateReviewRules: true` is enabled, ambiguous rules are commented out in the output CSS with an explanatory tag:
 ```css

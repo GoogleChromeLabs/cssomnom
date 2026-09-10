@@ -18,14 +18,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
 import { pruneUnusedCss } from './coverage-prune.ts';
 import { diffCssAst } from './ast-diff.ts';
 import { checkCascadeConflicts } from './cascade-diff.ts';
 
 describe('coverage-prune: Coverage-guided CSS dead-code pruner', () => {
   describe('Simple Case: Puppeteer golden-chrome csscoverage-involved.txt', () => {
-    const goldenPath = '/usr/local/google/home/paulirish/code/puppeteer/test/golden-chrome/csscoverage-involved.txt';
-    const goldenJson = JSON.parse(readFileSync(goldenPath, 'utf8'));
+    const fixturePath = path.resolve(import.meta.dirname, '../../../tests/fixtures/external/csscoverage-involved.json');
+    const goldenJson = JSON.parse(readFileSync(fixturePath, 'utf8'));
     const originalText: string = goldenJson[0].text;
     const goldenRanges = goldenJson[0].ranges;
 
