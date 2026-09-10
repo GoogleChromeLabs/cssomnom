@@ -1,13 +1,11 @@
 ---
 name: bulk-css-operation
 description: >-
-  Safely performs bulk CSS transformations (splitting stylesheets into modules,
-  consolidating bundles, migrating to variables, pruning dead selectors,
-  and unnesting) with AST diffing, cascade order conflict checks,
-  and cascaded style DOM verification. Use when splitting monolithic stylesheets,
-  merging CSS files, restructuring nesting, migrating design tokens, or pruning
-  unused CSS rules across a codebase. Don't use for single-rule or cosmetic CSS fixes,
-  general HTML/JS refactoring without stylesheet changes, or running test suites.
+  Executes bulk CSS transformations (module splitting, bundling, variable migrations,
+  unnesting, and coverage-guided dead-code pruning) verified via AST diffing, cascade
+  conflict detection, and DOM cascaded style diffing. Use when modularizing stylesheets,
+  merging CSS bundles, restructuring selectors/tokens, or pruning unused rules via DevTools/CDP
+  coverage ranges. Don't use for single-rule CSS edits or general JS/HTML refactoring.
 ---
 
 # Bulk CSS Operations with CSSOM
@@ -67,9 +65,14 @@ Beyond simple file splitting, this skill addresses 6 primary operations:
    - Migrating directional properties (`margin-left`, `right`, `padding-left`, `border-top`) to logical equivalents (`margin-inline-start`, `inset-inline-end`, `padding-inline-start`).
    - *Key Risk*: Specificity ties or partial overrides when physical and logical properties co-exist.
 
-6. **Dead Code & Unused Selector Pruning**:
-   - Using DevTools/Puppeteer CSS coverage ranges or static template scanning to remove unused rules.
-   - *Key Risk*: Accidentally removing rules needed for dynamic runtime classes or shared variables.
+6. **Dead Code & Coverage-Guided Pruning**:
+   - Pruning unused CSS rules using Chrome DevTools / Puppeteer CSS coverage ranges (`CSS.startRuleUsageTracking`).
+   - Uses AST token spans (`rule.location`) to cleanly slice out unused rules without AST stringification mangling.
+   - Operates across 3 confidence tiers:
+     - **Tier 1 (High-Confidence Auto-Cuts)**: 0% hit rules with no active base elements stripped automatically.
+     - **Tier 2 (Guaranteed Auto-Preserves)**: Structural at-rules (`@layer statement`, `@charset`, `@namespace`, `@import`), environmental media (`print`, `prefers-color-scheme`), design tokens (`:root`, `html`), active `:hover`/`:focus` when base selector is used, and referenced `@keyframes`/`@font-face`.
+     - **Tier 3 (Review Queue / Triage)**: Unreferenced assets, dynamic states (`:checked`, `:disabled`), and orphaned `:hover` rules routed to `reviewQueue` or annotated in-place with `/* @cssom-review: ... */` via `--annotateReviewRules`.
+   - *Key Risk*: Blind point-in-time capture deleting hover states, print stylesheets, cascade statement rules, or unreferenced assets without human review.
 
 ---
 
@@ -138,6 +141,46 @@ assert.equal(result.beforeCount, result.afterCount);
    console.error('Cascaded style differences detected:', result.differences);
  }
  ```
+
+---
+
+### Coverage-Guided Dead-Code Pruning (`pruneUnusedCss`)
+
+When pruning unused rules across large stylesheets using Puppeteer or Chrome DevTools Protocol (CDP) CSS coverage (`CSS.startRuleUsageTracking`), point-in-time capture alone is insufficient. Coverage does not evaluate un-triggered hover states, alternative color scheme queries, or print styles, and CDP emits 0% usage for `@keyframes`, `@font-face`, and `@layer` statements.
+
+Use the coverage pruner at [`skills/bulk-css-operation/scripts/coverage-prune.ts`](./scripts/coverage-prune.ts):
+
+```typescript
+import { pruneUnusedCss } from './skills/bulk-css-operation/scripts/coverage-prune.ts';
+
+// coverageRanges: Array<{ start: number, end: number }> from Puppeteer / CDP
+const result = pruneUnusedCss(stylesheetText, coverageRanges, {
+  preserveRootCustomProperties: true,     // Protect :root, html, [data-theme] tokens
+  preserveKeyframes: true,                // Auto-preserves referenced @keyframes, queues unreferenced
+  preserveFontFaces: true,                // Auto-preserves referenced @font-face, queues unreferenced
+  preserveInteractivePseudoClasses: true, // Auto-preserves :hover/:focus if base selector was active
+  preserveEnvironmentalMediaQueries: true,// Auto-preserves print and prefers-color-scheme queries
+  annotateReviewRules: true,              // Comment out ambiguous rules in CSS with @cssom-review
+});
+
+console.log(`Pruned CSS length: ${result.prunedCss.length}`);
+console.log(`Rules removed: ${result.removedRules.length}`);
+console.log(`Rules retained: ${result.retainedRules.length}`);
+
+// Triage review items (unreferenced keyframes, orphaned pseudos, dynamic states)
+for (const item of result.reviewQueue) {
+  console.log(`[Review Needed] ${item.header}: ${item.reason} - ${item.description}`);
+}
+```
+
+**Ergonomics for Review (`annotateReviewRules`)**:
+When `annotateReviewRules: true` is enabled, ambiguous rules are commented out in the output CSS with an explanatory tag:
+```css
+/* @cssom-review: INTERACTIVE_WITHOUT_BASE (Interactive pseudo-class without active base selector '.card'.)
+.card:hover { color: green; }
+*/
+```
+This enables reviewing pruning decisions directly in `git diff`.
 
 ---
 
