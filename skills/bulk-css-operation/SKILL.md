@@ -201,6 +201,9 @@ Or run the CLI runner directly on an HTML file or live URL:
 node skills/bulk-css-operation/scripts/run-coverage-prune.ts [path/to/page.html | https://example.com]
 ```
 
+**End-to-End Recipe**:
+For a complete, runnable reference showing how an agent coordinates live Chrome coverage collection, 3-Tier pruning, AST fidelity diffing, and cascade validation in a single automated flow, see [`skills/bulk-css-operation/scripts/live-coverage-prune.integration.test.ts`](./scripts/live-coverage-prune.integration.test.ts).
+
 **Ergonomics for Review (`annotateReviewRules`)**:
 When `annotateReviewRules: true` is enabled, ambiguous rules are commented out in the output CSS with an explanatory tag:
 ```css
