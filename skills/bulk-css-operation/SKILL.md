@@ -153,15 +153,8 @@ Use the coverage pruner at [`skills/bulk-css-operation/scripts/coverage-prune.ts
 ```typescript
 import { pruneUnusedCss } from './skills/bulk-css-operation/scripts/coverage-prune.ts';
 
-// coverageRanges: Array<{ start: number, end: number }> from Puppeteer / CDP
-const result = pruneUnusedCss(stylesheetText, coverageRanges, {
-  preserveRootCustomProperties: true,     // Protect :root, html, [data-theme] tokens
-  preserveKeyframes: true,                // Auto-preserves referenced @keyframes, queues unreferenced
-  preserveFontFaces: true,                // Auto-preserves referenced @font-face, queues unreferenced
-  preserveInteractivePseudoClasses: true, // Auto-preserves :hover/:focus if base selector was active
-  preserveEnvironmentalMediaQueries: true,// Auto-preserves print and prefers-color-scheme queries
-  annotateReviewRules: true,              // Comment out ambiguous rules in CSS with @cssom-review
-});
+// Safe 3-Tier pruning with baked-in defaults (preserves :root, dark mode/print, active pseudos, referenced assets, and annotates review rules)
+const result = pruneUnusedCss(stylesheetText, coverageRanges);
 
 console.log(`Pruned CSS length: ${result.prunedCss.length}`);
 console.log(`Rules removed: ${result.removedRules.length}`);
@@ -180,16 +173,7 @@ To extract live coverage ranges directly from headless Chrome via `puppeteer-cor
 import { collectLiveCssCoverage } from './skills/bulk-css-operation/scripts/live-coverage-collector.ts';
 
 // Navigates headless Chrome, starts CSS rule tracking, and returns 3-Tier pruned stylesheets
-const results = await collectLiveCssCoverage({ html: pageHtml }, {
-  pruneOptions: {
-    preserveRootCustomProperties: true,
-    preserveKeyframes: true,
-    preserveFontFaces: true,
-    preserveInteractivePseudoClasses: true,
-    preserveEnvironmentalMediaQueries: true,
-    annotateReviewRules: true,
-  },
-});
+const results = await collectLiveCssCoverage({ html: pageHtml });
 
 for (const { url, pruneResult } of results) {
   console.log(`${url}: pruned ${pruneResult.removedRules.length} rules, retained ${pruneResult.retainedRules.length}`);

@@ -62,13 +62,25 @@ export interface CoveragePruneResult {
 }
 
 export interface PruneOptions {
+  /**
+   * When true, comments out ambiguous triage rules in the CSS with @cssom-review annotations
+   * instead of removing them, enabling easy visual diff inspection.
+   * Defaults to `true`.
+   */
+  annotateReviewRules?: boolean;
+  /**
+   * When true, unreferenced @keyframes and @font-face rules are pruned immediately
+   * instead of being retained and routed to the Tier 3 review queue.
+   * Defaults to `false` (safe mode).
+   */
+  aggressiveAssetPruning?: boolean;
+
+  // Granular override escape-hatches (all default to safe values: true):
   preserveRootCustomProperties?: boolean;
   preserveKeyframes?: boolean;
   preserveFontFaces?: boolean;
   preserveInteractivePseudoClasses?: boolean;
   preserveEnvironmentalMediaQueries?: boolean;
-  /** When true, comments out ambiguous triage rules in the CSS with @cssom-review annotations instead of omitting them */
-  annotateReviewRules?: boolean;
 }
 
 /**
@@ -276,12 +288,13 @@ export function pruneUnusedCss(
   coverageRanges: CoverageRange[],
   options?: PruneOptions
 ): CoveragePruneResult {
+  const annotateReview = options?.annotateReviewRules ?? true;
+  const aggressiveAssetPruning = options?.aggressiveAssetPruning ?? false;
   const preserveRootCustomProperties = options?.preserveRootCustomProperties ?? true;
-  const preserveKeyframes = options?.preserveKeyframes ?? true;
-  const preserveFontFaces = options?.preserveFontFaces ?? true;
+  const preserveKeyframes = options?.preserveKeyframes ?? (!aggressiveAssetPruning);
+  const preserveFontFaces = options?.preserveFontFaces ?? (!aggressiveAssetPruning);
   const preserveInteractive = options?.preserveInteractivePseudoClasses ?? true;
   const preserveEnvironmental = options?.preserveEnvironmentalMediaQueries ?? true;
-  const annotateReview = options?.annotateReviewRules ?? false;
 
   const sheet = parse(css);
   const removedRules: string[] = [];
@@ -430,7 +443,12 @@ export function pruneUnusedCss(
       const isDynamicState = DYNAMIC_STATE_PSEUDO_REGEX.test(sel);
 
       if (isInteractive || isDynamicState) {
-        const base = extractBaseSelector(sel);
+        let base = extractBaseSelector(sel);
+        // If nested selector starts with '&', resolve against parent style rule
+        if (base.startsWith('&') && rule.parentRule instanceof CSSStyleRule) {
+          const parentBase = extractBaseSelector(rule.parentRule.selectorText);
+          base = parentBase + base.slice(1);
+        }
         const baseActive = base !== '' && activeBaseSelectors.has(base);
 
         if (preserveInteractive && isInteractive && baseActive) {

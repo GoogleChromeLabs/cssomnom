@@ -94,16 +94,7 @@ async function main() {
   }
 
   console.log('[Live CSS Coverage] Launching headless Chrome and tracking rule usage...');
-  const results = await collectLiveCssCoverage(target, {
-    pruneOptions: {
-      preserveRootCustomProperties: true,
-      preserveKeyframes: true,
-      preserveFontFaces: true,
-      preserveInteractivePseudoClasses: true,
-      preserveEnvironmentalMediaQueries: true,
-      annotateReviewRules: true,
-    },
-  });
+  const results = await collectLiveCssCoverage(target);
 
   console.log(`\nFound ${results.length} stylesheet(s).\n`);
 

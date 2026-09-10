@@ -22,7 +22,7 @@ import { diffCssAst } from './ast-diff.ts';
 import { checkCascadeConflicts } from './cascade-diff.ts';
 
 describe('Live CSS Coverage Integration: Headless Chrome CDP to cssomnom Pruning Pipeline', () => {
-  it('collects live coverage from Chrome and executes 3-Tier pruning on live HTML', async () => {
+  it('collects live coverage from Chrome and executes 3-Tier pruning on complex modern CSS', async () => {
     const html = `
 <!DOCTYPE html>
 <html>
@@ -30,64 +30,130 @@ describe('Live CSS Coverage Integration: Headless Chrome CDP to cssomnom Pruning
 <style>
   :root {
     --brand: #1a73e8;
-    --unused: #d93025;
+    --accent: #e37400;
+    --unused-color: #d93025;
   }
-  @layer reset, components;
+
+  @layer reset, layout, components, utilities;
+
+  @font-face {
+    font-family: "BrandFont";
+    src: local("Arial");
+  }
+
+  @font-face {
+    font-family: "OrphanFont";
+    src: local("Comic Sans");
+  }
 
   @layer components {
-    .btn {
+    /* Modern CSS Nesting */
+    .card {
+      padding: 16px;
+      font-family: "BrandFont", sans-serif;
+      border: 1px solid #ccc;
+
+      .card-title {
+        font-size: 20px;
+        font-weight: bold;
+      }
+
+      .unused-card-footer {
+        color: gray;
+      }
+
+      &:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      }
+    }
+
+    /* Container Queries */
+    .container-box {
+      container-type: inline-size;
+    }
+
+    @container (min-width: 250px) {
+      .responsive-badge {
+        display: inline-block;
+        background: var(--accent);
+        color: white;
+      }
+      .unused-container-child {
+        display: none;
+      }
+    }
+
+    /* Interactive & Dynamic States */
+    button.action-btn {
       background: var(--brand);
       color: white;
     }
-    .btn:hover {
+    button.action-btn:hover {
       background: #1557b0;
     }
-    .btn:focus-visible {
+    button.action-btn:focus-visible {
       outline: 2px solid orange;
     }
-    .unused-hero {
-      font-size: 48px;
+
+    /* Unreferenced dynamic states & orphaned hover */
+    input.toggle:checked + label {
+      font-weight: bold;
     }
-    .unused-card:hover {
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    .completely-unused-modal:hover {
+      opacity: 0.9;
+    }
+    .completely-unused-modal {
+      display: none;
     }
   }
 
-  @keyframes pulse {
+  /* Keyframe animations: referenced vs orphan */
+  @keyframes active-pulse {
     from { opacity: 1; }
     to { opacity: 0.5; }
   }
 
-  @keyframes unused-spin {
+  @keyframes orphan-spin {
+    from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
 
-  .spinner {
-    animation: pulse 1s infinite;
+  .animated-spinner {
+    animation: active-pulse 1.5s infinite;
   }
 
+  /* Transitions & Starting Style */
+  @starting-style {
+    .fade-widget {
+      opacity: 0;
+    }
+  }
+
+  /* Environmental queries */
   @media print {
-    body { color: black; }
+    body { color: black; font-size: 10pt; }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root { --brand: #8ab4f8; }
   }
 </style>
 </head>
 <body>
-  <button class="btn">Click me</button>
-  <div class="spinner"></div>
+  <div class="card container-box">
+    <h2 class="card-title">Card Header</h2>
+    <span class="responsive-badge">Active</span>
+    <button class="action-btn">Action</button>
+    <div class="animated-spinner"></div>
+    <div class="fade-widget">Fading</div>
+    <input type="checkbox" class="toggle" id="t1"><label for="t1">Toggle</label>
+  </div>
 </body>
 </html>
 `;
 
-    const results = await collectLiveCssCoverage({ html }, {
-      pruneOptions: {
-        preserveRootCustomProperties: true,
-        preserveKeyframes: true,
-        preserveFontFaces: true,
-        preserveInteractivePseudoClasses: true,
-        preserveEnvironmentalMediaQueries: true,
-        annotateReviewRules: true,
-      },
-    });
+    // Note: Called with ZERO options to verify canonical baked-in defaults!
+    const results = await collectLiveCssCoverage({ html });
 
     assert.equal(results.length, 1, 'Extracted 1 live stylesheet from Chrome');
     const { pruneResult, originalCss, ranges } = results[0];
@@ -96,26 +162,42 @@ describe('Live CSS Coverage Integration: Headless Chrome CDP to cssomnom Pruning
     assert.ok(ranges.length > 0, 'Chrome reported non-empty coverage ranges');
 
     // Assert Tier 1: unused rules were pruned
-    assert.ok(pruneResult.removedRules.includes('.unused-hero'), '.unused-hero was stripped');
-    assert.ok(!pruneResult.prunedCss.includes('.unused-hero'), 'pruned CSS does not contain .unused-hero');
+    assert.ok(pruneResult.removedRules.includes('& .unused-card-footer'), 'nested .unused-card-footer was stripped');
+    assert.ok(pruneResult.removedRules.includes('.unused-container-child'), 'unused container child was stripped');
+    assert.ok(pruneResult.removedRules.includes('.completely-unused-modal'), 'unused modal was stripped');
+    assert.ok(!pruneResult.prunedCss.includes('.unused-card-footer'), 'pruned CSS does not contain unused card footer');
+    assert.ok(!pruneResult.prunedCss.includes('.unused-container-child'), 'pruned CSS does not contain unused container child');
 
     // Assert Tier 2: guaranteed preserves
     assert.ok(pruneResult.retainedRules.includes(':root'), ':root tokens retained');
-    assert.ok(pruneResult.retainedRules.includes('@layer reset, components'), '@layer statement rule retained');
-    assert.ok(pruneResult.retainedRules.includes('.btn'), 'active .btn retained');
-    assert.ok(pruneResult.retainedRules.includes('.btn:hover'), 'active button :hover retained via base selector');
-    assert.ok(pruneResult.retainedRules.includes('.btn:focus-visible'), 'active button :focus-visible retained');
-    assert.ok(pruneResult.retainedRules.includes('@keyframes pulse'), 'referenced @keyframes pulse retained');
+    assert.ok(pruneResult.retainedRules.includes('@layer reset, layout, components, utilities'), '@layer statement rule retained');
+    assert.ok(pruneResult.retainedRules.includes('@font-face'), '@font-face for BrandFont retained');
+    assert.ok(pruneResult.retainedRules.includes('.card'), 'active .card retained');
+    assert.ok(pruneResult.retainedRules.includes('& .card-title'), 'active nested .card-title retained');
+    assert.ok(pruneResult.retainedRules.includes('&:hover'), 'nested &:hover retained via active base');
+    assert.ok(pruneResult.retainedRules.includes('.responsive-badge'), 'active @container child retained');
+    assert.ok(pruneResult.retainedRules.includes('button.action-btn'), 'active button retained');
+    assert.ok(pruneResult.retainedRules.includes('button.action-btn:hover'), 'active button :hover retained');
+    assert.ok(pruneResult.retainedRules.includes('button.action-btn:focus-visible'), 'active button :focus-visible retained');
+    assert.ok(pruneResult.retainedRules.includes('@keyframes active-pulse'), 'referenced keyframes active-pulse retained');
+    assert.ok(pruneResult.retainedRules.includes('@starting-style'), '@starting-style block retained');
     assert.ok(pruneResult.retainedRules.includes('@media print'), 'environmental @media print retained');
+    assert.ok(pruneResult.retainedRules.includes('@media (prefers-color-scheme: dark)'), 'environmental dark mode retained');
 
-    // Assert Tier 3: ambiguous unreferenced keyframes and orphaned pseudo routed to review queue
+    // Assert Tier 3: ambiguous unreferenced assets and orphaned pseudo routed to review queue
     const unrefKeyframe = pruneResult.reviewQueue.find((q) => q.reason === 'UNREFERENCED_KEYFRAMES');
-    assert.ok(unrefKeyframe, 'unused-spin queued in review queue');
-    assert.equal(unrefKeyframe?.header, '@keyframes unused-spin');
+    assert.ok(unrefKeyframe, 'orphan-spin queued in review queue');
+    assert.equal(unrefKeyframe?.header, '@keyframes orphan-spin');
 
-    // Assert annotated review rule in CSS
+    const unrefFont = pruneResult.reviewQueue.find((q) => q.reason === 'UNREFERENCED_FONT_FACE');
+    assert.ok(unrefFont, 'OrphanFont queued in review queue');
+
+    const orphanedHover = pruneResult.reviewQueue.find((q) => q.reason === 'INTERACTIVE_WITHOUT_BASE');
+    assert.ok(orphanedHover, 'completely-unused-modal:hover queued as orphaned pseudo');
+
+    // Assert annotated review rules in output CSS (default annotateReviewRules: true)
     assert.ok(pruneResult.prunedCss.includes('@cssom-review: INTERACTIVE_WITHOUT_BASE'), 'annotated orphaned :hover rule');
-    assert.ok(pruneResult.prunedCss.includes('.unused-card:hover'), 'kept commented-out review rule in CSS');
+    assert.ok(pruneResult.prunedCss.includes('.completely-unused-modal:hover'), 'kept commented-out review rule in CSS');
 
     // Verification Pipeline Stage 1: AST fidelity on pruned CSS
     const astDiff = diffCssAst(pruneResult.prunedCss, pruneResult.prunedCss);
