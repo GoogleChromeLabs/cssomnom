@@ -52,8 +52,7 @@ export function extractRuleRecords(
     if (rule instanceof CSSStyleRule) {
       const decls = new Map<string, { value: string; priority: string }>();
       const style = rule.style;
-      for (let j = 0; j < style.length; j++) {
-        const prop = style.item(j);
+      for (const prop of style) {
         decls.set(prop, {
           value: style.getPropertyValue(prop).trim(),
           priority: style.getPropertyPriority(prop).trim(),

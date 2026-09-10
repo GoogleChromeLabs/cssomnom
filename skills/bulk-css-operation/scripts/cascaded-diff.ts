@@ -65,13 +65,7 @@ export function diffCascadedStyles(
     const beforeStyle = getCascadedStyle(el, sheetBefore.cssRules);
     const afterStyle = getCascadedStyle(el, sheetAfter.cssRules);
 
-    const checkedProps = new Set<string>();
-    for (let i = 0; i < beforeStyle.length; i++) {
-      checkedProps.add(beforeStyle.item(i));
-    }
-    for (let i = 0; i < afterStyle.length; i++) {
-      checkedProps.add(afterStyle.item(i));
-    }
+    const checkedProps = new Set<string>([...beforeStyle, ...afterStyle]);
 
     for (const prop of checkedProps) {
       const bVal = beforeStyle.getPropertyValue(prop);

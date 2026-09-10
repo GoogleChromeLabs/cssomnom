@@ -16,9 +16,10 @@
  */
 
 import * as fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { collectLiveCssCoverage } from './live-coverage-collector.ts';
 
-async function main() {
+export async function run() {
   const arg = process.argv[2];
 
   let target: { html: string } | { url: string };
@@ -87,10 +88,12 @@ async function main() {
     target = { html: demoHtml };
   } else if (arg.startsWith('http://') || arg.startsWith('https://')) {
     target = { url: arg };
-  } else if (fs.existsSync(arg)) {
-    target = { html: fs.readFileSync(arg, 'utf-8') };
   } else {
-    target = { html: arg };
+    try {
+      target = { html: fs.readFileSync(arg, 'utf-8') };
+    } catch {
+      target = { html: arg };
+    }
   }
 
   console.log('[Live CSS Coverage] Launching headless Chrome and tracking rule usage...');
@@ -137,7 +140,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('Error running coverage pruning:', err);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  run().catch((err) => {
+    console.error('Error running coverage pruning:', err);
+    process.exit(1);
+  });
+}

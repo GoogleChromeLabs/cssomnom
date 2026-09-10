@@ -45,7 +45,7 @@ export type ReviewReason =
   | 'UNREFERENCED_FONT_FACE'
   | 'DYNAMIC_STATE_PSEUDO'
   | 'INTERACTIVE_WITHOUT_BASE'
-  | 'ENVIRONMENTAL_MEDIA_QUERY';
+  | 'AMBIGUOUS';
 
 export interface ReviewItem {
   header: string;
@@ -86,7 +86,7 @@ export interface PruneOptions {
 /**
  * Common interactive and dynamic pseudo-classes.
  */
-const INTERACTIVE_PSEUDO_REGEX = /:(?:hover|focus|focus-visible|focus-within|active|target|popover-open|visited)\b/i;
+const INTERACTIVE_PSEUDO_REGEX = /:(?:focus-visible|focus-within|popover-open|hover|focus|active|target|visited)\b/i;
 const DYNAMIC_STATE_PSEUDO_REGEX = /:(?:checked|disabled|enabled|valid|invalid|required|optional|read-only|read-write|empty|indeterminate|default)\b/i;
 
 /**
@@ -94,8 +94,8 @@ const DYNAMIC_STATE_PSEUDO_REGEX = /:(?:checked|disabled|enabled|valid|invalid|r
  */
 function extractBaseSelector(selector: string): string {
   return selector
-    .replace(/:(?:focus-visible|focus-within|popover-open|hover|focus|active|target|visited)\b/gi, '')
-    .replace(/:(?:checked|disabled|enabled|valid|invalid|required|optional|read-only|read-write|empty|indeterminate|default)\b/gi, '')
+    .replace(new RegExp(INTERACTIVE_PSEUDO_REGEX.source, 'gi'), '')
+    .replace(new RegExp(DYNAMIC_STATE_PSEUDO_REGEX.source, 'gi'), '')
     .trim();
 }
 
@@ -301,7 +301,7 @@ export function pruneUnusedCss(
   const retainedRules: string[] = [];
   const retainedSet = new Set<CSSRule>();
   const reviewQueue: ReviewItem[] = [];
-  const annotatedReviewSet = new Set<CSSRule>();
+  const annotatedReviewMap = new Map<CSSRule, ReviewItem>();
 
   // Set of base selectors that have confirmed usage across retained rules
   const activeBaseSelectors = new Set<string>();
@@ -357,16 +357,27 @@ export function pruneUnusedCss(
     }
 
     // 2. TIER 2: Guaranteed Preserves - Environmental media queries (print, dark mode)
-    // Only enabled if preserveEnvironmental is true AND preserveRootCustomProperties is not explicitly disabled
-    if (preserveEnvironmental && preserveRootCustomProperties && rule instanceof CSSMediaRule && isEnvironmentalMedia(rule.conditionText)) {
-      retainedRules.push(header);
-      retainedSet.add(rule);
-      // Retain all children inside environmental media queries
-      for (const child of getChildRules(rule)) {
-        retainedSet.add(child);
-        retainedRules.push(getRuleHeader(child, css));
+    if (preserveEnvironmental && rule instanceof CSSMediaRule && isEnvironmentalMedia(rule.conditionText)) {
+      const children = getChildRules(rule);
+      const activeChildren = children.filter((child) => {
+        if (!preserveRootCustomProperties && child instanceof CSSStyleRule) {
+          const sel = child.selectorText.trim();
+          if (sel === ':root' || sel.startsWith(':root') || sel === 'html' || sel.startsWith('html')) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (activeChildren.length > 0) {
+        retainedRules.push(header);
+        retainedSet.add(rule);
+        for (const child of activeChildren) {
+          retainedSet.add(child);
+          retainedRules.push(getRuleHeader(child, css));
+        }
+        return true;
       }
-      return true;
     }
 
     // 3. TIER 2: Guaranteed Preserves - Custom properties & design tokens
@@ -459,26 +470,26 @@ export function pruneUnusedCss(
         }
 
         if (isDynamicState && baseActive) {
-          // Dynamic state on active base: add to review queue
-          reviewQueue.push({
+          const item: ReviewItem = {
             header,
             reason: 'DYNAMIC_STATE_PSEUDO',
             description: `Dynamic state pseudo-class on active base selector '${base}'.`,
             rule,
-          });
+          };
+          reviewQueue.push(item);
           if (annotateReview) {
-            annotatedReviewSet.add(rule);
+            annotatedReviewMap.set(rule, item);
           }
         } else if (isInteractive && !baseActive) {
-          // Orphaned pseudo-class: there is no active base element rule!
-          reviewQueue.push({
+          const item: ReviewItem = {
             header,
             reason: 'INTERACTIVE_WITHOUT_BASE',
             description: `Interactive pseudo-class without active base selector '${base || sel}'.`,
             rule,
-          });
+          };
+          reviewQueue.push(item);
           if (annotateReview) {
-            annotatedReviewSet.add(rule);
+            annotatedReviewMap.set(rule, item);
           }
         }
       }
@@ -511,7 +522,7 @@ export function pruneUnusedCss(
       retainedSet.add(rule);
       return true;
     } else {
-      if (!annotatedReviewSet.has(rule)) {
+      if (!annotatedReviewMap.has(rule)) {
         removedRules.push(header);
       }
       return false;
@@ -523,6 +534,12 @@ export function pruneUnusedCss(
     evaluateRuleUsage(sheet.cssRules[i]);
   }
 
+  function formatReviewAnnotation(item: ReviewItem | undefined, rawText: string): string {
+    const reason = item?.reason || 'AMBIGUOUS';
+    const desc = item?.description ? ` (${item.description})` : '';
+    return `/* @cssom-review: ${reason}${desc}\n${rawText}\n*/`;
+  }
+
   // Recursive slice/splicing to preserve comments and layout accurately
   function serializeKeptSlice(rule: CSSRule): string {
     const loc = rule.location!;
@@ -530,10 +547,8 @@ export function pruneUnusedCss(
 
     // If not a grouping rule with children, return verbatim original text
     if (children.length === 0 || loc.bodyStart === undefined || loc.bodyEnd === undefined) {
-      if (annotatedReviewSet.has(rule)) {
-        const ruleText = css.slice(loc.start, loc.end);
-        const item = reviewQueue.find(q => q.rule === rule);
-        return `/* @cssom-review: ${item?.reason || 'AMBIGUOUS'} (${item?.description || ''})\n${ruleText}\n*/`;
+      if (annotatedReviewMap.has(rule)) {
+        return formatReviewAnnotation(annotatedReviewMap.get(rule), css.slice(loc.start, loc.end));
       }
       return css.slice(loc.start, loc.end);
     }
@@ -547,16 +562,12 @@ export function pruneUnusedCss(
 
     for (const child of children) {
       const childLoc = child.location!;
-      // FIX DATA LOSS BUG: Always flush text between lastPos and childLoc.start
-      // so property declarations between nested rules are preserved!
       innerContent += css.slice(lastPos, childLoc.start);
 
       if (retainedSet.has(child)) {
         innerContent += serializeKeptSlice(child);
-      } else if (annotatedReviewSet.has(child)) {
-        const childText = css.slice(childLoc.start, childLoc.end);
-        const item = reviewQueue.find(q => q.rule === child);
-        innerContent += `/* @cssom-review: ${item?.reason || 'AMBIGUOUS'}\n${childText}\n*/`;
+      } else if (annotatedReviewMap.has(child)) {
+        innerContent += formatReviewAnnotation(annotatedReviewMap.get(child), css.slice(childLoc.start, childLoc.end));
       }
       lastPos = childLoc.end;
     }
@@ -580,11 +591,9 @@ export function pruneUnusedCss(
       prunedCss += css.slice(lastPos, loc.start);
       prunedCss += serializeKeptSlice(rootRule);
       lastPos = loc.end;
-    } else if (annotatedReviewSet.has(rootRule)) {
+    } else if (annotatedReviewMap.has(rootRule)) {
       prunedCss += css.slice(lastPos, loc.start);
-      const ruleText = css.slice(loc.start, loc.end);
-      const item = reviewQueue.find(q => q.rule === rootRule);
-      prunedCss += `/* @cssom-review: ${item?.reason || 'AMBIGUOUS'} (${item?.description || ''})\n${ruleText}\n*/`;
+      prunedCss += formatReviewAnnotation(annotatedReviewMap.get(rootRule), css.slice(loc.start, loc.end));
       lastPos = loc.end;
     } else {
       lastPos = loc.end;

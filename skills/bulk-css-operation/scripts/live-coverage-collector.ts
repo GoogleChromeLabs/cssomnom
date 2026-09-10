@@ -166,11 +166,13 @@ export async function collectLiveCssCoverage(
     await cdp.send('CSS.enable');
 
     const stylesheetSources = new Map<string, { url: string; text: string }>();
+    const pendingStyleSheets: Promise<void>[] = [];
 
     cdp.on('CSS.styleSheetAdded', (event) => {
       const header = event.header;
       if (!header?.styleSheetId) return;
-      cdp.send('CSS.getStyleSheetText', { styleSheetId: header.styleSheetId })
+      const fetchPromise = cdp
+        .send('CSS.getStyleSheetText', { styleSheetId: header.styleSheetId })
         .then((resp) => {
           stylesheetSources.set(header.styleSheetId, {
             url: header.sourceURL || header.origin || 'inline',
@@ -178,6 +180,7 @@ export async function collectLiveCssCoverage(
           });
         })
         .catch(() => {});
+      pendingStyleSheets.push(fetchPromise);
     });
 
     await cdp.send('CSS.startRuleUsageTracking');
@@ -190,6 +193,7 @@ export async function collectLiveCssCoverage(
 
     // Brief stabilization delay for style recalc
     await new Promise((res) => setTimeout(res, 100));
+    await Promise.all(pendingStyleSheets);
 
     const { ruleUsage } = await cdp.send('CSS.stopRuleUsageTracking');
 

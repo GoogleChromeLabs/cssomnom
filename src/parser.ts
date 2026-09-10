@@ -36,7 +36,7 @@ import { PropertyRegistry, matchesSyntax } from './PropertyRegistry.ts';
 /**
  * Extracts the start offset of a component value (Token or SimpleBlock).
  */
-export function getComponentValueStartIndex(item?: ComponentValue): number | undefined {
+function getComponentValueStartIndex(item?: ComponentValue): number | undefined {
   if (!item) return undefined;
   if (item.type === 'simple-block') {
     return item.associatedToken?.startIndex;
@@ -50,7 +50,7 @@ export function getComponentValueStartIndex(item?: ComponentValue): number | und
 /**
  * Extracts the end offset of a component value (Token or SimpleBlock).
  */
-export function getComponentValueEndIndex(item?: ComponentValue): number | undefined {
+function getComponentValueEndIndex(item?: ComponentValue): number | undefined {
   if (!item) return undefined;
   if (item.type === 'simple-block') {
     return item.endIndex ?? item.associatedToken?.endIndex;
@@ -59,6 +59,16 @@ export function getComponentValueEndIndex(item?: ComponentValue): number | undef
     return item.endIndex;
   }
   return undefined;
+}
+
+/**
+ * Computes RuleSourceLocation from a starting character index and SimpleBlock.
+ */
+function createBlockLocation(start: number, block: SimpleBlock): RuleSourceLocation {
+  const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
+  const bodyStart = block.associatedToken.endIndex;
+  const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
+  return { start, end, bodyStart, bodyEnd };
 }
 
 /**
@@ -394,10 +404,7 @@ export class Parser {
         rule.prelude.push(next);
       } else if (next.type === '{') {
         const block = this.consumeBlock(this.consumeToken());
-        const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
-        const bodyStart = block.associatedToken.endIndex;
-        const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
-        const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
+        const location = createBlockLocation(start, block);
 
         if (!this.isSupportedAtRule(atRuleName, nested)) return null;
         
@@ -1309,10 +1316,7 @@ export class Parser {
         const block = val as SimpleBlock;
         const blockContents = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
         const start = getComponentValueStartIndex(prelude[0]) ?? block.associatedToken.startIndex ?? 0;
-        const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
-        const bodyStart = block.associatedToken.endIndex;
-        const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
-        const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
+        const location = createBlockLocation(start, block);
         const rule = this.createStyleRule(prelude, blockContents, nested, allowRelative, location);
         if (!rule) return null;
         return rule;
@@ -1374,10 +1378,7 @@ export class Parser {
       } else if (val.type === 'simple-block' && (val as SimpleBlock).associatedToken.type === '{') {
         stream.next();
         const block = val as SimpleBlock;
-        const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
-        const bodyStart = block.associatedToken.endIndex;
-        const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
-        const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
+        const location = createBlockLocation(start, block);
 
         if (!this.isSupportedAtRule(atRuleName, nested)) return null;
         
