@@ -15,10 +15,10 @@
  * limitations under the License.
  */
 
-import { spawn } from 'node:child_process';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
+import puppeteer from 'puppeteer-core';
 import { pruneUnusedCss, type CoverageRange, type CoveragePruneResult, type PruneOptions } from './coverage-prune.ts';
 
 export interface LiveCoverageResult {
@@ -35,92 +35,54 @@ export interface CollectCoverageOptions {
   pruneOptions?: PruneOptions;
 }
 
+/**
+ * Discovers a local Chrome or Chromium executable across Linux, macOS, and Windows.
+ * Respects CHROME_BIN and PUPPETEER_EXECUTABLE_PATH environment overrides.
+ */
 export function findChromeExecutable(): string {
-  const candidates = [
-    process.env.CHROME_BIN,
-    process.env.PUPPETEER_EXECUTABLE_PATH,
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-  ].filter((p): p is string => Boolean(p && fs.existsSync(p)));
-
-  if (candidates.length === 0) {
-    throw new Error('No Chrome/Chromium executable found in standard locations. Set CHROME_BIN.');
+  if (process.env.CHROME_BIN && fs.existsSync(process.env.CHROME_BIN)) {
+    return process.env.CHROME_BIN;
   }
-  return candidates[0];
-}
-
-interface CdpMessage {
-  id: number;
-  sessionId?: string;
-  method?: string;
-  params?: Record<string, unknown>;
-  result?: Record<string, unknown>;
-  error?: { message: string; code?: number };
-}
-
-class CdpConnection {
-  private ws: WebSocket;
-  private nextId = 1;
-  private pending = new Map<number, { resolve: (val: unknown) => void; reject: (err: Error) => void }>();
-  private eventHandlers = new Map<string, Set<(params: unknown) => void>>();
-
-  constructor(ws: WebSocket) {
-    this.ws = ws;
-    this.ws.onmessage = (evt) => {
-      const msg: CdpMessage = JSON.parse(evt.data.toString());
-      if (msg.id && this.pending.has(msg.id)) {
-        const { resolve, reject } = this.pending.get(msg.id)!;
-        this.pending.delete(msg.id);
-        if (msg.error) {
-          reject(new Error(msg.error.message));
-        } else {
-          resolve(msg.result);
-        }
-      } else if (msg.method) {
-        const listeners = this.eventHandlers.get(msg.method);
-        if (listeners) {
-          for (const listener of listeners) {
-            listener(msg.params);
-          }
-        }
-      }
-    };
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
 
-  send<T = unknown>(method: string, params: Record<string, unknown> = {}, sessionId?: string): Promise<T> {
-    const id = this.nextId++;
-    return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (val: unknown) => void, reject });
-      const payload: Record<string, unknown> = { id, method, params };
-      if (sessionId) {
-        payload.sessionId = sessionId;
-      }
-      this.ws.send(JSON.stringify(payload));
-    });
+  const platform = process.platform;
+  let candidates: string[] = [];
+
+  if (platform === 'linux') {
+    candidates = [
+      '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/chromium',
+      '/usr/bin/chromium-browser',
+      '/snap/bin/chromium',
+    ];
+  } else if (platform === 'darwin') {
+    candidates = [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      path.join(os.homedir(), 'Applications/Google Chrome.app/Contents/MacOS/Google Chrome'),
+    ];
+  } else if (platform === 'win32') {
+    const programFiles = process.env.PROGRAMFILES || 'C:\\Program Files';
+    const programFilesX86 = process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)';
+    const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
+    candidates = [
+      path.join(programFiles, 'Google/Chrome/Application/chrome.exe'),
+      path.join(programFilesX86, 'Google/Chrome/Application/chrome.exe'),
+      path.join(localAppData, 'Google/Chrome/Application/chrome.exe'),
+    ];
   }
 
-  on<T = unknown>(method: string, handler: (params: T) => void): () => void {
-    let set = this.eventHandlers.get(method);
-    if (!set) {
-      set = new Set();
-      this.eventHandlers.set(method, set);
-    }
-    const genericHandler = handler as (params: unknown) => void;
-    set.add(genericHandler);
-    return () => {
-      set?.delete(genericHandler);
-    };
+  const found = candidates.find((p) => fs.existsSync(p));
+  if (!found) {
+    throw new Error(
+      `No Chrome/Chromium executable found for platform '${platform}'. Set CHROME_BIN or PUPPETEER_EXECUTABLE_PATH.`
+    );
   }
-
-  close(): void {
-    try {
-      this.ws.close();
-    } catch {
-      // Ignore socket closing errors
-    }
-  }
+  return found;
 }
 
 /**
@@ -169,7 +131,7 @@ export function convertToDisjointRanges(
 }
 
 /**
- * Launches Chrome in headless mode, collects live CSS coverage for an HTML string or URL,
+ * Launches Chrome in headless mode via puppeteer-core, collects live CSS coverage for an HTML string or URL,
  * and passes the gathered stylesheet and coverage ranges through cssomnom's 3-Tier pruner.
  */
 export async function collectLiveCssCoverage(
@@ -181,90 +143,36 @@ export async function collectLiveCssCoverage(
   const userDataDir = options.userDataDir ?? path.join(os.tmpdir(), `cssom-chrome-${Date.now()}-${randomSuffix}`);
   const timeoutMs = options.timeoutMs ?? 30000;
 
-  fs.mkdirSync(userDataDir, { recursive: true });
-
-  const chromeArgs = [
-    '--headless=new',
-    '--remote-debugging-port=0',
-    '--disable-gpu',
-    '--no-sandbox',
-    '--no-first-run',
-    '--disable-background-networking',
-    '--disable-default-apps',
-    '--disable-sync',
-    `--user-data-dir=${userDataDir}`,
-    'about:blank',
-  ];
-
-  const chrome = spawn(chromeBin, chromeArgs, {
-    stdio: ['ignore', 'ignore', 'pipe'],
+  const browser = await puppeteer.launch({
+    executablePath: chromeBin,
+    headless: true,
+    userDataDir,
+    timeout: timeoutMs,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-sync',
+    ],
   });
 
-  const cleanup = () => {
-    try {
-      if (!chrome.killed && chrome.pid) {
-        chrome.kill('SIGKILL');
-      }
-    } catch {
-      // Ignore
-    }
-    try {
-      fs.rmSync(userDataDir, { recursive: true, force: true });
-    } catch {
-      // Ignore
-    }
-  };
-
   try {
-    const wsEndpoint = await new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(new Error(`Timed out waiting for Chrome DevTools WebSocket after ${timeoutMs}ms`));
-      }, timeoutMs);
+    const page = await browser.newPage();
+    const cdp = await page.createCDPSession();
 
-      let buffer = '';
-      chrome.stderr?.on('data', (chunk) => {
-        buffer += chunk.toString();
-        const match = buffer.match(/DevTools listening on (ws:\/\/127\.0\.0\.1:\d+\/[^\s]+)/);
-        if (match) {
-          clearTimeout(timer);
-          resolve(match[1]);
-        }
-      });
-
-      chrome.on('error', (err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-
-      chrome.on('exit', (code) => {
-        clearTimeout(timer);
-        reject(new Error(`Chrome process exited early with code ${code}`));
-      });
-    });
-
-    const ws = new WebSocket(wsEndpoint);
-    await new Promise((res, rej) => {
-      ws.onopen = res;
-      ws.onerror = rej;
-    });
-
-    const cdp = new CdpConnection(ws);
-
-    const { targetId } = await cdp.send<{ targetId: string }>('Target.createTarget', { url: 'about:blank' });
-    const { sessionId } = await cdp.send<{ sessionId: string }>('Target.attachToTarget', { targetId, flatten: true });
-
-    await cdp.send('DOM.enable', {}, sessionId);
-    await cdp.send('CSS.enable', {}, sessionId);
-    await cdp.send('Page.enable', {}, sessionId);
+    await cdp.send('DOM.enable');
+    await cdp.send('CSS.enable');
 
     const stylesheetSources = new Map<string, { url: string; text: string }>();
 
-    cdp.on<{ header?: { styleSheetId?: string; sourceURL?: string; origin?: string } }>('CSS.styleSheetAdded', (params) => {
-      const header = params?.header;
+    cdp.on('CSS.styleSheetAdded', (event) => {
+      const header = event.header;
       if (!header?.styleSheetId) return;
-      cdp.send<{ text: string }>('CSS.getStyleSheetText', { styleSheetId: header.styleSheetId }, sessionId)
+      cdp.send('CSS.getStyleSheetText', { styleSheetId: header.styleSheetId })
         .then((resp) => {
-          stylesheetSources.set(header.styleSheetId!, {
+          stylesheetSources.set(header.styleSheetId, {
             url: header.sourceURL || header.origin || 'inline',
             text: resp.text,
           });
@@ -272,28 +180,21 @@ export async function collectLiveCssCoverage(
         .catch(() => {});
     });
 
-    await cdp.send('CSS.startRuleUsageTracking', {}, sessionId);
+    await cdp.send('CSS.startRuleUsageTracking');
 
-    const targetUrl = 'url' in target ? target.url : `data:text/html;charset=utf-8,${encodeURIComponent(target.html)}`;
-    await cdp.send('Page.navigate', { url: targetUrl }, sessionId);
+    if ('url' in target) {
+      await page.goto(target.url, { waitUntil: 'load', timeout: timeoutMs });
+    } else {
+      await page.setContent(target.html, { waitUntil: 'load', timeout: timeoutMs });
+    }
 
-    await new Promise((resolve) => {
-      const off = cdp.on('Page.loadEventFired', () => {
-        off();
-        resolve(undefined);
-      });
-      setTimeout(resolve, 600);
-    });
+    // Brief stabilization delay for style recalc
+    await new Promise((res) => setTimeout(res, 100));
 
-    await new Promise((res) => setTimeout(res, 150));
-
-    const { ruleUsage } = await cdp.send<{
-      ruleUsage: Array<{ styleSheetId: string; startOffset: number; endOffset: number; used: boolean }>;
-    }>('CSS.stopRuleUsageTracking', {}, sessionId);
-    cdp.close();
+    const { ruleUsage } = await cdp.send('CSS.stopRuleUsageTracking');
 
     const sheetRanges = new Map<string, Array<{ startOffset: number; endOffset: number; count: number }>>();
-    for (const entry of (ruleUsage || [])) {
+    for (const entry of ruleUsage || []) {
       if (!entry.styleSheetId) continue;
       let list = sheetRanges.get(entry.styleSheetId);
       if (!list) {
@@ -312,7 +213,7 @@ export async function collectLiveCssCoverage(
       if (!sheetInfo.text.trim()) continue;
       const rawUsage = sheetRanges.get(sheetId) || [];
       const disjointRanges = convertToDisjointRanges(rawUsage);
-      // We pass the raw un-flattened used ranges to pruneUnusedCss so that outer grouping
+      // We pass the raw unflattened used ranges to pruneUnusedCss so that outer grouping
       // at-rules (@layer, @media) do not have their coverage intervals flattened with child rules.
       const usedRuleRanges: CoverageRange[] = rawUsage
         .filter((u) => u.count > 0)
@@ -330,6 +231,15 @@ export async function collectLiveCssCoverage(
 
     return results;
   } finally {
-    cleanup();
+    try {
+      await browser.close();
+    } catch {
+      // Ignore browser close errors
+    }
+    try {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+    } catch {
+      // Ignore cleanup errors
+    }
   }
 }

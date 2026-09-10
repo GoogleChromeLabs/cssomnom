@@ -174,7 +174,7 @@ for (const item of result.reviewQueue) {
 ```
 
 **Live Coverage Collection (`collectLiveCssCoverage`)**:
-To extract live coverage ranges directly from headless Chrome via CDP without external dependencies:
+To extract live coverage ranges directly from headless Chrome via `puppeteer-core` (with automatic cross-platform browser discovery on Linux, macOS, Windows, and CI):
 
 ```typescript
 import { collectLiveCssCoverage } from './skills/bulk-css-operation/scripts/live-coverage-collector.ts';
