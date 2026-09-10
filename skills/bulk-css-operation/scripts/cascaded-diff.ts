@@ -18,29 +18,33 @@
 import { CSSStyleSheet, getCascadedStyle } from '../../../src/index.ts';
 import type { DOMElement } from '../../../src/matcher.ts';
 
-export interface DomSampleDifference {
+export interface CascadedStyleDifference {
   elementDescription: string;
   property: string;
   beforeValue: string;
   afterValue: string;
 }
 
-export interface DomSampleResult {
+export interface CascadedDiffResult {
   valid: boolean;
   totalElementsTested: number;
-  differences: DomSampleDifference[];
+  differences: CascadedStyleDifference[];
 }
 
+/** Backward compatibility aliases */
+export type DomSampleDifference = CascadedStyleDifference;
+export type DomSampleResult = CascadedDiffResult;
+
 /**
- * Stage 3 Verification: Computed Style Sampling.
- * Evaluates computed cascaded styles for a sample set of DOM elements
- * against before and after stylesheets.
+ * Stage 3 Verification: Cascaded Style DOM Verification.
+ * Evaluates cascaded winning declarations for a collection of DOM elements
+ * against before and after stylesheets using `getCascadedStyle`.
  */
-export function diffComputedStyles(
+export function diffCascadedStyles(
   elements: DOMElement[],
   beforeCss: string | string[],
   afterCss: string | string[]
-): DomSampleResult {
+): CascadedDiffResult {
   const beforeText = Array.isArray(beforeCss) ? beforeCss.join('\n') : beforeCss;
   const afterText = Array.isArray(afterCss) ? afterCss.join('\n') : afterCss;
 
@@ -50,7 +54,7 @@ export function diffComputedStyles(
   const sheetAfter = new CSSStyleSheet();
   sheetAfter.replaceSync(afterText);
 
-  const differences: DomSampleDifference[] = [];
+  const differences: CascadedStyleDifference[] = [];
 
   for (const el of elements) {
     const tagName = el.tagName || el.localName || 'element';
@@ -89,4 +93,7 @@ export function diffComputedStyles(
     differences,
   };
 }
+
+/** Backward compatibility alias */
+export const diffComputedStyles = diffCascadedStyles;
 

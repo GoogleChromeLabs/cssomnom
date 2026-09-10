@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { diffCssAst } from './ast-diff.ts';
 import { checkCascadeConflicts } from './cascade-diff.ts';
-import { diffComputedStyles } from './computed-diff.ts';
+import { diffCascadedStyles } from './cascaded-diff.ts';
 import type { DOMElement } from '../../../src/matcher.ts';
 
 describe('bulk-css-operation: verification scripts', () => {
@@ -150,8 +150,8 @@ describe('bulk-css-operation: verification scripts', () => {
     });
   });
 
-  describe('Stage 3: diffComputedStyles', () => {
-    it('verifies computed style parity on synthetic DOM elements', () => {
+  describe('Stage 3: diffCascadedStyles', () => {
+    it('verifies cascaded style parity on synthetic DOM elements', () => {
       const before = `
         button { background: white; }
         .btn { color: blue; padding-top: 10px; }
@@ -174,13 +174,13 @@ describe('bulk-css-operation: verification scripts', () => {
         ownerDocument: { contentType: 'text/html' } as unknown as Document,
       };
 
-      const result = diffComputedStyles([element], before, after);
+      const result = diffCascadedStyles([element], before, after);
       assert.equal(result.valid, true);
       assert.equal(result.differences.length, 0);
       assert.equal(result.totalElementsTested, 1);
     });
 
-    it('detects computed style discrepancy when refactored CSS alters element style', () => {
+    it('detects cascaded style discrepancy when refactored CSS alters element style', () => {
       const before = `
         .btn { color: blue; font-size: 14px; }
       `;
@@ -199,7 +199,7 @@ describe('bulk-css-operation: verification scripts', () => {
         ownerDocument: { contentType: 'text/html' } as unknown as Document,
       };
 
-      const result = diffComputedStyles([element], before, after);
+      const result = diffCascadedStyles([element], before, after);
       assert.equal(result.valid, false);
       assert.equal(result.differences.length, 1);
       assert.equal(result.differences[0].property, 'color');

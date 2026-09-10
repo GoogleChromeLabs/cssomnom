@@ -4,7 +4,7 @@ description: >-
   Safely performs bulk CSS transformations (splitting stylesheets into modules,
   consolidating bundles, migrating to variables, pruning dead selectors,
   and unnesting) with AST diffing, cascade order conflict checks,
-  and computed style DOM sampling. Use when splitting monolithic stylesheets,
+  and cascaded style DOM verification. Use when splitting monolithic stylesheets,
   merging CSS files, restructuring nesting, migrating design tokens, or pruning
   unused CSS rules across a codebase. Don't use for single-rule or cosmetic CSS fixes,
   general HTML/JS refactoring without stylesheet changes, or running test suites.
@@ -26,8 +26,8 @@ Because selectors can match arbitrary HTML elements, static analysis cannot guar
 
 ```
 +-------------------------------------------------------------------------+
-| Stage 3: Computed Style Sampling (Element-Level DOM Comparison)         |
-| When selectors or classnames change. Compares getComputedStyle() on DOM.|
+| Stage 3: Cascaded Style DOM Verification (Element-Level Comparison)     |
+| When selectors or classnames change. Compares getCascadedStyle() on DOM.|
 +-------------------------------------------------------------------------+
                                     ^
 +-------------------------------------------------------------------------+
@@ -123,19 +123,19 @@ assert.equal(result.beforeCount, result.afterCount);
  
  ---
  
- ### Stage 3: Computed Style Sampling (`diffComputedStyles`)
+ ### Stage 3: Cascaded Style DOM Verification (`diffCascadedStyles`)
  
  When performing structural selector changes (e.g. converting BEM `.block__elem--mod` to modular utility classes `.flex .items-center`), AST diffing cannot prove equivalence because the selectors themselves differ.
  
- Use the DOM computed style diff tool at [`skills/bulk-css-operation/scripts/computed-diff.ts`](./scripts/computed-diff.ts):
+ Use the cascaded style diff tool at [`skills/bulk-css-operation/scripts/cascaded-diff.ts`](./scripts/cascaded-diff.ts):
  
  ```typescript
- import { diffComputedStyles } from './skills/bulk-css-operation/scripts/computed-diff.ts';
+ import { diffCascadedStyles } from './skills/bulk-css-operation/scripts/cascaded-diff.ts';
  
- // Sample representative DOM elements from application fixtures / JSDOM / linkedom
- const domResult = diffComputedStyles(sampledElements, originalCss, refactoredCss);
- if (!domResult.valid) {
-   console.error('DOM computed style differences detected:', domResult.differences);
+ // Test representative DOM elements against before and after stylesheets
+ const result = diffCascadedStyles(testElements, originalCss, refactoredCss);
+ if (!result.valid) {
+   console.error('Cascaded style differences detected:', result.differences);
  }
  ```
 
@@ -144,7 +144,7 @@ assert.equal(result.beforeCount, result.afterCount);
 ## 3. Automated Skill Tests
 
 All verification and transformation scripts are tested directly within this skill directory:
-- [`skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts) (AST diffing, cascade order checks, computed style diffing)
+- [`skills/bulk-css-operation/scripts/bulk-css-operation.test.ts`](./scripts/bulk-css-operation.test.ts) (AST diffing, cascade order checks, cascaded style diffing)
 - [`skills/bulk-css-operation/scripts/coverage-prune.test.ts`](./scripts/coverage-prune.test.ts) (Coverage-guided dead-code pruner across simple and complex stylesheets)
 - [`skills/bulk-css-operation/scripts/audit-scorecard.test.ts`](./scripts/audit-scorecard.test.ts) (Regression test suite covering CDP range isolation, AST asset references, and review triage)
 
