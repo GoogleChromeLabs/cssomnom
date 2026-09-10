@@ -32,7 +32,8 @@ export interface DomSampleResult {
 }
 
 /**
- * Level 3 Verification: Evaluates computed cascaded styles for a sample set of DOM elements
+ * Stage 3 Verification: Computed Style Sampling.
+ * Evaluates computed cascaded styles for a sample set of DOM elements
  * against before and after stylesheets.
  */
 export function diffComputedStyles(

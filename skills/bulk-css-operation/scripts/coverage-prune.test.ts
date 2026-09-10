@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { pruneUnusedCss } from './coverage-prune.ts';
 import { diffCssAst } from './ast-diff.ts';
-import { checkCascadeInversions } from './cascade-diff.ts';
+import { checkCascadeConflicts } from './cascade-diff.ts';
 
 describe('coverage-prune: Coverage-guided CSS dead-code pruner', () => {
   describe('Simple Case: Puppeteer golden-chrome csscoverage-involved.txt', () => {
@@ -43,7 +43,7 @@ describe('coverage-prune: Coverage-guided CSS dead-code pruner', () => {
       assert.equal(astDiff.errors.length, 0);
 
       // Cascade preservation
-      const cascadeCheck = checkCascadeInversions(originalText, result.prunedCss);
+      const cascadeCheck = checkCascadeConflicts(originalText, result.prunedCss);
       assert.equal(cascadeCheck.valid, true);
     });
 
@@ -126,7 +126,7 @@ describe('coverage-prune: Coverage-guided CSS dead-code pruner', () => {
       assert.equal(astDiff.errors.length, 0);
 
       // Verify cascade order preservation
-      const cascadeCheck = checkCascadeInversions(modernCss, result.prunedCss);
+      const cascadeCheck = checkCascadeConflicts(modernCss, result.prunedCss);
       assert.equal(cascadeCheck.valid, true);
       assert.equal(cascadeCheck.conflicts.length, 0);
     });

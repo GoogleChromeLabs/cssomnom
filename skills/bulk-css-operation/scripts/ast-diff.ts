@@ -79,8 +79,8 @@ export function extractRuleRecords(
 }
 
 /**
- * Level 1 Verification: Compares two stylesheets (or sets of stylesheets)
- * for exact rule and declaration AST set-difference parity.
+ * Stage 1 Verification: AST Rule & Declaration Diffing.
+ * Compares two stylesheets (or sets of stylesheets) for exact rule and declaration AST diffing parity.
  */
 export function diffCssAst(
   beforeCss: string | string[],
