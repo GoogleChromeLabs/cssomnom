@@ -598,7 +598,7 @@ export class SelectorParser {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
-        if (!(PSEUDO_ELEMENTS as unknown as Set<string>).has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
+        if (!PSEUDO_ELEMENTS.has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
           throw new DOMException(`Unknown pseudo-element ::${name}`, 'SyntaxError');
         }
         return { type: 'pseudo-element-selector', name };
@@ -612,7 +612,7 @@ export class SelectorParser {
         return { type: 'pseudo-element-selector', name };
       }
       
-      if (!(PSEUDO_CLASSES as unknown as Set<string>).has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
+      if (!PSEUDO_CLASSES.has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
         throw new DOMException(`Unknown pseudo-class :${name}`, 'SyntaxError');
       }
       return { type: 'pseudo-class-selector', name };
@@ -625,7 +625,7 @@ export class SelectorParser {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
-        if (!(PSEUDO_ELEMENTS as unknown as Set<string>).has(lowerName)) {
+        if (!PSEUDO_ELEMENTS.has(lowerName)) {
           throw new DOMException(`Unknown pseudo-element ::${name}()`, 'SyntaxError');
         }
         
@@ -655,7 +655,7 @@ export class SelectorParser {
         return { type: 'pseudo-element-selector', name, argument: func.value };
       }
       
-      if (!(PSEUDO_CLASSES as unknown as Set<string>).has(lowerName) && lowerName !== 'matches') {
+      if (!PSEUDO_CLASSES.has(lowerName) && lowerName !== 'matches') {
         throw new DOMException(`Unknown pseudo-class :${name}()`, 'SyntaxError');
       }
       

@@ -462,11 +462,12 @@ export abstract class AbstractTokenizer {
     
     let exp = 0;
     let expSign = 1;
-    if ((this.cp === 0x0045 || this.cp === 0x0065) && 
+    const currentCp = this.cp;
+    if ((currentCp === 0x0045 || currentCp === 0x0065) && 
         ((this.isDigit(this.peek(1))) || 
          ((this.peek(1) === 0x002B || this.peek(1) === 0x002D) && this.isDigit(this.peek(2))))) { // E or e
       this.consume();
-      const nextCp = this.cp as unknown as number;
+      const nextCp = this.cp;
       if (nextCp === 0x002B) {
         this.consume();
       } else if (nextCp === 0x002D) {

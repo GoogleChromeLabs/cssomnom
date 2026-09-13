@@ -597,5 +597,24 @@ export interface MediaEnvironment {
   customMedia?: Record<string, boolean | string | unknown> | Map<string, boolean | string | unknown>;
 }
 
+export interface InternalRuleMetadata {
+  _assignedLayerName?: string;
+  _isScoped?: boolean;
+  isScoped?: boolean;
+  _scopeStart?: string | null;
+  scopeStart?: string | null;
+  _scopeEnd?: string | null;
+  scopeEnd?: string | null;
+  _parentStyleSheet?: StyleSheet | null;
+}
 
+export interface InternalStyleSheet {
+  _ownerRule?: CSSRule | null;
+  _parentStyleSheet?: StyleSheet | null;
+  _href?: string | null;
+}
 
+export interface InternalStyleDeclaration {
+  _readonly?: boolean;
+  declarations?: Declaration[];
+}

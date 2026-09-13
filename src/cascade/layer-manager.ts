@@ -22,7 +22,7 @@ import {
   CSSRule,
 } from '../CSSOM.ts';
 import { serialize } from '../serializer.ts';
-import type { Rule, ASTAtRule } from '../types.ts';
+import type { Rule, ASTAtRule, InternalRuleMetadata } from '../types.ts';
 
 export interface LayerState {
   nextLayerIndex: number;
@@ -79,7 +79,7 @@ export function scanLayers(
         fullName = prefix ? `${prefix}.${rawName}` : rawName;
         registerLayer(fullName);
       }
-      (r as unknown as { _assignedLayerName?: string })._assignedLayerName = fullName;
+      (r as CSSRule & InternalRuleMetadata)._assignedLayerName = fullName;
       if (r instanceof CSSGroupingRule && r.cssRules) {
         scanLayers(Array.from(r.cssRules as ArrayLike<Rule | CSSRule>), layerDeclarationOrder, state, fullName, isInsideStyleRule);
       }

@@ -3027,15 +3027,15 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Align codebase with `~/.gemini/TASTE.md` ("Type Design") by eliminating brute-force `as unknown as T` double casts, removing redundant primitive casts, and formalizing internal rule metadata interfaces.
 
 ### Tasks
-- [ ] **Purge Redundant & Bizarre Double Casts**:
+- [x] **Purge Redundant & Bizarre Double Casts**:
   - Remove `this.cp as unknown as number` in `src/AbstractTokenizer.ts`.
   - Remove `(PSEUDO_ELEMENTS as unknown as Set<string>)` and `(PSEUDO_CLASSES as unknown as Set<string>)` in `src/SelectorParser.ts` by refining set typing.
-- [ ] **Formalize Internal Rule Metadata Interfaces**:
+- [x] **Formalize Internal Rule Metadata Interfaces**:
   - Replace inline ad-hoc casts (`(rule as unknown as { _assignedLayerName?: string })`, `_isScoped`, `_scopeStart`, `_scopeEnd`, `_ownerRule`, `_readonly`) across `src/cascade/rule-filter.ts`, `src/cascade/layer-manager.ts`, `src/cascade/index.ts`, and `src/rules/at-rules.ts` with explicit internal interfaces (`InternalRuleMetadata`, `InternalStyleDeclaration`).
-- [ ] **Eliminate Parser and AST Double Casts**:
+- [x] **Eliminate Parser and AST Double Casts**:
   - Clean up casts in `src/parser-api.ts` (`ASTAtRule`, `Declaration`, `ComponentValue[]`).
   - Refactor `CSSStyleDeclaration.ts` proxy casts and internal collection indexing.
-- [ ] **Verification**:
+- [x] **Verification**:
   - Run `pnpm run preflight` to confirm 0 type errors, 0 lint warnings, safe-exec pass, and 100% unit tests pass.
 
 ---

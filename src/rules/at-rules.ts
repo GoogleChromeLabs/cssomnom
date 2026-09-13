@@ -21,7 +21,7 @@ import { tokenize } from '../tokenizer.ts';
 import type { Declaration, Rule, ComponentValue, CustomMediaQuery } from '../types.ts';
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { CSSRule, CSSGroupingRule } from './base.ts';
-import { CSSStyleSheet, StyleSheet } from '../CSSOM.ts';
+import { CSSStyleSheet } from '../CSSOM.ts';
 import { MediaList, CSSRuleList } from './collections.ts';
 import { serializeGroupingRule, FONT_FACE_DESCRIPTORS, PAGE_DESCRIPTORS } from './utils.ts';
 
@@ -582,9 +582,7 @@ export class CSSImportRule extends CSSRule {
         const tokens = tokenize(text);
         return ParseHooks.consumeRule(tokens) as unknown as Rule;
       });
-      (this._styleSheet as unknown as { _ownerRule: CSSRule | null })._ownerRule = this;
-      (this._styleSheet as unknown as { _parentStyleSheet: StyleSheet | null })._parentStyleSheet = this.parentStyleSheet;
-      (this._styleSheet as unknown as { _href: string | null })._href = this._href;
+      this._styleSheet._initImportedSheet(this, this.parentStyleSheet, this._href);
     }
     return this._styleSheet;
   }

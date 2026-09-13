@@ -33,7 +33,7 @@ export function createIndexedProxy<T extends object, V, R = V>(
         const val = arr[index];
         return val !== undefined ? mapValue(val) : undefined;
       }
-      return (t as unknown as Record<string | symbol, unknown>)[prop];
+      return Reflect.get(t, prop);
     }
   });
 }

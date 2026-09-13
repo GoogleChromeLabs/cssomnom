@@ -23,7 +23,7 @@ import type { DOMElement } from '../matcher.ts';
 import type { Token } from '../types.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
-import type { Rule, CSSRuleList, Declaration } from '../types.ts';
+import type { Rule, CSSRuleList, Declaration, InternalStyleDeclaration } from '../types.ts';
 
 // Domain Modules
 export * from './types.ts';
@@ -338,9 +338,9 @@ export function getCascadedStyle(
     }
   }
 
-  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, false, parentCascaded, element);
+  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, true, parentCascaded, element);
 
-  (resultStyle as unknown as { _readonly: boolean })._readonly = true;
+  (resultStyle as CSSComputedStyleDeclaration & InternalStyleDeclaration)._readonly = true;
 
   return resultStyle;
 }

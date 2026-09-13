@@ -22,10 +22,13 @@ import { deleteRuleFromArray } from '../utils.ts';
 import { CSSRuleList } from './collections.ts';
 import { isImportRule, isNamespaceRule } from './utils.ts';
 import type { CSSStyleSheet } from '../CSSOM.ts';
+import type { CSSNestedDeclarations } from './at-rules.ts';
+export type { InternalRuleMetadata } from '../types.ts';
 
 export class CSSRule {
   private _parentRule: CSSRule | null = null;
-  private _parentStyleSheet: CSSStyleSheet | null = null;
+  /** @internal */
+  _parentStyleSheet: CSSStyleSheet | null = null;
   /** @internal */
   _location?: RuleSourceLocation;
 
@@ -160,7 +163,7 @@ export class CSSGroupingRule extends CSSRule {
       if (!isNested) {
         throw new DOMException('Syntax error: CSSNestedDeclarations cannot be inserted into top-level grouping rule', 'SyntaxError');
       }
-      const decls = (parsedRule as unknown as { style: { declarations: Declaration[] } }).style.declarations;
+      const decls = (parsedRule as CSSNestedDeclarations).style.declarations;
       const validDecls = decls.filter((d: Declaration) => {
         const name = d.name.toLowerCase();
         return name.startsWith('--') || CSSStyleDeclaration.prototype._isPropertySupported(name);

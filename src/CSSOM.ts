@@ -113,6 +113,13 @@ export class CSSStyleSheet extends StyleSheet {
     return this._ownerRule;
   }
 
+  /** @internal */
+  _initImportedSheet(ownerRule: CSSRule | null, parentStyleSheet: StyleSheet | null, href: string | null): void {
+    this._ownerRule = ownerRule;
+    this._parentStyleSheet = parentStyleSheet as CSSStyleSheet | null;
+    this._href = href;
+  }
+
   override get parentStyleSheet(): CSSStyleSheet | null {
     // cssom-1 § 6.4.3: parentStyleSheet of child stylesheet is ownerRule's parentStyleSheet
     if (this._ownerRule) {

@@ -48,6 +48,7 @@ import type {
   Declaration,
   ASTAtRule,
   MediaEnvironment,
+  InternalRuleMetadata,
 } from '../types.ts';
 import type { MatchedDeclaration, Specificity } from './types.ts';
 
@@ -324,8 +325,8 @@ function normalizeScopeEndSelector(rawEnd: string): string {
   }).join(', ');
 }
 
-function findParentStyleSheet(rule: unknown): { ownerNode?: unknown } | null {
-  let curr = rule as { parentRule?: unknown; parentStyleSheet?: { ownerNode?: unknown } } | null;
+function findParentStyleSheet(rule: unknown): CSSStyleSheet | null {
+  let curr = rule as { parentRule?: unknown; parentStyleSheet?: CSSStyleSheet | null } | null;
   while (curr) {
     if (curr.parentStyleSheet) return curr.parentStyleSheet;
     curr = curr.parentRule as typeof curr;
@@ -533,7 +534,7 @@ export function collectMatchedDeclarations(
         rule instanceof CSSLayerBlockRule ||
         ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'layer' && (rule as ASTAtRule).block)
       ) {
-        const assigned = (rule as unknown as { _assignedLayerName?: string })._assignedLayerName;
+        const assigned = (rule as CSSRule & InternalRuleMetadata)._assignedLayerName;
         const rawName = (rule as CSSLayerBlockRule).name || serialize((rule as ASTAtRule).prelude || []).trim();
         const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
         const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
@@ -611,18 +612,19 @@ export function collectMatchedDeclarations(
         const importedSheet = (rule as CSSImportRule).styleSheet;
         if (importedSheet && importedSheet.cssRules && importedSheet.cssRules.length > 0) {
           const rawLayer = (rule as CSSImportRule).layerName;
-          const assignedLayer = (rule as unknown as { _assignedLayerName?: string })._assignedLayerName;
+          const assignedLayer = (rule as CSSRule & InternalRuleMetadata)._assignedLayerName;
           const layerName = assignedLayer || (rawLayer !== null && rawLayer !== undefined ? (currentLayer ? (rawLayer ? `${currentLayer}.${rawLayer}` : currentLayer) : rawLayer) : currentLayer);
           
-          const isScoped = (rule as unknown as { isScoped?: boolean }).isScoped || (rule as unknown as { _isScoped?: boolean })._isScoped;
-          const scopeStart = (rule as unknown as { scopeStart?: string | null }).scopeStart ?? (rule as unknown as { _scopeStart?: string | null })._scopeStart;
-          const scopeEnd = (rule as unknown as { scopeEnd?: string | null }).scopeEnd ?? (rule as unknown as { _scopeEnd?: string | null })._scopeEnd;
+          const meta = rule as CSSRule & InternalRuleMetadata;
+          const isScoped = meta.isScoped || meta._isScoped;
+          const scopeStart = meta.scopeStart ?? meta._scopeStart;
+          const scopeEnd = meta.scopeEnd ?? meta._scopeEnd;
 
           if (isScoped) {
             const startStr = scopeStart ? `(${scopeStart})` : null;
             const endStr = scopeEnd ? `(${scopeEnd})` : null;
             const scopeRule = new CSSScopeRule(startStr, endStr, importedSheet.cssRules as unknown as Rule[], ParseHooks.parseRuleInScopeBlock);
-            (scopeRule as unknown as { _parentStyleSheet: unknown })._parentStyleSheet = (rule as CSSRule).parentStyleSheet || findParentStyleSheet(rule as CSSRule);
+            (scopeRule as CSSRule & InternalRuleMetadata)._parentStyleSheet = (rule as CSSRule).parentStyleSheet || findParentStyleSheet(rule as CSSRule);
             walkRules([scopeRule], parentSelector, layerName, scopeNode, scopeProximity);
           } else {
             walkRules(importedSheet.cssRules as unknown as Rule[], parentSelector, layerName, scopeNode, scopeProximity);

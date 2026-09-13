@@ -185,28 +185,42 @@ function toParserToken(val: ComponentValue): CSSToken {
   return res;
 }
 
+interface QualifiedRuleLike {
+  selectorText?: string;
+  prelude?: ComponentValue[];
+  cssRules?: Iterable<unknown>;
+  style?: Iterable<string> & { getPropertyValue(n: string): string };
+}
+
+function isASTAtRule(r: unknown): r is ASTAtRule {
+  return typeof r === 'object' && r !== null && (r as { type?: unknown }).type === 'at-rule';
+}
+
+function isASTDeclaration(r: unknown): r is Declaration {
+  return typeof r === 'object' && r !== null && (r as { type?: unknown }).type === 'declaration';
+}
+
 function toParserRule(rule: unknown): CSSParserRule {
-  const r = rule as Record<string, unknown>;
   // Handle internal AST at-rule
-  if (r.type === 'at-rule') {
-    const at = r as unknown as ASTAtRule;
-    const body = at.childRules ? (at.childRules as unknown[]).map(toParserRule) : 
-                 (at.block ? (at.block.value as unknown[]).map(v => {
-                    const val = v as Record<string, unknown>;
-                    if (val.type === 'declaration') return toParserRule(val);
-                    if (val.type === 'at-rule') return toParserRule(val);
+  if (isASTAtRule(rule)) {
+    const body = rule.childRules ? rule.childRules.map(toParserRule) : 
+                 (rule.block ? (rule.block.value as unknown[]).map(v => {
+                    if (isASTDeclaration(v)) return toParserRule(v);
+                    if (isASTAtRule(v)) return toParserRule(v);
                     return null;
-                 }).filter(r => r !== null) as CSSParserRule[] : null);
+                 }).filter((r): r is CSSParserRule => r !== null) : null);
     
     return new CSSParserAtRule(
-      at.name,
-      at.prelude.map(toParserToken),
+      rule.name,
+      rule.prelude.map(toParserToken),
       body
     );
   }
 
+  const r = typeof rule === 'object' && rule !== null ? (rule as Record<string, unknown>) : null;
+
   // Handle CSSOM at-rules (Media, Keyframes, etc.)
-  if (typeof r.type === 'number' && r.type !== 1 && r.type !== 17 && r.type !== 0) {
+  if (r && typeof r.type === 'number' && r.type !== 1 && r.type !== 17 && r.type !== 0) {
     const name = (r.name as string) || 
                  (r.type === 4 ? 'media' : 
                   r.type === 7 ? 'keyframes' : 
@@ -221,11 +235,10 @@ function toParserRule(rule: unknown): CSSParserRule {
   }
 
   // Handle internal AST declaration
-  if (r.type === 'declaration') {
-    const decl = r as unknown as Declaration;
+  if (isASTDeclaration(rule)) {
     return new CSSParserDeclaration(
-      decl.name,
-      decl.value.map(v => {
+      rule.name,
+      rule.value.map(v => {
         const res = toParserValue(v);
         return typeof res === 'string' ? new CSSParserToken(res) : res;
       })
@@ -233,8 +246,8 @@ function toParserRule(rule: unknown): CSSParserRule {
   }
   
   // Handle CSSOM style-rule or qualified rule
-  if (r.type === 1 || r.type === 'style-rule' || (typeof r === 'object' && r !== null && 'selectorText' in r)) {
-      const qr = r as unknown as { selectorText?: string, prelude?: ComponentValue[], cssRules?: Iterable<unknown>, style?: Iterable<string> & { getPropertyValue(n: string): string } };
+  if (r && (r.type === 1 || r.type === 'style-rule' || 'selectorText' in r)) {
+      const qr = rule as QualifiedRuleLike;
       return new CSSParserQualifiedRule(
           [new CSSParserToken(qr.selectorText || serialize(qr.prelude || []))],
           qr.cssRules ? Array.from(qr.cssRules).map(toParserRule) : 
@@ -245,7 +258,10 @@ function toParserRule(rule: unknown): CSSParserRule {
   }
 
   // Fallback for raw ComponentValue or unknown things
-  return new CSSParserRawRule(serialize(Array.isArray(r) ? r as unknown as ComponentValue[] : [r as unknown as ComponentValue]));
+  if (Array.isArray(rule)) {
+    return new CSSParserRawRule(serialize(rule as ComponentValue[]));
+  }
+  return new CSSParserRawRule(serialize([rule as ComponentValue]));
 }
 
 class CSSParserRawRule extends CSSParserRule {

@@ -31,11 +31,11 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
       if (typeof prop === 'string') {
         if (!isNaN(Number(prop))) {
           const index = Number(prop);
-          const decl = (t as unknown as { declarations: Declaration[] }).declarations[index];
+          const decl = t.declarations[index];
           return decl ? decl.name : undefined;
         }
         
-        if (prop in t && (typeof (t as unknown as Record<string, unknown>)[prop] !== 'undefined' || prop.startsWith('_'))) {
+        if (prop in t && (typeof Reflect.get(t, prop) !== 'undefined' || prop.startsWith('_'))) {
           return Reflect.get(t, prop, receiver);
         }
 
@@ -63,7 +63,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
         if (!isNaN(Number(prop))) {
           return false;
         }
-        if (prop in t && (typeof (t as unknown as Record<string, unknown>)[prop] !== 'undefined' || prop.startsWith('_'))) {
+        if (prop in t && (typeof Reflect.get(t, prop) !== 'undefined' || prop.startsWith('_'))) {
           return Reflect.set(t, prop, value, receiver);
         }
 
@@ -89,7 +89,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
       if (typeof prop === 'string') {
         if (!isNaN(Number(prop))) {
           const index = Number(prop);
-          return index >= 0 && index < (t as unknown as { declarations: Declaration[] }).declarations.length;
+          return index >= 0 && index < t.declarations.length;
         }
         if (prop in t) return true;
         if (prop.startsWith('--')) return true;
@@ -102,7 +102,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
       }
       return Reflect.has(t, prop);
     }
-  }) as unknown as T;
+  }) as T;
 }
 
 export class CSSStyleDeclaration extends CSSStyleProperties {
@@ -110,7 +110,8 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   [property: string]: unknown;
   protected _declarations: Declaration[];
   private _declMap: Map<string, Declaration>;
-  private _readonly: boolean;
+  /** @internal */
+  _readonly: boolean;
   public parentRule: CSSRule | null = null;
   public _onChange: ((force?: boolean) => void) | null = null;
 
