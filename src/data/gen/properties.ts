@@ -101,6 +101,8 @@ export class CSSStyleProperties {
   declare animation: string;
   declare animationComposition: string;
   declare animationDelay: string;
+  declare animationDelayEnd: string;
+  declare animationDelayStart: string;
   declare animationDirection: string;
   declare animationDuration: string;
   declare animationFillMode: string;
@@ -520,11 +522,13 @@ export class CSSStyleProperties {
   declare maxHeight: string;
   declare maxInlineSize: string;
   declare maxLines: string;
+  declare maxSize: string;
   declare maxWidth: string;
   declare minBlockSize: string;
   declare minHeight: string;
   declare minInlineSize: string;
   declare minIntrinsicSizing: string;
+  declare minSize: string;
   declare minWidth: string;
   declare mixBlendMode: string;
   declare navDown: string;
@@ -655,6 +659,7 @@ export class CSSStyleProperties {
   declare rx: string;
   declare ry: string;
   declare scale: string;
+  declare scrollAxisLock: string;
   declare scrollBehavior: string;
   declare scrollInitialTarget: string;
   declare scrollMargin: string;
@@ -696,6 +701,7 @@ export class CSSStyleProperties {
   declare shapeOutside: string;
   declare shapePadding: string;
   declare shapeRendering: string;
+  declare size: string;
   declare sliderOrientation: string;
   declare spatialNavigationAction: string;
   declare spatialNavigationContain: string;
