@@ -18,7 +18,7 @@
 import { tokenize } from '../tokenizer.ts';
 import { Parser } from '../parser.ts';
 import { serialize } from '../serializer.ts';
-import type { ComponentValue, SimpleBlock, Token } from '../types.ts';
+import type { ComponentValue, SimpleBlock, Token, CSSFunction } from '../types.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import type { MatchedDeclaration } from './types.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
@@ -66,7 +66,7 @@ export function substituteVariables(
     for (let i = 0; i < nodes.length; i++) {
       const node = nodes[i];
       if (node.type === 'function' && 'name' in node && Array.isArray(node.value)) {
-        const funcNode = node as unknown as { name: string; value: ComponentValue[] };
+        const funcNode = node as CSSFunction;
         const funcNameLower = funcNode.name.toLowerCase();
 
         if (funcNameLower === 'env') {

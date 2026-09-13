@@ -18,18 +18,19 @@
 import type { CSSNumericType } from '../numeric/CSSNumericType.ts';
 import type { CSSNumericValue } from '../numeric/CSSNumericValue.ts';
 import type { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
+import { getGlobalConstructor } from './host-env.ts';
 
 export function isNumericValue(val: unknown): val is CSSNumericValue {
   if (!val || typeof val !== 'object') return false;
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSNumericValue as unknown as { prototype: unknown }) || undefined;
-  if (Cls && val instanceof (Cls as unknown as Function)) return true;
+  const Cls = getGlobalConstructor<new (...args: unknown[]) => unknown>('CSSNumericValue');
+  if (Cls && val instanceof Cls) return true;
   return typeof (val as CSSNumericValue).type === 'function' && typeof (val as CSSNumericValue).toSum === 'function';
 }
 
 export function isKeywordValue(val: unknown): val is CSSKeywordValue {
   if (!val || typeof val !== 'object') return false;
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSKeywordValue as unknown as { prototype: unknown }) || undefined;
-  if (Cls && val instanceof (Cls as unknown as Function)) return true;
+  const Cls = getGlobalConstructor<new (...args: unknown[]) => unknown>('CSSKeywordValue');
+  if (Cls && val instanceof Cls) return true;
   return typeof (val as CSSKeywordValue).value === 'string' && (val as { constructor: { name: string } }).constructor?.name === 'CSSKeywordValue';
 }
 

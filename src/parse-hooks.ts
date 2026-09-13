@@ -21,7 +21,7 @@ export const ParseHooks = {
   parseStyleAttribute: (_tokens: Token[]): CSSStyleDeclaration => {
     throw new Error('parseStyleAttribute not injected');
   },
-  consumeRule: (_tokens: Token[]): Rule => {
+  consumeRule: (_tokens: Token[]): Rule | null => {
     throw new Error('consumeRule not injected');
   },
   consumeListOfRules: (_tokens: Token[], _topLevel: boolean): Rule[] => {

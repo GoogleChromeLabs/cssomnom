@@ -106,7 +106,7 @@ export class CSSStyleSheet extends StyleSheet {
   protected _ownerRule: CSSRule | null = null;
   private _cssRules: CSSRuleList;
   private _rules: Rule[];
-  private _parseRule: (text: string) => Rule;
+  private _parseRule: (text: string) => Rule | null;
   private _registeredProperties: string[] = [];
 
   get ownerRule(): CSSRule | null {
@@ -212,13 +212,13 @@ export class CSSStyleSheet extends StyleSheet {
     // Default parseRule for constructed stylesheets
     this._parseRule = (text: string) => {
       const tokens = tokenize(text);
-      return ParseHooks.consumeRule(tokens) as unknown as Rule;
+      return ParseHooks.consumeRule(tokens);
     };
     this._cssRules = new CSSRuleList(() => this._rules);
   }
 
   /** @internal */
-  static createInternal(rules: Rule[], parseRule: (text: string) => Rule, originClean: boolean = true): CSSStyleSheet {
+  static createInternal(rules: Rule[], parseRule: (text: string) => Rule | null, originClean: boolean = true): CSSStyleSheet {
     const sheet = new CSSStyleSheet();
     sheet._rules.push(...rules);
     sheet._parseRule = parseRule;

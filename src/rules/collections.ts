@@ -130,11 +130,11 @@ export class MediaList {
 
 export class CSSRuleList {
   [index: number]: CSSRule;
-  private _getRules: () => Rule[];
+  private _getRules: () => (Rule | CSSRule)[];
 
-  constructor(rulesOrGetter: Rule[] | (() => Rule[])) {
+  constructor(rulesOrGetter: (Rule | CSSRule)[] | (() => (Rule | CSSRule)[])) {
     this._getRules = typeof rulesOrGetter === 'function' ? rulesOrGetter : () => rulesOrGetter;
-    return createIndexedProxy(this, (t) => t._getRules(), (v) => v as unknown as CSSRule);
+    return createIndexedProxy(this, (t) => t._getRules(), (v) => v as CSSRule);
   }
 
   get length(): number {
@@ -142,13 +142,13 @@ export class CSSRuleList {
   }
 
   item(index: number): CSSRule | null {
-    return (this._getRules()[index] as unknown as CSSRule) || null;
+    return (this._getRules()[index] as CSSRule) || null;
   }
 
   *[Symbol.iterator](): Iterator<CSSRule> {
     const rules = this._getRules();
     for (let i = 0; i < rules.length; i++) {
-      yield rules[i] as unknown as CSSRule;
+      yield rules[i] as CSSRule;
     }
   }
 }

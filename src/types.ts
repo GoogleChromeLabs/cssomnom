@@ -200,7 +200,7 @@ export interface ASTAtRule {
   type: 'at-rule';
   name: string;
   prelude: ComponentValue[];
-  childRules?: (ASTAtRule | CSSRule)[];
+  childRules?: (Rule | Declaration)[];
   cssRules?: CSSRuleList;
   block?: SimpleBlock;
 }

@@ -18,7 +18,7 @@
 import { ParseHooks } from '../parse-hooks.ts';
 import { serialize, serializeString, serializeIdentifier } from '../serializer.ts';
 import { tokenize } from '../tokenizer.ts';
-import type { Declaration, Rule, ComponentValue, CustomMediaQuery } from '../types.ts';
+import type { Declaration, Rule, ComponentValue, CustomMediaQuery, SimpleBlock } from '../types.ts';
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { CSSRule, CSSGroupingRule } from './base.ts';
 import { CSSStyleSheet } from '../CSSOM.ts';
@@ -194,7 +194,7 @@ export class CSSScopeRule extends CSSGroupingRule {
   readonly startSelector: string | null;
   readonly endSelector: string | null;
 
-  constructor(startSelector: string | null, endSelector: string | null, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(startSelector: string | null, endSelector: string | null, rules: (Rule | CSSRule)[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
     this.startSelector = startSelector;
     this.endSelector = endSelector;
@@ -580,7 +580,7 @@ export class CSSImportRule extends CSSRule {
     if (!this._styleSheet) {
       this._styleSheet = CSSStyleSheet.createInternal([], (text: string) => {
         const tokens = tokenize(text);
-        return ParseHooks.consumeRule(tokens) as unknown as Rule;
+        return ParseHooks.consumeRule(tokens);
       });
       this._styleSheet._initImportedSheet(this, this.parentStyleSheet, this._href);
     }
@@ -841,11 +841,11 @@ export class CSSPropertyRule extends CSSRule {
 
 export class CSSAtRule extends CSSRule {
   public name: string;
-  public prelude: unknown[];
-  public block?: unknown;
+  public prelude: ComponentValue[];
+  public block?: SimpleBlock | null;
   public childRules?: CSSRule[];
 
-  constructor(name: string, prelude: unknown[], block?: unknown, childRules?: CSSRule[]) {
+  constructor(name: string, prelude: ComponentValue[], block?: SimpleBlock | null, childRules?: CSSRule[]) {
     super();
     this.name = name;
     this.prelude = prelude;
@@ -867,15 +867,15 @@ export class CSSAtRule extends CSSRule {
   }
 
   get cssText(): string {
-    const cond = this.prelude.length > 0 ? ' ' + serialize(this.prelude as unknown as ComponentValue[]).trim() : '';
+    const cond = this.prelude.length > 0 ? ' ' + serialize(this.prelude).trim() : '';
     if (!this.block) return `@${this.name}${cond};`;
     
     const childRules = this.childRules || [];
     if (childRules.length > 0) {
-      return serializeGroupingRule(this.name, cond.trim(), childRules as unknown as Rule[]);
+      return serializeGroupingRule(this.name, cond.trim(), childRules);
     }
     
-    const blockContentText = serialize((this.block as {value: ComponentValue[]}).value).trim();
+    const blockContentText = serialize(this.block.value).trim();
     if (!blockContentText) return `@${this.name}${cond} { }`;
     
     const indentedBody = blockContentText.split('\n').map(line => '  ' + line).join('\n');

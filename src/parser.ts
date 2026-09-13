@@ -423,12 +423,12 @@ export class Parser {
           const type = this.options.atRules[atRuleName];
           if (type === 'declaration') {
             const decls = this.consumeDeclarationsFromBlockContents(block.value);
-            rule.childRules = decls as unknown as Rule[];
-            return rule as unknown as Rule;
+            rule.childRules = decls;
+            return rule;
           } else if (type === 'rule') {
             const rules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
             rule.childRules = rules;
-            return rule as unknown as Rule;
+            return rule;
           }
         }
         
@@ -523,7 +523,7 @@ export class Parser {
       return null;
     }
     
-    return new CSSScopeRule(startSelector, endSelector, childRules as unknown as Rule[], parseRuleInScopeBlock);
+    return new CSSScopeRule(startSelector, endSelector, childRules, parseRuleInScopeBlock);
   }
 
   private handleViewTransitionRule(rule: ASTAtRule, block: SimpleBlock): Rule {
@@ -2162,7 +2162,7 @@ export function isValidUnicodeRangeValue(values: ComponentValue[]): boolean {
 
 // Inject Parser implementations into ParseHooks to break circular dependencies
 ParseHooks.parseStyleAttribute = (tokens) => new Parser(tokens).parseStyleAttribute();
-ParseHooks.consumeRule = (tokens) => new Parser(tokens).consumeRule() as unknown as Rule;
+ParseHooks.consumeRule = (tokens) => new Parser(tokens).consumeRule();
 ParseHooks.consumeListOfRules = (tokens, topLevel) => new Parser(tokens).consumeListOfRules(topLevel);
 ParseHooks.parseRule = (text) => parseRule(text);
 ParseHooks.parseRuleInBlock = (text, nested) => Parser.parseRuleInBlockText(text, nested);

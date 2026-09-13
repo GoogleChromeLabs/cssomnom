@@ -188,7 +188,7 @@ export function collectStyleSheetsAndRules(
     if (s.cssRules && s.cssRules.length !== undefined) {
       for (let j = 0; j < s.cssRules.length; j++) {
         const r = s.cssRules[j];
-        if (r) ruleList.push(r as unknown as CSSRule);
+        if (r) ruleList.push(r as CSSRule);
       }
       return;
     }
@@ -380,7 +380,7 @@ export function collectMatchedDeclarations(
   let sourceOrderCounter = 0;
 
   const walkRules = (
-    list: (Rule | CSSRule)[] | CSSRuleList,
+    list: (Rule | CSSRule | Declaration)[] | CSSRuleList,
     parentSelector: string = '',
     currentLayer: string | null = null,
     scopeNode?: DOMElement,
@@ -388,7 +388,7 @@ export function collectMatchedDeclarations(
   ) => {
     const count = list.length;
     for (let i = 0; i < count; i++) {
-      const rule = list[i] as Rule | CSSRule;
+      const rule = list[i] as Rule | CSSRule | Declaration;
 
       if (
         (rule as CSSRule).type === CSSRule.STYLE_RULE ||
@@ -528,9 +528,9 @@ export function collectMatchedDeclarations(
         }
 
         // Nested rules inside CSSStyleRule
-        const nestedRules = (rule as CSSStyleRule).cssRules || ((rule as { block?: { value?: unknown[] } }).block?.value ? (rule as { block?: { value?: unknown[] } }).block!.value!.filter((v: unknown) => v && typeof v === 'object' && ('type' in v) && ((v as { type: string }).type === 'qualified-rule' || (v as { type: string }).type === 'at-rule')) : undefined);
-        if (nestedRules && (nestedRules as ArrayLike<Rule | CSSRule>).length > 0) {
-          walkRules(nestedRules as unknown as (Rule | CSSRule)[], resolvedSelector, currentLayer, scopeNode, scopeProximity);
+        const nestedRules: (Rule | CSSRule | Declaration)[] | CSSRuleList | undefined = (rule as CSSStyleRule).cssRules || ((rule as { block?: { value?: unknown[] } }).block?.value ? (rule as { block?: { value?: unknown[] } }).block!.value!.filter((v: unknown): v is Rule => Boolean(v && typeof v === 'object' && ('type' in v) && ((v as { type: string }).type === 'qualified-rule' || (v as { type: string }).type === 'at-rule'))) : undefined);
+        if (nestedRules && nestedRules.length > 0) {
+          walkRules(nestedRules, resolvedSelector, currentLayer, scopeNode, scopeProximity);
         }
       } else if (
         rule instanceof CSSLayerBlockRule ||
@@ -625,11 +625,11 @@ export function collectMatchedDeclarations(
           if (isScoped) {
             const startStr = scopeStart ? `(${scopeStart})` : null;
             const endStr = scopeEnd ? `(${scopeEnd})` : null;
-            const scopeRule = new CSSScopeRule(startStr, endStr, importedSheet.cssRules as unknown as Rule[], ParseHooks.parseRuleInScopeBlock);
+            const scopeRule = new CSSScopeRule(startStr, endStr, Array.from(importedSheet.cssRules), ParseHooks.parseRuleInScopeBlock);
             (scopeRule as CSSRule & InternalRuleMetadata)._parentStyleSheet = (rule as CSSRule).parentStyleSheet || findParentStyleSheet(rule as CSSRule);
             walkRules([scopeRule], parentSelector, layerName, scopeNode, scopeProximity);
           } else {
-            walkRules(importedSheet.cssRules as unknown as Rule[], parentSelector, layerName, scopeNode, scopeProximity);
+            walkRules(importedSheet.cssRules, parentSelector, layerName, scopeNode, scopeProximity);
           }
         }
       } else if (rule instanceof CSSScopeRule) {

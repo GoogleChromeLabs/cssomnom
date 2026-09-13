@@ -102,10 +102,10 @@ export class CSSRule {
 
 export class CSSGroupingRule extends CSSRule {
   readonly cssRules: CSSRuleList;
-  protected _rules: Rule[];
+  protected _rules: (Rule | CSSRule)[];
   private _parseRuleInBlock: (text: string, nested?: boolean) => Rule;
 
-  constructor(rules: Rule[], parseRuleInBlock: (text: string, nested?: boolean) => Rule) {
+  constructor(rules: (Rule | CSSRule)[], parseRuleInBlock: (text: string, nested?: boolean) => Rule) {
     super();
     this._rules = rules;
     this.cssRules = new CSSRuleList(() => this._rules);

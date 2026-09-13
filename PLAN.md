@@ -3056,17 +3056,17 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 126: Rule Hierarchy Cohesion & Typed OM Host Environment Cleanup
+## Phase 126: Rule Hierarchy Cohesion & Typed OM Host Environment Cleanup [x]
 **Goal**: Eliminate remaining double casts between low-level CSS Syntax AST `Rule` and high-level `CSSRule`, and clean up Typed OM global reflection hacks.
 
 ### Tasks
-- [ ] **Unify Grouping Rule Children & Parser Hooks**:
+- [x] **Unify Grouping Rule Children & Parser Hooks**:
   - Cleanly type `CSSScopeRule`, `CSSGroupingRule`, and `childRules` to accept a unified `RuleLike = Rule | CSSRule | Declaration` union rather than forcing `as unknown as Rule[]`.
   - Refactor `ParseHooks.consumeRule` and related hooks to avoid double casting.
-- [ ] **Clean up Host Environment Global Reflection in Typed OM**:
+- [x] **Clean up Host Environment Global Reflection in Typed OM**:
   - Provide a typed host constructor accessor in `src/typed-om/utils/` instead of repeatedly casting `(globalThis as unknown as Record<string, unknown>)`.
   - Clean up type predicates in `src/typed-om/utils/type-guards.ts` and `validation.ts`.
-- [ ] **Gatekeeper Review & Verification**:
+- [x] **Gatekeeper Review & Verification**:
   - Run full `pnpm run preflight`.
   - Spawn `grizz` subagent to perform a thorough code taste and type design review across all three phases.
 

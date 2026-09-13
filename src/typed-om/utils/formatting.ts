@@ -20,14 +20,15 @@ import type { CSSNumericValue } from '../numeric/CSSNumericValue.ts';
 import type { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
 import { CSSKeywordValue as CSSKeywordValueClass } from '../values/CSSKeywordValue.ts';
+import { getGlobalConstructor } from './host-env.ts';
 
 export function createUnitValue(value: number, unit: CSSUnit): CSSUnitValue {
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSUnitValue as typeof CSSUnitValue) || CSSUnitValue;
+  const Cls = getGlobalConstructor<typeof CSSUnitValue>('CSSUnitValue') || CSSUnitValue;
   return new Cls(value, unit);
 }
 
 export function createKeywordValue(value: string): CSSKeywordValue {
-  const Cls = (typeof globalThis !== 'undefined' && (globalThis as unknown as Record<string, unknown>).CSSKeywordValue as typeof CSSKeywordValueClass) || CSSKeywordValueClass;
+  const Cls = getGlobalConstructor<typeof CSSKeywordValueClass>('CSSKeywordValue') || CSSKeywordValueClass;
   return new Cls(value);
 }
 

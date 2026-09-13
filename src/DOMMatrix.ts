@@ -470,7 +470,7 @@ export class DOMMatrixReadOnly {
       nw = this.m14 * x + this.m24 * y + this.m34 * z + this.m44 * w;
     }
 
-    const DOMPointClass = (typeof globalThis !== 'undefined' && (globalThis as unknown as { DOMPoint?: typeof DOMPoint }).DOMPoint) || DOMPoint;
+    const DOMPointClass = (typeof globalThis !== 'undefined' && (Reflect.get(globalThis, 'DOMPoint') as typeof DOMPoint)) || DOMPoint;
     return new DOMPointClass(nx, ny, nz, nw);
   }
 
