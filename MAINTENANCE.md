@@ -45,12 +45,18 @@ pnpm run fixtures:generate
 ```
 This runs `node scripts/external_suites/extract_all.ts`.
 
-**4. Triage Feasibility & Failure Clusters:**
-When WPT test files are added, modified, or removed in `submodules/web-platform-tests/`, inspect failure clusters and feasibility boundaries per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md).
+**4. Triage Feasibility, Parity & Failure Clusters:**
+When WPT test files are added, modified, or removed in `submodules/web-platform-tests/`, inspect failure clusters and 3-way differential parity against Chrome reference runs per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md) and [`.agents/skills/parity/SKILL.md`](./.agents/skills/parity/SKILL.md).
 
 ```bash
-# Cluster failures across all active suites
+# Cluster cached failures across all active suites (or single spec with --spec=<name>)
 pnpm run wpt:cluster
+
+# Or run live execution to cluster immediately without needing a prior run
+pnpm run wpt:cluster --live --spec=cssom
+
+# Compare 3-way differential parity against Reference Chrome (wpt.fyi)
+pnpm run wpt parity --spec=cssom
 
 # Run full WPT test suite
 pnpm run wpt:run

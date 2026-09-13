@@ -44,10 +44,10 @@ pnpm run wpt run --spec=cssom
 pnpm run wpt fetch-upstream
 
 # 3. Compute 3-Way Differential Parity Matrix across all or single spec
-pnpm run wpt parity --filter-by-spec=cssom
+pnpm run wpt parity --spec=cssom
 
 # 4. View failure clusters & top discrepancy patterns
-pnpm run wpt failures --spec=cssom
+pnpm run wpt:cluster --spec=cssom
 
 # 5. Verify monotonic zero-regression against baseline
 pnpm run wpt:verify
