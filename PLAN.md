@@ -3020,3 +3020,53 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Updated `skills/bulk-css-operation/scripts/coverage-prune.test.ts` and `skills/bulk-css-operation/SKILL.md`.
   - Cleaned up temporary diagnostic scripts (`audit-cdp-grouping.ts`, `audit-cdp-semantics.ts`, `cdp-helper.ts`).
   - Verified `pnpm run preflight` passes cleanly: 0 type errors, 0 lint warnings, safe-exec guard clean, and all unit tests passing.
+
+---
+
+## Phase 124: Type Design Audit & Double-Cast Purge (`as unknown as`)
+**Goal**: Align codebase with `~/.gemini/TASTE.md` ("Type Design") by eliminating brute-force `as unknown as T` double casts, removing redundant primitive casts, and formalizing internal rule metadata interfaces.
+
+### Tasks
+- [ ] **Purge Redundant & Bizarre Double Casts**:
+  - Remove `this.cp as unknown as number` in `src/AbstractTokenizer.ts`.
+  - Remove `(PSEUDO_ELEMENTS as unknown as Set<string>)` and `(PSEUDO_CLASSES as unknown as Set<string>)` in `src/SelectorParser.ts` by refining set typing.
+- [ ] **Formalize Internal Rule Metadata Interfaces**:
+  - Replace inline ad-hoc casts (`(rule as unknown as { _assignedLayerName?: string })`, `_isScoped`, `_scopeStart`, `_scopeEnd`, `_ownerRule`, `_readonly`) across `src/cascade/rule-filter.ts`, `src/cascade/layer-manager.ts`, `src/cascade/index.ts`, and `src/rules/at-rules.ts` with explicit internal interfaces (`InternalRuleMetadata`, `InternalStyleDeclaration`).
+- [ ] **Eliminate Parser and AST Double Casts**:
+  - Clean up casts in `src/parser-api.ts` (`ASTAtRule`, `Declaration`, `ComponentValue[]`).
+  - Refactor `CSSStyleDeclaration.ts` proxy casts and internal collection indexing.
+- [ ] **Verification**:
+  - Run `pnpm run preflight` to confirm 0 type errors, 0 lint warnings, safe-exec pass, and 100% unit tests pass.
+
+---
+
+## Phase 125: Structural Host Boundary Interfaces (`ElementLike`, `DocumentLike`)
+**Goal**: Enforce TASTE.md invariant "Parse at the Boundaries... Enforce invariants at construction or via type guards" by replacing loose `element: unknown` parameters with structural host interfaces.
+
+### Tasks
+- [ ] **Define Structural Host Interfaces**:
+  - Author `ElementLike`, `DocumentLike`, and `NodeLike` in `src/types.ts` with minimal structural properties needed across CSSOM (`nodeType`, `tagName`, `parentElement`, `ownerDocument`, `shadowRoot`, `getAttribute`, `hasAttribute`, `checked`, `selected`).
+  - Update `types.ts` `StyleSheet.ownerNode` from `unknown | null` to `NodeLike | null`.
+- [ ] **Eliminate `unknown` in Cascade & Matcher Boundaries**:
+  - Refactor `src/parser.ts` `getCascadedStyle(element: ElementLike, ...)` and `src/cascade/index.ts`.
+  - Refactor `src/matcher.ts` and `src/cascade/rule-filter.ts` to operate directly on `ElementLike`, eliminating ~15 inline `(element as unknown as { ... })` casts.
+  - Refactor `src/typed-om/style-map/StylePropertyMapReadOnly.ts` and `StylePropertyMap.ts` (`_element?: ElementLike`).
+- [ ] **Verification**:
+  - Run `pnpm run preflight` to confirm typecheck, linting, safe-exec, and all unit tests pass.
+
+---
+
+## Phase 126: Rule Hierarchy Cohesion & Typed OM Host Environment Cleanup
+**Goal**: Eliminate remaining double casts between low-level CSS Syntax AST `Rule` and high-level `CSSRule`, and clean up Typed OM global reflection hacks.
+
+### Tasks
+- [ ] **Unify Grouping Rule Children & Parser Hooks**:
+  - Cleanly type `CSSScopeRule`, `CSSGroupingRule`, and `childRules` to accept a unified `RuleLike = Rule | CSSRule | Declaration` union rather than forcing `as unknown as Rule[]`.
+  - Refactor `ParseHooks.consumeRule` and related hooks to avoid double casting.
+- [ ] **Clean up Host Environment Global Reflection in Typed OM**:
+  - Provide a typed host constructor accessor in `src/typed-om/utils/` instead of repeatedly casting `(globalThis as unknown as Record<string, unknown>)`.
+  - Clean up type predicates in `src/typed-om/utils/type-guards.ts` and `validation.ts`.
+- [ ] **Gatekeeper Review & Verification**:
+  - Run full `pnpm run preflight`.
+  - Spawn `grizz` subagent to perform a thorough code taste and type design review across all three phases.
+
