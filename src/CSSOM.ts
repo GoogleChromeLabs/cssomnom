@@ -38,7 +38,7 @@ export interface CSSStyleSheetInit {
 import { StyleSheetList, type LinkStyle, MediaList, CSSRuleList } from './rules/collections.ts';
 import { isImportRule, isNamespaceRule, isRegularRule, findParentStyleSheet } from './rules/utils.ts';
 import { CSSRule, CSSGroupingRule } from './rules/base.ts';
-import type { CSSNamespaceRule } from './rules/at-rules.ts';
+import { CSSPropertyRule, type CSSNamespaceRule } from './rules/at-rules.ts';
 export { StyleSheetList, type LinkStyle, MediaList, CSSRuleList, CSSRule, CSSGroupingRule };
 
 export class StyleSheet {
@@ -136,18 +136,17 @@ export class CSSStyleSheet extends StyleSheet {
   }
 
   private _registerRuleProperties(rule: Rule) {
-    if ((rule as { type?: number }).type === 18) {
-      const propRule = rule as unknown as { name: string; syntax: string; inherits: boolean; initialValue: string | null };
+    if (rule instanceof CSSPropertyRule) {
       try {
         PropertyRegistry.register({
-          name: propRule.name,
-          syntax: propRule.syntax,
-          inherits: propRule.inherits,
-          initialValue: propRule.initialValue ?? undefined
+          name: rule.name,
+          syntax: rule.syntax,
+          inherits: rule.inherits,
+          initialValue: rule.initialValue ?? undefined
         }, 'css');
-        this._registeredProperties.push(propRule.name);
+        this._registeredProperties.push(rule.name);
       } catch (e) {
-        console.warn(`CSS @property warning: Invalid descriptor values for ${propRule.name}. Rule was ignored.`, e);
+        console.warn(`CSS @property warning: Invalid descriptor values for ${rule.name}. Rule was ignored.`, e);
       }
     } else if (rule instanceof CSSGroupingRule || (rule && typeof rule === 'object' && 'cssRules' in rule)) {
       const childRules = (rule as { cssRules: CSSRuleList }).cssRules;
@@ -399,10 +398,9 @@ export class CSSStyleSheet extends StyleSheet {
     // 6. Set old rule's parent CSS rule and parent CSS style sheet to null.
     deleteRuleFromArray(this._rules, index);
 
-    if ((rule as { type?: number }).type === 18) {
-      const propRule = rule as unknown as { name: string };
-      PropertyRegistry.unregister(propRule.name, 'css');
-      const idx = this._registeredProperties.indexOf(propRule.name);
+    if (rule instanceof CSSPropertyRule) {
+      PropertyRegistry.unregister(rule.name, 'css');
+      const idx = this._registeredProperties.indexOf(rule.name);
       if (idx !== -1) {
         this._registeredProperties.splice(idx, 1);
       }

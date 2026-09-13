@@ -95,7 +95,7 @@ export class ComponentValueCursor {
   }
 
   public consume(): ComponentValue {
-    return this.values[this._i++] || { type: 'EOF', value: '' } as unknown as ComponentValue;
+    return this.values[this._i++] || { type: 'EOF' } as ComponentValue;
   }
 
   public skipWhitespace(): void {

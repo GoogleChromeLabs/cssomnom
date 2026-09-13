@@ -23,7 +23,7 @@ export function camelToDashed(str: string): string {
 export function createIndexedProxy<T extends object, V, R = V>(
   target: T,
   getArray: (t: T) => V[],
-  mapValue: (v: V) => R = (v) => v as unknown as R
+  mapValue?: (v: V) => R
 ) {
   return new Proxy(target, {
     get(t, prop) {
@@ -31,7 +31,7 @@ export function createIndexedProxy<T extends object, V, R = V>(
         const index = Number(prop);
         const arr = getArray(t);
         const val = arr[index];
-        return val !== undefined ? mapValue(val) : undefined;
+        return val !== undefined ? (mapValue ? mapValue(val) : val) : undefined;
       }
       return (t as Record<string | symbol, unknown>)[prop];
     }

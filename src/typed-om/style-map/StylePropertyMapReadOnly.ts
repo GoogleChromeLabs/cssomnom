@@ -31,6 +31,7 @@ export interface StyleReadOnlyLike {
   getPropertyValue(property: string): string;
   item(index: number): string;
   declarations?: Declaration[];
+  [property: string]: unknown;
 }
 
 // Spec: CSS Typed OM Level 1 § 2.1 #the-stylepropertymapreadonly-interface
@@ -49,7 +50,7 @@ export class StylePropertyMapReadOnly {
         item: (index: number) => styleOrDecls[index]?.name || '',
         declarations: styleOrDecls,
         ...Object.fromEntries(styleOrDecls.map((d, i) => [i, d.name]))
-      } as unknown as StyleReadOnlyLike;
+      } as StyleReadOnlyLike;
     } else {
       this._style = styleOrDecls;
     }

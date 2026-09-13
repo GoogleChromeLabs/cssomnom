@@ -51,7 +51,6 @@ import type {
   InternalRuleMetadata,
   ElementLike,
   DocumentLike,
-  NodeLike,
 } from '../types.ts';
 import type { MatchedDeclaration, Specificity } from './types.ts';
 
@@ -60,7 +59,7 @@ import type { MatchedDeclaration, Specificity } from './types.ts';
  * css-cascade-5 § 2 #filtering
  */
 export function collectStyleSheetsAndRules(
-  element: ElementLike,
+  element: ElementLike | DocumentLike | null | undefined,
   rules?: Rule[] | CSSRuleList
 ): (Rule | CSSRule)[] | null {
   if (!element || typeof element !== 'object') {
@@ -98,7 +97,7 @@ export function collectStyleSheetsAndRules(
   const ruleList: (Rule | CSSRule)[] = [];
   const root = typeof elObj.getRootNode === 'function'
     ? elObj.getRootNode()
-    : (elObj.ownerDocument ?? ((element as unknown as NodeLike).nodeType === 9 ? (element as unknown as DocumentLike) : null));
+    : (elObj.ownerDocument ?? (elObj.nodeType === 9 ? (elObj as DocumentLike) : null));
 
   const getSheetTitle = (sheet: unknown): string | null => {
     const s = sheet as { title?: string | null; ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
@@ -477,7 +476,7 @@ export function collectMatchedDeclarations(
               getPropertyPriority?(property: string): string;
               [property: string]: unknown;
             }
-            const s = style as unknown as StyleDeclarationLike;
+            const s = style as StyleDeclarationLike;
             if (typeof s.length === 'number' && s.length >= 0) {
               const len = s.length;
               for (let k = 0; k < len; k++) {
@@ -489,7 +488,7 @@ export function collectMatchedDeclarations(
                 const priority = typeof s.getPropertyPriority === 'function'
                   ? s.getPropertyPriority(name)
                   : '';
-                const rawValStr = typeof value === 'string' ? value : serialize(value as unknown as ComponentValue[]);
+                const rawValStr = typeof value === 'string' ? value : (Array.isArray(value) ? serialize(value) : String(value || ''));
                 matchedDeclarations.push({
                   name,
                   value: resolveUrlsInValue(rawValStr, ruleBase),
