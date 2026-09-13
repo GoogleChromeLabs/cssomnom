@@ -20,7 +20,7 @@ import {
   CSSStyleRule,
   CSSGroupingRule,
   type CSSRuleList,
-} from '../../../../src/index.ts';
+} from '../../../src/index.ts';
 
 export interface RuleRecord {
   context: string;
@@ -52,8 +52,7 @@ export function extractRuleRecords(
     if (rule instanceof CSSStyleRule) {
       const decls = new Map<string, { value: string; priority: string }>();
       const style = rule.style;
-      for (let j = 0; j < style.length; j++) {
-        const prop = style.item(j);
+      for (const prop of style) {
         decls.set(prop, {
           value: style.getPropertyValue(prop).trim(),
           priority: style.getPropertyPriority(prop).trim(),
@@ -79,8 +78,8 @@ export function extractRuleRecords(
 }
 
 /**
- * Level 1 Verification: Compares two stylesheets (or sets of stylesheets)
- * for exact rule and declaration AST set-difference parity.
+ * Stage 1 Verification: AST Rule & Declaration Diffing.
+ * Compares two stylesheets (or sets of stylesheets) for exact rule and declaration AST diffing parity.
  */
 export function diffCssAst(
   beforeCss: string | string[],

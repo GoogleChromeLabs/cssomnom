@@ -51,6 +51,13 @@ export interface ParseError {
   token?: Token;
 }
 
+export interface RuleSourceLocation {
+  start: number;
+  end: number;
+  bodyStart?: number;
+  bodyEnd?: number;
+}
+
 export interface BaseToken {
   startIndex?: number;
   endIndex?: number;
@@ -171,6 +178,8 @@ export interface SimpleBlock {
   type: 'simple-block';
   associatedToken: Token;
   value: ComponentValue[];
+  endIndex?: number;
+  isClosed?: boolean;
 }
 
 export interface CSSFunction {

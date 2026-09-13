@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-import { CSSStyleSheet } from '../../../../src/index.ts';
-import { calculateSpecificity, compareSpecificity } from '../../../../src/specificity.ts';
+import { CSSStyleSheet } from '../../../src/index.ts';
+import { calculateSpecificity, compareSpecificity } from '../../../src/specificity.ts';
 import { extractRuleRecords, type RuleRecord } from './ast-diff.ts';
 
 export interface CascadeConflict {
@@ -57,10 +57,11 @@ function canSelectorsOverlap(selA: string, selB: string): boolean {
 }
 
 /**
- * Level 2 Verification: Detects whether source order between competing rules
+ * Stage 2 Verification: Cascade & Source-Order Conflict Detection.
+ * Detects whether source order between competing rules
  * (rules with identical specificity defining identical properties) was swapped.
  */
-export function checkCascadeInversions(
+export function checkCascadeConflicts(
   beforeCss: string | string[],
   afterCss: string | string[]
 ): CascadeCheckResult {
@@ -136,7 +137,7 @@ export function checkCascadeInversions(
           specificity: specA,
           beforeIndices: [rA.originalIndex, rB.originalIndex],
           afterIndices: [afterPosA, afterPosB],
-          description: `Cascade inversion: '${rA.selector}' preceded '${rB.selector}' before, but succeeds it after for property [${sharedProps.join(', ')}] with specificity (${specA.join(',')})`,
+          description: `Cascade conflict: '${rA.selector}' preceded '${rB.selector}' before, but succeeds it after for property [${sharedProps.join(', ')}] with specificity (${specA.join(',')})`,
         });
       }
     }
@@ -147,4 +148,7 @@ export function checkCascadeInversions(
     conflicts,
   };
 }
+
+/** Backward compatibility alias */
+export const checkCascadeInversions = checkCascadeConflicts;
 

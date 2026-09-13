@@ -207,6 +207,7 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **Structured Tree Accessors**: `CSSStyleRule.prototype.selectorAST` and `MediaList.prototype.mediaQueriesAST` expose parsed selector and media query structures directly on CSSOM objects for tooling integration.
 - **Synchronous `CSSStyleSheet.prototype.replace()`**: While the CSSOM-1 specification specifies parallel parsing for `replace()`, our implementation executes parsing synchronously via `replaceSync()` and returns `Promise.resolve(this)`.
 - **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
+- **Source Location Tracking (`CSSRule.prototype.location`)**: Parsed CSS rules expose their 0-based character offsets (`{ start: number, end: number, bodyStart?: number, bodyEnd?: number }`) relative to the original source text via a non-enumerable `location` property on `CSSRule.prototype`, enabling source maps, DevTools coverage pruning, and refactoring tools without breaking standard IDL enumeration or serialization.
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
 
 ---
@@ -315,20 +316,20 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **87.3%** (18,921 / 21,664 passed assertions across 1,768 test files).
-* **Chrome 154 Parity**: **87.3%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **87.5%** (19,228 / 21,969 passed assertions across 1,768 test files).
+* **Chrome 154 Parity**: **87.5%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
 | **`Typed OM`** | 12,226 | 11,551 | **94.5%** | 🟢 **+1.0%** (ahead of Chrome) |
 | **`CSSOM`** | 2,156 | 1,616 | **75.0%** | -22.2% |
-| **`Nesting`** | 117 | 115 | **98.3%** | -1.0% |
+| **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
 | **`Cascade`** | 497 | 388 | **78.1%** | -21.8% |
 | **`Variables`** | 499 | 411 | **82.4%** | -8.2% |
-| **`Selectors`** | 5,345 | 4,022 | **75.2%** | -10.7% |
+| **`Selectors`** | 5,650 | 4,327 | **76.6%** | -9.4% |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **21,664** | **18,921** | **87.3%** | **-5.7%** |
+| **OVERALL** | **21,969** | **19,228** | **87.5%** | **-5.6%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

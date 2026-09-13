@@ -19,12 +19,12 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { diffCssAst } from './ast-diff.ts';
-import { checkCascadeInversions } from './cascade-diff.ts';
-import { diffComputedStyles } from './computed-diff.ts';
-import type { DOMElement } from '../../../../src/matcher.ts';
+import { checkCascadeConflicts } from './cascade-diff.ts';
+import { diffCascadedStyles } from './cascaded-diff.ts';
+import type { DOMElement } from '../../../src/matcher.ts';
 
 describe('bulk-css-operation: verification scripts', () => {
-  describe('Level 1: diffCssAst', () => {
+  describe('Stage 1: diffCssAst', () => {
     it('passes on identical stylesheets regardless of rule reordering or whitespace', () => {
       const before = `
         /* Monolithic original */
@@ -97,7 +97,7 @@ describe('bulk-css-operation: verification scripts', () => {
     });
   });
 
-  describe('Level 2: checkCascadeInversions', () => {
+  describe('Stage 2: checkCascadeConflicts', () => {
     it('passes when rule order between competing selectors is preserved', () => {
       const before = `
         .btn { color: blue; }
@@ -108,12 +108,12 @@ describe('bulk-css-operation: verification scripts', () => {
         .btn-primary { color: red; }
       `;
 
-      const result = checkCascadeInversions(before, after);
+      const result = checkCascadeConflicts(before, after);
       assert.equal(result.valid, true);
       assert.equal(result.conflicts.length, 0);
     });
 
-    it('flags cascade inversion when competing rules with same specificity swap order', () => {
+    it('flags cascade conflict when competing rules with same specificity swap order', () => {
       const before = `
         .btn { color: blue; }
         .btn-primary { color: red; }
@@ -124,12 +124,12 @@ describe('bulk-css-operation: verification scripts', () => {
         .btn { color: blue; }
       `;
 
-      const result = checkCascadeInversions(before, after);
+      const result = checkCascadeConflicts(before, after);
       assert.equal(result.valid, false);
       assert.equal(result.conflicts.length, 1);
       assert.equal(result.conflicts[0].selectorA, '.btn');
       assert.equal(result.conflicts[0].selectorB, '.btn-primary');
-      assert.ok(result.conflicts[0].description.includes('Cascade inversion'));
+      assert.ok(result.conflicts[0].description.includes('Cascade conflict'));
     });
 
     it('does not flag reordering when rules do not share properties or have different specificity', () => {
@@ -145,13 +145,13 @@ describe('bulk-css-operation: verification scripts', () => {
         #main-button { color: red; }
       `;
 
-      const result = checkCascadeInversions(before, after);
+      const result = checkCascadeConflicts(before, after);
       assert.equal(result.valid, true);
     });
   });
 
-  describe('Level 3: diffComputedStyles', () => {
-    it('verifies computed style parity on synthetic DOM elements', () => {
+  describe('Stage 3: diffCascadedStyles', () => {
+    it('verifies cascaded style parity on synthetic DOM elements', () => {
       const before = `
         button { background: white; }
         .btn { color: blue; padding-top: 10px; }
@@ -174,13 +174,13 @@ describe('bulk-css-operation: verification scripts', () => {
         ownerDocument: { contentType: 'text/html' } as unknown as Document,
       };
 
-      const result = diffComputedStyles([element], before, after);
+      const result = diffCascadedStyles([element], before, after);
       assert.equal(result.valid, true);
       assert.equal(result.differences.length, 0);
       assert.equal(result.totalElementsTested, 1);
     });
 
-    it('detects computed style discrepancy when refactored CSS alters element style', () => {
+    it('detects cascaded style discrepancy when refactored CSS alters element style', () => {
       const before = `
         .btn { color: blue; font-size: 14px; }
       `;
@@ -199,7 +199,7 @@ describe('bulk-css-operation: verification scripts', () => {
         ownerDocument: { contentType: 'text/html' } as unknown as Document,
       };
 
-      const result = diffComputedStyles([element], before, after);
+      const result = diffCascadedStyles([element], before, after);
       assert.equal(result.valid, false);
       assert.equal(result.differences.length, 1);
       assert.equal(result.differences[0].property, 'color');
@@ -209,7 +209,7 @@ describe('bulk-css-operation: verification scripts', () => {
   });
 
   describe('Comprehensive fixture verification: modern.css', () => {
-    const fixtureUrl = new URL('../../../../tests/fixtures/modern.css', import.meta.url);
+    const fixtureUrl = new URL('../../../tests/fixtures/modern.css', import.meta.url);
     const original = readFileSync(fixtureUrl, 'utf-8');
     const lines = original.split('\n');
     // Split cleanly into 3 modular files at top-level rule boundaries
@@ -225,8 +225,8 @@ describe('bulk-css-operation: verification scripts', () => {
       assert.equal(result.beforeCount, result.afterCount);
     });
 
-    it('verifies cascade order invariant preservation on modular split', () => {
-      const result = checkCascadeInversions(original, [file1, file2, file3]);
+    it('verifies cascade order preservation on modular split', () => {
+      const result = checkCascadeConflicts(original, [file1, file2, file3]);
       assert.equal(result.valid, true);
       assert.equal(result.conflicts.length, 0);
     });
