@@ -49,6 +49,8 @@ import type {
   ASTAtRule,
   MediaEnvironment,
   InternalRuleMetadata,
+  ElementLike,
+  DocumentLike,
 } from '../types.ts';
 import type { MatchedDeclaration, Specificity } from './types.ts';
 
@@ -57,7 +59,7 @@ import type { MatchedDeclaration, Specificity } from './types.ts';
  * css-cascade-5 § 2 #filtering
  */
 export function collectStyleSheetsAndRules(
-  element: unknown,
+  element: ElementLike,
   rules?: Rule[] | CSSRuleList
 ): (Rule | CSSRule)[] | null {
   if (!element || typeof element !== 'object') {
@@ -95,7 +97,7 @@ export function collectStyleSheetsAndRules(
   const ruleList: (Rule | CSSRule)[] = [];
   const root = typeof elObj.getRootNode === 'function'
     ? elObj.getRootNode()
-    : (elObj.ownerDocument || (elObj.nodeType === 9 ? (element as unknown as Document) : null));
+    : (elObj.ownerDocument || (elObj.nodeType === 9 ? (element as DocumentLike) : null));
 
   const getSheetTitle = (sheet: unknown): string | null => {
     const s = sheet as { title?: string | null; ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
@@ -369,7 +371,7 @@ function resolveUrlsInValue(val: string, baseURL: string | null): string {
  * css-cascade-5 § 2 #filtering
  */
 export function collectMatchedDeclarations(
-  element: unknown,
+  element: ElementLike,
   ruleList: (Rule | CSSRule)[],
   layerDeclarationOrder: Map<string, number>,
   pseudoElement?: string | null
@@ -816,7 +818,7 @@ export function collectMatchedDeclarations(
  * svg-2 § 6.2 #presentation-attributes, css-cascade-5 § 3 #cascade-origins
  */
 export function collectSvgPresentationAttributes(
-  element: unknown,
+  element: ElementLike,
   matchedDeclarationsCount: number
 ): MatchedDeclaration[] {
   const domEl = element as { getAttribute?(n: string): string | null };
@@ -845,7 +847,7 @@ export function collectSvgPresentationAttributes(
  * css-cascade-5 § 6.2 #cascade-sort
  */
 export function collectInlineDeclarations(
-  element: unknown,
+  element: ElementLike,
   sourceOrderCounter: number
 ): { declarations: MatchedDeclaration[]; nextSourceOrder: number } {
   const domEl = element as { getAttribute?(n: string): string | null; style?: { cssText?: string } | string };
@@ -1022,7 +1024,7 @@ export function resolveNestedSelector(selector: string, parentSelector: string):
  * Calculates specificity for matching selector.
  * selectors-4 § 4 #specificity-rules
  */
-export function getMatchingSpecificity(element: unknown, selectorText: string, scope?: DOMElement): Specificity {
+export function getMatchingSpecificity(element: ElementLike, selectorText: string, scope?: DOMElement): Specificity {
   const tokens = tokenize(selectorText);
   const parser = new Parser(tokens);
   const componentValues = parser.parseComponentValues();

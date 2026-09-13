@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, FunctionToken, CustomMediaQuery, RuleSourceLocation } from './types.ts';
+import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, FunctionToken, CustomMediaQuery, RuleSourceLocation, ElementLike } from './types.ts';
 
 
 import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
@@ -1773,7 +1773,7 @@ export class Parser {
     return calculateSpecificity(selector);
   }
 
-  public static getCascadedStyle(element: unknown, rules?: Rule[]): CSSStyleDeclaration {
+  public static getCascadedStyle(element?: ElementLike | null, rules?: Rule[]): CSSStyleDeclaration {
     return getCascadedStyle(element, rules);
   }
 

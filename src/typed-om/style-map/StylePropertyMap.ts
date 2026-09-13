@@ -33,6 +33,7 @@ import {
 import { tokenize } from '../../tokenizer.ts';
 import { ParseHooks } from '../../parse-hooks.ts';
 import { validateProperty, privateToken } from '../utils/validation.ts';
+import type { ElementLike } from '../../types.ts';
 
 export interface StyleLike extends StyleReadOnlyLike {
   setProperty(property: string, value: string | null, priority?: string): void;
@@ -43,7 +44,7 @@ export interface StyleLike extends StyleReadOnlyLike {
 export class StylePropertyMap extends StylePropertyMapReadOnly {
   declare protected _style: StyleLike;
 
-  constructor(style: StyleLike, element?: unknown) {
+  constructor(style: StyleLike, element?: ElementLike) {
     super(style, element);
   }
 

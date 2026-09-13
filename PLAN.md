@@ -3044,14 +3044,14 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 **Goal**: Enforce TASTE.md invariant "Parse at the Boundaries... Enforce invariants at construction or via type guards" by replacing loose `element: unknown` parameters with structural host interfaces.
 
 ### Tasks
-- [ ] **Define Structural Host Interfaces**:
+- [x] **Define Structural Host Interfaces**:
   - Author `ElementLike`, `DocumentLike`, and `NodeLike` in `src/types.ts` with minimal structural properties needed across CSSOM (`nodeType`, `tagName`, `parentElement`, `ownerDocument`, `shadowRoot`, `getAttribute`, `hasAttribute`, `checked`, `selected`).
   - Update `types.ts` `StyleSheet.ownerNode` from `unknown | null` to `NodeLike | null`.
-- [ ] **Eliminate `unknown` in Cascade & Matcher Boundaries**:
+- [x] **Eliminate `unknown` in Cascade & Matcher Boundaries**:
   - Refactor `src/parser.ts` `getCascadedStyle(element: ElementLike, ...)` and `src/cascade/index.ts`.
   - Refactor `src/matcher.ts` and `src/cascade/rule-filter.ts` to operate directly on `ElementLike`, eliminating ~15 inline `(element as unknown as { ... })` casts.
   - Refactor `src/typed-om/style-map/StylePropertyMapReadOnly.ts` and `StylePropertyMap.ts` (`_element?: ElementLike`).
-- [ ] **Verification**:
+- [x] **Verification**:
   - Run `pnpm run preflight` to confirm typecheck, linting, safe-exec, and all unit tests pass.
 
 ---

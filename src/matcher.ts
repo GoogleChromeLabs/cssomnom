@@ -28,9 +28,10 @@ import type {
   AttributeSelector,
   PseudoClassSelector,
   ComponentValue,
+  ElementLike,
 } from './types.ts';
 
-export interface DOMElement {
+export interface DOMElement extends ElementLike {
   nodeType?: number;
   tagName?: string;
   localName?: string;
@@ -548,7 +549,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
 
   // selectors-4 § 14 #the-host-pseudo
   if (name === 'host' || name === 'host-context') {
-    const isHost = Boolean((element as unknown as { shadowRoot?: unknown }).shadowRoot);
+    const isHost = Boolean(element.shadowRoot);
     if (!isHost) return false;
     if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
       for (const complex of pseudo.argument.selectors) {
@@ -658,11 +659,11 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     if (tag === 'input') {
       const type = toAsciiLowerCase(element.getAttribute ? element.getAttribute('type') || '' : '');
       if (type === 'checkbox' || type === 'radio') {
-        return (element as unknown as { checked?: boolean }).checked || element.hasAttribute?.('checked') || false;
+        return element.checked || element.hasAttribute?.('checked') || false;
       }
     }
     if (tag === 'option') {
-      return (element as unknown as { selected?: boolean }).selected || element.hasAttribute?.('selected') || false;
+      return element.selected || element.hasAttribute?.('selected') || false;
     }
     return false;
   }

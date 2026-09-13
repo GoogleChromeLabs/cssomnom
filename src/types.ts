@@ -215,7 +215,7 @@ export type Rule = ASTAtRule | CSSRule;
 export interface StyleSheet {
   readonly type: string;
   readonly href: string | null;
-  readonly ownerNode: unknown | null; // Element or ProcessingInstruction in DOM
+  readonly ownerNode: NodeLike | null; // Element or ProcessingInstruction in DOM
   readonly parentStyleSheet: StyleSheet | null;
   readonly title: string | null;
   media: MediaList;
@@ -617,4 +617,37 @@ export interface InternalStyleSheet {
 export interface InternalStyleDeclaration {
   _readonly?: boolean;
   declarations?: Declaration[];
+}
+
+export interface NodeLike {
+  nodeType?: number;
+  ownerDocument?: DocumentLike | null | unknown;
+  parentElement?: ElementLike | null;
+  parentNode?: unknown;
+}
+
+export interface DocumentLike extends NodeLike {
+  nodeType?: number;
+  documentElement?: ElementLike | null;
+  head?: ElementLike | null;
+  body?: ElementLike | null;
+  title?: string;
+  getElementById?(id: string): ElementLike | null;
+  querySelectorAll?(selector: string): Iterable<ElementLike> | unknown;
+  querySelector?(selector: string): ElementLike | null;
+}
+
+export interface ElementLike extends NodeLike {
+  tagName?: string;
+  shadowRoot?: unknown;
+  getAttribute?(name: string): string | null;
+  hasAttribute?(name: string): boolean;
+  getAttributeNode?(name: string): unknown;
+  classList?: { contains(token: string): boolean };
+  id?: string;
+  className?: string;
+  checked?: boolean;
+  selected?: boolean;
+  disabled?: boolean;
+  matches?(selector: string): boolean;
 }

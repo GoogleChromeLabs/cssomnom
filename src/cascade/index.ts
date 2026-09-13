@@ -23,7 +23,7 @@ import type { DOMElement } from '../matcher.ts';
 import type { Token } from '../types.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
-import type { Rule, CSSRuleList, Declaration, InternalStyleDeclaration } from '../types.ts';
+import type { Rule, CSSRuleList, Declaration, InternalStyleDeclaration, ElementLike } from '../types.ts';
 
 // Domain Modules
 export * from './types.ts';
@@ -154,7 +154,7 @@ export function normalizePseudoElement(pseudo: string): { valid: boolean; normal
  * css-variables-1 § 4 #resolving-var-functions
  */
 export function getCascadedStyle(
-  element: unknown,
+  element?: ElementLike | null,
   rules?: Rule[] | CSSRuleList,
   pseudoElement?: string | null
 ): CSSStyleDeclaration {

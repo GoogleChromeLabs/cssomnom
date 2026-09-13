@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import type { Declaration, ComponentValue } from '../../types.ts';
+import type { Declaration, ComponentValue, ElementLike } from '../../types.ts';
 import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 import { CSSUnparsedValue, tokensToUnparsedSegments } from '../values/CSSUnparsedValue.ts';
 import { SHORTHANDS } from '../../shorthands.ts';
@@ -36,9 +36,9 @@ export interface StyleReadOnlyLike {
 // Spec: CSS Typed OM Level 1 § 2.1 #the-stylepropertymapreadonly-interface
 export class StylePropertyMapReadOnly {
   protected _style: StyleReadOnlyLike;
-  protected _element?: unknown;
+  protected _element?: ElementLike;
 
-  constructor(styleOrDecls: StyleReadOnlyLike | Declaration[], element?: unknown) {
+  constructor(styleOrDecls: StyleReadOnlyLike | Declaration[], element?: ElementLike) {
     if (Array.isArray(styleOrDecls)) {
       this._style = {
         length: styleOrDecls.length,

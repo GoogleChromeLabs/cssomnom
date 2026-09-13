@@ -44,7 +44,7 @@ export { StyleSheetList, type LinkStyle, MediaList, CSSRuleList, CSSRule, CSSGro
 export class StyleSheet {
   protected _type: string = 'text/css';
   protected _href: string | null = null;
-  protected _ownerNode: unknown | null = null;
+  protected _ownerNode: import('./types.ts').NodeLike | null = null;
   protected _parentStyleSheet: StyleSheet | null = null;
   protected _titleVal: string | null = null;
   private _media: MediaList;
@@ -58,7 +58,7 @@ export class StyleSheet {
     return this._href;
   }
 
-  get ownerNode(): unknown | null {
+  get ownerNode(): import('./types.ts').NodeLike | null {
     return this._ownerNode;
   }
 
@@ -67,8 +67,8 @@ export class StyleSheet {
   }
 
   get title(): string | null {
-    if (this.ownerNode && typeof (this.ownerNode as Element).getAttribute === 'function') {
-      const t = (this.ownerNode as Element).getAttribute('title');
+    if (this.ownerNode && 'getAttribute' in this.ownerNode && typeof this.ownerNode.getAttribute === 'function') {
+      const t = this.ownerNode.getAttribute('title');
       return t === null || t === '' ? null : t;
     }
     return this._titleVal ?? null;
