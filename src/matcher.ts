@@ -29,27 +29,22 @@ import type {
   PseudoClassSelector,
   ComponentValue,
   ElementLike,
+  NodeLike,
+  DocumentLike,
 } from './types.ts';
 
 export interface DOMElement extends ElementLike {
-  nodeType?: number;
-  tagName?: string;
   localName?: string;
-  id?: string;
-  className?: string;
-  classList?: { contains(cls: string): boolean };
-  getAttribute?(name: string): string | null;
   getAttributeNS?(namespace: string | null, name: string): string | null;
-  hasAttribute?(name: string): boolean;
   hasAttributeNS?(namespace: string | null, name: string): boolean;
   attributes?: Array<{ name: string; value: string; prefix?: string | null }> | NamedNodeMap;
-  parentElement?: DOMElement | null;
-  parentNode?: DOMElement | null;
+  parentElement: DOMElement | null;
+  parentNode: NodeLike | null;
   children?: ArrayLike<DOMElement>;
   childNodes?: ArrayLike<{ nodeType: number; nodeValue?: string | null; textContent?: string | null }>;
   previousElementSibling?: DOMElement | null;
   nextElementSibling?: DOMElement | null;
-  ownerDocument?: { documentElement?: DOMElement; contentType?: string; location?: { hash?: string } } | null;
+  ownerDocument: DocumentLike | null;
   textContent?: string | null;
   namespaceURI?: string | null;
   prefix?: string | null;
@@ -105,14 +100,13 @@ export function matches(element: unknown, selector: string | ComplexSelector | S
   const list = parseSelector(selector);
   const scope = isElement(scopeElement) ? scopeElement : undefined;
 
-  // Support mock elements that provide a custom matches(string) method without standard DOM properties
-  const elObj = element as { matches?: (s: string) => boolean; localName?: string; tagName?: string; nodeType?: number };
-  if (typeof elObj.matches === 'function' && !elObj.localName && !elObj.tagName && !elObj.nodeType) {
+  // Support mock elements that provide an own custom matches(string) method
+  if (typeof element.matches === 'function' && Object.hasOwn(element, 'matches')) {
     for (const complex of list.selectors) {
       if (complex.type === 'invalid-selector') continue;
       const text = serialize(complex.tokens).trim();
       try {
-        if (elObj.matches(text)) return true;
+        if (element.matches(text)) return true;
       } catch {
         // Mock threw
       }

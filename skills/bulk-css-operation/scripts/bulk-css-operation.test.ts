@@ -164,10 +164,12 @@ describe('bulk-css-operation: verification scripts', () => {
       `;
 
       const element: DOMElement = {
-        nodeType: 1,
+        nodeType: 1 as const,
         tagName: 'BUTTON',
         localName: 'button',
         className: 'btn btn-danger',
+        parentElement: null,
+        parentNode: null,
         classList: { contains: (c: string) => ['btn', 'btn-danger'].includes(c) },
         getAttribute: (attr: string) => (attr === 'class' ? 'btn btn-danger' : null),
         hasAttribute: (attr: string) => attr === 'class',
@@ -189,10 +191,12 @@ describe('bulk-css-operation: verification scripts', () => {
       `;
 
       const element: DOMElement = {
-        nodeType: 1,
+        nodeType: 1 as const,
         tagName: 'BUTTON',
         localName: 'button',
         className: 'btn',
+        parentElement: null,
+        parentNode: null,
         classList: { contains: (c: string) => c === 'btn' },
         getAttribute: (attr: string) => (attr === 'class' ? 'btn' : null),
         hasAttribute: (attr: string) => attr === 'class',

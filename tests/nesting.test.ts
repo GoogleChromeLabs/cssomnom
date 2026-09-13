@@ -19,8 +19,20 @@ import assert from 'node:assert';
 import { getCascadedStyle } from '../src/cascade.ts';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import type { Rule, Declaration } from '../src/types.ts';
+import type { Rule, Declaration, ElementLike } from '../src/types.ts';
 import { CSSStyleRule, CSSNestedDeclarations, CSSMediaRule, CSSScopeRule } from '../src/index.ts';
+
+function createMockElement(matches: (sel: string) => boolean): ElementLike {
+  return {
+    nodeType: 1,
+    tagName: 'DIV',
+    ownerDocument: null,
+    parentElement: null,
+    parentNode: null,
+    getAttribute: () => null,
+    matches,
+  };
+}
 
 describe('CSS Nesting', () => {
     test('nested selector with &', () => {
@@ -35,20 +47,11 @@ describe('CSS Nesting', () => {
         const parser = new Parser(tokens);
         const stylesheet = parser.parseStyleSheet();
         
-        const elementChild = {
-            matches(sel: string) {
-                // Our implementation serializes as :is(.parent) .child
-                return sel === ':is(.parent) .child';
-            }
-        };
+        const elementChild = createMockElement((sel: string) => sel === ':is(.parent) .child');
         const styleChild = getCascadedStyle(elementChild, Array.from(stylesheet.cssRules) as unknown as Rule[]);
         assert.strictEqual(styleChild.color, 'rgb(0, 0, 255)');
 
-        const elementHover = {
-            matches(sel: string) {
-                return sel === ':is(.parent):hover';
-            }
-        };
+        const elementHover = createMockElement((sel: string) => sel === ':is(.parent):hover');
         const styleHover = getCascadedStyle(elementHover, Array.from(stylesheet.cssRules) as unknown as Rule[]);
         assert.strictEqual(styleHover.color, 'rgb(0, 128, 0)');
     });
@@ -63,12 +66,7 @@ describe('CSS Nesting', () => {
         const parser = new Parser(tokens);
         const stylesheet = parser.parseStyleSheet();
         
-        const elementChild = {
-            matches(sel: string) {
-                // Implicitly it becomes '& .child' which is ':is(.parent) .child'
-                return sel === ':is(.parent) .child';
-            }
-        };
+        const elementChild = createMockElement((sel: string) => sel === ':is(.parent) .child');
         const styleChild = getCascadedStyle(elementChild, Array.from(stylesheet.cssRules) as unknown as Rule[]);
         assert.strictEqual(styleChild.color, 'rgb(0, 0, 255)');
     });
@@ -81,11 +79,7 @@ describe('CSS Nesting', () => {
         const parser = new Parser(tokens);
         const stylesheet = parser.parseStyleSheet();
         
-        const element = {
-            matches(sel: string) {
-                return sel === ':where(:scope)';
-            }
-        };
+        const element = createMockElement((sel: string) => sel === ':where(:scope)');
         const style = getCascadedStyle(element, Array.from(stylesheet.cssRules) as unknown as Rule[]);
         assert.strictEqual(style.color, 'rgb(255, 0, 0)');
     });
@@ -242,11 +236,9 @@ describe('CSS Nesting', () => {
         const parser = new Parser(tokens);
         const stylesheet = parser.parseStyleSheet();
         
-        const element = {
-            matches(_sel: string) {
-                throw new Error('DOMException: Simulated failure');
-            }
-        };
+        const element = createMockElement((_sel: string) => {
+            throw new Error('DOMException: Simulated failure');
+        });
         
         // Should not throw and return empty style because no match
         const style = getCascadedStyle(element, Array.from(stylesheet.cssRules) as unknown as Rule[]);
@@ -359,11 +351,7 @@ describe('CSS Nesting', () => {
         const scopeRule = parentRule.cssRules[0] as CSSScopeRule;
         const childRules = Array.from(scopeRule.cssRules) as Rule[];
         
-        const elementScopeChild = {
-            matches(sel: string) {
-                return sel === ':where(:scope) .child';
-            }
-        };
+        const elementScopeChild = createMockElement((sel: string) => sel === ':where(:scope) .child');
         
         const style = getCascadedStyle(elementScopeChild, childRules);
         assert.strictEqual(style.color, 'rgb(0, 0, 255)');

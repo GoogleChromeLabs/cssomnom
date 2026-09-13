@@ -27,7 +27,7 @@ import { CSSStyleProperties } from './data/gen/properties.ts';
 
 export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
   return new Proxy(target, {
-    get(t, prop, receiver) {
+    get(t, prop) {
       if (typeof prop === 'string') {
         if (!isNaN(Number(prop))) {
           const index = Number(prop);
@@ -35,8 +35,8 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
           return decl ? decl.name : undefined;
         }
         
-        if (prop in t && (typeof Reflect.get(t, prop) !== 'undefined' || prop.startsWith('_'))) {
-          return Reflect.get(t, prop, receiver);
+        if (prop in t && (typeof (t as Record<string | symbol, unknown>)[prop] !== 'undefined' || prop.startsWith('_'))) {
+          return (t as Record<string | symbol, unknown>)[prop];
         }
 
         if (prop.startsWith('--')) {
@@ -56,15 +56,16 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
           return t.getPropertyValue(cssProp);
         }
       }
-      return Reflect.get(t, prop, receiver);
+      return (t as Record<string | symbol, unknown>)[prop];
     },
-    set(t, prop, value, receiver) {
+    set(t, prop, value) {
       if (typeof prop === 'string') {
         if (!isNaN(Number(prop))) {
           return false;
         }
-        if (prop in t && (typeof Reflect.get(t, prop) !== 'undefined' || prop.startsWith('_'))) {
-          return Reflect.set(t, prop, value, receiver);
+        if (prop in t && (typeof (t as Record<string | symbol, unknown>)[prop] !== 'undefined' || prop.startsWith('_'))) {
+          (t as Record<string | symbol, unknown>)[prop] = value;
+          return true;
         }
 
         if (prop.startsWith('--')) {
@@ -83,7 +84,8 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
           return true;
         }
       }
-      return Reflect.set(t, prop, value, receiver);
+      (t as Record<string | symbol, unknown>)[prop] = value;
+      return true;
     },
     has(t, prop) {
       if (typeof prop === 'string') {

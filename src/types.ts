@@ -620,27 +620,32 @@ export interface InternalStyleDeclaration {
 }
 
 export interface NodeLike {
-  nodeType?: number;
-  ownerDocument?: DocumentLike | null | unknown;
-  parentElement?: ElementLike | null;
-  parentNode?: unknown;
+  nodeType: number;
+  ownerDocument: DocumentLike | null;
+  parentElement: ElementLike | null;
+  parentNode: NodeLike | null;
+  childNodes?: ArrayLike<unknown>;
 }
 
 export interface DocumentLike extends NodeLike {
-  nodeType?: number;
-  documentElement?: ElementLike | null;
-  head?: ElementLike | null;
-  body?: ElementLike | null;
+  nodeType: 9;
+  documentElement: ElementLike | null;
+  head: ElementLike | null;
+  body: ElementLike | null;
   title?: string;
-  getElementById?(id: string): ElementLike | null;
-  querySelectorAll?(selector: string): Iterable<ElementLike> | unknown;
+  contentType?: string;
+  location?: { hash?: string } | null;
+  defaultView?: unknown;
+  querySelectorAll?(selector: string): Iterable<ElementLike>;
   querySelector?(selector: string): ElementLike | null;
+  getElementById?(id: string): ElementLike | null;
 }
 
 export interface ElementLike extends NodeLike {
-  tagName?: string;
+  nodeType: 1;
+  tagName: string;
   shadowRoot?: unknown;
-  getAttribute?(name: string): string | null;
+  getAttribute(name: string): string | null;
   hasAttribute?(name: string): boolean;
   getAttributeNode?(name: string): unknown;
   classList?: { contains(token: string): boolean };
@@ -651,3 +656,13 @@ export interface ElementLike extends NodeLike {
   disabled?: boolean;
   matches?(selector: string): boolean;
 }
+
+declare global {
+  interface Element {
+    readonly nodeType: 1;
+  }
+  interface Document {
+    readonly nodeType: 9;
+  }
+}
+

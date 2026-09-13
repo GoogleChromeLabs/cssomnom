@@ -51,6 +51,7 @@ import type {
   InternalRuleMetadata,
   ElementLike,
   DocumentLike,
+  NodeLike,
 } from '../types.ts';
 import type { MatchedDeclaration, Specificity } from './types.ts';
 
@@ -97,7 +98,7 @@ export function collectStyleSheetsAndRules(
   const ruleList: (Rule | CSSRule)[] = [];
   const root = typeof elObj.getRootNode === 'function'
     ? elObj.getRootNode()
-    : (elObj.ownerDocument || (elObj.nodeType === 9 ? (element as DocumentLike) : null));
+    : (elObj.ownerDocument ?? ((element as unknown as NodeLike).nodeType === 9 ? (element as unknown as DocumentLike) : null));
 
   const getSheetTitle = (sheet: unknown): string | null => {
     const s = sheet as { title?: string | null; ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
@@ -468,18 +469,25 @@ export function collectMatchedDeclarations(
           const ruleBase = getRuleBaseURL(rule, element);
 
           if (style) {
-            if (typeof (style as { length?: number }).length === 'number' && (style as { length: number }).length >= 0) {
-              const len = (style as { length: number }).length;
+            interface StyleDeclarationLike {
+              length: number;
+              item?(index: number): string;
+              [index: number]: string;
+              getPropertyValue?(property: string): string;
+              getPropertyPriority?(property: string): string;
+              [property: string]: unknown;
+            }
+            const s = style as unknown as StyleDeclarationLike;
+            if (typeof s.length === 'number' && s.length >= 0) {
+              const len = s.length;
               for (let k = 0; k < len; k++) {
-                const name = typeof (style as { item?: (i: number) => string }).item === 'function'
-                  ? (style as { item: (i: number) => string }).item(k)
-                  : (style as unknown as Record<number, string>)[k];
+                const name = typeof s.item === 'function' ? s.item(k) : s[k];
                 if (!name) continue;
-                const value = typeof (style as { getPropertyValue?: (p: string) => string }).getPropertyValue === 'function'
-                  ? (style as { getPropertyValue: (p: string) => string }).getPropertyValue(name)
-                  : (style as unknown as Record<string, string>)[name];
-                const priority = typeof (style as { getPropertyPriority?: (p: string) => string }).getPropertyPriority === 'function'
-                  ? (style as { getPropertyPriority: (p: string) => string }).getPropertyPriority(name)
+                const value = typeof s.getPropertyValue === 'function'
+                  ? s.getPropertyValue(name)
+                  : (s[name] as string | ComponentValue[] | undefined);
+                const priority = typeof s.getPropertyPriority === 'function'
+                  ? s.getPropertyPriority(name)
                   : '';
                 const rawValStr = typeof value === 'string' ? value : serialize(value as unknown as ComponentValue[]);
                 matchedDeclarations.push({

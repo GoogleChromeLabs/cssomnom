@@ -237,9 +237,13 @@ describe('Cascade Engine Rule Filtering with @media', () => {
     `;
     const rules = parseStyleSheet(css);
     const mockEl = {
+      nodeType: 1 as const,
       tagName: 'div',
       className: 'box',
       ownerDocument: null,
+      parentElement: null,
+      parentNode: null,
+      getAttribute: () => null,
     };
 
     const style = getCascadedStyle(mockEl, rules);

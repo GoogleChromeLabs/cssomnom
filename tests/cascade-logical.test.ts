@@ -19,7 +19,19 @@ import assert from 'node:assert';
 import { getCascadedStyle } from '../src/cascade.ts';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import type { Rule } from '../src/types.ts';
+import type { Rule, ElementLike } from '../src/types.ts';
+
+function createMockElement(matches: (sel: string) => boolean, parent: ElementLike | null = null): ElementLike {
+  return {
+    nodeType: 1,
+    tagName: 'DIV',
+    ownerDocument: null,
+    parentElement: parent,
+    parentNode: parent,
+    getAttribute: () => null,
+    matches,
+  };
+}
 
 test('getCascadedStyle retains logical properties in output', () => {
   const css = '.test { margin-inline-start: 10px; }';
@@ -27,7 +39,7 @@ test('getCascadedStyle retains logical properties in output', () => {
   const parser = new Parser(tokens);
   const stylesheet = parser.parseStyleSheet();
   
-  const element = { matches: (sel: string) => sel === '.test' };
+  const element = createMockElement((sel: string) => sel === '.test');
   const style = getCascadedStyle(element, stylesheet.cssRules as unknown as Rule[]);
   
   assert.strictEqual(style.getPropertyValue('margin-left'), '10px');
@@ -41,7 +53,7 @@ test('getCascadedStyle resolves logical properties based on writing-mode', () =>
   const parser = new Parser(tokens);
   const stylesheet = parser.parseStyleSheet();
   
-  const element = { matches: (sel: string) => sel === '.test' };
+  const element = createMockElement((sel: string) => sel === '.test');
   const style = getCascadedStyle(element, stylesheet.cssRules as unknown as Rule[]);
   
   // In vertical-rl, inline-start is top.
@@ -56,7 +68,7 @@ test('text-orientation: upright forces direction to ltr in vertical writing mode
   const parser = new Parser(tokens);
   const stylesheet = parser.parseStyleSheet();
   
-  const element = { matches: (sel: string) => sel === '.test' };
+  const element = createMockElement((sel: string) => sel === '.test');
   const style = getCascadedStyle(element, stylesheet.cssRules as unknown as Rule[]);
   
   // vertical-rl + ltr (forced by text-orientation: upright) -> inline-start is top.
@@ -73,18 +85,8 @@ test('getCascadedStyle inherits writing-mode and direction from parent element',
   const parser = new Parser(tokens);
   const stylesheet = parser.parseStyleSheet();
   
-  interface MockElement {
-    matches: (sel: string) => boolean;
-    parentElement: MockElement | null;
-  }
-  const parentEl: MockElement = {
-    matches: (sel: string) => sel === '.parent',
-    parentElement: null
-  };
-  const childEl: MockElement = {
-    matches: (sel: string) => sel === '.child',
-    parentElement: parentEl
-  };
+  const parentEl = createMockElement((sel: string) => sel === '.parent');
+  const childEl = createMockElement((sel: string) => sel === '.child', parentEl);
   
   const rules = stylesheet.cssRules as unknown as Rule[];
   const childStyle = getCascadedStyle(childEl, rules);

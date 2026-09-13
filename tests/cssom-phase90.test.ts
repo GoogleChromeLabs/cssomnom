@@ -115,14 +115,25 @@ describe('Phase 90: CSSOM Core Rules, Constructable Sheets & SelectorText Invali
       sheet.replaceSync('.target { color: red; }');
 
       const mockDoc = {
+        nodeType: 9 as const,
+        documentElement: null,
+        head: null,
+        body: null,
+        ownerDocument: null,
+        parentElement: null,
+        parentNode: null,
         adoptedStyleSheets: [sheet],
         styleSheets: []
       };
 
       const mockElement = {
+        nodeType: 1 as const,
         localName: 'div',
         tagName: 'div',
         className: 'target',
+        parentElement: null,
+        parentNode: null,
+        getAttribute: () => null,
         ownerDocument: mockDoc,
         getRootNode: () => mockDoc,
         isConnected: true
@@ -143,14 +154,25 @@ describe('Phase 90: CSSOM Core Rules, Constructable Sheets & SelectorText Invali
       adoptedSheet.replaceSync('.target { color: green; }');
 
       const mockDoc = {
+        nodeType: 9 as const,
+        documentElement: null,
+        head: null,
+        body: null,
+        ownerDocument: null,
+        parentElement: null,
+        parentNode: null,
         styleSheets: [authorSheet],
         adoptedStyleSheets: [adoptedSheet]
       };
 
       const mockElement = {
+        nodeType: 1 as const,
         localName: 'div',
         tagName: 'div',
         className: 'target',
+        parentElement: null,
+        parentNode: null,
+        getAttribute: () => null,
         ownerDocument: mockDoc,
         getRootNode: () => mockDoc,
         isConnected: true

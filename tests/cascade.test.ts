@@ -174,6 +174,12 @@ test('Cascade: CSSNestedDeclarations without Parent', () => {
   const nestedDecls = new CSSNestedDeclarations(decls);
   
   const element = {
+    nodeType: 1 as const,
+    tagName: 'DIV',
+    ownerDocument: null,
+    parentElement: null,
+    parentNode: null,
+    getAttribute: () => null,
     matches(sel: string) {
       return sel === ':scope';
     }

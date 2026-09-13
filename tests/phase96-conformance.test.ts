@@ -26,9 +26,9 @@ describe('Phase 96 Conformance - CSS Variables in Shorthands & env()', () => {
   it('substitutes custom properties inside margin shorthand and expands to longhands', () => {
     const el = {
       tagName: 'div',
-      nodeType: 1,
+      nodeType: 1 as const,
       style: new CSSStyleDeclaration(),
-      ownerDocument: { defaultView: null },
+      ownerDocument: null,
       parentElement: null,
       parentNode: null,
       getAttribute(attr: string) {
@@ -51,9 +51,9 @@ describe('Phase 96 Conformance - CSS Variables in Shorthands & env()', () => {
   it('substitutes custom properties inside border shorthand and expands to side longhands', () => {
     const el = {
       tagName: 'div',
-      nodeType: 1,
+      nodeType: 1 as const,
       style: new CSSStyleDeclaration(),
-      ownerDocument: { defaultView: null },
+      ownerDocument: null,
       parentElement: null,
       parentNode: null,
       getAttribute(attr: string) {
@@ -75,9 +75,9 @@ describe('Phase 96 Conformance - CSS Variables in Shorthands & env()', () => {
   it('handles revert keyword in variable fallback for shorthand properties', () => {
     const el = {
       tagName: 'body',
-      nodeType: 1,
+      nodeType: 1 as const,
       style: new CSSStyleDeclaration(),
-      ownerDocument: { defaultView: null },
+      ownerDocument: null,
       parentElement: null,
       parentNode: null,
       getAttribute(attr: string) {
@@ -119,9 +119,9 @@ describe('Phase 96 Conformance - CSS Variables in Shorthands & env()', () => {
   it('preserves strict case-sensitivity for custom property lookups', () => {
     const el = {
       tagName: 'div',
-      nodeType: 1,
+      nodeType: 1 as const,
       style: new CSSStyleDeclaration(),
-      ownerDocument: { defaultView: null },
+      ownerDocument: null,
       parentElement: null,
       parentNode: null,
       getAttribute(attr: string) {

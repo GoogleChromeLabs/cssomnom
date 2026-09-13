@@ -84,6 +84,12 @@ describe("Phase 93: CSS Nesting 1 Conformance & CSSNestedDeclarations Lifecycle"
       `);
 
       const rootA = {
+        nodeType: 1 as const,
+        tagName: "div",
+        parentElement: null,
+        parentNode: null,
+        ownerDocument: null,
+        getAttribute: () => null,
         className: "a",
         matches(sel: string) {
           if (sel === ".a" || sel === ":is(.a)" || sel === ":scope") return true;
@@ -92,8 +98,13 @@ describe("Phase 93: CSS Nesting 1 Conformance & CSSNestedDeclarations Lifecycle"
       };
 
       const childEl = {
-        className: "child",
+        nodeType: 1 as const,
+        tagName: "div",
         parentElement: rootA,
+        parentNode: rootA,
+        ownerDocument: null,
+        getAttribute: () => null,
+        className: "child",
         matches(sel: string) {
           if (sel.includes(".a") && sel.includes(".child")) return true;
           if (sel === ":is(.a) .child") return true;
@@ -115,6 +126,12 @@ describe("Phase 93: CSS Nesting 1 Conformance & CSSNestedDeclarations Lifecycle"
 
       // Element with class b should match now
       const rootB = {
+        nodeType: 1 as const,
+        tagName: "div",
+        parentElement: null,
+        parentNode: null,
+        ownerDocument: null,
+        getAttribute: () => null,
         className: "b",
         matches(sel: string) {
           if (sel === ".b" || sel === ":is(.b)" || sel === ":scope") return true;
@@ -122,8 +139,13 @@ describe("Phase 93: CSS Nesting 1 Conformance & CSSNestedDeclarations Lifecycle"
         }
       };
       const childB = {
-        className: "child",
+        nodeType: 1 as const,
+        tagName: "div",
         parentElement: rootB,
+        parentNode: rootB,
+        ownerDocument: null,
+        getAttribute: () => null,
+        className: "child",
         matches(sel: string) {
           if (sel.includes(".b") && sel.includes(".child")) return true;
           if (sel === ":is(.b) .child") return true;

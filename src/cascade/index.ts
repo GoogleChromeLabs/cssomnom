@@ -19,7 +19,6 @@ import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { tokenize } from '../tokenizer.ts';
 import { serialize } from '../serializer.ts';
 import { isElement } from '../matcher.ts';
-import type { DOMElement } from '../matcher.ts';
 import type { Token } from '../types.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
@@ -211,9 +210,8 @@ export function getCascadedStyle(
   let direction = 'ltr';
   let textOrientation = 'mixed';
 
-  const elWithParent = element as { parentElement?: DOMElement | null; parentNode?: DOMElement | null };
-  const parentNode = elWithParent.parentElement || (elWithParent.parentNode && isElement(elWithParent.parentNode) ? elWithParent.parentNode : null);
-  const rootNode = (element as { ownerDocument?: { documentElement?: DOMElement | null } }).ownerDocument?.documentElement;
+  const parentNode = element.parentElement ?? (element.parentNode && isElement(element.parentNode) ? element.parentNode : null);
+  const rootNode = element.ownerDocument?.documentElement;
   const parentCascaded = parentNode ? getCascadedStyle(parentNode, rules) : null;
 
   if (parentCascaded) {
