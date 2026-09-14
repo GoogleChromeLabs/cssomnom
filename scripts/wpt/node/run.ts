@@ -542,24 +542,73 @@ export function runWptFile(filePath: string): WptFileResult {
   };
 }
 
+// Flush asynchronous stdio pipe streams before process exit to prevent truncated test output
+function flushAndExit(code: number): void {
+  process.exitCode = code;
+  let stdoutFlushed = false;
+  let stderrFlushed = false;
+
+  const tryExit = () => {
+    if (stdoutFlushed && stderrFlushed) {
+      setImmediate(() => process.exit(code));
+    }
+  };
+
+  if (process.stdout.writableNeedDrain) {
+    process.stdout.once('drain', () => {
+      stdoutFlushed = true;
+      tryExit();
+    });
+  } else {
+    process.stdout.write('', () => {
+      stdoutFlushed = true;
+      tryExit();
+    });
+  }
+
+  if (process.stderr.writableNeedDrain) {
+    process.stderr.once('drain', () => {
+      stderrFlushed = true;
+      tryExit();
+    });
+  } else {
+    process.stderr.write('', () => {
+      stderrFlushed = true;
+      tryExit();
+    });
+  }
+
+  // Fail-safe timeout in case drain never fires
+  setTimeout(() => process.exit(code), 2000).unref();
+}
+
 // Support running directly as a CLI script
 if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run.ts') || process.argv[1].endsWith('run_wpt_node.ts'))) {
+  process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception during test runner execution:', err);
+    flushAndExit(1);
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled rejection during test runner execution:', reason);
+    flushAndExit(1);
+  });
+
   if (!process.execArgv.some(arg => arg.startsWith('--max-old-space-size'))) {
     console.error('\x1b[31m[Fatal Error] scripts/wpt/node/run.ts MUST be executed with `--max-old-space-size=512` (e.g. `node --max-old-space-size=512 scripts/wpt/node/run.ts <file>`). Aborting to prevent unconstrained memory growth.\x1b[0m');
-    process.exit(1);
+    flushAndExit(1);
   }
 
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error('Usage: node scripts/wpt/node/run.ts <wpt-html-file-paths...>');
-    process.exit(1);
+    flushAndExit(1);
   }
   
   (async () => {
     // Master fail-safe timeout: exit process after 240000ms to prevent orphaned background hangs
     setTimeout(() => {
       console.error("Runner timed out after 240000ms (self-termination fail-safe).");
-      process.exit(1);
+      flushAndExit(1);
     }, 240000).unref();
 
     let total = 0;
@@ -609,11 +658,12 @@ if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv
       } catch (err) {
         console.error(`Failed to run file ${relPath}:`, err);
         console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);
-        process.exit(1);
+        flushAndExit(1);
+        return;
       }
     }
     
     console.log(`\nSummary: ${passed}/${total} passed, ${failed} failed`);
-    process.exit(failed > 0 ? 1 : 0);
+    flushAndExit(failed > 0 ? 1 : 0);
   })();
 }

@@ -3086,4 +3086,24 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Author regression unit tests in `tests/pseudo-validation.test.ts` verifying that `:-moz-ui-invalid`, `:-ms-input-placeholder`, and `::-moz-selection` survive into `cssRules` when `allowVendorPseudos: true`, and are discarded under strict mode.
   - Run `pnpm run preflight`.
 
+---
+
+## Phase 128: Stdout Pipe Stream Flush Hardening & WPT Flakiness Resolution
+**Goal**: Resolve intermittent dropped test counts and variance in parallel WPT runs caused by asynchronous pipe stream buffer truncation on `process.exit()`.
+
+### Tasks
+- [x] **Empirically Isolate Root Cause of Runner Variance**:
+  - Identified that in Node.js on POSIX, stdout writes to an OS pipe (via `execFile`) are asynchronous.
+  - `scripts/wpt/node/run.ts` called `console.log` followed immediately by `process.exit(code)`, which terminated the worker before pending output chunks in the stream buffer were drained to the parent.
+  - Missing `Summary: P/T passed` lines caused the parser to fall back to counting static HTML declarations, dropping 173 loop-generated subtests from both numerator and denominator in concurrent runs.
+- [x] **Implement Asynchronous Stdio Draining (`flushAndExit`)**:
+  - In `scripts/wpt/node/run.ts`: Implemented `flushAndExit(code: number)` that awaits `drain` events and write callbacks on `process.stdout` and `process.stderr` before exiting via `setImmediate()`.
+  - Added global `uncaughtException` and `unhandledRejection` hooks that flush stdio before exit.
+  - In `scripts/wpt/node/core/parser.ts`: Hardened error-state parsing so `loadError` is explicitly recorded instead of assuming partial outputs represent the full test count when a process crashes without a summary.
+- [x] **Verify Stability & Restore Conformance Baseline**:
+  - Empirically stress tested 80 consecutive runs with 0 anomalies.
+  - Executed full 1,768 file WPT suite and restored true baseline in `wpt-progress.md` and `README.md` (19,224 / 21,969 - 87.51%).
+  - Verified `pnpm run preflight` passes cleanly.
+
+
 

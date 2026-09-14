@@ -122,10 +122,10 @@ export function parseRunnerOutput(
   if (meta.status === 'TIMEOUT' || meta.status === 'WATCHDOG_KILLED') {
     loadError = 'Runner timed out or killed by watchdog';
     if (!summaryMatch) total = Math.max(total, countDeclaredTests(meta.filePath));
-  } else if (meta.status === 'ERROR' && subtests.length === 0) {
+  } else if (meta.status === 'ERROR' && !summaryMatch) {
     const match = merged.match(/Failed to run file .*?: (.*)/);
     loadError = match ? match[1].trim() : 'Process crashed during test execution';
-    if (!summaryMatch) total = Math.max(total, countDeclaredTests(meta.filePath));
+    total = Math.max(total, countDeclaredTests(meta.filePath));
   }
 
   let browserOnlyCount = subtests.filter(s => s.isBrowserOnly).length;
