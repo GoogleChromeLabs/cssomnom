@@ -3140,7 +3140,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 ---
 
 ## Phase 130: WebIDL Entry Points Conformance for Typed OM [x]
-**Goal**: Align `CSSStyleRule.styleMap`, `Element.prototype.computedStyleMap()`, and `attributeStyleMap` with WebIDL property-descriptor and prototype location requirements.
+**Goal**: Accept WebIDL interface objects in WPT harness assertions, and align `CSSStyleRule.styleMap`, `Element.prototype.computedStyleMap()`, and `attributeStyleMap` with WebIDL property-descriptor and prototype location requirements.
 
 **Spec References**:
 - CSS Typed OM: § 2.3 (`#declared-stylepropertymap-objects`), § 2.2 (`#computed-stylepropertymapreadonly-objects`)
@@ -3148,6 +3148,13 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - WebIDL: § 3.6 (`#es-attributes`), § 3.7 (`#es-operations`), § 3.6.3 (`#interface-prototype-object`)
 
 ### Tasks
+- [x] **WPT Harness WebIDL Interface Object Assertion Guard (`c366afd`)**:
+  - `assert_own_property` and `assert_not_own_property` in `tests/dom-shim/src/wpt-assertions.ts` guarded on `typeof object === 'object'`, but WebIDL interface objects are functions.
+  - `idlharness.js` calls `assert_own_property(Interface, "prototype")` for every interface member, so every interface conformance check failed with "target must be an object".
+  - Upstream `testharness.js` applies no typeof guard at all; aligned by accepting functions as well as objects (`typeof object === 'object' || typeof object === 'function'`).
+  - Added regression test in `tests/dom-shim/tests/wpt-assertions.test.ts`, verified red by stashing the source fix.
+  - Conformance impact: +244 subtests across the suite (19,346 -> 19,590; `css-typed-om/idlharness.html` 119/544 -> 291/544).
+  - Note: This commit touched only `tests/dom-shim/` and went unmeasured by the pre-commit hook at the time (which only triggered on `^src/`), misattributing the +244 gain to `d480059` until retroactively measured and inserted into `wpt-progress.md`.
 - [x] **CSSStyleRule.prototype.styleMap Interface Attribute (`src/CSSOM.ts`)**:
   - Replaced own instance property initialization with an enumerable prototype getter on `CSSStyleRule.prototype` with brand check throwing `TypeError` on invalid `this`.
   - Cached `StylePropertyMap` lazily per instance (`[SameObject]`).
@@ -3160,10 +3167,10 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Reconciled `SVGElement.prototype.constructor` to point to `SVGElement` per WebIDL § 3.6.3.
   - Justified out-of-scope decision for `MathMLElement` (non-existent in LinkeDOM; avoiding fake mocks).
 - [x] **Verification & Preflight**:
-  - Added regression unit tests in `tests/typed-om-entrypoints-webidl.test.ts`.
+  - Added regression unit tests in `tests/dom-shim/tests/wpt-assertions.test.ts` and `tests/typed-om-entrypoints-webidl.test.ts`.
   - Verified `pnpm run preflight` exits 0 (clean lint, typecheck, safe-exec, unit tests).
-  - WPT `css/css-typed-om/idlharness.html` increased from 335/544 to 339/544 (+4 passes).
-  - WPT `css/cssom/idlharness.html` maintained at 117/497 passed.
+  - WPT `css/css-typed-om/idlharness.html` increased from 119/544 to 291/544 (+172 via `c366afd`), to 335/544 (+44 via `d480059`), to 339/544 (+4 passes via `a957ca8`).
+  - WPT `css/cssom/idlharness.html` gained +60 subtests via `c366afd` (maintained at 117/497 passed).
   - Spot-checked non-idlharness tests `the-stylepropertymap/declared/declared.tentative.html` (4/7), `inline/clear.html` (3/3), and `inline/get.html` (7/7).
 
 ---
