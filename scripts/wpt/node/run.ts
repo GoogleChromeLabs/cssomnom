@@ -542,128 +542,83 @@ export function runWptFile(filePath: string): WptFileResult {
   };
 }
 
-// Flush asynchronous stdio pipe streams before process exit to prevent truncated test output
-function flushAndExit(code: number): void {
-  process.exitCode = code;
-  let stdoutFlushed = false;
-  let stderrFlushed = false;
-
-  const tryExit = () => {
-    if (stdoutFlushed && stderrFlushed) {
-      setImmediate(() => process.exit(code));
-    }
-  };
-
-  if (process.stdout.writableNeedDrain) {
-    process.stdout.once('drain', () => {
-      stdoutFlushed = true;
-      tryExit();
-    });
-  } else {
-    process.stdout.write('', () => {
-      stdoutFlushed = true;
-      tryExit();
-    });
-  }
-
-  if (process.stderr.writableNeedDrain) {
-    process.stderr.once('drain', () => {
-      stderrFlushed = true;
-      tryExit();
-    });
-  } else {
-    process.stderr.write('', () => {
-      stderrFlushed = true;
-      tryExit();
-    });
-  }
-
-  // Fail-safe timeout in case drain never fires
-  setTimeout(() => process.exit(code), 2000).unref();
-}
-
 // Support running directly as a CLI script
-if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run.ts') || process.argv[1].endsWith('run_wpt_node.ts'))) {
-  process.on('uncaughtException', (err) => {
-    console.error('Uncaught exception during test runner execution:', err);
-    flushAndExit(1);
-  });
-  process.on('unhandledRejection', (reason) => {
-    console.error('Unhandled rejection during test runner execution:', reason);
-    flushAndExit(1);
-  });
-
+async function runCli(): Promise<void> {
   if (!process.execArgv.some(arg => arg.startsWith('--max-old-space-size'))) {
     console.error('\x1b[31m[Fatal Error] scripts/wpt/node/run.ts MUST be executed with `--max-old-space-size=512` (e.g. `node --max-old-space-size=512 scripts/wpt/node/run.ts <file>`). Aborting to prevent unconstrained memory growth.\x1b[0m');
-    flushAndExit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const args = process.argv.slice(2);
   if (args.length === 0) {
     console.error('Usage: node scripts/wpt/node/run.ts <wpt-html-file-paths...>');
-    flushAndExit(1);
+    process.exitCode = 1;
+    return;
   }
-  
-  (async () => {
-    // Master fail-safe timeout: exit process after 240000ms to prevent orphaned background hangs
-    setTimeout(() => {
-      console.error("Runner timed out after 240000ms (self-termination fail-safe).");
-      flushAndExit(1);
-    }, 240000).unref();
 
-    let total = 0;
-    let passed = 0;
-    let failed = 0;
-    
-    const filesToRun: string[] = [];
-    const collectFiles = (dir: string) => {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          collectFiles(full);
-        } else if (entry.isFile() && (entry.name.endsWith('.html') || entry.name.endsWith('.htm'))) {
-          filesToRun.push(full);
-        }
-      }
-    };
+  // Master fail-safe timeout: exit process after 240000ms to prevent orphaned background hangs
+  setTimeout(() => {
+    console.error("Runner timed out after 240000ms (self-termination fail-safe).");
+    process.exit(1);
+  }, 240000).unref();
 
-    for (const filePattern of args) {
-      const fullPath = path.resolve(process.cwd(), filePattern);
-      if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
-        collectFiles(fullPath);
-      } else {
-        filesToRun.push(fullPath);
+  let total = 0;
+  let passed = 0;
+  let failed = 0;
+
+  const filesToRun: string[] = [];
+  const collectFiles = (dir: string) => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        collectFiles(full);
+      } else if (entry.isFile() && (entry.name.endsWith('.html') || entry.name.endsWith('.htm'))) {
+        filesToRun.push(full);
       }
     }
+  };
 
-    for (const fullPath of filesToRun) {
-      const relPath = path.relative(process.cwd(), fullPath);
-      console.log(`Running WPT file: ${relPath}`);
-      try {
-        const result = runWptFile(fullPath);
-        for (const testItem of result.tests) {
-          total++;
-          try {
-            await testItem.fn();
-            passed++;
-            console.log(`  ✔ ${testItem.name.replace(/\n/g, '\\n')}`);
-          } catch (err) {
-            failed++;
-            console.error(`  ✖ ${testItem.name.replace(/\n/g, '\\n')}`);
-            console.error(err);
-          }
-        }
-        result.cleanup();
-      } catch (err) {
-        console.error(`Failed to run file ${relPath}:`, err);
-        console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);
-        flushAndExit(1);
-        return;
-      }
+  for (const filePattern of args) {
+    const fullPath = path.resolve(process.cwd(), filePattern);
+    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory()) {
+      collectFiles(fullPath);
+    } else {
+      filesToRun.push(fullPath);
     }
-    
-    console.log(`\nSummary: ${passed}/${total} passed, ${failed} failed`);
-    flushAndExit(failed > 0 ? 1 : 0);
-  })();
+  }
+
+  for (const fullPath of filesToRun) {
+    const relPath = path.relative(process.cwd(), fullPath);
+    console.log(`Running WPT file: ${relPath}`);
+    try {
+      const result = runWptFile(fullPath);
+      for (const testItem of result.tests) {
+        total++;
+        try {
+          await testItem.fn();
+          passed++;
+          console.log(`  ✔ ${testItem.name.replace(/\n/g, '\\n')}`);
+        } catch (err) {
+          failed++;
+          console.error(`  ✖ ${testItem.name.replace(/\n/g, '\\n')}`);
+          console.error(err);
+        }
+      }
+      result.cleanup();
+    } catch (err) {
+      console.error(`Failed to run file ${relPath}:`, err);
+      console.log(`\nSummary: ${passed}/${Math.max(1, total)} passed, ${Math.max(1, failed)} failed`);
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  console.log(`\nSummary: ${passed}/${total} passed, ${failed} failed`);
+  process.exitCode = failed > 0 ? 1 : 0;
+}
+
+if (process.argv[1] && (process.argv[1] === import.meta.filename || process.argv[1].endsWith('run.ts') || process.argv[1].endsWith('run_wpt_node.ts'))) {
+  runCli();
 }
