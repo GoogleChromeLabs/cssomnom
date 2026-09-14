@@ -3166,7 +3166,73 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - WPT `css/cssom/idlharness.html` maintained at 117/497 passed.
   - Spot-checked non-idlharness tests `the-stylepropertymap/declared/declared.tentative.html` (4/7), `inline/clear.html` (3/3), and `inline/get.html` (7/7).
 
+---
 
+## Phase 131: DOM Interface Constructor Wiring Regression, Revert & Flake Removal [x]
+**Goal**: Account for attempted WebIDL § 3.6.3 constructor wiring on LinkeDOM prototypes, document the load-bearing internal constructor dependency and revert, and eliminate wall-clock flake in VirtualClock tests.
 
+**Spec References**:
+- WebIDL: § 3.6.3 (`#interface-prototype-object`)
+- DOM Standard: § 4.4 (`#dom-node-clonenode`)
 
+### Tasks
+- [x] **Attempt WebIDL Constructor Wiring Repair (`699040c`)**:
+  - Repointed `X.prototype.constructor` at LinkeDOM's window-exposed interface objects across 12 DOM interfaces (`Attr`, `CharacterData`, `Comment`, `Document`, `DocumentFragment`, `DocumentType`, `Element`, `HTMLElement`, `Node`, `ShadowRoot`, `SVGElement`, `Text`) to satisfy WebIDL § 3.6.3.
+  - Targeted fixing WPT sandbox constructor detection (`val.prototype.constructor !== val`) in `scripts/wpt/node/run.ts`.
+- [x] **Revert Constructor Wiring to Restore LinkeDOM Cloning (`71b6700`)**:
+  - Reverted `699040c` after identifying that LinkeDOM's window-exposed interface objects are throw-on-construct facades sharing the internal class prototype (`DocumentFragment.prototype = _DocumentFragment.prototype`).
+  - LinkeDOM's internal `cloneNode` relies on `const {ownerDocument, constructor} = this; new constructor(ownerDocument)`. Repointing `prototype.constructor` at the facade caused internal cloning to throw `TypeError: Illegal constructor`.
+  - Regression cost 142 `css-cascade` subtests (400/497 -> 258/501) because every `@scope` test clones a fragment. Net negative on balance; recorded as attempted-and-reverted with the rationale rather than a gap to retry.
+  - Added regression guard test in `tests/dom-shim/tests/dom-stubs.test.ts` verifying shallow/deep fragment cloning and element cloning succeed, preventing silent reintroduction.
+- [x] **Eliminate Wall-Clock Flake in `VirtualClock.pumpUntil` (`d7752b4`)**:
+  - Scaled virtual interval and timeout durations 1000x (10ms/50ms -> 10s/50s) in `tests/dom-shim/tests/virtual-clock.test.ts` to widen wall-clock assertion margin from 2x (<20ms) to ~50x (<1000ms), removing intermittent flakes under parallel suite load without altering test semantics.
 
+---
+
+## Phase 132: WPT Harness VM Realm Eval Isolation & Pre-Commit Measurement Hook [x]
+**Goal**: Stop host-realm `eval` from shadowing the VM context realm in the WPT runner, resolving `idlharness.js` `ReferenceError`s across test objects, and track the pre-commit conformance measurement hook in version control.
+
+**Spec References**:
+- ECMA-262: § 19.2.1 (`#sec-eval-x`)
+
+### Tasks
+- [x] **Stop Host-Realm `eval` Shadowing VM Context in WPT Sandbox (`c69eb49`)**:
+  - Identified that `runWptFile` bulk-copied own properties from LinkeDOM's `window` into the VM context sandbox, copying the host realm's `eval`.
+  - Per ECMA-262 § 19.2.1, a call is only a direct eval when the callee is the current realm's `%eval%`. A foreign realm's eval degrades to an indirect eval in the host global scope, leaving test-scope identifiers inaccessible.
+  - Upstream `idlharness.js` `test_object()` executes `obj = eval(desc)`, so every `add_objects` entry threw `ReferenceError`.
+  - Added `'eval'` to `JS_INTRINSICS` in `scripts/wpt/node/run.ts` to preserve context-realm `eval`.
+  - Conformance gain: +235 passing subtests (`css/cssom/idlharness.html` 117/497 -> 281/484, `css/css-typed-om/idlharness.html` 339/544 -> 408/539; overall 19,638 -> 19,873).
+  - Denominator impact: Denominators shrank by 21 total because upstream idlharness skips its `must be primary interface of` subtest for cross-realm objects (`obj instanceof Object === false` for host-realm CSSOM objects in VM context) — verified empirically, not an exclusion introduced locally.
+- [x] **Track Pre-Commit Hook & Broaden Result-Affecting Triggers (`82ba1dd`)**:
+  - Moved untracked `.git/hooks/pre-commit` into version-controlled `.githooks/pre-commit` activated via npm `prepare` script (`git config core.hooksPath .githooks`).
+  - Broadened `RESULT_AFFECTING` commit trigger from `^src/` to `^(src/|tests/dom-shim/src/|scripts/wpt/node/|tests/wpt-node-config\.json$|pnpm-lock\.yaml$)` so DOM shim, runner, and config changes are measured upon commit instead of being misattributed.
+  - Automated staging of regenerated `wpt-progress.md` and `README.md` when metrics change.
+
+---
+
+## Phase 133: Spec-Wide WebIDL Prototype Descriptors & Review Remediation [x]
+**Goal**: Align CSSOM and DOM shim interface prototype descriptors, attribute accessors, and operations with WebIDL specification requirements and remediate review findings.
+
+**Spec References**:
+- WebIDL: § 3.6 (`#es-attributes`), § 3.6.1 (`#es-attribute-getter`), § 3.6.2 (`#es-attribute-setter`), § 3.6.3 (`#interface-prototype-object`), § 3.6.4 (`#es-constants`), § 3.6.5 (`#constants-on-interface-prototype-object`), § 3.7 (`#es-operations`)
+- CSSOM 1: § 6.5 (`#the-cssrule-interface`), § 6.5.1 (`#the-cssstylerule-interface`), § 6.7 (`#the-cssstyledeclaration-interface`), § 6.8 (`#the-elementcssinlinestyle-mixin`)
+
+### Tasks
+- [x] **WebIDL Interface Prototype Descriptors & Brand Checks (`eea136a`)**:
+  - Created `src/webidl.ts` with `applyWebIDLInterface` and `applyWebIDLConstants`.
+  - Configured prototype attributes as `{ enumerable: true, configurable: true, get, set }` with brand checks throwing `TypeError` on invalid receiver or when called on the prototype itself (WebIDL § 3.6.1, § 3.6.2).
+  - Configured prototype operations as `{ writable: true, enumerable: true, configurable: true, value }` with brand checks and arity checks throwing `TypeError` when called with fewer arguments than required (WebIDL § 3.7).
+  - Configured constants as `{ writable: false, enumerable: true, configurable: false }` on interface objects and prototypes (WebIDL § 3.6.4, § 3.6.5).
+  - Applied across core CSSOM classes (`CSSRule`, `CSSStyleRule`, `CSSGroupingRule`, `CSSMediaRule`, `CSSPageRule`, `CSSNamespaceRule`, `CSSMarginRule`, `CSSImportRule`, `CSSNestedDeclarations`, `CSSStyleSheet`, `CSSRuleList`, `MediaList`, `StyleSheetList`) and DOM shim prototypes in `tests/dom-shim/src/dom-stubs.ts`.
+  - Updated property accessors codegen in `scripts/codegen/generate_properties.ts` and `src/data/gen/properties.ts` to generate enumerable and configurable descriptors.
+  - Added unit test suite in `tests/cssom-webidl-descriptors.test.ts`.
+- [x] **WebIDL Review Remediation & API Surface Hardening (`1e268e2`)**:
+  - Added idempotency guard (`appliedCtors` WeakSet) in `src/webidl.ts` to prevent double-wrapping prototype properties.
+  - Added `interfaceName` option for clean error messages and `exclude` option for internal properties.
+  - Added `rejectOperations` option supporting async operations (e.g. `CSSStyleSheet.prototype.replace`) to return rejected promises rather than throwing synchronously on brand/arity failure.
+  - Added `applyWebIDLPrototypeDescriptors(ctor)` for light enumerability enforcement.
+  - Removed duplicate `applyWebIDLInterface` in `src/typed-om/utils/webidl.ts`, unifying logic in `src/webidl.ts`.
+  - Enforced API surface boundaries in `tests/api-surface.test.ts` ensuring WebIDL utility helpers are not exposed on the public package entry point.
+- [x] **Verification & Conformance**:
+  - Conformance moved 19,638/22,517 (87.2%) -> 20,020/22,494 (89.0%) over this span.
+  - `pnpm run preflight` passes cleanly: 0 type errors, 0 lint warnings, safe-exec guard clean, and all 4,166 unit tests passing.
