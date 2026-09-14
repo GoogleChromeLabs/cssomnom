@@ -94,13 +94,16 @@ test('VirtualClock pumpUntil halts on completion even with uncancelled setInterv
   let intervalCount = 0;
   let targetFinished = false;
 
+  // Virtual durations are deliberately large (seconds, not milliseconds) so the wall-clock
+  // assertion below has a wide margin. A clock that actually slept would take ~50s here, while
+  // a correctly virtualized one returns near-instantly regardless of host load.
   clock.setInterval(() => {
     intervalCount++;
-  }, 10);
+  }, 10_000);
 
   clock.setTimeout(() => {
     targetFinished = true;
-  }, 50);
+  }, 50_000);
 
   const startWallClock = performance.now();
   const completed = await clock.pumpUntil(() => targetFinished, { maxTicks: 1000 });
@@ -108,11 +111,11 @@ test('VirtualClock pumpUntil halts on completion even with uncancelled setInterv
 
   assert.strictEqual(completed, true);
   assert.strictEqual(targetFinished, true);
-  // Interval fired at t=10, 20, 30, 40 (4 times).
-  // At t=50, the setTimeout (scheduled earlier at t=0 with lower sequence number) executes first and causes pumpUntil to immediately halt before the 5th interval tick.
+  // Interval fired at t=10s, 20s, 30s, 40s (4 times).
+  // At t=50s, the setTimeout (scheduled earlier at t=0 with lower sequence number) executes first and causes pumpUntil to immediately halt before the 5th interval tick.
   assert.strictEqual(intervalCount, 4);
-  assert.strictEqual(clock.currentTime, 50);
-  assert.ok(wallClockDuration < 20, `Wall-clock duration was ${wallClockDuration}ms`);
+  assert.strictEqual(clock.currentTime, 50_000);
+  assert.ok(wallClockDuration < 1000, `Wall-clock duration was ${wallClockDuration}ms`);
 });
 
 test('VirtualClock clearTimeout, clearInterval, and cancelAnimationFrame', async () => {
