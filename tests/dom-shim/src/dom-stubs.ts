@@ -68,7 +68,7 @@ const PROTECTED_HARNESS_NAMES = new Set([
   'assert_own_property', 'assert_not_own_property', 'assert_inherits',
   'assert_idl_attribute', 'assert_readonly', 'assert_throws_dom', 'assert_throws_js',
   'assert_throws_exactly', 'assert_unreached', 'assert_any', 'assert_object_equals',
-  'assert_regexp_match', 'format_value', 'window', 'document', 'location',
+  'assert_regexp_match', 'assert_throws_quotaexceedederror', 'format_value', 'window', 'document', 'location',
   'navigator', 'console', 'fetch', 'self', 'globalThis', 'top', 'parent',
   'Array', 'Object', 'Function', 'Promise', 'Error', 'TypeError', 'RangeError',
   'SyntaxError', 'ReferenceError', 'URIError', 'EvalError', 'Map', 'Set',

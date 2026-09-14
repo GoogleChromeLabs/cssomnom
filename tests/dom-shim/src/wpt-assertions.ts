@@ -237,37 +237,72 @@ export const WPT_ASSERTIONS = {
   },
 
   assert_approx_equals(actual: unknown, expected: unknown, epsilon: number, description?: string): void {
-    assert.ok(Math.abs(Number(actual) - Number(expected)) <= epsilon, `${description || ''}: expected ${expected} +/- ${epsilon}, got ${actual}`);
+    assert.strictEqual(typeof actual, 'number', `${description || ''}: expected a number but got a ${typeof actual}`);
+    if (Number.isFinite(actual as number) || Number.isFinite(Number(expected))) {
+      assert.ok(
+        Math.abs((actual as number) - Number(expected)) <= epsilon,
+        `${description || ''}: expected ${expected} +/- ${epsilon} but got ${actual}`
+      );
+    } else {
+      WPT_ASSERTIONS.assert_equals(actual, expected, description);
+    }
   },
 
   assert_less_than(actual: unknown, expected: unknown, description?: string): void {
-    assert.ok(Number(actual) < Number(expected), `${description || ''}: expected ${actual} < ${expected}`);
+    assert.ok(typeof actual === 'number' || typeof actual === 'bigint', `${description || ''}: expected a number or bigint but got a ${typeof actual}`);
+    assert.strictEqual(typeof actual, typeof expected, `${description || ''}: expected a ${typeof expected} but got a ${typeof actual}`);
+    assert.ok((actual as number) < (expected as number), `${description || ''}: expected a number less than ${expected} but got ${actual}`);
   },
 
   assert_greater_than(actual: unknown, expected: unknown, description?: string): void {
-    assert.ok(Number(actual) > Number(expected), `${description || ''}: expected ${actual} > ${expected}`);
+    assert.ok(typeof actual === 'number' || typeof actual === 'bigint', `${description || ''}: expected a number or bigint but got a ${typeof actual}`);
+    assert.strictEqual(typeof actual, typeof expected, `${description || ''}: expected a ${typeof expected} but got a ${typeof actual}`);
+    assert.ok((actual as number) > (expected as number), `${description || ''}: expected a number greater than ${expected} but got ${actual}`);
+  },
+
+  assert_between_exclusive(actual: unknown, lower: unknown, upper: unknown, description?: string): void {
+    assert.strictEqual(typeof lower, typeof upper, `${description || ''}: expected lower (${typeof lower}) and upper (${typeof upper}) types to match (test error)`);
+    assert.ok(typeof actual === 'number' || typeof actual === 'bigint', `${description || ''}: expected a number or bigint but got a ${typeof actual}`);
+    assert.strictEqual(typeof actual, typeof lower, `${description || ''}: expected a ${typeof lower} but got a ${typeof actual}`);
+    assert.ok((actual as number) > (lower as number) && (actual as number) < (upper as number), `${description || ''}: expected a number greater than ${lower} and less than ${upper} but got ${actual}`);
   },
 
   assert_less_than_equal(actual: unknown, expected: unknown, description?: string): void {
-    assert.ok(Number(actual) <= Number(expected), `${description || ''}: expected ${actual} <= ${expected}`);
+    assert.ok(typeof actual === 'number' || typeof actual === 'bigint', `${description || ''}: expected a number or bigint but got a ${typeof actual}`);
+    assert.strictEqual(typeof actual, typeof expected, `${description || ''}: expected a ${typeof expected} but got a ${typeof actual}`);
+    assert.ok((actual as number) <= (expected as number), `${description || ''}: expected a number less than or equal to ${expected} but got ${actual}`);
   },
 
   assert_greater_than_equal(actual: unknown, expected: unknown, description?: string): void {
-    assert.ok(Number(actual) >= Number(expected), `${description || ''}: expected ${actual} >= ${expected}`);
+    assert.ok(typeof actual === 'number' || typeof actual === 'bigint', `${description || ''}: expected a number or bigint but got a ${typeof actual}`);
+    assert.strictEqual(typeof actual, typeof expected, `${description || ''}: expected a ${typeof expected} but got a ${typeof actual}`);
+    assert.ok((actual as number) >= (expected as number), `${description || ''}: expected a number greater than or equal to ${expected} but got ${actual}`);
+  },
+
+  assert_between_inclusive(actual: unknown, lower: unknown, upper: unknown, description?: string): void {
+    assert.strictEqual(typeof lower, typeof upper, `${description || ''}: expected lower (${typeof lower}) and upper (${typeof upper}) types to match (test error)`);
+    assert.ok(typeof actual === 'number' || typeof actual === 'bigint', `${description || ''}: expected a number or bigint but got a ${typeof actual}`);
+    assert.strictEqual(typeof actual, typeof lower, `${description || ''}: expected a ${typeof lower} but got a ${typeof actual}`);
+    assert.ok((actual as number) >= (lower as number) && (actual as number) <= (upper as number), `${description || ''}: expected a number greater than or equal to ${lower} and less than or equal to ${upper} but got ${actual}`);
   },
 
   assert_in_array(actual: unknown, expected: unknown[], description?: string): void {
-    assert.ok(expected.includes(actual), `${description || ''}: expected ${actual} to be in array ${JSON.stringify(expected)}`);
+    assert.ok(Array.isArray(expected), `${description || ''}: expected must be an array`);
+    assert.ok(expected.indexOf(actual) !== -1, `${description || ''}: value ${actual} not in array ${JSON.stringify(expected)}`);
   },
 
   assert_array_approx_equals(actual: unknown, expected: unknown, epsilon: number, description?: string): void {
     const isArrayLike = (v: unknown): v is ArrayLike<unknown> => {
-      return Array.isArray(v) || ArrayBuffer.isView(v);
+      return typeof v === 'object' && v !== null && 'length' in v;
     };
     if (isArrayLike(actual) && isArrayLike(expected)) {
       assert.strictEqual(actual.length, expected.length, description ?? '');
       for (let i = 0; i < actual.length; i++) {
-        assert.ok(Math.abs(Number(actual[i]) - Number(expected[i])) <= epsilon, `${description || ''} (index ${i}): expected ${expected[i]} +/- ${epsilon}, got ${actual[i]}`);
+        const actHas: boolean = Object.prototype.hasOwnProperty.call(actual, i);
+        const expHas: boolean = Object.prototype.hasOwnProperty.call(expected, i);
+        assert.strictEqual(actHas, expHas, `${description || ''}: property ${i}, property expected to be ${expHas ? 'present' : 'missing'} but was ${actHas ? 'present' : 'missing'}`);
+        assert.strictEqual(typeof actual[i], 'number', `${description || ''}: property ${i}, expected a number but got a ${typeof actual[i]}`);
+        assert.ok(Math.abs((actual[i] as number) - (expected[i] as number)) <= epsilon, `${description || ''} (index ${i}): expected ${expected[i]} +/- ${epsilon}, got ${actual[i]}`);
       }
     } else {
       assert.fail('assert_array_approx_equals: expected arrays');
@@ -303,21 +338,37 @@ export const WPT_ASSERTIONS = {
     }
   },
 
-  assert_array_equals(actual: unknown[], expected: unknown[], message?: string): void {
-    if (actual.length !== expected.length) {
+  assert_array_equals(actual: unknown, expected: unknown, message?: string): void {
+    assert.ok(typeof actual === 'object' && actual !== null && 'length' in actual, `${message || ''}: value is ${actual}, expected array`);
+    assert.ok(typeof expected === 'object' && expected !== null && 'length' in expected, `${message || ''}: expected is ${expected}, expected array`);
+
+    const act = actual as ArrayLike<unknown>;
+    const exp = expected as ArrayLike<unknown>;
+
+    if (act.length !== exp.length) {
       throw new AssertionErrorProxy({
-        message: `${message || 'Array length mismatch'}: expected ${expected.length} but got ${actual.length}`,
-        actual: String(actual.length),
-        expected: String(expected.length),
+        message: `${message || 'Array length mismatch'}: expected ${exp.length} but got ${act.length}`,
+        actual: String(act.length),
+        expected: String(exp.length),
         operator: 'strictEqual'
       });
     }
-    for (let i = 0; i < actual.length; i++) {
-      if (!Object.is(actual[i], expected[i])) {
+    for (let i = 0; i < act.length; i++) {
+      const actHas = Object.prototype.hasOwnProperty.call(act, i);
+      const expHas = Object.prototype.hasOwnProperty.call(exp, i);
+      if (actHas !== expHas) {
         throw new AssertionErrorProxy({
-          message: `${message || 'Array element mismatch at index ' + i}: expected ${format_value(expected[i])} but got ${format_value(actual[i])}`,
-          actual: format_value(actual[i]),
-          expected: format_value(expected[i]),
+          message: `${message || 'Array element missing at index ' + i}: expected property ${i} to be ${expHas ? 'present' : 'missing'} but was ${actHas ? 'present' : 'missing'}`,
+          actual: actHas ? 'present' : 'missing',
+          expected: expHas ? 'present' : 'missing',
+          operator: 'strictEqual'
+        });
+      }
+      if (!Object.is(act[i], exp[i])) {
+        throw new AssertionErrorProxy({
+          message: `${message || 'Array element mismatch at index ' + i}: expected ${format_value(exp[i])} but got ${format_value(act[i])}`,
+          actual: format_value(act[i]),
+          expected: format_value(exp[i]),
           operator: 'strictEqual'
         });
       }
@@ -383,10 +434,54 @@ export const WPT_ASSERTIONS = {
   assert_readonly(object: unknown, property_name: string | symbol, description?: string): void {
     assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: provided value is not an object`);
     assert.strictEqual(property_name in (object as Record<string | symbol, unknown>), true, `${description || ''}: property ${String(property_name)} not found`);
+
+    let cur: unknown = object;
+    let desc: PropertyDescriptor | undefined;
+    while (cur && (desc = Object.getOwnPropertyDescriptor(cur, property_name)) === undefined) {
+      cur = Object.getPrototypeOf(cur);
+    }
+    assert.ok(desc !== undefined, `${description || ''}: could not find a descriptor for property ${String(property_name)}`);
+
+    if (Object.prototype.hasOwnProperty.call(desc, 'value')) {
+      // Data property descriptor
+      assert.strictEqual(desc.writable, false, `${description || ''}: descriptor [[Writable]] expected false got ${desc.writable}`);
+    } else if (Object.prototype.hasOwnProperty.call(desc, 'get') || Object.prototype.hasOwnProperty.call(desc, 'set')) {
+      // Accessor property descriptor
+      assert.strictEqual(desc.set, undefined, `${description || ''}: property ${String(property_name)} is an accessor property with a [[Set]] attribute, cannot test readonly-ness`);
+    } else {
+      assert.fail(`${description || ''}: Object.getOwnPropertyDescriptor must return a fully populated property descriptor`);
+    }
   },
 
   assert_unreached(message?: string): void {
     assert.fail(message || 'Reached unreachable code');
+  },
+
+  assert_any(
+    assert_func: Function,
+    actual: unknown,
+    expected_array: unknown[],
+    ...args: unknown[]
+  ): void {
+    const errors: string[] = [];
+    let passed = false;
+    for (const expected of expected_array) {
+      try {
+        assert_func(actual, expected, ...args);
+        passed = true;
+        break;
+      } catch (e: unknown) {
+        errors.push(messageOf(e));
+      }
+    }
+    if (!passed) {
+      throw new AssertionErrorProxy({
+        message: errors.join('\n\n'),
+        actual: format_value(actual),
+        expected: format_value(expected_array),
+        operator: 'assert_any'
+      });
+    }
   },
 
   assert_implements(condition: unknown, description?: string): void {
@@ -402,6 +497,16 @@ export const WPT_ASSERTIONS = {
   },
 
   assert_throws_js(constructor: Function, func: () => void, description?: string): void {
+    assert.strictEqual(typeof constructor, 'function', `${description || ''}: ${constructor} is not a constructor`);
+    let obj: unknown = constructor;
+    while (obj) {
+      if (typeof obj === 'function' && (obj as Function).name === 'Error') {
+        break;
+      }
+      obj = Object.getPrototypeOf(obj);
+    }
+    assert.ok(obj !== null, `${description || ''}: ${constructor.name} is not an Error subtype`);
+
     try {
       func();
       assert.fail(`${description || ''}: Expected to throw JS exception`);
@@ -411,54 +516,194 @@ export const WPT_ASSERTIONS = {
       }
       assert.ok(e && typeof e === 'object', `${description || ''}: Thrown value is not an object`);
       const errObj = e as Record<string, unknown>;
+      const matchConstructor =
+        errObj.constructor === constructor ||
+        (errObj.constructor as Function | undefined)?.name === constructor.name;
       assert.ok(
-        errObj.constructor === constructor || (errObj.constructor as Function | undefined)?.name === constructor.name,
+        matchConstructor,
         `${description || ''}: expected constructor ${constructor.name}, got ${(errObj.constructor as Function | undefined)?.name}`
       );
       assert.strictEqual(errObj.name, constructor.name, `${description || ''}: expected error name ${constructor.name}, got ${errObj.name}`);
     }
   },
 
-  assert_throws_dom(errorName: string | number, func: () => void, description?: string): void {
+  assert_throws_dom(
+    type: string | number,
+    funcOrConstructor: unknown,
+    descriptionOrFunc?: unknown,
+    maybeDescription?: string
+  ): void {
+    let constructor: unknown;
+    let func: () => void;
+    let description: string | undefined;
+
+    if (typeof funcOrConstructor === 'function' && funcOrConstructor.name === 'DOMException') {
+      constructor = funcOrConstructor;
+      func = descriptionOrFunc as () => void;
+      description = maybeDescription;
+    } else {
+      constructor =
+        (typeof globalThis !== 'undefined' && (globalThis as unknown as { DOMException?: unknown }).DOMException) ||
+        (typeof DOMException !== 'undefined' ? DOMException : undefined);
+      func = funcOrConstructor as () => void;
+      description = descriptionOrFunc as string | undefined;
+      assert.strictEqual(maybeDescription, undefined, 'Too many args passed to no-constructor version of assert_throws_dom');
+    }
+
     try {
       func();
-      assert.fail(`Expected to throw DOMException ${errorName}`);
+      assert.fail(`${description || ''}: Expected to throw DOMException ${type}`);
     } catch (e: unknown) {
-      if (e && typeof e === 'object' && 'name' in e) {
-        let expectedName = '';
-        let expectedCode: number | undefined = undefined;
-
-        if (typeof errorName === 'number') {
-          if (errorName === 0) {
-            throw new assert.AssertionError({ message: 'Test bug: ambiguous DOMException code 0 passed to assert_throws_dom()' });
-          }
-          if (errorName === 22) {
-            throw new assert.AssertionError({ message: 'Test bug: QuotaExceededError needs to be tested for using assert_throws_quotaexceedederror()' });
-          }
-          if (!(errorName in CODE_NAME_MAP)) {
-            throw new assert.AssertionError({ message: `Test bug: unrecognized DOMException code "${errorName}" passed to assert_throws_dom()` });
-          }
-          expectedName = CODE_NAME_MAP[errorName];
-          expectedCode = errorName;
-        } else {
-          if (errorName === 'QuotaExceededError') {
-            throw new assert.AssertionError({ message: 'Test bug: QuotaExceededError needs to be tested for using assert_throws_quotaexceedederror()' });
-          }
-          expectedName = CODENAME_NAME_MAP[errorName] || errorName;
-          if (!(expectedName in NAME_CODE_MAP)) {
-            throw new assert.AssertionError({ message: `Test bug: unrecognized DOMException code name or name "${errorName}" passed to assert_throws_dom()` });
-          }
-          expectedCode = NAME_CODE_MAP[expectedName];
-        }
-
-        const errObj = e as Record<string, unknown>;
-        assert.strictEqual(errObj.name, expectedName, `${description || ''}: expected name ${expectedName}`);
-        if (expectedCode !== undefined && expectedCode > 0) {
-          assert.strictEqual(errObj.code, expectedCode, `${description || ''}: expected code ${expectedCode}`);
-        }
-        return;
+      if (e instanceof assert.AssertionError) {
+        throw e;
       }
-      throw e;
+      assert.ok(typeof e === 'object' && e !== null, `${description || ''}: Thrown value is not an object`);
+      assert.ok(typeof type === 'number' || typeof type === 'string', `${description || ''}: ${type} is not a number or string`);
+
+      let expectedName = '';
+      let expectedCode: number | undefined = undefined;
+
+      if (typeof type === 'number') {
+        if (type === 0) {
+          throw new assert.AssertionError({ message: 'Test bug: ambiguous DOMException code 0 passed to assert_throws_dom()' });
+        }
+        if (type === 22) {
+          throw new assert.AssertionError({ message: 'Test bug: QuotaExceededError needs to be tested for using assert_throws_quotaexceedederror()' });
+        }
+        if (!(type in CODE_NAME_MAP)) {
+          throw new assert.AssertionError({ message: `Test bug: unrecognized DOMException code "${type}" passed to assert_throws_dom()` });
+        }
+        expectedName = CODE_NAME_MAP[type];
+        expectedCode = type;
+      } else {
+        if (type === 'QuotaExceededError') {
+          throw new assert.AssertionError({ message: 'Test bug: QuotaExceededError needs to be tested for using assert_throws_quotaexceedederror()' });
+        }
+        expectedName = CODENAME_NAME_MAP[type] || type;
+        if (!(expectedName in NAME_CODE_MAP)) {
+          throw new assert.AssertionError({ message: `Test bug: unrecognized DOMException code name or name "${type}" passed to assert_throws_dom()` });
+        }
+        expectedCode = NAME_CODE_MAP[expectedName];
+      }
+
+      const errObj = e as Record<string, unknown>;
+      const requiredProps: Record<string, unknown> = {};
+      if (expectedCode !== undefined) {
+        requiredProps.code = expectedCode;
+      }
+      if (
+        expectedCode === 0 ||
+        ('name' in errObj &&
+          typeof errObj.name === 'string' &&
+          errObj.name !== errObj.name.toUpperCase() &&
+          errObj.name !== 'DOMException')
+      ) {
+        requiredProps.name = expectedName;
+      }
+
+      for (const [prop, expectedVal] of Object.entries(requiredProps)) {
+        assert.ok(
+          prop in errObj && errObj[prop] == expectedVal,
+          `${description || ''}: expected property ${prop} to be ${expectedVal}, got ${errObj[prop]}`
+        );
+      }
+
+      if (constructor) {
+        const ctorMatches =
+          errObj.constructor === constructor ||
+          ((errObj.constructor as Function | undefined)?.name === 'DOMException' &&
+            (constructor as Function).name === 'DOMException');
+        assert.ok(ctorMatches, `${description || ''}: threw an exception from the wrong global`);
+      }
+    }
+  },
+
+  assert_throws_quotaexceedederror(
+    funcOrConstructor: unknown,
+    requestedOrFunc?: unknown,
+    quotaOrRequested?: unknown,
+    descriptionOrQuota?: unknown,
+    maybeDescription?: string
+  ): void {
+    let constructor: unknown;
+    let func: () => void;
+    let requested: unknown;
+    let quota: unknown;
+    let description: string | undefined;
+
+    if (
+      typeof funcOrConstructor === 'function' &&
+      (funcOrConstructor.name === 'QuotaExceededError' || funcOrConstructor.name === 'DOMException')
+    ) {
+      constructor = funcOrConstructor;
+      func = requestedOrFunc as () => void;
+      requested = quotaOrRequested;
+      quota = descriptionOrQuota;
+      description = maybeDescription;
+    } else {
+      constructor =
+        (typeof globalThis !== 'undefined' &&
+          ((globalThis as unknown as Record<string, unknown>).QuotaExceededError ||
+            (globalThis as unknown as { DOMException?: unknown }).DOMException)) ||
+        (typeof DOMException !== 'undefined' ? DOMException : undefined);
+      func = funcOrConstructor as () => void;
+      requested = requestedOrFunc;
+      quota = quotaOrRequested;
+      description = descriptionOrQuota as string | undefined;
+      assert.strictEqual(maybeDescription, undefined, 'Too many args passed to no-constructor version of assert_throws_quotaexceedederror');
+    }
+
+    try {
+      func();
+      assert.fail(`${description || ''}: Expected to throw QuotaExceededError`);
+    } catch (e: unknown) {
+      if (e instanceof assert.AssertionError) {
+        throw e;
+      }
+      assert.ok(typeof e === 'object' && e !== null, `${description || ''}: Thrown value is not an object`);
+      const errObj = e as Record<string, unknown>;
+
+      assert.ok(
+        requested === undefined || requested === null || typeof requested === 'number' || typeof requested === 'function',
+        `${description || ''}: ${requested} is not null, a number, or a function`
+      );
+      assert.ok(
+        quota === undefined || quota === null || typeof quota === 'number' || typeof quota === 'function',
+        `${description || ''}: ${quota} is not null or a number`
+      );
+
+      const requiredProps: Record<string, unknown> = {
+        code: 22,
+        name: 'QuotaExceededError'
+      };
+      if (requested !== undefined && typeof requested !== 'function') {
+        requiredProps.requested = requested;
+      }
+      if (quota !== undefined && typeof quota !== 'function') {
+        requiredProps.quota = quota;
+      }
+
+      for (const [prop, expectedVal] of Object.entries(requiredProps)) {
+        assert.ok(
+          prop in errObj && errObj[prop] == expectedVal,
+          `${description || ''}: property ${prop} is equal to ${errObj[prop]}, expected ${expectedVal}`
+        );
+      }
+
+      if (typeof requested === 'function') {
+        assert.ok(requested(errObj.requested), `${description || ''}: requested value did not pass requested predicate`);
+      }
+      if (typeof quota === 'function') {
+        assert.ok(quota(errObj.quota), `${description || ''}: quota value did not pass quota predicate`);
+      }
+
+      if (constructor) {
+        const ctorMatches =
+          errObj.constructor === constructor ||
+          ((errObj.constructor as Function | undefined)?.name === 'QuotaExceededError' ||
+            (errObj.constructor as Function | undefined)?.name === 'DOMException');
+        assert.ok(ctorMatches, `${description || ''}: threw an exception from the wrong global`);
+      }
     }
   }
 };
