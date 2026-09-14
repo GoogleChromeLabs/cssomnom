@@ -108,7 +108,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     super(declarations, readonlyFlag);
     this._parentStyle = parentStyle;
     this._element = element;
-    this.parentRule = null;
+    this._parentRule = null;
   }
 
   override get cssText(): string {

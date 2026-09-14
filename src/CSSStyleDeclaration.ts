@@ -24,6 +24,7 @@ import { resolveLogicalProperty } from './data/gen/LogicalMapping.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
+import { applyWebIDLInterface } from './webidl.ts';
 
 export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
   return new Proxy(target, {
@@ -114,8 +115,17 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   private _declMap: Map<string, Declaration>;
   /** @internal */
   _readonly: boolean;
-  public parentRule: CSSRule | null = null;
+  /** @internal */
+  _parentRule: CSSRule | null = null;
   public _onChange: ((force?: boolean) => void) | null = null;
+
+  // cssom-1 § 6.6 #dom-cssstyledeclaration-parentrule
+  get parentRule(): CSSRule | null {
+    if (!this || this === CSSStyleDeclaration.prototype || !(this instanceof CSSStyleDeclaration)) {
+      throw new TypeError("Failed to read the 'parentRule' property from 'CSSStyleDeclaration': The provided value is not of type 'CSSStyleDeclaration'.");
+    }
+    return this._parentRule;
+  }
 
   constructor(declarations: Declaration[] = [], readonlyFlag: boolean = false) {
     super();
@@ -729,3 +739,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     }
   }
 }
+
+// WebIDL § 3.6, § 3.7
+applyWebIDLInterface(CSSStyleDeclaration);

@@ -65,8 +65,10 @@ describe('Readonly properties', () => {
   it('should make CSSMarginRule properties readonly', () => {
     const rule = new CSSMarginRule('top-left', []);
     
-    // @ts-expect-error - name should be readonly
-    rule.name = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - name should be readonly
+      rule.name = 'foo';
+    }, TypeError);
     
     assert.ok(true);
   });
@@ -93,8 +95,10 @@ describe('Readonly properties', () => {
 
   it('should make CSSGroupingRule cssRules readonly', () => {
     const rule = new CSSGroupingRule([], () => ({} as unknown as Rule));
-    // @ts-expect-error - cssRules should be readonly
-    rule.cssRules = null as unknown as CSSRuleList;
+    assert.throws(() => {
+      // @ts-expect-error - cssRules should be readonly
+      rule.cssRules = null as unknown as CSSRuleList;
+    }, TypeError);
     assert.ok(true);
   });
 

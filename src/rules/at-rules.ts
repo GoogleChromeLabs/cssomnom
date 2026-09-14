@@ -346,7 +346,7 @@ export class CSSKeyframesRule extends CSSRule {
     const body = ruleText.slice(openBrace + 1, closeBrace);
     const styleDecl = ParseHooks.parseStyleAttribute(tokenize(body));
     const keyframe = new CSSKeyframeRule(keyText, styleDecl.declarations);
-    keyframe.parentRule = this;
+    keyframe._parentRule = this;
     this._rules.push(keyframe);
   }
 
@@ -374,7 +374,7 @@ export class CSSKeyframeRule extends CSSRule {
     super();
     this.keyText = keyText;
     this._style = new CSSStyleDeclaration(styleDeclarations);
-    this._style.parentRule = this;
+    this._style._parentRule = this;
   }
 
   get keyText(): string {
@@ -412,7 +412,7 @@ export class CSSNestedDeclarations extends CSSRule {
   constructor(styleDeclarations: Declaration[]) {
     super();
     this._style = new CSSStyleDeclaration(styleDeclarations);
-    this._style.parentRule = this;
+    this._style._parentRule = this;
   }
 
   get style(): CSSStyleDeclaration {
@@ -449,7 +449,7 @@ export class CSSFontFaceRule extends CSSRule {
   constructor(styleDeclarations: Declaration[]) {
     super();
     this._style = new CSSFontFaceDescriptors(styleDeclarations);
-    this._style.parentRule = this;
+    this._style._parentRule = this;
   }
 
   get style(): CSSFontFaceDescriptors {
@@ -472,7 +472,16 @@ export class CSSFontFaceRule extends CSSRule {
   }
 }
 
+const PAGE_DESCRIPTORS_INTERNAL = Symbol('CSSPageDescriptors.internal');
+
 export class CSSPageDescriptors extends CSSStyleDeclaration {
+  constructor(declarations?: Declaration[], internalToken?: symbol) {
+    if (internalToken !== PAGE_DESCRIPTORS_INTERNAL) {
+      throw new TypeError('Illegal constructor');
+    }
+    super(declarations);
+  }
+
   declare margin: string;
   declare marginTop: string;
   declare marginRight: string;
@@ -494,18 +503,62 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
   }
 }
 
+const PAGE_DESCRIPTOR_PROPERTIES = [
+  'margin',
+  'marginTop',
+  'marginRight',
+  'marginBottom',
+  'marginLeft',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'size',
+  'pageOrientation',
+  'page-orientation',
+  'marks',
+  'bleed',
+] as const;
+
+// WebIDL § 3.6 #es-attributes
+for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {
+  const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+  Object.defineProperty(CSSPageDescriptors.prototype, prop, {
+    // css-page-3 § 3.2 #the-csspagedescriptors-interface
+    get(this: unknown): string {
+      if (!this || this === CSSPageDescriptors.prototype || !(this instanceof CSSPageDescriptors)) {
+        throw new TypeError(`Failed to read the '${prop}' property from 'CSSPageDescriptors': The provided value is not of type 'CSSPageDescriptors'.`);
+      }
+      return (this as CSSPageDescriptors).getPropertyValue(cssProp);
+    },
+    set(this: unknown, val: unknown): void {
+      if (!this || this === CSSPageDescriptors.prototype || !(this instanceof CSSPageDescriptors)) {
+        throw new TypeError(`Failed to set the '${prop}' property on 'CSSPageDescriptors': The provided value is not of type 'CSSPageDescriptors'.`);
+      }
+      (this as CSSPageDescriptors).setProperty(cssProp, val === null || val === undefined ? '' : String(val));
+    },
+    enumerable: true,
+    configurable: true,
+  });
+}
+
 export class CSSMarginDescriptors extends CSSStyleDeclaration {
 }
 
 export class CSSMarginRule extends CSSRule {
-  readonly name: string;
+  private _name: string;
   private _style: CSSMarginDescriptors;
 
   constructor(name: string, declarations: Declaration[]) {
     super();
-    this.name = name;
+    this._name = name;
     this._style = new CSSMarginDescriptors(declarations);
-    this._style.parentRule = this;
+    this._style._parentRule = this;
+  }
+
+  // css-page-3 § 3.2.1 #the-cssmarginrule-interface
+  get name(): string {
+    return this._name;
   }
 
   get style(): CSSMarginDescriptors {
@@ -762,8 +815,8 @@ export class CSSPageRule extends CSSGroupingRule {
     super(rules, parseRuleInBlock);
     const parsed = parsePageSelectorList(selectorText);
     this._selectorText = parsed ? (parsed.length === 1 && parsed[0] === '' ? '' : parsed.join(', ')) : selectorText;
-    this._style = new CSSPageDescriptors(declarations);
-    this._style.parentRule = this;
+    this._style = new CSSPageDescriptors(declarations, PAGE_DESCRIPTORS_INTERNAL);
+    this._style._parentRule = this;
   }
 
   get selectorText(): string {

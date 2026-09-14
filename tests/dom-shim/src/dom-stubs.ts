@@ -6,6 +6,7 @@ import * as vm from 'node:vm';
 import { parseHTML } from 'linkedom';
 import { parseStyleSheet, parseRule } from '../../../src/parser.ts';
 import {
+  StyleSheet,
   CSSStyleSheet,
   MediaList,
   CSSRule,
@@ -26,8 +27,12 @@ import {
   CSSPropertyRule,
   CSSNamespaceRule,
   CSSMarginRule,
-  CSSStyleRule
+  CSSStyleRule,
+  StyleSheetList,
+  CSSRuleList,
+  CSSPageDescriptors
 } from '../../../src/CSSOM.ts';
+import { CSSStyleProperties } from '../../../src/data/gen/properties.ts';
 import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
 import { getCascadedStyle } from '../../../src/cascade.ts';
 import { PropertyRegistry } from '../../../src/PropertyRegistry.ts';
@@ -678,29 +683,50 @@ function getOrCreateAdoptedHolder(
 }
 
 function createAdoptedStyleSheetsAccessor(window: WindowType) {
+  const win = window as unknown as Record<string, unknown>;
+  const getFn = function (this: object & { ownerDocument?: Document }) {
+    const docCtor = win.Document as Function | undefined;
+    const shadowCtor = (win.ShadowRoot || win.DocumentFragment) as Function | undefined;
+    const isDoc = docCtor && this instanceof docCtor;
+    const isShadow = shadowCtor && this instanceof shadowCtor;
+    if (!this || (!isDoc && !isShadow)) {
+      throw new TypeError("Failed to read the 'adoptedStyleSheets' property: The provided value is not of type 'Document' or 'ShadowRoot'.");
+    }
+    return getOrCreateAdoptedHolder(this, window).proxy;
+  };
+  Object.defineProperty(getFn, 'name', { value: 'get adoptedStyleSheets', configurable: true });
+
+  const setFn = function (this: object & { ownerDocument?: Document }, sheets: CSSStyleSheet[]) {
+    const docCtor = win.Document as Function | undefined;
+    const shadowCtor = (win.ShadowRoot || win.DocumentFragment) as Function | undefined;
+    const isDoc = docCtor && this instanceof docCtor;
+    const isShadow = shadowCtor && this instanceof shadowCtor;
+    if (!this || (!isDoc && !isShadow)) {
+      throw new TypeError("Failed to set the 'adoptedStyleSheets' property: The provided value is not of type 'Document' or 'ShadowRoot'.");
+    }
+    if (!sheets || typeof (sheets as unknown as Iterable<unknown>)[Symbol.iterator] !== 'function') {
+      throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
+    }
+    const arr = Array.from(sheets);
+    const holder = getOrCreateAdoptedHolder(this, window);
+    for (const s of arr) {
+      holder.validateSheet(s);
+    }
+    holder.rawArray.length = 0;
+    for (let i = 0; i < arr.length; i++) {
+      Object.defineProperty(holder.rawArray, i, {
+        value: arr[i],
+        writable: true,
+        enumerable: true,
+        configurable: true
+      });
+    }
+  };
+  Object.defineProperty(setFn, 'name', { value: 'set adoptedStyleSheets', configurable: true });
+
   return {
-    get(this: object & { ownerDocument?: Document }) {
-      return getOrCreateAdoptedHolder(this, window).proxy;
-    },
-    set(this: object & { ownerDocument?: Document }, sheets: CSSStyleSheet[]) {
-      if (!sheets || typeof (sheets as unknown as Iterable<unknown>)[Symbol.iterator] !== 'function') {
-        throw new TypeError('Failed to set adoptedStyleSheets: member of list is not a CSSStyleSheet');
-      }
-      const arr = Array.from(sheets);
-      const holder = getOrCreateAdoptedHolder(this, window);
-      for (const s of arr) {
-        holder.validateSheet(s);
-      }
-      holder.rawArray.length = 0;
-      for (let i = 0; i < arr.length; i++) {
-        Object.defineProperty(holder.rawArray, i, {
-          value: arr[i],
-          writable: true,
-          enumerable: true,
-          configurable: true
-        });
-      }
-    },
+    get: getFn,
+    set: setFn,
     configurable: true,
     enumerable: true
   };
@@ -716,7 +742,7 @@ function isInsideTemplate(el: Element | null): boolean {
   return false;
 }
 
-function collectStyleSheets(root: Document | DocumentFragment): StyleSheetListImpl {
+function collectStyleSheets(root: Document | DocumentFragment): StyleSheetList {
   const isDoc = 'documentElement' in root;
   const styles = Array.from(root.querySelectorAll('style')).filter(s => {
     if (isDoc && isInsideTemplate(s)) return false;
@@ -729,7 +755,7 @@ function collectStyleSheets(root: Document | DocumentFragment): StyleSheetListIm
     return !l.hasAttribute('disabled');
   });
 
-  const list = new StyleSheetListImpl();
+  const list: CSSStyleSheet[] = [];
   for (const styleEl of styles) {
     if (styleEl && 'sheet' in styleEl && styleEl.sheet) {
       list.push(styleEl.sheet as unknown as CSSStyleSheet);
@@ -740,7 +766,7 @@ function collectStyleSheets(root: Document | DocumentFragment): StyleSheetListIm
       list.push(linkEl.sheet as unknown as CSSStyleSheet);
     }
   }
-  return list;
+  return new StyleSheetList(list);
 }
 
 // ---------------------------------------------------------------------------
@@ -872,16 +898,29 @@ function patchElementStyle(targetProto: Record<string, unknown>, window: WindowT
   if (targetProto.__isStylePatched) return;
   targetProto.__isStylePatched = true;
 
+  const styleGet = function (this: Element) {
+    if (!this || (this as unknown) === targetProto || (targetProto.constructor && !(this instanceof (targetProto.constructor as Function)))) {
+      throw new TypeError("Failed to read the 'style' property: The provided value is not of type 'Element'.");
+    }
+    return getOrCreateElementStyle(this);
+  };
+  Object.defineProperty(styleGet, 'name', { value: 'get style', configurable: true });
+
+  const styleSet = function (this: Element, value: string) {
+    if (!this || (this as unknown) === targetProto || (targetProto.constructor && !(this instanceof (targetProto.constructor as Function)))) {
+      throw new TypeError("Failed to set the 'style' property: The provided value is not of type 'Element'.");
+    }
+    if (typeof value === 'string') {
+      const style = getOrCreateElementStyle(this);
+      style.cssText = value;
+    }
+  };
+  Object.defineProperty(styleSet, 'name', { value: 'set style', configurable: true });
+
   Object.defineProperty(targetProto, 'style', {
-    get(this: Element) {
-      return getOrCreateElementStyle(this);
-    },
-    set(this: Element, value: string) {
-      if (typeof value === 'string') {
-        const style = getOrCreateElementStyle(this);
-        style.cssText = value;
-      }
-    },
+    get: styleGet,
+    set: styleSet,
+    enumerable: true,
     configurable: true
   });
 
@@ -1180,42 +1219,60 @@ function patchStyleElementPrototype(window: WindowType): void {
     });
   }
 
+  const disabledGet = function (this: Element) {
+    if (!this || (this as unknown) === htmlStyleEl.prototype || !(this instanceof (win.HTMLStyleElement as Function))) {
+      throw new TypeError("Failed to read the 'disabled' property from 'HTMLStyleElement': The provided value is not of type 'HTMLStyleElement'.");
+    }
+    const sheet = styleSheetMap.get(this);
+    return sheet ? sheet.disabled : false;
+  };
+  Object.defineProperty(disabledGet, 'name', { value: 'get disabled', configurable: true });
+
+  const disabledSet = function (this: Element, val: boolean) {
+    if (!this || (this as unknown) === htmlStyleEl.prototype || !(this instanceof (win.HTMLStyleElement as Function))) {
+      throw new TypeError("Failed to set the 'disabled' property on 'HTMLStyleElement': The provided value is not of type 'HTMLStyleElement'.");
+    }
+    const sheet = styleSheetMap.get(this);
+    if (sheet) {
+      sheet.disabled = Boolean(val);
+    }
+  };
+  Object.defineProperty(disabledSet, 'name', { value: 'set disabled', configurable: true });
+
   Object.defineProperty(htmlStyleEl.prototype, 'disabled', {
-    get(this: Element) {
-      const sheet = styleSheetMap.get(this);
-      return sheet ? sheet.disabled : false;
-    },
-    set(this: Element, val: boolean) {
-      const sheet = styleSheetMap.get(this);
-      if (sheet) {
-        sheet.disabled = Boolean(val);
-      }
-    },
+    get: disabledGet,
+    set: disabledSet,
     configurable: true,
     enumerable: true
   });
 
+  const sheetGet = function (this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
+    if (!this || (this as unknown) === htmlStyleEl.prototype || !(this instanceof (win.HTMLStyleElement as Function))) {
+      throw new TypeError("Failed to read the 'sheet' property from 'HTMLStyleElement': The provided value is not of type 'HTMLStyleElement'.");
+    }
+    const currentText = this.textContent || '';
+    let sheet = styleSheetMap.get(this);
+    const source = styleSheetSourceMap.get(this);
+    if (!sheet || source !== currentText) {
+      styleSheetSourceMap.set(this, currentText);
+      const rules = parseStyleSheet(currentText);
+      sheet = CSSStyleSheet.createInternal(rules, parseRule);
+      (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+      const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
+      if (mediaText) {
+        sheet.media.mediaText = mediaText;
+      }
+      resolveImportRules(sheet, this.ownerDocument);
+      styleSheetMap.set(this, sheet);
+    }
+    return sheet;
+  };
+  Object.defineProperty(sheetGet, 'name', { value: 'get sheet', configurable: true });
+
   Object.defineProperty(htmlStyleEl.prototype, 'sheet', {
     configurable: true,
     enumerable: true,
-    get(this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
-      const currentText = this.textContent || '';
-      let sheet = styleSheetMap.get(this);
-      const source = styleSheetSourceMap.get(this);
-      if (!sheet || source !== currentText) {
-        styleSheetSourceMap.set(this, currentText);
-        const rules = parseStyleSheet(currentText);
-        sheet = CSSStyleSheet.createInternal(rules, parseRule);
-        (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
-        const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
-        if (mediaText) {
-          sheet.media.mediaText = mediaText;
-        }
-        resolveImportRules(sheet, this.ownerDocument);
-        styleSheetMap.set(this, sheet);
-      }
-      return sheet;
-    }
+    get: sheetGet
   });
 }
 
@@ -1311,53 +1368,71 @@ function patchLinkElementPrototype(window: WindowType): void {
   const htmlLinkEl = win.HTMLLinkElement as { prototype: Record<string, unknown> } | undefined;
   if (!htmlLinkEl) return;
 
-  Object.defineProperty(htmlLinkEl.prototype, 'disabled', {
-    get(this: Element) {
-      return this.hasAttribute('disabled');
-    },
-    set(this: Element, val: boolean) {
-      if (val) {
-        this.setAttribute('disabled', '');
-        const sheet = styleSheetMap.get(this);
-        if (sheet) {
-          (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
-        }
-      } else {
-        this.removeAttribute('disabled');
-        const sheet = styleSheetMap.get(this);
-        if (sheet) {
-          (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
-        }
-        queueMicrotask(() => {
-          try {
-            if (this.dispatchEvent) {
-              const doc = (this as unknown as { ownerDocument?: Document }).ownerDocument;
-              const winContext = doc ? (doc as Document).defaultView || window : window;
-              const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
-              this.dispatchEvent(new eventConstructor.Event('load'));
-            }
-          } catch {}
-        });
+  const linkDisabledGet = function (this: Element) {
+    if (!this || (this as unknown) === htmlLinkEl.prototype || !(this instanceof (win.HTMLLinkElement as Function))) {
+      throw new TypeError("Failed to read the 'disabled' property from 'HTMLLinkElement': The provided value is not of type 'HTMLLinkElement'.");
+    }
+    return this.hasAttribute('disabled');
+  };
+  Object.defineProperty(linkDisabledGet, 'name', { value: 'get disabled', configurable: true });
+
+  const linkDisabledSet = function (this: Element, val: boolean) {
+    if (!this || (this as unknown) === htmlLinkEl.prototype || !(this instanceof (win.HTMLLinkElement as Function))) {
+      throw new TypeError("Failed to set the 'disabled' property on 'HTMLLinkElement': The provided value is not of type 'HTMLLinkElement'.");
+    }
+    if (val) {
+      this.setAttribute('disabled', '');
+      const sheet = styleSheetMap.get(this);
+      if (sheet) {
+        (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
       }
-    },
+    } else {
+      this.removeAttribute('disabled');
+      const sheet = styleSheetMap.get(this);
+      if (sheet) {
+        (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+      }
+      queueMicrotask(() => {
+        try {
+          if (this.dispatchEvent) {
+            const doc = (this as unknown as { ownerDocument?: Document }).ownerDocument;
+            const winContext = doc ? (doc as Document).defaultView || window : window;
+            const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };
+            this.dispatchEvent(new eventConstructor.Event('load'));
+          }
+        } catch {}
+      });
+    }
+  };
+  Object.defineProperty(linkDisabledSet, 'name', { value: 'set disabled', configurable: true });
+
+  Object.defineProperty(htmlLinkEl.prototype, 'disabled', {
+    get: linkDisabledGet,
+    set: linkDisabledSet,
     configurable: true,
     enumerable: true
   });
 
+  const linkSheetGet = function (this: object & { getAttribute?: (attr: string) => string | null; hasAttribute?: (attr: string) => boolean; ownerDocument?: Document }) {
+    if (!this || (this as unknown) === htmlLinkEl.prototype || !(this instanceof (win.HTMLLinkElement as Function))) {
+      throw new TypeError("Failed to read the 'sheet' property from 'HTMLLinkElement': The provided value is not of type 'HTMLLinkElement'.");
+    }
+    if (this.hasAttribute && this.hasAttribute('disabled')) {
+      return null;
+    }
+    let sheet = styleSheetMap.get(this);
+    if (!sheet) {
+      sheet = loadLinkStyleSheet(this, window);
+      styleSheetMap.set(this, sheet);
+    }
+    return sheet;
+  };
+  Object.defineProperty(linkSheetGet, 'name', { value: 'get sheet', configurable: true });
+
   Object.defineProperty(htmlLinkEl.prototype, 'sheet', {
     configurable: true,
     enumerable: true,
-    get(this: object & { getAttribute?: (attr: string) => string | null; hasAttribute?: (attr: string) => boolean; ownerDocument?: Document }) {
-      if (this.hasAttribute && this.hasAttribute('disabled')) {
-        return null;
-      }
-      let sheet = styleSheetMap.get(this);
-      if (!sheet) {
-        sheet = loadLinkStyleSheet(this, window);
-        styleSheetMap.set(this, sheet);
-      }
-      return sheet;
-    }
+    get: linkSheetGet
   });
 }
 
@@ -1370,10 +1445,17 @@ function patchDocumentPrototype(window: WindowType): void {
 
   Object.defineProperty(docProto, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor(window));
 
+  const docSheetsGet = function (this: Document) {
+    if (!this || (this as unknown) === docProto || !(this instanceof (documentConstructor as Function))) {
+      throw new TypeError("Failed to read the 'styleSheets' property from 'Document': The provided value is not of type 'Document'.");
+    }
+    return collectStyleSheets(this);
+  };
+  Object.defineProperty(docSheetsGet, 'name', { value: 'get styleSheets', configurable: true });
+
   Object.defineProperty(docProto, 'styleSheets', {
-    get(this: Document) {
-      return collectStyleSheets(this);
-    },
+    get: docSheetsGet,
+    enumerable: true,
     configurable: true
   });
 
@@ -1497,10 +1579,17 @@ function patchShadowRootPrototype(window: WindowType): void {
     | { prototype: Record<string, unknown> }
     | undefined;
   if (shadowRootConstructor) {
+    const shadowSheetsGet = function (this: DocumentFragment) {
+      if (!this || (this as unknown) === shadowRootConstructor.prototype || !(this instanceof (shadowRootConstructor as Function))) {
+        throw new TypeError("Failed to read the 'styleSheets' property from 'ShadowRoot': The provided value is not of type 'ShadowRoot'.");
+      }
+      return collectStyleSheets(this);
+    };
+    Object.defineProperty(shadowSheetsGet, 'name', { value: 'get styleSheets', configurable: true });
+
     Object.defineProperty(shadowRootConstructor.prototype, 'styleSheets', {
-      get(this: DocumentFragment) {
-        return collectStyleSheets(this);
-      },
+      get: shadowSheetsGet,
+      enumerable: true,
       configurable: true
     });
   }
@@ -1857,7 +1946,12 @@ function patchWindowGlobals(window: WindowType): void {
     CSSPropertyRule,
     CSSNamespaceRule,
     CSSMarginRule,
-    CSSStyleRule
+    CSSStyleRule,
+    StyleSheet,
+    StyleSheetList,
+    CSSRuleList,
+    CSSStyleProperties,
+    CSSPageDescriptors
   });
 
   if (!('FocusEvent' in win)) {
@@ -2066,12 +2160,10 @@ function createEmptyComputedStyle() {
     get(_target, prop, _receiver) {
       if (prop === 'length') return 0;
       if (prop === 'cssText') return '';
-      if (prop === 'getPropertyValue') return () => '';
-      if (prop === 'getPropertyPriority') return () => '';
-      if (prop === 'item') return () => '';
+      if (prop === 'parentRule') return null;
+      if (prop in _target) return Reflect.get(_target, prop, _receiver);
       if (typeof prop === 'string') {
         if (!isNaN(Number(prop))) return undefined;
-        if (prop === 'constructor' || prop === 'toString' || prop === 'valueOf') return Reflect.get(_target, prop, _receiver);
         return '';
       }
       return Reflect.get(_target, prop, _receiver);
@@ -2086,6 +2178,10 @@ function patchWindowStyles(window: WindowType): void {
   const win = window as unknown as Record<string, unknown>;
 
   win.getComputedStyle = function (element: Element, pseudoElt?: string | null) {
+    // WebIDL § 3.7 #es-operations
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'getComputedStyle' on 'Window': 1 argument required, but only 0 present.");
+    }
     if (!element || typeof element !== 'object' || element.isConnected === false) {
       return createEmptyComputedStyle();
     }
@@ -2270,6 +2366,23 @@ function patchWindowStyles(window: WindowType): void {
       }
     });
   };
+
+  // WebIDL § 3.7 #es-operations
+  Object.defineProperty(win, 'getComputedStyle', {
+    value: win.getComputedStyle,
+    writable: true,
+    enumerable: true,
+    configurable: true
+  });
+
+  if (win.Window && (win.Window as Function).prototype) {
+    Object.defineProperty((win.Window as Function).prototype, 'getComputedStyle', {
+      value: win.getComputedStyle,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------

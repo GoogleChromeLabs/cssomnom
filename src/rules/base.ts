@@ -23,10 +23,28 @@ import { CSSRuleList } from './collections.ts';
 import { isImportRule, isNamespaceRule } from './utils.ts';
 import type { CSSStyleSheet } from '../CSSOM.ts';
 import type { CSSNestedDeclarations } from './at-rules.ts';
+import { applyWebIDLConstants } from '../webidl.ts';
 export type { InternalRuleMetadata } from '../types.ts';
 
+const RULE_CONSTANTS = {
+  STYLE_RULE: 1,
+  CHARSET_RULE: 2,
+  IMPORT_RULE: 3,
+  MEDIA_RULE: 4,
+  FONT_FACE_RULE: 5,
+  PAGE_RULE: 6,
+  KEYFRAMES_RULE: 7,
+  KEYFRAME_RULE: 8,
+  MARGIN_RULE: 9,
+  NAMESPACE_RULE: 10,
+  COUNTER_STYLE_RULE: 11,
+  SUPPORTS_RULE: 12,
+  FONT_FEATURE_VALUES_RULE: 14,
+} as const;
+
 export class CSSRule {
-  private _parentRule: CSSRule | null = null;
+  /** @internal */
+  _parentRule: CSSRule | null = null;
   /** @internal */
   _parentStyleSheet: CSSStyleSheet | null = null;
   /** @internal */
@@ -42,10 +60,6 @@ export class CSSRule {
     return this._parentRule;
   }
 
-  set parentRule(rule: CSSRule | null) {
-    this._parentRule = rule;
-  }
-
   // cssom-1 § 6.4 #dom-cssrule-parentstylesheet
   get parentStyleSheet(): CSSStyleSheet | null {
     if (this._parentStyleSheet) return this._parentStyleSheet;
@@ -53,37 +67,34 @@ export class CSSRule {
     return null;
   }
 
-  set parentStyleSheet(sheet: CSSStyleSheet | null) {
-    this._parentStyleSheet = sheet;
-  }
+  // WebIDL § 3.6.4 #es-constants & WebIDL § 3.6.5 #constants-on-interface-prototype-object
+  declare static readonly STYLE_RULE: 1;
+  declare static readonly CHARSET_RULE: 2;
+  declare static readonly IMPORT_RULE: 3;
+  declare static readonly MEDIA_RULE: 4;
+  declare static readonly FONT_FACE_RULE: 5;
+  declare static readonly PAGE_RULE: 6;
+  declare static readonly KEYFRAMES_RULE: 7;
+  declare static readonly KEYFRAME_RULE: 8;
+  declare static readonly MARGIN_RULE: 9;
+  declare static readonly NAMESPACE_RULE: 10;
+  declare static readonly COUNTER_STYLE_RULE: 11;
+  declare static readonly SUPPORTS_RULE: 12;
+  declare static readonly FONT_FEATURE_VALUES_RULE: 14;
 
-  static readonly STYLE_RULE = 1;
-  static readonly CHARSET_RULE = 2;
-  static readonly IMPORT_RULE = 3;
-  static readonly MEDIA_RULE = 4;
-  static readonly FONT_FACE_RULE = 5;
-  static readonly PAGE_RULE = 6;
-  static readonly KEYFRAMES_RULE = 7;
-  static readonly KEYFRAME_RULE = 8;
-  static readonly MARGIN_RULE = 9;
-  static readonly NAMESPACE_RULE = 10;
-  static readonly COUNTER_STYLE_RULE = 11;
-  static readonly SUPPORTS_RULE = 12;
-  static readonly FONT_FEATURE_VALUES_RULE = 14;
-
-  get STYLE_RULE() { return CSSRule.STYLE_RULE; }
-  get CHARSET_RULE() { return CSSRule.CHARSET_RULE; }
-  get IMPORT_RULE() { return CSSRule.IMPORT_RULE; }
-  get MEDIA_RULE() { return CSSRule.MEDIA_RULE; }
-  get FONT_FACE_RULE() { return CSSRule.FONT_FACE_RULE; }
-  get PAGE_RULE() { return CSSRule.PAGE_RULE; }
-  get KEYFRAMES_RULE() { return CSSRule.KEYFRAMES_RULE; }
-  get KEYFRAME_RULE() { return CSSRule.KEYFRAME_RULE; }
-  get MARGIN_RULE() { return CSSRule.MARGIN_RULE; }
-  get NAMESPACE_RULE() { return CSSRule.NAMESPACE_RULE; }
-  get COUNTER_STYLE_RULE() { return CSSRule.COUNTER_STYLE_RULE; }
-  get SUPPORTS_RULE() { return CSSRule.SUPPORTS_RULE; }
-  get FONT_FEATURE_VALUES_RULE() { return CSSRule.FONT_FEATURE_VALUES_RULE; }
+  declare readonly STYLE_RULE: 1;
+  declare readonly CHARSET_RULE: 2;
+  declare readonly IMPORT_RULE: 3;
+  declare readonly MEDIA_RULE: 4;
+  declare readonly FONT_FACE_RULE: 5;
+  declare readonly PAGE_RULE: 6;
+  declare readonly KEYFRAMES_RULE: 7;
+  declare readonly KEYFRAME_RULE: 8;
+  declare readonly MARGIN_RULE: 9;
+  declare readonly NAMESPACE_RULE: 10;
+  declare readonly COUNTER_STYLE_RULE: 11;
+  declare readonly SUPPORTS_RULE: 12;
+  declare readonly FONT_FEATURE_VALUES_RULE: 14;
 
   // cssom-1 § 6.4 #dom-cssrule-type: returns 0 if no legacy constant matches
   get type(): number {
@@ -100,19 +111,30 @@ export class CSSRule {
   }
 }
 
+// WebIDL § 3.6.4, § 3.6.5: constants on CSSRule interface and prototype
+applyWebIDLConstants(CSSRule, RULE_CONSTANTS);
+
 export class CSSGroupingRule extends CSSRule {
-  readonly cssRules: CSSRuleList;
+  private _cssRules!: CSSRuleList;
   protected _rules: (Rule | CSSRule)[];
   private _parseRuleInBlock: (text: string, nested?: boolean) => Rule;
+
+  // cssom-1 § 6.4.3 #dom-cssgroupingrule-cssrules
+  get cssRules(): CSSRuleList {
+    if (!this._cssRules) {
+      this._cssRules = new CSSRuleList(() => this._rules);
+    }
+    return this._cssRules;
+  }
 
   constructor(rules: (Rule | CSSRule)[], parseRuleInBlock: (text: string, nested?: boolean) => Rule) {
     super();
     this._rules = rules;
-    this.cssRules = new CSSRuleList(() => this._rules);
+    this._cssRules = new CSSRuleList(() => this._rules);
     this._parseRuleInBlock = parseRuleInBlock;
     for (const rule of rules) {
       if (rule instanceof CSSRule) {
-        rule.parentRule = this;
+        rule._parentRule = this;
       }
     }
   }
@@ -120,6 +142,10 @@ export class CSSGroupingRule extends CSSRule {
   // cssom-1 § 6.4.3 #the-cssgroupingrule-interface
   // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
   insertRule(rule: string, index: number = 0): number {
+    // WebIDL § 3.7 #es-operations
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'insertRule' on 'CSSGroupingRule': 1 argument required, but only 0 present.");
+    }
     // 1. Set length to the number of items in list.
     // 2. If index is greater than length (or index < 0), throw IndexSizeError.
     // NOTE: This boundary check MUST precede parsing per CSSOM 1 § 6.5.3 step 2!
@@ -176,8 +202,8 @@ export class CSSGroupingRule extends CSSRule {
     // 8. Insert new rule into list at zero-indexed position index.
     // cssom-1 § 6.4 #the-cssrule-interface: establish parentRule reference
     if (parsedRule instanceof CSSRule) {
-      parsedRule.parentRule = this;
-      parsedRule.parentStyleSheet = null;
+      parsedRule._parentRule = this;
+      parsedRule._parentStyleSheet = null;
     }
     this._rules.splice(index, 0, parsedRule);
     return index;
@@ -186,6 +212,10 @@ export class CSSGroupingRule extends CSSRule {
   // cssom-1 § 6.16 #the-cssgroupingrule-interface
   // cssom-1 § 6.5.4 #remove-a-css-rule
   deleteRule(index: number): void {
+    // WebIDL § 3.7 #es-operations
+    if (arguments.length < 1) {
+      throw new TypeError("Failed to execute 'deleteRule' on 'CSSGroupingRule': 1 argument required, but only 0 present.");
+    }
     deleteRuleFromArray(this._rules, index);
   }
 }

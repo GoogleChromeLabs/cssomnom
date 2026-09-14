@@ -39,7 +39,10 @@ import { StyleSheetList, type LinkStyle, MediaList, CSSRuleList } from './rules/
 import { isImportRule, isNamespaceRule, isRegularRule, findParentStyleSheet } from './rules/utils.ts';
 import { CSSRule, CSSGroupingRule } from './rules/base.ts';
 import { CSSPropertyRule, type CSSNamespaceRule } from './rules/at-rules.ts';
-export { StyleSheetList, type LinkStyle, MediaList, CSSRuleList, CSSRule, CSSGroupingRule };
+import * as AtRules from './rules/at-rules.ts';
+import { CSSStyleProperties } from './data/gen/properties.ts';
+import { applyWebIDLInterface } from './webidl.ts';
+export { StyleSheetList, type LinkStyle, MediaList, CSSRuleList, CSSRule, CSSGroupingRule, CSSStyleProperties };
 
 export class StyleSheet {
   protected _type: string = 'text/css';
@@ -225,7 +228,7 @@ export class CSSStyleSheet extends StyleSheet {
     sheet._originCleanFlag = originClean;
     for (const rule of rules) {
       if (rule instanceof CSSRule) {
-        rule.parentStyleSheet = sheet;
+        rule._parentStyleSheet = sheet;
       }
       sheet._registerRuleProperties(rule);
     }
@@ -246,8 +249,8 @@ export class CSSStyleSheet extends StyleSheet {
 
     for (const rule of this._rules) {
       if (rule instanceof CSSRule) {
-        rule.parentRule = null;
-        rule.parentStyleSheet = null;
+        rule._parentRule = null;
+        rule._parentStyleSheet = null;
       }
     }
 
@@ -255,8 +258,8 @@ export class CSSStyleSheet extends StyleSheet {
     this._rules = filteredRules;
     for (const rule of this._rules) {
       if (rule instanceof CSSRule) {
-        rule.parentStyleSheet = this;
-        rule.parentRule = null;
+        rule._parentStyleSheet = this;
+        rule._parentRule = null;
       }
       this._registerRuleProperties(rule);
     }
@@ -264,6 +267,10 @@ export class CSSStyleSheet extends StyleSheet {
 
   // cssom-1 § 6.5.1 #dom-cssstylesheet-replace
   replace(text: string): Promise<CSSStyleSheet> {
+    // WebIDL § 3.7 #es-operations
+    if (arguments.length === 0) {
+      return Promise.reject(new TypeError("Failed to execute 'replace' on 'CSSStyleSheet': 1 argument required, but only 0 present."));
+    }
     if (!this._constructedFlag || this._disallowModificationFlag) {
       return Promise.reject(new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError"));
     }
@@ -286,6 +293,10 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 § 6.5.1 #dom-cssstylesheet-replacesync
   // cssom-1 § 6.5.1 #synchronously-replace-the-rules-of-a-cssstylesheet
   replaceSync(text: string): void {
+    // WebIDL § 3.7 #es-operations
+    if (arguments.length === 0) {
+      throw new TypeError("Failed to execute 'replaceSync' on 'CSSStyleSheet': 1 argument required, but only 0 present.");
+    }
     if (!this._constructedFlag) {
       throw new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError");
     }
@@ -298,6 +309,10 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 § 6.3 #dom-cssstylesheet-insertrule
   // cssom-1 § 6.5.3 #insert-a-css-rule
   insertRule(rule: string, index: number = 0): number {
+    // WebIDL § 3.7 #es-operations
+    if (arguments.length === 0) {
+      throw new TypeError("Failed to execute 'insertRule' on 'CSSStyleSheet': 1 argument required, but only 0 present.");
+    }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
     }
@@ -361,8 +376,8 @@ export class CSSStyleSheet extends StyleSheet {
     // 8. Insert new rule into list at zero-indexed position index.
     // cssom-1 § 6.4 #the-cssrule-interface: establish parentStyleSheet reference
     if (parsedRule instanceof CSSRule) {
-      parsedRule.parentStyleSheet = this;
-      parsedRule.parentRule = null;
+      parsedRule._parentStyleSheet = this;
+      parsedRule._parentRule = null;
     }
     this._rules.splice(index, 0, parsedRule);
     this._registerRuleProperties(parsedRule);
@@ -372,6 +387,10 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 § 6.3 #dom-cssstylesheet-deleterule
   // cssom-1 § 6.5.4 #remove-a-css-rule
   deleteRule(index: number): void {
+    // WebIDL § 3.7 #es-operations
+    if (arguments.length === 0) {
+      throw new TypeError("Failed to execute 'deleteRule' on 'CSSStyleSheet': 1 argument required, but only 0 present.");
+    }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
     }
@@ -444,7 +463,7 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._selectorText = selectorText;
     this._selectorAST = selectorAST;
     this._style = new CSSStyleDeclaration(styleDeclarations);
-    this._style.parentRule = this;
+    this._style._parentRule = this;
   }
 
   // css-typed-om § 2.3 #declared-stylepropertymap-objects
@@ -610,5 +629,22 @@ export class CSSStyleRule extends CSSGroupingRule {
 Object.defineProperty(CSSStyleRule.prototype, 'styleMap', {
   enumerable: true
 });
+
+const cssomClasses = [
+  StyleSheet,
+  CSSStyleSheet,
+  CSSRule,
+  CSSGroupingRule,
+  MediaList,
+  StyleSheetList,
+  CSSRuleList,
+  CSSStyleRule,
+  CSSStyleProperties,
+  ...Object.values(AtRules).filter(v => typeof v === 'function' && (v as Function).prototype && typeof (v as Function).prototype === 'object')
+];
+
+for (const ctor of cssomClasses) {
+  applyWebIDLInterface(ctor as Function);
+}
 
 export * from './rules/at-rules.ts';

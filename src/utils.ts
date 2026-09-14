@@ -51,11 +51,11 @@ export function deleteRuleFromArray(rules: Rule[], index: number): Rule {
   rules.splice(index, 1);
   // 6. Set old rule's parent CSS rule and parent CSS style sheet to null.
   if (oldRule && typeof oldRule === 'object') {
-    if ('parentRule' in oldRule) {
-      (oldRule as { parentRule: unknown }).parentRule = null;
+    if ('_parentRule' in oldRule) {
+      (oldRule as { _parentRule: unknown })._parentRule = null;
     }
-    if ('parentStyleSheet' in oldRule) {
-      (oldRule as { parentStyleSheet: unknown }).parentStyleSheet = null;
+    if ('_parentStyleSheet' in oldRule) {
+      (oldRule as { _parentStyleSheet: unknown })._parentStyleSheet = null;
     }
   }
   return oldRule;
