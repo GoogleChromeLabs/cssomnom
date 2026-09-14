@@ -3246,7 +3246,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 134: Typed OM Color Reification Spec Compliance & Cross-Realm Assertion Documentation [ ]
+## Phase 134: Typed OM Color Reification Spec Compliance & Cross-Realm Assertion Documentation [x]
 **Goal**: Realign Typed OM color property reification with the normative per-property rules in CSS Typed OM Level 1 § 7.2 (#reify-property) and § 7.1 (#reify-failure) by returning generic base `CSSStyleValue` instead of `CSSColorValue` or `CSSKeywordValue` (except for `currentcolor` and property-specific non-color keywords), and document the cross-realm DOMException escape hatch in the WPT test harness.
 
 **Spec References**:
@@ -3268,7 +3268,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Permitted direct associated `CSSStyleValue`s in `validateValuesForProperty` without re-parsing per § 3.2.
   - Cleaned up redundant `CSSColorValue` unwrapping helper in `tests/polyfill-compat/parser-compat.ts`.
   - Added pure unit tests in `tests/typed-om-color-reification.test.ts` and updated assertions in `tests/typed-om-colors.test.ts` and `tests/typed-om-syntax.test.ts`.
-- [ ] **Cross-Realm DOMException Assertion Documentation (`tests/dom-shim/src/wpt-assertions.ts`)**:
-  - Document cross-realm `assert_throws_dom` leniency fallback in `tests/dom-shim/src/wpt-assertions.ts:611-616` against upstream `submodules/web-platform-tests/resources/testharness.js:2441`.
-  - Explicitly record why host-vs-VM realm divergence necessitates constructor name matching, and transparently note that wrong-global throw detection cannot fail under this harness.
+- [x] **Cross-Realm DOMException Assertion Documentation (`tests/dom-shim/src/wpt-assertions.ts`)**:
+  - Documented cross-realm `assert_throws_dom` leniency fallback in `tests/dom-shim/src/wpt-assertions.ts:611-616` against upstream `submodules/web-platform-tests/resources/testharness.js:2441`.
+  - Explicitly recorded why host-vs-VM realm divergence necessitates constructor name matching, and transparently noted that wrong-global throw detection cannot fail under this harness.
 

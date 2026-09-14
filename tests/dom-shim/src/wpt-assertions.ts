@@ -609,6 +609,17 @@ export const WPT_ASSERTIONS = {
       }
 
       if (constructor) {
+        // Upstream testharness.js (submodules/web-platform-tests/resources/testharness.js:2441 in assert_throws_dom_impl)
+        // performs a strict identity check: assert(e.constructor === constructor, ...).
+        //
+        // Deviation: This is a deliberate, more-lenient-than-upstream cross-realm escape hatch.
+        // Our CSSOM and DOM implementation objects live in the host Node.js realm while tests execute in a VM context
+        // sandbox with a distinct DOMException constructor, so strict identity fails universally across realm boundaries.
+        //
+        // Cost / Trade-off: The upstream assertion's sole purpose is detecting wrong-global throws ("threw an exception
+        // from the wrong global"). By falling back to matching constructor name (errObj.constructor.name === 'DOMException'),
+        // our test harness accepts a DOMException originating from any global/realm, which means that specific check can
+        // never fail in this harness.
         const ctorMatches =
           errObj.constructor === constructor ||
           ((errObj.constructor as Function | undefined)?.name === 'DOMException' &&
