@@ -348,7 +348,7 @@ export function validateValuesForProperty(property: string, values: (CSSStyleVal
   // "A direct CSSStyleValue object (not a subclass) with a non-null [[associatedProperty]] slot
   //  matches the grammar of the property specified in its [[associatedProperty]] slot, regardless of what it is."
   const allAssociatedDirectStyleValues = values.every(
-    val => typeof val !== 'string' && val.constructor === CSSStyleValue && (val._associatedProperty === null || val._associatedProperty === propKey)
+    val => typeof val !== 'string' && val.constructor === CSSStyleValue && val._associatedProperty === propKey
   );
 
   if (!propKey.startsWith('--') && !allAssociatedDirectStyleValues) {

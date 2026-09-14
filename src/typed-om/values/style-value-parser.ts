@@ -311,12 +311,20 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
   //    or generic CSSStyleValues (otherwise)."
   // That prose is unreferenced and has no algorithmic caller — "reify a color value" (line 5548)
   // is ONLY invoked by CSSColorValue.parse() (§ 6.1 lines 3085-3098, line 3096).
-  // The normative per-property table at #reify-property defines reification for properties
-  // (e.g. 'color' line 4105, 'caret-color' line 4078, 'border-top-color' line 4013,
-  // 'outline-color' line 4745, 'background-color' line 3752):
-  // 1. If value is 'currentcolor' (or property-specific non-color keywords), reify an identifier;
+  //
+  // Claim (a) — What the normative per-property table literally says:
+  // The table at #reify-property defines reification for color properties (e.g. 'color' line 4105,
+  // 'caret-color' line 4078, 'border-top-color' line 4013, 'outline-color' line 4745, 'background-color' line 3752):
+  // 1. If value is 'currentcolor', reify an identifier;
   // 2. Otherwise, reify as a CSSStyleValue (css-typed-om-1 § 7.1 #reify-failure line 5307).
   // The per-property table is followed by Chromium and the WPT test suite (testUnsupportedValue).
+  //
+  // Claim (b) — Deliberate alignment on property-specific grammar keywords:
+  // By the literal letter of the table, non-color grammar keywords (such as 'auto' for 'caret-color'
+  // or 'none' for 'fill'/'stroke') would hit step 2 and reify as a base CSSStyleValue.
+  // However, returning CSSKeywordValue for property-specific grammar keywords is a deliberate alignment
+  // with Chromium and WPT where the specification table is stale, pinned by:
+  // submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/caret-color.html
   if (COLOR_PROPERTIES.has(propLower)) {
     if (trimmed.length === 1 && trimmed[0].type === 'ident') {
       const kw = (trimmed[0] as IdentToken).value.toLowerCase();

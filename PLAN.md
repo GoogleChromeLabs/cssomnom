@@ -3268,6 +3268,8 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Permitted direct associated `CSSStyleValue`s in `validateValuesForProperty` without re-parsing per § 3.2.
   - Cleaned up redundant `CSSColorValue` unwrapping helper in `tests/polyfill-compat/parser-compat.ts`.
   - Added pure unit tests in `tests/typed-om-color-reification.test.ts` and updated assertions in `tests/typed-om-colors.test.ts` and `tests/typed-om-syntax.test.ts`.
+  - Closed leniency hole in `validateValuesForProperty` (`src/typed-om/style-map/style-validation.ts`) by requiring a non-null `_associatedProperty` matching `propKey` per CSS Typed OM Level 1 § 3.2, ensuring direct `CSSStyleValue`s with null slots and invalid grammar throw `TypeError`.
+  - Separated citation comment in `src/typed-om/values/style-value-parser.ts` into distinct claims: literal table behavior (only `currentcolor` reifies as identifier) vs deliberate alignment with Chromium and WPT (`caret-color.html`) for property-specific grammar keywords.
 - [x] **Cross-Realm DOMException Assertion Documentation (`tests/dom-shim/src/wpt-assertions.ts`)**:
   - Documented cross-realm `assert_throws_dom` leniency fallback in `tests/dom-shim/src/wpt-assertions.ts:611-616` against upstream `submodules/web-platform-tests/resources/testharness.js:2441`.
   - Explicitly recorded why host-vs-VM realm divergence necessitates constructor name matching, and transparently noted that wrong-global throw detection cannot fail under this harness.

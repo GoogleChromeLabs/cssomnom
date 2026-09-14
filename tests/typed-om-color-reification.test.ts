@@ -74,4 +74,41 @@ describe('Typed OM color property reification', () => {
     const parsedColor = CSSColorValue.parse('rgb(1 2 3)');
     assert.ok(parsedColor instanceof CSSRGB, 'CSSColorValue.parse must still return CSSRGB');
   });
+
+  // css-typed-om-1 § 3.2 #dom-stylepropertymap-set
+  test("attributeStyleMap.set rejects direct CSSStyleValue with null _associatedProperty and invalid syntax", () => {
+    const { window, document } = parseHTML('<html><body><div id="test"></div></body></html>');
+    patchWindowForTypedOM(window);
+    const div = document.getElementById('test') as unknown as HTMLElement & {
+      style: { color: string };
+      attributeStyleMap: StylePropertyMap;
+    };
+
+    // Legitimate companion round-trip: get then set of reified color succeeds
+    div.style.color = 'rgb(1, 2, 3)';
+    const reifiedColor = div.attributeStyleMap.get('color');
+    assert.ok(reifiedColor !== null && reifiedColor !== undefined);
+    assert.strictEqual(reifiedColor.constructor, CSSStyleValue);
+    assert.strictEqual((reifiedColor as CSSStyleValue)._associatedProperty, 'color');
+    div.attributeStyleMap.set('color', reifiedColor);
+    assert.strictEqual(div.style.color, 'rgb(1, 2, 3)');
+
+    // Direct CSSStyleValue with null _associatedProperty and invalid color grammar must throw TypeError
+    const invalidVal = Object.assign(Object.create(CSSStyleValue.prototype), {
+      _associatedProperty: null,
+      _cssText: 'notacolor!!!',
+    }) as CSSStyleValue;
+    assert.strictEqual(invalidVal.constructor, CSSStyleValue);
+    assert.strictEqual(invalidVal.toString(), 'notacolor!!!');
+
+    assert.throws(
+      () => {
+        div.attributeStyleMap.set('color', invalidVal);
+      },
+      {
+        name: 'TypeError',
+      }
+    );
+  });
 });
+
