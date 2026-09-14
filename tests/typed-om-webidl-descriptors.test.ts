@@ -166,4 +166,37 @@ describe('WebIDL Interface Prototype Member Descriptors in Typed OM', () => {
     const rgb = new TypedOM.CSSRGB(1, 0.5, 0.25);
     assert.strictEqual(rgb.toString(), 'rgb(100%, 50%, 25%)');
   });
+
+  // Drift guard. The tests above enumerate an explicit class list, which is the same list the
+  // registry in src/typed-om/index.ts maintains -- so on their own they can only ever confirm that
+  // the classes we already fixed are still fixed. This test instead derives its subjects from the
+  // module's public exports, so a newly-added interface that never got registered fails here
+  // rather than silently shipping non-conformant descriptors.
+  test('every exported interface satisfies WebIDL prototype descriptors (drift guard)', () => {
+    const offenders: string[] = [];
+
+    for (const [exportName, value] of Object.entries(TypedOM)) {
+      if (typeof value !== 'function' || !value.prototype) continue;
+
+      const proto = value.prototype;
+      for (const member of Object.getOwnPropertyNames(proto)) {
+        // `constructor` is required to be non-enumerable; `_`-prefixed members are internal
+        // implementation details rather than WebIDL members, so they stay non-enumerable.
+        if (member === 'constructor' || member.startsWith('_')) continue;
+
+        const desc = Object.getOwnPropertyDescriptor(proto, member);
+        if (desc && !desc.enumerable) {
+          offenders.push(`${exportName}.prototype.${member}`);
+        }
+      }
+    }
+
+    assert.deepStrictEqual(
+      offenders,
+      [],
+      'Exported interfaces have non-enumerable prototype members, which violates WebIDL. ' +
+        'Register them in WEBIDL_INTERFACES in src/typed-om/index.ts:\n  ' +
+        offenders.join('\n  ')
+    );
+  });
 });

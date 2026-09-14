@@ -88,7 +88,7 @@ import './values/style-value-parser.ts';
 import './numeric/numeric-methods.ts';
 import './color/color-reify.ts';
 import { CSSTransformValue } from './transform/CSSTransformValue.ts';
-import { setParseTransformListHook } from '../DOMMatrix.ts';
+import { setParseTransformListHook, DOMMatrix, DOMMatrixReadOnly } from '../DOMMatrix.ts';
 import { applyWebIDLPrototypeDescriptors } from './utils/webidl.ts';
 
 import { CSSStyleValue } from './values/CSSStyleValue.ts';
@@ -139,8 +139,11 @@ import { StylePropertyMap } from './style-map/StylePropertyMap.ts';
 
 // WebIDL § 3.6 #es-attributes
 // WebIDL § 3.7 #es-operations
-// Ensure all regular prototype members match WebIDL enumerable descriptor requirements
-const TYPED_OM_CLASSES: Function[] = [
+// Ensure all regular prototype members match WebIDL enumerable descriptor requirements.
+// Covers Typed OM interfaces plus the Geometry interfaces we expose alongside them.
+// Membership is enforced by the drift guard in tests/typed-om-webidl-descriptors.test.ts,
+// which derives its subjects from this module's exports rather than from this list.
+const WEBIDL_INTERFACES: Function[] = [
   CSSStyleValue,
   CSSNumericValue,
   CSSUnitValue,
@@ -182,10 +185,15 @@ const TYPED_OM_CLASSES: Function[] = [
   CSSTransformValue,
   CSSPositionValue,
   StylePropertyMapReadOnly,
-  StylePropertyMap
+  StylePropertyMap,
+
+  // Geometry interfaces (re-exported from this module, so they are subject to the same
+  // WebIDL descriptor rules as the Typed OM interfaces above).
+  DOMMatrixReadOnly,
+  DOMMatrix
 ];
 
-for (const cls of TYPED_OM_CLASSES) {
+for (const cls of WEBIDL_INTERFACES) {
   applyWebIDLPrototypeDescriptors(cls);
 }
 
