@@ -385,6 +385,32 @@ export function parseStyleValue(property: string, css: string): CSSStyleValue {
 CSSStyleValue.parseAll = parseAllStyleValues;
 CSSStyleValue.parse = parseStyleValue;
 
+// css-sizing-3 § 5.1 #propdef-width
+// css-box-3 § 4 #padding-physical
+// css-backgrounds-3 § 4.3 #border-width
+export function isNonNegativeProperty(prop: string): boolean {
+  if (
+    prop === 'width' || prop.endsWith('-width') ||
+    prop === 'height' || prop.endsWith('-height') ||
+    prop === 'size' || prop.endsWith('-size') ||
+    prop === 'padding' || prop.startsWith('padding-') ||
+    prop === 'scroll-padding' || prop.startsWith('scroll-padding-') ||
+    prop === 'border-radius' || prop.endsWith('-radius') ||
+    prop === 'gap' || prop.endsWith('-gap') ||
+    prop === 'r' || prop === 'rx' || prop === 'ry' ||
+    prop === 'flex-basis' || prop === 'perspective' ||
+    prop === 'border' || prop === 'border-top' || prop === 'border-right' ||
+    prop === 'border-bottom' || prop === 'border-left' ||
+    prop === 'border-inline' || prop === 'border-inline-start' || prop === 'border-inline-end' ||
+    prop === 'border-block' || prop === 'border-block-start' || prop === 'border-block-end' ||
+    prop === 'outline' || prop === 'column-rule'
+  ) {
+    return true;
+  }
+  const syntax = STANDARD_PROPERTIES_SYNTAX[prop] || '';
+  return syntax.includes('[0,∞]') || syntax.includes('[0,') || syntax.includes('[0.0,');
+}
+
 ParseHooks.validatePropertyValue = (property: string, value: string): boolean => {
   if (property.startsWith('--')) return true;
   const lowerProp = property.toLowerCase();
@@ -404,11 +430,17 @@ ParseHooks.validatePropertyValue = (property: string, value: string): boolean =>
     }
   }
 
-  // Reject negative dimensions on non-negative properties
-  if (tokens.length === 1 && tokens[0].type === 'dimension' && (tokens[0] as { value?: number }).value !== undefined && (tokens[0] as { value: number }).value < 0) {
-    const syntax = STANDARD_PROPERTIES_SYNTAX[lowerProp] || '';
-    if (syntax.includes('[0,∞]') || syntax.includes('[0,') || syntax.includes('[0.0,')) {
-      return false;
+  // Reject negative dimensions, percentages, and numbers on non-negative properties
+  // css-sizing-3 § 5.1 #propdef-width, css-box-3 § 4 #padding-physical, cssom-1 § 6.7.1 #set-a-css-declaration
+  if (isNonNegativeProperty(lowerProp)) {
+    for (const t of tokens) {
+      if (
+        (t.type === 'dimension' || t.type === 'percentage' || t.type === 'number') &&
+        (t as { value?: number }).value !== undefined &&
+        (t as { value: number }).value < 0
+      ) {
+        return false;
+      }
     }
   }
 

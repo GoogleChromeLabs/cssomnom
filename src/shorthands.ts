@@ -583,15 +583,19 @@ const LENGTH_UNITS = new Set([
   'cqi', 'cqb', 'cqmin', 'cqmax'
 ]);
 
-function isValidLengthOrPercentage(val: ComponentValue): boolean {
+function isValidLengthOrPercentage(val: ComponentValue, allowNegative: boolean = true): boolean {
   if (val.type === 'ident') {
     const kw = (val.value ?? '').toString().toLowerCase();
     return ['auto', 'initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(kw);
   }
   if (val.type === 'dimension') {
+    if (!allowNegative && typeof val.value === 'number' && val.value < 0) return false;
     return LENGTH_UNITS.has((val.unit ?? '').toLowerCase());
   }
-  if (val.type === 'percentage') return true;
+  if (val.type === 'percentage') {
+    if (!allowNegative && typeof val.value === 'number' && val.value < 0) return false;
+    return true;
+  }
   if (val.type === 'number' && val.value === 0) return true;
   if (val.type === 'function') {
     const fnName = ('name' in val ? val.name : ('value' in val ? val.value : ''))?.toString().toLowerCase();
@@ -614,8 +618,9 @@ const expandBox = (physical: readonly string[], logical: readonly string[]) => (
   const data = filtered.slice(offset);
   if (data.length < 1 || data.length > 4) return null;
 
-  const isLengthBox = physical[0].startsWith('margin') || physical[0].startsWith('padding') || physical[0] === 'top' || physical[0].startsWith('scroll-');
-  if (isLengthBox && !data.every(isValidLengthOrPercentage)) {
+  const isLengthBox = physical[0].startsWith('margin') || physical[0].startsWith('padding') || physical[0] === 'top' || physical[0].startsWith('scroll-') || (physical[0].startsWith('border-') && physical[0].endsWith('-width'));
+  const allowNegative = !physical[0].startsWith('padding') && !physical[0].startsWith('scroll-padding') && !(physical[0].startsWith('border-') && physical[0].endsWith('-width'));
+  if (isLengthBox && !data.every(v => isValidLengthOrPercentage(v, allowNegative))) {
     return null;
   }
 
@@ -698,6 +703,14 @@ const contractBox = (physical: readonly string[], logical: readonly string[]) =>
 const expandTwoValue = (longhands: readonly string[]) => (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
   const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
   if (filtered.length < 1 || filtered.length > 2) return null;
+  const isNonNeg = longhands[0].startsWith('padding') || longhands[0].endsWith('-width');
+  if (isNonNeg) {
+    for (const v of filtered) {
+      if ((v.type === 'dimension' || v.type === 'percentage' || v.type === 'number') && typeof v.value === 'number' && v.value < 0) {
+        return null;
+      }
+    }
+  }
   const result: Record<string, ComponentValue[]> = {};
   result[longhands[0]] = [filtered[0]];
   result[longhands[1]] = filtered.length > 1 ? [filtered[1]] : [filtered[0]];

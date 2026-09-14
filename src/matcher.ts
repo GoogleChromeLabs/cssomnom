@@ -728,24 +728,24 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
 
   // selectors-4 § 9.3 #the-focus-pseudo
   if (name === 'focus') {
-    const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
-    const active = doc?.activeElement;
+    const doc = element.ownerDocument as { activeElement?: unknown; _focusedElement?: Element | null; contains?: (n: unknown) => boolean } | null;
+    const active = doc && '_focusedElement' in doc ? doc._focusedElement : doc?.activeElement;
     if (!active || active !== element) return false;
     return typeof doc?.contains === 'function' ? doc.contains(element) : true;
   }
 
   // selectors-4 § 9.4 #the-focus-visible-pseudo
   if (name === 'focus-visible') {
-    const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
-    const active = doc?.activeElement;
+    const doc = element.ownerDocument as { activeElement?: unknown; _focusedElement?: Element | null; contains?: (n: unknown) => boolean } | null;
+    const active = doc && '_focusedElement' in doc ? doc._focusedElement : doc?.activeElement;
     if (!active || active !== element) return false;
     return typeof doc?.contains === 'function' ? doc.contains(element) : true;
   }
 
   // selectors-4 § 9.5 #the-focus-within-pseudo
   if (name === 'focus-within') {
-    const doc = element.ownerDocument as { activeElement?: unknown; contains?: (n: unknown) => boolean } | null;
-    const active = doc?.activeElement;
+    const doc = element.ownerDocument as { activeElement?: unknown; _focusedElement?: Element | null; contains?: (n: unknown) => boolean } | null;
+    const active = doc && '_focusedElement' in doc ? doc._focusedElement : doc?.activeElement;
     if (!active) return false;
     if (typeof doc?.contains === 'function' && !doc.contains(active as DOMElement)) return false;
     if (active === element) return true;

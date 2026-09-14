@@ -512,16 +512,17 @@ function dispatchNodeMutationEffects(
   if (!node || typeof node !== 'object') return;
   invalidateStyleElementSheet(node);
 
-  if (doc?.activeElement) {
+  if (doc) {
     const shouldCheckActive = isRemoval || Boolean((node as { parentNode?: unknown }).parentNode);
     if (shouldCheckActive) {
-      const active = doc.activeElement;
+      const active = (doc as unknown as { _focusedElement?: Element | null })._focusedElement;
       if (
-        active === node ||
-        (typeof (node as { contains?: (n: unknown) => boolean }).contains === 'function' &&
-          (node as { contains: (n: unknown) => boolean }).contains(active))
+        active &&
+        (active === node ||
+          (typeof (node as { contains?: (n: unknown) => boolean }).contains === 'function' &&
+            (node as { contains: (n: unknown) => boolean }).contains(active)))
       ) {
-        doc.activeElement = null;
+        (doc as unknown as { _focusedElement?: Element | null })._focusedElement = null;
       }
     }
   }
@@ -1469,6 +1470,24 @@ function patchDocumentPrototype(window: WindowType): void {
       configurable: true
     });
   }
+
+  // html § 7.4.2 #dom-document-activeelement
+  if (!Object.getOwnPropertyDescriptor(docProto, 'activeElement')) {
+    Object.defineProperty(docProto, 'activeElement', {
+      get(this: Document) {
+        const focused = (this as unknown as { _focusedElement?: Element | null })._focusedElement;
+        if (focused && (typeof this.contains !== 'function' || this.contains(focused))) {
+          return focused;
+        }
+        return this.body ?? this.documentElement ?? null;
+      },
+      set(this: Document, val: Element | null) {
+        (this as unknown as { _focusedElement?: Element | null })._focusedElement = val;
+      },
+      configurable: true,
+      enumerable: true
+    });
+  }
 }
 
 function patchShadowRootPrototype(window: WindowType): void {
@@ -1527,6 +1546,7 @@ function patchHTMLElementFocusAndClick(window: WindowType): void {
   htmlProto.focus = function (this: HTMLElement) {
     const doc = (this.ownerDocument || window.document) as (Document & {
       activeElement?: unknown;
+      _focusedElement?: Element | null;
       contains?: (n: unknown) => boolean;
       body?: unknown;
     }) | null;
@@ -1534,27 +1554,27 @@ function patchHTMLElementFocusAndClick(window: WindowType): void {
     if (typeof doc.contains === 'function' && !doc.contains(this)) {
       return;
     }
-    const prevActive = doc.activeElement as HTMLElement | null;
+    const prevActive = doc._focusedElement as HTMLElement | null;
     if (prevActive === this) {
       return;
     }
 
     if (prevActive && prevActive !== this) {
-      doc.activeElement = null;
+      doc._focusedElement = null;
       dispatchFocusEvent(prevActive, 'blur', { bubbles: false, cancelable: false }, window);
       dispatchFocusEvent(prevActive, 'focusout', { bubbles: true, cancelable: false, composed: true }, window);
 
-      if (doc.activeElement && doc.activeElement !== null && doc.activeElement !== this) {
+      if (doc._focusedElement && doc._focusedElement !== this) {
         return;
       }
     }
 
     if (typeof doc.contains === 'function' && !doc.contains(this)) {
-      doc.activeElement = (doc.body as HTMLElement) || null;
+      doc._focusedElement = null;
       return;
     }
 
-    doc.activeElement = this;
+    doc._focusedElement = this;
     dispatchFocusEvent(this, 'focus', { bubbles: false, cancelable: false }, window);
     dispatchFocusEvent(this, 'focusin', { bubbles: true, cancelable: false, composed: true }, window);
   };
@@ -1562,12 +1582,13 @@ function patchHTMLElementFocusAndClick(window: WindowType): void {
   htmlProto.blur = function (this: HTMLElement) {
     const doc = (this.ownerDocument || window.document) as (Document & {
       activeElement?: unknown;
+      _focusedElement?: Element | null;
       contains?: (n: unknown) => boolean;
       body?: unknown;
     }) | null;
     if (!doc) return;
-    if (doc.activeElement === this) {
-      doc.activeElement = null;
+    if (doc._focusedElement === this) {
+      doc._focusedElement = null;
       dispatchFocusEvent(this, 'blur', { bubbles: false, cancelable: false }, window);
       dispatchFocusEvent(this, 'focusout', { bubbles: true, cancelable: false, composed: true }, window);
     }
@@ -1868,11 +1889,11 @@ function patchWindowPreferences(window: WindowType): void {
 }
 
 function checkAutofocus(win: Record<string, unknown>): void {
-  const docObj = win.document as (Document & { activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
-  if (docObj && typeof docObj.querySelector === 'function' && !docObj.activeElement) {
+  const docObj = win.document as (Document & { _focusedElement?: unknown; activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
+  if (docObj && typeof docObj.querySelector === 'function' && !docObj._focusedElement) {
     const autofocusEl = docObj.querySelector('[autofocus]');
     if (autofocusEl) {
-      docObj.activeElement = autofocusEl;
+      docObj._focusedElement = autofocusEl;
     }
   }
 }

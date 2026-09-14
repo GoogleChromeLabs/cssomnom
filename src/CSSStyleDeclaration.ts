@@ -516,6 +516,12 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       this._declMap.delete('all');
     }
 
+    if (!property.startsWith('--')) {
+      if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, valueStr)) {
+        return;
+      }
+    }
+
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
       const compVals = ParseHooks.parseComponentValues(tokens);
@@ -523,6 +529,13 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       if (!hasVar) {
         const expanded = shorthand.expand(compVals);
         if (expanded) {
+          if (ParseHooks.validatePropertyValue) {
+            for (const [lh, val] of Object.entries(expanded)) {
+              if (!ParseHooks.validatePropertyValue(lh, serialize(val))) {
+                return;
+              }
+            }
+          }
           for (const [lh, val] of Object.entries(expanded)) {
             this.setProperty(lh, serialize(val), normalizedPriority, false);
           }
@@ -537,10 +550,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           this.removeProperty(lh);
         }
       } else if (!shorthand.stub) {
-        return;
-      }
-    } else if (!property.startsWith('--')) {
-      if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, valueStr)) {
         return;
       }
     }

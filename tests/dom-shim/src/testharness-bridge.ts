@@ -88,11 +88,11 @@ export function createWptContext(
   const win = window as unknown as Record<string, unknown>;
 
   const checkAutofocus = () => {
-    const docObj = document as (Document & { activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
-    if (docObj && typeof docObj.querySelector === 'function' && !docObj.activeElement) {
+    const docObj = document as (Document & { _focusedElement?: unknown; activeElement?: unknown; querySelector?: (s: string) => Element | null }) | undefined;
+    if (docObj && typeof docObj.querySelector === 'function' && !docObj._focusedElement) {
       const autofocusEl = docObj.querySelector('[autofocus]');
       if (autofocusEl) {
-        docObj.activeElement = autofocusEl;
+        docObj._focusedElement = autofocusEl;
       }
     }
   };

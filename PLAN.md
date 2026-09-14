@@ -3105,6 +3105,38 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Node.js automatically drains all standard I/O pipes on natural exit when the event loop is exhausted, completely eliminating the race condition with zero wrapper logic.
   - Stress tested 100 concurrent executions with 0 anomalies, followed by a full 1,768-file WPT suite run confirming 100% stability.
 
+---
+
+## Phase 129: Sizing Property Validation & DOM ActiveElement Spec Alignment [x]
+**Goal**: Reject negative lengths/percentages/numbers on non-negative CSS sizing and box properties in CSSStyleDeclaration and align `document.activeElement` with HTML Standard § 7.4.2.
+
+**Spec References**:
+- CSS Sizing 3: § 5.1 (`#propdef-width`), § 5.2 (`#propdef-height`), § 5.3 (`#propdef-min-width`), § 5.4 (`#propdef-max-width`)
+- CSS Box Model 3: § 4 (`#padding-physical`)
+- CSS Backgrounds and Borders 3: § 4.3 (`#border-width`), § 5.1 (`#border-radius`)
+- CSS Values and Units 4: § 10.10 (`#range-checking`)
+- CSSOM 1: § 6.7.1 (`#set-a-css-declaration`)
+- HTML Standard: § 7.4.2 (`#dom-document-activeelement`)
+- CSS Selectors 4: § 9.3 (`#the-focus-pseudo`), § 9.4 (`#the-focus-visible-pseudo`), § 9.5 (`#the-focus-within-pseudo`)
+
+### Tasks
+- [x] **Reject Negative Sizing & Box Values in Property Value Validation (`src/typed-om/values/style-value-parser.ts`)**:
+  - Implemented `isNonNegativeProperty(prop)` identifying sizing (`width`, `height`, `*-width`, `*-height`, `*-size`, `column-width`), box padding (`padding*`, `scroll-padding*`), border width/radii (`border*`, `*-radius`), gaps (`gap`, `*-gap`), and SVG radii (`r`, `rx`, `ry`).
+  - In `ParseHooks.validatePropertyValue`: Rejected negative dimension, percentage, and number tokens on non-negative properties so `style.width = "-100px"` is a silent no-op.
+  - In `CSSStyleDeclaration.setProperty`: Validated properties prior to shorthand expansion and validated all expanded longhands atomically prior to applying changes.
+  - In `src/shorthands.ts`: Disallowed negative lengths/percentages in `isValidLengthOrPercentage`, `expandBox`, and `expandTwoValue` for non-negative box properties (`padding`, `scroll-padding`, `border-*-width`).
+  - Verified WPT `css/cssom/cssstyledeclaration-mutationrecord-002.html` and `005.html` pass 100% without spurious MutationRecord notifications.
+- [x] **Align `document.activeElement` with HTML Standard § 7.4.2 (`tests/dom-shim/src/dom-stubs.ts`)**:
+  - Defined `activeElement` getter and setter on `Document.prototype` per HTML Standard § 7.4.2, returning the focused element if one is focused, or falling back to `this.body ?? this.documentElement ?? null`.
+  - Updated `HTMLElement.prototype.focus()` and `blur()` to track `_focusedElement` and properly clear it on blur without firing unintended events on `body`.
+  - Updated `:focus`, `:focus-visible`, and `:focus-within` matchers in `src/matcher.ts` to prioritize `_focusedElement` so `body` does not match `:focus` unless explicitly focused.
+  - Updated autofocus initialization in `dom-stubs.ts` and `testharness-bridge.ts`.
+  - Verified `focus-visible-script-focus-003.tentative.html`, `007.tentative.html`, `009.html`, and `011.html` execute cleanly without throwing `TypeError: Cannot read properties of undefined (reading 'blur')`.
+- [x] **Unit Tests & Preflight**:
+  - Created `tests/style-declaration-negative-sizing.test.ts` verifying negative length rejection across sizing, box, and SVG properties, preserving negative lengths for margin/top/left, and verifying no MutationRecords are queued.
+  - Updated `tests/dom-shim/tests/dom-stubs.test.ts` to verify `activeElement` defaults to `body` before focus and falls back to `body` after blur.
+  - Preflight verification: `pnpm run preflight` 100% clean (0 TypeScript type errors, 0 linter warnings, all tests passing).
+
 
 
 

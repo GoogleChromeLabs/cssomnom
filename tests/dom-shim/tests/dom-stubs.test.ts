@@ -82,6 +82,8 @@ test('HTMLElement.prototype.focus() and blur() with synchronous :focus/:focus-vi
     blurEventFired = true;
   });
 
+  assert.strictEqual(win.document.activeElement, win.document.body, 'activeElement defaults to body before focus');
+
   input.focus();
 
   assert.strictEqual(focusEventFired, true, 'focus event was fired synchronously');
@@ -93,7 +95,7 @@ test('HTMLElement.prototype.focus() and blur() with synchronous :focus/:focus-vi
   input.blur();
 
   assert.strictEqual(blurEventFired, true, 'blur event was fired synchronously');
-  assert.strictEqual(win.document.activeElement, null, 'activeElement cleared after blur');
+  assert.strictEqual(win.document.activeElement, win.document.body, 'activeElement falls back to body after blur');
   assert.strictEqual(win.document.querySelector(':focus'), null, ':focus matches nothing after blur');
 });
 
