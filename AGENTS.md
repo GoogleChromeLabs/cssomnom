@@ -60,6 +60,24 @@ To prevent unmonitored child process spawning, worker process memory ballooning,
 - **Watchdog Unref**: All background watchdog/polling intervals must call `timer.unref()` immediately so timers do not keep the Node event loop alive.
 - **Progress Hash Reconciliation**: Reconcile unfinalized pre-commit hashes (`*`) in `wpt-progress.md` via `syncProgressFromNotes()` using `git notes` and `git log`.
 
+### Conformance Measurement on Commit (`.githooks/pre-commit`)
+The hook is tracked at `.githooks/pre-commit` and activated by `core.hooksPath`, which the `prepare`
+npm script sets on install. It is not in `.git/hooks/`.
+- **It re-runs the entire WPT suite.** A qualifying commit will sit for minutes with no output. **Do
+  not kill it.** It then stages the regenerated `wpt-progress.md` and `README.md` into that commit.
+- **Trigger**: any staged path under `src/`, `tests/dom-shim/src/`, `scripts/wpt/node/`, plus
+  `tests/wpt-node-config.json` and `pnpm-lock.yaml`. Docs-only commits are free.
+- **Rule**: Do not narrow that trigger list to make commits faster. Attribution in `wpt-progress.md`
+  depends on every result-affecting commit being measured; when a commit is skipped, its delta is
+  silently absorbed into the next commit that does qualify. This has already produced wrong history
+  (`c366afd`'s +244 was credited to `d480059`).
+- Rows are still deduplicated: `writeProgressMarkdown()` compares every metric column against the
+  newest row and skips the insert when nothing moved, so a qualifying commit that changes no numbers
+  adds no row.
+- **Corollary**: a green local test run is not evidence that a change is neutral. Changes to the DOM
+  shim and the WPT harness routinely move whole spec domains. Verify with a full
+  `pnpm run wpt:progress` and compare per-spec, not just the file you were targeting.
+
 ## Spec Evolution & Maintainability
 
 ### Automation Over Hardcoding

@@ -1,0 +1,56 @@
+#!/bin/sh
+# /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
+#
+# Re-measures WPT conformance and records a progress row for commits that can move the numbers.
+#
+# Attribution depends on this running for EVERY result-affecting commit. It previously gated on
+# `^src/` alone, which silently misattributed any gain made outside src/: the row is only written
+# on the next commit that does touch src/, so that commit absorbs credit for both. Real examples
+# from 2026-09-14: c366afd (+244, tests/dom-shim/) was folded into d480059's row, and c69eb49
+# (+235, scripts/wpt/) and 71b6700 (-142, tests/dom-shim/) were never measured by the hook at all.
+#
+# Rows are still deduplicated downstream -- writeProgressMarkdown() in
+# scripts/wpt/node/core/progress.ts compares every metric column against the newest row and skips
+# the insert when nothing moved. So widening the trigger costs measurement time on more commits but
+# never adds a redundant row.
+
+# Paths whose contents can change WPT results:
+#   src/                        the library under test
+#   tests/dom-shim/src/         the DOM shim the Node WPT runner executes against
+#                               (tests/dom-shim/tests/ is that shim's own unit tests -- excluded,
+#                                they cannot move conformance numbers)
+#   scripts/wpt/node/           the Node runner, harness, and scoring itself
+#                               (scripts/wpt/browser/ drives Playwright and does not feed
+#                                wpt:progress, which reads a cached upstream report -- excluded)
+#   tests/wpt-node-config.json  which files are in scope
+#   pnpm-lock.yaml              dependency pins (linkedom in particular)
+RESULT_AFFECTING='^(src/|tests/dom-shim/src/|scripts/wpt/node/|tests/wpt-node-config\.json$|pnpm-lock\.yaml$)'
+
+if ! git diff --cached --name-only | grep -qE "$RESULT_AFFECTING"; then
+  exit 0
+fi
+
+echo "Result-affecting files staged, updating WPT progress..."
+
+# Only stage a generated file if this hook actually changed it, so unrelated working-tree edits
+# are not swept into the commit.
+hash_of() { [ -f "$1" ] && git hash-object "$1" || echo "absent"; }
+
+progress_before=$(hash_of wpt-progress.md)
+readme_before=$(hash_of README.md)
+
+if ! pnpm run wpt:progress; then
+  echo "warning: wpt:progress failed; committing without refreshed conformance numbers." >&2
+  exit 0
+fi
+
+for f in wpt-progress.md README.md; do
+  case "$f" in
+    wpt-progress.md) before=$progress_before ;;
+    README.md)       before=$readme_before ;;
+  esac
+  if [ "$(hash_of "$f")" != "$before" ]; then
+    git add "$f"
+    echo "  staged $f"
+  fi
+done
