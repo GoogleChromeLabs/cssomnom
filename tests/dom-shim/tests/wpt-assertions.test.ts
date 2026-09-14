@@ -44,6 +44,43 @@ test('WPT_ASSERTIONS: assert_array_equals and assert_object_equals', () => {
   assert.throws(() => WPT_ASSERTIONS.assert_object_equals({ a: 1 }, { a: 2 }), assert.AssertionError);
 });
 
+// Regression: WebIDL interface objects are functions, not plain objects. idlharness.js calls
+// assert_own_property(Interface, "prototype") on every interface (idlharness.js #test_member_attribute,
+// #test_member_operation), so rejecting `typeof target === 'function'` failed every interface check.
+// Upstream testharness.js only does `object.hasOwnProperty(...)` with no typeof guard.
+test('WPT_ASSERTIONS: assert_own_property accepts interface objects (functions) as targets', () => {
+  class SomeInterface {}
+
+  // The exact idlharness.js call shape that regressed.
+  WPT_ASSERTIONS.assert_own_property(SomeInterface, 'prototype');
+  WPT_ASSERTIONS.assert_not_own_property(SomeInterface, 'notAProperty');
+
+  // A function missing the property must still fail, rather than passing vacuously.
+  assert.throws(
+    () => WPT_ASSERTIONS.assert_own_property(() => {}, 'prototype'),
+    assert.AssertionError
+  );
+
+  // Plain objects keep working.
+  WPT_ASSERTIONS.assert_own_property({ a: 1 }, 'a');
+  WPT_ASSERTIONS.assert_not_own_property({ a: 1 }, 'b');
+
+  // Inherited properties are not own properties.
+  WPT_ASSERTIONS.assert_not_own_property({ a: 1 }, 'toString');
+
+  // Non-objects are still rejected.
+  for (const notAnObject of [null, undefined, 'str', 42]) {
+    assert.throws(
+      () => WPT_ASSERTIONS.assert_own_property(notAnObject, 'prototype'),
+      assert.AssertionError
+    );
+    assert.throws(
+      () => WPT_ASSERTIONS.assert_not_own_property(notAnObject, 'prototype'),
+      assert.AssertionError
+    );
+  }
+});
+
 test('WPT_ASSERTIONS: assert_throws_js and assert_throws_dom', () => {
   // assert_throws_js
   WPT_ASSERTIONS.assert_throws_js(TypeError, () => {

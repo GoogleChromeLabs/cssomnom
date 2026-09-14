@@ -359,12 +359,12 @@ export const WPT_ASSERTIONS = {
   },
 
   assert_own_property(object: unknown, property_name: string | symbol, description?: string): void {
-    assert.ok(typeof object === 'object' && object !== null, `${description || ''}: target must be an object`);
+    assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: target must be an object`);
     assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), true, `${description || ''}: expected property ${String(property_name)} missing`);
   },
 
   assert_not_own_property(object: unknown, property_name: string | symbol, description?: string): void {
-    assert.ok(typeof object === 'object' && object !== null, `${description || ''}: target must be an object`);
+    assert.ok((typeof object === 'object' && object !== null) || typeof object === 'function', `${description || ''}: target must be an object`);
     assert.strictEqual(Object.prototype.hasOwnProperty.call(object, property_name), false, `${description || ''}: unexpected property ${String(property_name)} is found on object`);
   },
 
