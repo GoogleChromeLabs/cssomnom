@@ -89,6 +89,105 @@ import './numeric/numeric-methods.ts';
 import './color/color-reify.ts';
 import { CSSTransformValue } from './transform/CSSTransformValue.ts';
 import { setParseTransformListHook } from '../DOMMatrix.ts';
+import { applyWebIDLPrototypeDescriptors } from './utils/webidl.ts';
+
+import { CSSStyleValue } from './values/CSSStyleValue.ts';
+import { CSSNumericValue } from './numeric/CSSNumericValue.ts';
+import { CSSUnitValue } from './numeric/CSSUnitValue.ts';
+import { CSSNumericArray } from './numeric/CSSNumericArray.ts';
+import { CSSMathValue } from './numeric/math/CSSMathValue.ts';
+import {
+  CSSMathNegate,
+  CSSMathInvert,
+  CSSMathSum,
+  CSSMathProduct,
+  CSSMathMin,
+  CSSMathMax,
+  CSSMathClamp,
+  CSSMathRound,
+  CSSMathFunction
+} from './numeric/math/CSSMathOperations.ts';
+import { CSSKeywordValue } from './values/CSSKeywordValue.ts';
+import { CSSImageValue, CSSURLImageValue, CSSGradientImageValue } from './values/CSSImageValue.ts';
+import { CSSVariableReferenceValue } from './values/CSSVariableReferenceValue.ts';
+import { CSSUnparsedValue } from './values/CSSUnparsedValue.ts';
+import { CSSColorValue } from './color/CSSColorValue.ts';
+import {
+  CSSRGB,
+  CSSHSL,
+  CSSHWB,
+  CSSLab,
+  CSSLCH,
+  CSSOKLab,
+  CSSOKLCH,
+  CSSColor
+} from './color/color-spaces.ts';
+import { CSSTransformComponent } from './transform/CSSTransformComponent.ts';
+import {
+  CSSTranslate,
+  CSSScale,
+  CSSRotate,
+  CSSSkew,
+  CSSSkewX,
+  CSSSkewY,
+  CSSPerspective,
+  CSSMatrixComponent
+} from './transform/transform-components.ts';
+import { CSSPositionValue } from './position/CSSPositionValue.ts';
+import { StylePropertyMapReadOnly } from './style-map/StylePropertyMapReadOnly.ts';
+import { StylePropertyMap } from './style-map/StylePropertyMap.ts';
+
+// WebIDL § 3.6 #es-attributes
+// WebIDL § 3.7 #es-operations
+// Ensure all regular prototype members match WebIDL enumerable descriptor requirements
+const TYPED_OM_CLASSES: Function[] = [
+  CSSStyleValue,
+  CSSNumericValue,
+  CSSUnitValue,
+  CSSNumericArray,
+  CSSMathValue,
+  CSSMathNegate,
+  CSSMathInvert,
+  CSSMathSum,
+  CSSMathProduct,
+  CSSMathMin,
+  CSSMathMax,
+  CSSMathClamp,
+  CSSMathRound,
+  CSSMathFunction,
+  CSSKeywordValue,
+  CSSImageValue,
+  CSSURLImageValue,
+  CSSGradientImageValue,
+  CSSVariableReferenceValue,
+  CSSUnparsedValue,
+  CSSColorValue,
+  CSSRGB,
+  CSSHSL,
+  CSSHWB,
+  CSSLab,
+  CSSLCH,
+  CSSOKLab,
+  CSSOKLCH,
+  CSSColor,
+  CSSTransformComponent,
+  CSSTranslate,
+  CSSScale,
+  CSSRotate,
+  CSSSkew,
+  CSSSkewX,
+  CSSSkewY,
+  CSSPerspective,
+  CSSMatrixComponent,
+  CSSTransformValue,
+  CSSPositionValue,
+  StylePropertyMapReadOnly,
+  StylePropertyMap
+];
+
+for (const cls of TYPED_OM_CLASSES) {
+  applyWebIDLPrototypeDescriptors(cls);
+}
 
 setParseTransformListHook((str) => {
   try {
@@ -107,3 +206,4 @@ setParseTransformListHook((str) => {
     throw new DOMException(`Failed to parse transform list: "${str}"`, 'SyntaxError');
   }
 });
+
