@@ -24,10 +24,17 @@ export interface WptFileResult {
 
 const WPT_ROOT = path.resolve(process.cwd(), 'submodules/web-platform-tests');
 
+// Realm-sensitive globals that must resolve to the VM context's own intrinsics, never the host's.
+// LinkeDOM's window carries host-realm `Function` and `eval` as own properties. Copying `eval`
+// into the sandbox is especially damaging: per ECMA-262 § 19.2.1, a call is only a *direct* eval
+// when the callee is the current realm's %eval%. A foreign realm's eval silently degrades to an
+// indirect eval, which evaluates in the *host* global scope -- so bare identifiers from the test
+// (`document`, `sheet`, ...) are not in scope. idlharness.js's test_object() does `eval(desc)`.
 const JS_INTRINSICS = new Set([
   'Array',
   'Object',
   'Function',
+  'eval',
   'Promise',
   'Error',
   'TypeError',
