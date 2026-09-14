@@ -311,12 +311,20 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
   //    or generic CSSStyleValues (otherwise)."
   // That prose is unreferenced and has no algorithmic caller — "reify a color value" (line 5548)
   // is ONLY invoked by CSSColorValue.parse() (§ 6.1 lines 3085-3098, line 3096).
+  // Confirmed by implementers in W3C Houdini Issue #1159:
+  // https://github.com/w3c/css-houdini-drafts/issues/1159
   //
-  // Claim (a) — What the normative per-property table literally says:
+  // Claim (a) — What the normative per-property table literally says & Houdini Issue #689:
   // The table at #reify-property defines reification for color properties (e.g. 'color' line 4105,
   // 'caret-color' line 4078, 'border-top-color' line 4013, 'outline-color' line 4745, 'background-color' line 3752):
   // 1. If value is 'currentcolor', reify an identifier;
   // 2. Otherwise, reify as a CSSStyleValue (css-typed-om-1 § 7.1 #reify-failure line 5307).
+  //
+  // This deliberate policy decision was established by Tab Atkins and Blink in W3C Houdini Issue #689:
+  // https://github.com/w3c/css-houdini-drafts/issues/689
+  // "The plan was to represent currentcolor as a CSSKeywordValue and all the rest as CSSColorValue
+  //  subclasses, so we should do the same here - currentcolor is a CSSKeywordValue, while the rest
+  //  are CSSStyleValue."
   // The per-property table is followed by Chromium and the WPT test suite (testUnsupportedValue).
   //
   // Claim (b) — Deliberate alignment on property-specific grammar keywords:

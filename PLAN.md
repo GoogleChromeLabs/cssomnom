@@ -3339,12 +3339,12 @@ Also settled: the apparent Chrome-parity coincidence on `semantics.html` (Chrome
 
 ## Field Notes for Future Agents
 
-### The css-typed-om-1 per-property reification table is stale
-Phase 134 hit this twice. The spec defines rich machinery (`CSSColorValue`, "reify a color value") that the per-property table at `#reify-property` never invokes, and the table's own entries lag the surrounding prose.
+### The css-typed-om-1 per-property reification table is stale (RESOLVED in Phase 134)
+**Status: Resolved & Permanent Policy.** (Not a pending task). Phase 134 hit this twice. The spec defines rich machinery (`CSSColorValue`, "reify a color value") that the per-property table at `#reify-property` never invokes, and the table's own entries lag the surrounding prose.
 
-- §7.5 opens with "CSS `<color>` values become either `CSSColorValue`s … or generic `CSSStyleValue`s", which **contradicts** the table. It is unreferenced prose with no algorithmic caller.
-- "reify a color value" (line 5548) has exactly **one** invocation in the whole spec: `CSSColorValue.parse()` at line 3096.
-- The table says only `currentcolor` reifies as an identifier, yet Chrome and WPT reify grammar keywords like `caret-color: auto` as `CSSKeywordValue`.
+- **Historical W3C Decision**: In W3C Houdini Issue [#689](https://github.com/w3c/css-houdini-drafts/issues/689), Darren Shen (Chromium) and Tab Atkins (Spec Editor) resolved that because `ColorValue` was moved to Level 2, color properties in Level 1 reify as base `CSSStyleValue` (unsupported), and `currentcolor` as `CSSKeywordValue`. Chromium and WPT tests (`runUnsupportedPropertyTests('color', ...)`) implement this resolution.
+- **Spec Prose vs Algorithm Call Graph**: §7.5 opens with "CSS `<color>` values become either `CSSColorValue`s … or generic `CSSStyleValue`s", which **contradicts** the normative table in §7.2. As implementers confirmed in W3C Houdini Issue [#1159](https://github.com/w3c/css-houdini-drafts/issues/1159), "reify a color value" (line 5548) has exactly **one** invocation in the whole spec: `CSSColorValue.parse()` at line 3096. No property reification algorithm invokes it.
+- **Property-specific Keywords**: The table says only `currentcolor` reifies as an identifier, yet Chrome and WPT reify grammar keywords like `caret-color: auto` as `CSSKeywordValue`.
 
 **Rule: on a "spec says X but WPT wants Y" conflict in Typed OM, check the table for staleness first, follow WPT/Chrome, and comment the divergence as two separate claims — what the table literally says, and what we do instead — rather than paraphrasing them into one.**
 

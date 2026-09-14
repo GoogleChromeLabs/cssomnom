@@ -265,6 +265,7 @@ These APIs expose low-level parsing, property registration, and typed values def
 - **WebIDL Dictionary Bindings**: Dictionary constraints and computationally independent initial value validations for `CSS.registerProperty()` are enforced natively in JavaScript.
 - **`CSSTransformComponent` Inheritance**: `CSSTransformComponent` inherits from `CSSStyleValue`, aligning with browser implementations (Blink, WebKit) and enabling reification from `CSSStyleValue.parseAll()` and `StylePropertyMap.get()`.
 - **Math Simplification & Calculation Tree Preservation**: Calculation trees from `CSSNumericValue.parse()` and `StylePropertyMap` preserve `CSSMathValue` tree structures per CSS Values 4 §10.7 rather than performing eager unit reduction at parse time.
+- **Typed OM Color Property Reification**: Per CSS Typed OM Level 1 § 7.2 (`#reify-property`), W3C Houdini Issue [#689](https://github.com/w3c/css-houdini-drafts/issues/689), and WPT conformance tests, color properties accessed via `StylePropertyMap` (`styleMap.get('color')`, etc.) reify as generic base `CSSStyleValue` objects (with `currentcolor` and grammar keywords like `auto` on `caret-color` reifying as `CSSKeywordValue`). `CSSColorValue` subclasses (`CSSRGB`, `CSSHSL`, etc.) are exposed via `CSSColorValue.parse()` per § 6.1, deferring property-level color reification to Level 2 in alignment with browser engines.
 
 ---
 
