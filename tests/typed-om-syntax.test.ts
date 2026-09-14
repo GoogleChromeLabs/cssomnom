@@ -47,8 +47,8 @@ describe('Typed OM Standard Property Syntax & Validation (Phase 85)', () => {
       assert.equal((autoVal as CSSKeywordValue).value, 'auto');
 
       const colorVal = CSSStyleValue.parse('accent-color', 'red');
-      assert.ok(colorVal instanceof CSSKeywordValue);
-      assert.equal((colorVal as CSSKeywordValue).value, 'red');
+      assert.strictEqual(colorVal.constructor, CSSStyleValue);
+      assert.equal(colorVal.toString(), 'red');
 
       const durVal = CSSStyleValue.parse('animation-duration', '5s');
       assert.ok(durVal instanceof CSSUnitValue);

@@ -88,7 +88,8 @@ export const COLOR_PROPERTIES = new Set([
   'border-inline-color', 'border-inline-start-color', 'border-inline-end-color',
   'border-block-color', 'border-block-start-color', 'border-block-end-color',
   'outline-color', 'text-decoration-color', 'column-rule-color', 'caret-color',
-  'fill', 'stroke'
+  'fill', 'stroke',
+  'accent-color', 'fill-color', 'flood-color', 'lighting-color', 'stop-color', 'text-emphasis-color'
 ]);
 
 export function getPropertyValueSafe(style: unknown, property: string): string {
@@ -343,7 +344,14 @@ export function validateValuesForProperty(property: string, values: (CSSStyleVal
 
   const finalString = valStrings.join(isList ? ', ' : ' ');
 
-  if (!propKey.startsWith('--')) {
+  // css-typed-om-1 § 3.2 #dom-stylepropertymap-set
+  // "A direct CSSStyleValue object (not a subclass) with a non-null [[associatedProperty]] slot
+  //  matches the grammar of the property specified in its [[associatedProperty]] slot, regardless of what it is."
+  const allAssociatedDirectStyleValues = values.every(
+    val => typeof val !== 'string' && val.constructor === CSSStyleValue && (val._associatedProperty === null || val._associatedProperty === propKey)
+  );
+
+  if (!propKey.startsWith('--') && !allAssociatedDirectStyleValues) {
     try {
       CSSStyleValue.parseAll(property, finalString);
     } catch (e) {

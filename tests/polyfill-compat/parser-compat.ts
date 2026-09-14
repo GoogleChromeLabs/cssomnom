@@ -18,16 +18,11 @@
 import { CSSStyleValue, CSSColorValue, tokenize } from '../../src/index.ts';
 
 export function parseCSSValue(property: string, value: string) {
-  const parsed = CSSStyleValue.parse(property, value);
-  if (parsed instanceof CSSColorValue) {
-    return new CSSStyleValue(value);
-  }
-  return parsed;
+  return CSSStyleValue.parse(property, value);
 }
 
 export function parseAllCSSValues(property: string, value: string) {
-  const parsed = CSSStyleValue.parseAll(property, value);
-  return parsed.map(v => v instanceof CSSColorValue ? new CSSStyleValue(v.toString()) : v);
+  return CSSStyleValue.parseAll(property, value);
 }
 
 export function parseColor(color: string) {

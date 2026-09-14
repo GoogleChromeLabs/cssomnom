@@ -3243,3 +3243,32 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - [x] **Verification & Conformance**:
   - Conformance moved 19,638/22,517 (87.2%) -> 20,020/22,494 (89.0%) over this span.
   - `pnpm run preflight` passes cleanly: 0 type errors, 0 lint warnings, safe-exec guard clean, and all 4,166 unit tests passing.
+
+---
+
+## Phase 134: Typed OM Color Reification Spec Compliance & Cross-Realm Assertion Documentation [ ]
+**Goal**: Realign Typed OM color property reification with the normative per-property rules in CSS Typed OM Level 1 § 7.2 (#reify-property) and § 7.1 (#reify-failure) by returning generic base `CSSStyleValue` instead of `CSSColorValue` or `CSSKeywordValue` (except for `currentcolor` and property-specific non-color keywords), and document the cross-realm DOMException escape hatch in the WPT test harness.
+
+**Spec References**:
+- CSS Typed OM 1: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
+  - § 3.2 The StylePropertyMap (`#dom-stylepropertymap-set`)
+  - § 6.1 CSSColorValue (`#dom-csscolorvalue-parse`, lines 3085-3098)
+  - § 7.1 Unrepresentable Values (`#reify-failure`, lines 5296-5315)
+  - § 7.2 Property-specific Rules (`#reify-property`, lines 3622+)
+  - § 7.5 `<color>` Values (`#reify-color`, lines 5540-5545, 5548)
+- WPT testharness: `submodules/web-platform-tests/resources/testharness.js` (lines 2300-2447, line 2441)
+
+### Tasks
+- [x] **Typed OM Color Property Reification (`src/typed-om/values/style-value-parser.ts`, `src/typed-om/style-map/style-validation.ts`)**:
+  - Replaced property reification delegation to `CSSColorValue.parse()` with base `CSSStyleValue` construction per CSS Typed OM Level 1 § 7.2 table (e.g. lines 4105, 4078, 4013, 4745, 3752) and § 7.1 (#reify-failure).
+  - Preserved static `CSSColorValue.parse()` algorithm for `CSSRGB`/`CSSColorValue` subclasses per § 6.1.
+  - Reserved `CSSKeywordValue` identifier reification strictly for `currentcolor` and syntax-permitted non-color keywords (`auto` for `caret-color`/`accent-color`, `none` for `fill`/`stroke`), reifying named colors (`red`, `black`, etc.) and `transparent` as base `CSSStyleValue`.
+  - Added full spec conflict documentation explaining why the normative per-property table at #reify-property takes precedence over unreferenced prose in § 7.5.
+  - Extended `COLOR_PROPERTIES` to encompass all longhand color properties (`accent-color`, `fill-color`, `flood-color`, `lighting-color`, `stop-color`, `text-emphasis-color`).
+  - Permitted direct associated `CSSStyleValue`s in `validateValuesForProperty` without re-parsing per § 3.2.
+  - Cleaned up redundant `CSSColorValue` unwrapping helper in `tests/polyfill-compat/parser-compat.ts`.
+  - Added pure unit tests in `tests/typed-om-color-reification.test.ts` and updated assertions in `tests/typed-om-colors.test.ts` and `tests/typed-om-syntax.test.ts`.
+- [ ] **Cross-Realm DOMException Assertion Documentation (`tests/dom-shim/src/wpt-assertions.ts`)**:
+  - Document cross-realm `assert_throws_dom` leniency fallback in `tests/dom-shim/src/wpt-assertions.ts:611-616` against upstream `submodules/web-platform-tests/resources/testharness.js:2441`.
+  - Explicitly record why host-vs-VM realm divergence necessitates constructor name matching, and transparently note that wrong-global throw detection cannot fail under this harness.
+

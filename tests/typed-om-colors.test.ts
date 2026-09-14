@@ -83,16 +83,18 @@ test('Color functions parsing', () => {
 });
 
 test('Color property routing logic in parseAll', () => {
-  // color
+  // color: property reification produces base CSSStyleValue (css-typed-om-1 § 7.2 line 4112, § 7.1 line 5307)
   const color = CSSStyleValue.parseAll('color', '#00ff00');
   assert.strictEqual(color.length, 1);
-  assert.ok(color[0] instanceof CSSRGB);
-  assert.strictEqual(color[0].toString(), 'rgb(0, 255, 0)');
+  assert.strictEqual(color[0].constructor, CSSStyleValue);
+  assert.strictEqual(color[0] instanceof CSSColorValue, false);
+  assert.strictEqual(color[0].toString(), '#00ff00');
 
-  // fill
+  // fill: named colors reify as base CSSStyleValue, not CSSKeywordValue
   const fill = CSSStyleValue.parseAll('fill', 'blue');
   assert.strictEqual(fill.length, 1);
-  assert.ok(fill[0] instanceof CSSKeywordValue);
+  assert.strictEqual(fill[0].constructor, CSSStyleValue);
+  assert.strictEqual(fill[0] instanceof CSSKeywordValue, false);
   assert.strictEqual(fill[0].toString(), 'blue');
 
   // invalid color property value throws TypeError

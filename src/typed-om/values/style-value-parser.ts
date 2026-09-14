@@ -305,27 +305,47 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     }
   }
 
+  // css-typed-om-1 § 7.2 #reify-property (Overview.bs lines 3622+)
+  // Note on spec conflict: css-typed-om-1 § 7.5 #reify-color (Overview.bs lines 5540-5545) states:
+  //   "CSS <color> values become either CSSColorValues (if they can be resolved to an absolute color)
+  //    or generic CSSStyleValues (otherwise)."
+  // That prose is unreferenced and has no algorithmic caller — "reify a color value" (line 5548)
+  // is ONLY invoked by CSSColorValue.parse() (§ 6.1 lines 3085-3098, line 3096).
+  // The normative per-property table at #reify-property defines reification for properties
+  // (e.g. 'color' line 4105, 'caret-color' line 4078, 'border-top-color' line 4013,
+  // 'outline-color' line 4745, 'background-color' line 3752):
+  // 1. If value is 'currentcolor' (or property-specific non-color keywords), reify an identifier;
+  // 2. Otherwise, reify as a CSSStyleValue (css-typed-om-1 § 7.1 #reify-failure line 5307).
+  // The per-property table is followed by Chromium and the WPT test suite (testUnsupportedValue).
   if (COLOR_PROPERTIES.has(propLower)) {
     if (trimmed.length === 1 && trimmed[0].type === 'ident') {
       const kw = (trimmed[0] as IdentToken).value.toLowerCase();
-      const syntax = STANDARD_PROPERTIES_SYNTAX[propLower];
-      if (
-        kw in NAMED_COLORS ||
-        kw === 'currentcolor' ||
-        kw === 'transparent' ||
-        kw === 'auto' ||
-        kw === 'invert' ||
-        kw === 'none' ||
-        (syntax && syntax.split('|').map(s => s.trim().toLowerCase()).includes(kw))
-      ) {
+      // currentcolor reifies as an identifier (CSSKeywordValue)
+      // css-typed-om-1 § 7.2 #reify-property (e.g. line 4108)
+      if (kw === 'currentcolor') {
         return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
       }
+
+      // Non-color keywords allowed by property grammar (e.g. 'auto' for caret-color / accent-color, 'none' for fill / stroke)
+      const syntax = STANDARD_PROPERTIES_SYNTAX[propLower];
+      if (syntax) {
+        const allowedKeywords = syntax.split('|').map(s => s.trim().toLowerCase()).filter(s => !s.startsWith('<'));
+        if (allowedKeywords.includes(kw) && !(kw in NAMED_COLORS) && kw !== 'transparent') {
+          return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
+        }
+      }
     }
+
+    // Validate that css is a valid <color> value; throws TypeError on invalid color values
     try {
-      return [CSSColorValue.parse(css)];
+      CSSColorValue.parse(css);
     } catch {
       throw new TypeError(`Invalid value for color property ${property}: ${css}`);
     }
+
+    // Property reification produces a base CSSStyleValue, NOT a CSSColorValue
+    // css-typed-om-1 § 7.1 #reify-failure (lines 5307-5315)
+    return [new CSSStyleValue(css, privateToken)];
   }
   if (trimmed.length === 1) {
     const first = trimmed[0];
