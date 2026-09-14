@@ -3274,3 +3274,87 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Documented cross-realm `assert_throws_dom` leniency fallback in `tests/dom-shim/src/wpt-assertions.ts:611-616` against upstream `submodules/web-platform-tests/resources/testharness.js:2441`.
   - Explicitly recorded why host-vs-VM realm divergence necessitates constructor name matching, and transparently noted that wrong-global throw detection cannot fail under this harness.
 
+---
+
+## Backlog: Verified Conformance Clusters (not started)
+
+Baseline for every delta below is `88ea423` — **20,202 / 22,494 (89.81% raw)**.
+
+| Spec | Pass / Total | Spec | Pass / Total |
+|---|---|---|---|
+| css-typed-om | 12,135 / 12,765 | css-variables | 411 / 499 |
+| cssom | 1,989 / 2,141 | selectors | 4,328 / 5,654 |
+| css-syntax | 406 / 407 | mediaqueries | 412 / 417 |
+| css-nesting | 117 / 117 | css-cascade | 404 / 494 |
+
+**Confidence labels are load-bearing.** "Verified" means a claim was independently reproduced by a second agent that ran the tests. "Surveyed" means a single agent asserted it from code reading and it has *not* been reproduced. Do not budget on a surveyed number.
+
+### B1. `offsetWidth` ignores cascaded style — VERIFIED, ~38 subtests
+`tests/dom-shim/src/dom-stubs.ts:1750-1768`. `offsetHeight` consults `getCascadedStyle(this).getPropertyValue('height')`; `offsetWidth` only reads the inline `style.width`. Mirror the `offsetHeight` branch.
+
+- **42** files in `css/selectors/i18n/css3-selectors-lang-*.html` (non-contiguous, numbered to 056), baseline 0/42. Simulated fix: **38 pass, 4 fail**.
+- The 4 stragglers (`lang-024`, `lang-035`, `lang-044`, `lang-055`) fail for an unrelated reason — `src/matcher.ts` lacks HTML case-insensitive attribute-value matching (`lang="ES"` vs `[lang="es"]`). Separate fix; do not conflate.
+- Not faking layout: these tests use `offsetWidth` purely as a binary oracle for "did the selector match" (`#box:lang(es) { width: 100px }` + `assert_equals(box.offsetWidth, 100)`). Closing this closes a shim gap.
+
+Highest confidence-to-effort item in the backlog.
+
+### B2. Typed OM `getDummyStyle()` caches an empty stub — SURVEYED, 157 claimed
+`src/typed-om/style-map/style-validation.ts:154` checks `typeof globalThis.document === 'undefined'`, which in pure Node is always true at import time, permanently caching `{ getPropertyValue() { return ''; } }`. `shouldWrapInCalc()` can therefore never return true; negative values on non-negative-syntax properties are set raw, LinkeDOM rejects them, and the property ends `undefined`, failing `assert_true(specifiedResult instanceof CSSStyleValue)` (112 claimed).
+
+Plus unitless zero in transform parsers (`translateX(0)`, `rotateX(0)`, `skew(0,0)`, `perspective(0)`) not rectified to `0px`/`0deg`, so constructors throw and 6 globals stay undefined → 45 `ReferenceError` subtests in `css-typed-om/idlharness.html`.
+
+Same *shape* as the two biggest wins of the 2026-09-14 session (`c366afd` +244, `c69eb49` +235): one environmental assumption, wrong at module load, fanning out. **Verify the mechanism before budgeting the 157.**
+
+### B3. iframes never load their `src` — VERIFIED mechanism, gain corrected to 320–395
+`tests/dom-shim/src/iframe-runner.ts:374-428`. `setupIframePrototype` registers `contentDocument`, `contentWindow`, `srcdoc` but **no `src` getter/setter**; `contentDocument` unconditionally parses a blank document, so `resources/syntax-quirks.html`, `syntax-xml.xhtml`, `semantics-quirks.html`, `semantics-xml.xhtml` never load.
+
+The original survey claimed ~734. That is wrong, for three reasons that must be carried forward:
+
+1. **216 subtests in `semantics.html` currently pass spuriously.** `nomatch` tests assert `querySelector(s) === null`, trivially true in an empty document. Loading the iframes converts some of these into real failures. The cluster's *net* is well below its gross.
+2. **120 failures in `syntax.html` are permanent** even with perfect iframe loading — the 40 standards-mode failures repeat ×3 across modes.
+3. **`src/matcher.ts` has no `document.contentType === 'application/xhtml+xml'` branch.** XML attribute-name case-sensitivity will surface as *new* failures once the XML iframes load.
+
+In-memory simulation: `syntax.html` 236 → 408, `semantics.html` 513 → 702. **Realistic net 320–395.**
+
+Also settled: the apparent Chrome-parity coincidence on `semantics.html` (Chrome fails ~444, we fail 442) is genuinely a coincidence. Blink lacks the `s` case-sensitive modifier; we already implement it and pass those in standards mode. Orthogonal causes — do not treat parity as evidence of anything.
+
+### B4. `:has()` multi-compound relative combinators — SURVEYED, 102 claimed
+`src/matcher.ts:787-815`. `matchHasPseudo` passes the intermediate sibling/child directly to `matchComplexSelector`, which matches right-to-left against the *rightmost* compound. Any `:has()` combining a relative combinator with multiple compounds fails: `:has(~ div .test)`, `:has(> .a > .b)`, `:has(+ div [test_attr])`. Unverified.
+
+### B5. Feasibility classifier is wrong in both directions — VERIFIED
+`scripts/wpt/node/core/classifier.ts`. This changes the *normalized* rate, not the raw count, and the second direction is the one that matters.
+
+- **False browser-only (inflates our rate — fix first).** Lines 120-129 classify **any** failure in a path containing `focus-visible` as `HARDWARE_INPUT_DRIVER`, masking genuine selector-parsing bugs (`@supports selector(:focus-visible)`, `:not(:focus-visible)`). Lines 131-140 do the same for any file with `active-` in the name plus `button` or `display-none`. These are hiding real work.
+- **False feasible (depresses our rate).** Lines 248-263 gate the layout heuristic on `^\s*["']?\d+(\.\d+)?px["']?\s*$`, but `clientWidth` yields bare integers and actual is often `'undefined'`; `checkLayout`, `clientWidth`, `clientHeight` are not recognized keywords. Confirmed on `css/css-cascade/presentational-hints-rollback.html` (16 subtests marked feasible, genuinely needs image natural dimensions and replaced-element layout). **Over 1,000 WPT files use `check-layout-th.js`** and are exposed.
+
+### Not worth pursuing
+- **mediaqueries** — all 5 remaining failures are `preferences-*.tentative.https.html` needing `navigator.preferences.*` via `test_driver.set_permission`. 100% infeasible; 412/412 of everything else passes. Stop looking at this suite.
+- **cssom** — 21 browser-only (`caretRangeFromPoint` / `caretPositionFromPoint`) are correctly classified `VIEWPORT_GEOMETRY`.
+
+### Cheap one-offs
+- **css-syntax** last failure: `escaped-eof.html` — `\` at EOF inside a hash token becomes `\uFFFD`, making it an ID token. Claimed one-line tokenizer fix; would take the suite to 407/407.
+- **css-cascade**: 12 failures in `layer-basic.html` (nested sub-layer ordering) claimed genuinely fixable; 16 more are the B5 misclassified layout tests.
+
+---
+
+## Field Notes for Future Agents
+
+### The css-typed-om-1 per-property reification table is stale
+Phase 134 hit this twice. The spec defines rich machinery (`CSSColorValue`, "reify a color value") that the per-property table at `#reify-property` never invokes, and the table's own entries lag the surrounding prose.
+
+- §7.5 opens with "CSS `<color>` values become either `CSSColorValue`s … or generic `CSSStyleValue`s", which **contradicts** the table. It is unreferenced prose with no algorithmic caller.
+- "reify a color value" (line 5548) has exactly **one** invocation in the whole spec: `CSSColorValue.parse()` at line 3096.
+- The table says only `currentcolor` reifies as an identifier, yet Chrome and WPT reify grammar keywords like `caret-color: auto` as `CSSKeywordValue`.
+
+**Rule: on a "spec says X but WPT wants Y" conflict in Typed OM, check the table for staleness first, follow WPT/Chrome, and comment the divergence as two separate claims — what the table literally says, and what we do instead — rather than paraphrasing them into one.**
+
+### Reconcile headline numbers against their components
+`699040c` was reported net-zero on the strength of two green idlharness files and was actually **−142**. It was caught only because +233 on two files didn't reconcile with +97 overall. A green local unit-test run is not evidence a change is conformance-neutral.
+
+### Spec-fidelity commits can still introduce leniency
+`94a11f4` quoted css-typed-om-1 §3.2 correctly — "a direct `CSSStyleValue` … **with a non-null [[associatedProperty]] slot** matches the grammar … regardless of what it is" — but implemented `_associatedProperty === null || … === propKey`, granting the exemption to null slots too. `set('color', <garbage>)` silently wrote `notacolor!!!`. Fixed in `88ea423`.
+
+The hole was found by writing a throwaway probe, not by reading the diff. **When a change widens a validation path, probe the widened path directly with a value that should be rejected.**
+
+### The WPT assertion shims are faithful as of `84515a4`
+A function-by-function audit against `submodules/web-platform-tests/resources/testharness.js` tightened seven shims (`assert_readonly`, `assert_throws_js`, all four numeric comparisons, `assert_array_equals`, `assert_approx_equals`) and the score went **up 2**. Our conformance is not inflated by lenient assertions. One deliberate deviation remains and is documented in place: the cross-realm `DOMException` constructor fallback in `assert_throws_dom`.
