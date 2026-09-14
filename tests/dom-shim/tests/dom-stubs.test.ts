@@ -170,3 +170,51 @@ test('adoptedStyleSheets and document.styleSheets collection behavior', () => {
     (doc as unknown as { adoptedStyleSheets: unknown }).adoptedStyleSheets = ['invalid' as unknown as CSSStyleSheet];
   }, TypeError);
 });
+
+// WebIDL § 3.6.3 #interface-prototype-object: every interface prototype object has a
+// non-enumerable, writable, configurable `constructor` pointing back at its interface object.
+// LinkeDOM ships several of these mis-wired; patchInterfaceConstructors() in dom-stubs.ts repairs
+// them. The list is restated here rather than imported so that dropping a name from the source
+// list is a test failure instead of a silently shrinking assertion.
+const WEBIDL_CONSTRUCTOR_INTERFACES = [
+  'Attr',
+  'CharacterData',
+  'Comment',
+  'Document',
+  'DocumentFragment',
+  'DocumentType',
+  'Element',
+  'HTMLElement',
+  'Node',
+  'ShadowRoot',
+  'SVGElement',
+  'Text'
+];
+
+test('DOM interface prototypes have WebIDL-conformant constructor properties', () => {
+  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+
+  const winObj = win as unknown as Record<string, unknown>;
+
+  for (const name of WEBIDL_CONSTRUCTOR_INTERFACES) {
+    const ctor = winObj[name];
+    assert.equal(typeof ctor, 'function', `${name} is exposed as an interface object`);
+
+    const proto = (ctor as { prototype?: unknown }).prototype;
+    assert.equal(typeof proto, 'object', `${name}.prototype is an object`);
+
+    // Compare by identity, never by structural diff: these are cyclic DOM objects.
+    assert.ok(
+      (proto as Record<string, unknown>).constructor === ctor,
+      `${name}.prototype.constructor points back at ${name}`
+    );
+
+    const descriptor = Object.getOwnPropertyDescriptor(proto as object, 'constructor');
+    assert.ok(descriptor, `${name}.prototype has an own constructor property`);
+    assert.equal(descriptor.enumerable, false, `${name}.prototype.constructor is non-enumerable`);
+    assert.equal(descriptor.writable, true, `${name}.prototype.constructor is writable`);
+    assert.equal(descriptor.configurable, true, `${name}.prototype.constructor is configurable`);
+  }
+});

@@ -1719,10 +1719,7 @@ function patchElementPrototype(window: WindowType): void {
   const winObj = window as unknown as Record<string, unknown>;
   const svgCtor = winObj.SVGElement as (Function & { prototype?: Record<string, unknown> }) | undefined;
   if (svgCtor && svgCtor.prototype) {
-    // WebIDL § 3.6.3 #interface-prototype-object: constructor must point to interface object
-    if (svgCtor.prototype.constructor !== svgCtor) {
-      svgCtor.prototype.constructor = svgCtor;
-    }
+    // Constructor wiring is repaired generally by patchInterfaceConstructors().
     patchElementStyle(svgCtor.prototype, window);
 
     // css-typed-om § 2.3 #declared-stylepropertymap-objects
@@ -1814,9 +1811,69 @@ function patchElementPrototype(window: WindowType): void {
 
 let prototypesPatched = false;
 
+// WebIDL § 3.6.3 #interface-prototype-object: an interface prototype object must have a
+// `constructor` property pointing back at its interface object.
+//
+// Several LinkeDOM interfaces are exposed as facade objects whose `.prototype.constructor` points
+// elsewhere. That breaks more than descriptor conformance: the WPT sandbox in
+// scripts/wpt/node/run.ts uses `val.prototype.constructor !== val` to tell plain functions apart
+// from constructors, and `.bind()`s anything that fails the check -- which strips `.prototype`
+// entirely and surfaces as `interface "X" does not have own property "prototype"` in idlharness.
+//
+// The list below is explicit rather than discovered, because LinkeDOM serves these through a Proxy
+// `get` trap: they are not own properties of the window or of anything on its prototype chain, so
+// Object.getOwnPropertyNames()/for..in cannot see them. They are only reachable by name.
+// tests/dom-shim/tests/dom-stubs.test.ts asserts these stay wired.
+const WEBIDL_INTERFACE_NAMES = [
+  'Attr',
+  'CharacterData',
+  'Comment',
+  'Document',
+  'DocumentFragment',
+  'DocumentType',
+  'Element',
+  'HTMLElement',
+  'Node',
+  'ShadowRoot',
+  'SVGElement',
+  'Text'
+] as const;
+
+function patchInterfaceConstructors(window: WindowType): void {
+  const winObj = window as unknown as Record<string, unknown>;
+
+  for (const name of WEBIDL_INTERFACE_NAMES) {
+    let value: unknown;
+    try {
+      value = winObj[name];
+    } catch {
+      continue; // Not provided by this DOM implementation.
+    }
+
+    if (typeof value !== 'function') continue;
+
+    const proto = (value as { prototype?: unknown }).prototype;
+    if (!proto || typeof proto !== 'object') continue;
+
+    const protoObj = proto as Record<string, unknown>;
+    if (protoObj.constructor === value) continue;
+
+    Object.defineProperty(protoObj, 'constructor', {
+      value,
+      writable: true,
+      enumerable: false, // WebIDL § 3.6.3 requires constructor to be non-enumerable.
+      configurable: true
+    });
+  }
+}
+
 export function patchDomPrototypes(window: WindowType, patchWindow: (win: WindowType) => void): void {
   if (prototypesPatched) return;
   prototypesPatched = true;
+
+  // Must run first: later patches and the WPT sandbox both rely on interface objects being
+  // recognizable as constructors.
+  patchInterfaceConstructors(window);
 
   patchNodeTreeMutations(window);
   patchIFramePrototype(window, patchWindow);
