@@ -316,20 +316,20 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **87.2%** (19,638 / 22,517 passed assertions across 1,769 test files).
-* **Chrome 154 Parity**: **87.2%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **88.3%** (19,873 / 22,496 passed assertions across 1,769 test files).
+* **Chrome 154 Parity**: **88.3%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
-| **`Typed OM`** | 12,770 | 11,886 | **93.1%** | -0.4% |
-| **`CSSOM`** | 2,156 | 1,678 | **77.8%** | -19.3% |
+| **`Typed OM`** | 12,765 | 11,955 | **93.7%** | 🟢 **+0.1%** (ahead of Chrome) |
+| **`CSSOM`** | 2,143 | 1,842 | **86.0%** | -11.2% |
 | **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
-| **`Cascade`** | 497 | 400 | **80.5%** | -19.4% |
+| **`Cascade`** | 494 | 402 | **81.4%** | -18.5% |
 | **`Variables`** | 499 | 411 | **82.4%** | -8.2% |
 | **`Selectors`** | 5,654 | 4,328 | **76.5%** | -9.4% |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **22,517** | **19,638** | **87.2%** | **-5.9%** |
+| **OVERALL** | **22,496** | **19,873** | **88.3%** | **-4.7%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.
