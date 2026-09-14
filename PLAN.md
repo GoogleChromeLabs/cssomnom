@@ -3070,3 +3070,20 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Run full `pnpm run preflight`.
   - Spawn `grizz` subagent to perform a thorough code taste and type design review across all three phases.
 
+---
+
+## Phase 127: Cross-Browser Vendor Pseudo Support (`allowVendorPseudos`)
+**Goal**: Support cross-browser stylesheet analysis and prevent silent dropping of vendor-prefixed pseudo-classes/elements (such as `:-moz-ui-invalid`, `:-ms-input-placeholder`, `::-moz-selection`) via a first-class `allowVendorPseudos` parser option while maintaining strict W3C Selectors 4 Appendix B conformance by default.
+
+### Tasks
+- [ ] **Define Option in Parser & Selector Parser Interfaces**:
+  - Add `allowVendorPseudos?: boolean` to `ParserOptions` in `src/parser.ts` and `SelectorParserOptions` in `src/SelectorParser.ts`.
+  - Propagate `allowVendorPseudos` through `parse(css, options?)`, `Parser.parseSelectorAST(text, options?)`, and `consumeQualifiedRule`.
+- [ ] **Implement Vendor Prefix Recognition in `SelectorParser`**:
+  - In `src/SelectorParser.ts`: When `this.allowVendorPseudos` is enabled, permit vendor-prefixed pseudo-classes and pseudo-elements (`-moz-`, `-ms-`, `-o-`, `-webkit-`, or generic `^-[a-z0-9]+-`) without throwing `SyntaxError`.
+  - Preserve strict Appendix B behavior by default (`allowVendorPseudos: false` or omitted), where only `::-webkit-*` pseudo-elements and `:-webkit-autofill` are permitted as quirks.
+- [ ] **Unit Tests & Preflight**:
+  - Author regression unit tests in `tests/pseudo-validation.test.ts` verifying that `:-moz-ui-invalid`, `:-ms-input-placeholder`, and `::-moz-selection` survive into `cssRules` when `allowVendorPseudos: true`, and are discarded under strict mode.
+  - Run `pnpm run preflight`.
+
+
