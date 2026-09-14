@@ -171,50 +171,36 @@ test('adoptedStyleSheets and document.styleSheets collection behavior', () => {
   }, TypeError);
 });
 
-// WebIDL § 3.6.3 #interface-prototype-object: every interface prototype object has a
-// non-enumerable, writable, configurable `constructor` pointing back at its interface object.
-// LinkeDOM ships several of these mis-wired; patchInterfaceConstructors() in dom-stubs.ts repairs
-// them. The list is restated here rather than imported so that dropping a name from the source
-// list is a test failure instead of a silently shrinking assertion.
-const WEBIDL_CONSTRUCTOR_INTERFACES = [
-  'Attr',
-  'CharacterData',
-  'Comment',
-  'Document',
-  'DocumentFragment',
-  'DocumentType',
-  'Element',
-  'HTMLElement',
-  'Node',
-  'ShadowRoot',
-  'SVGElement',
-  'Text'
-];
-
-test('DOM interface prototypes have WebIDL-conformant constructor properties', () => {
-  const dom = parseHTML('<!DOCTYPE html><html><body></body></html>');
+// Regression guard: LinkeDOM exposes throw-on-construct *facades* on the window whose `prototype`
+// is the very same object as the internal class's prototype:
+//
+//   export function DocumentFragment() { illegalConstructor(); }
+//   DocumentFragment.prototype = _DocumentFragment.prototype;
+//
+// So `X.prototype.constructor` deliberately points at the *internal* class, not at the facade, and
+// LinkeDOM's own code depends on it -- non-element-parent-node.js does
+// `const {constructor} = this; new constructor(ownerDocument)` inside cloneNode().
+//
+// "Repairing" that wiring to satisfy WebIDL 3.6.3 makes every such internal construction throw
+// `TypeError: Illegal constructor`. It was tried in 699040c and cost 142 css-cascade subtests
+// (every @scope test clones a fragment). This test fails loudly if anyone tries it again.
+test('patching does not clobber LinkeDOM internal constructor wiring (cloneNode still works)', () => {
+  const dom = parseHTML('<!DOCTYPE html><html><body><div id="host"><span>a</span><span>b</span></div></body></html>');
   const win = dom.window;
   patchWindowForTypedOM(win);
 
-  const winObj = win as unknown as Record<string, unknown>;
+  const fragment = win.document.createDocumentFragment();
+  fragment.appendChild(win.document.createElement('p'));
 
-  for (const name of WEBIDL_CONSTRUCTOR_INTERFACES) {
-    const ctor = winObj[name];
-    assert.equal(typeof ctor, 'function', `${name} is exposed as an interface object`);
+  const shallow = fragment.cloneNode(false);
+  assert.ok(shallow, 'shallow cloneNode on a DocumentFragment does not throw');
+  assert.equal(shallow.childNodes.length, 0, 'shallow clone has no children');
 
-    const proto = (ctor as { prototype?: unknown }).prototype;
-    assert.equal(typeof proto, 'object', `${name}.prototype is an object`);
+  const deep = fragment.cloneNode(true);
+  assert.equal(deep.childNodes.length, 1, 'deep clone copies children');
 
-    // Compare by identity, never by structural diff: these are cyclic DOM objects.
-    assert.ok(
-      (proto as Record<string, unknown>).constructor === ctor,
-      `${name}.prototype.constructor points back at ${name}`
-    );
-
-    const descriptor = Object.getOwnPropertyDescriptor(proto as object, 'constructor');
-    assert.ok(descriptor, `${name}.prototype has an own constructor property`);
-    assert.equal(descriptor.enumerable, false, `${name}.prototype.constructor is non-enumerable`);
-    assert.equal(descriptor.writable, true, `${name}.prototype.constructor is writable`);
-    assert.equal(descriptor.configurable, true, `${name}.prototype.constructor is configurable`);
-  }
+  // Element cloning travels the same internal path.
+  const host = win.document.getElementById('host')!;
+  const clonedHost = host.cloneNode(true);
+  assert.equal(clonedHost.childNodes.length, 2, 'deep element clone copies children');
 });
