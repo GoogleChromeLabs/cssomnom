@@ -100,8 +100,10 @@ describe('Readonly properties', () => {
 
   it('should make CSSStyleRule styleMap readonly', () => {
     const rule = new CSSStyleRule('.foo', [], [], () => ({} as unknown as Rule));
-    // @ts-expect-error - styleMap should be readonly
-    rule.styleMap = null as unknown as StylePropertyMapReadOnly;
+    assert.throws(() => {
+      // @ts-expect-error - styleMap should be readonly
+      rule.styleMap = null as unknown as StylePropertyMapReadOnly;
+    }, TypeError);
     assert.ok(true);
   });
 

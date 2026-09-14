@@ -1633,27 +1633,22 @@ function patchElementPrototype(window: WindowType): void {
       (elProto as unknown as Record<string, unknown>).scrollIntoView = () => {};
     }
 
-    Object.defineProperty(window.Element.prototype, 'attributeStyleMap', {
-      get(this: Element & { style: CSSStyleDeclaration }) {
-        let map = attributeStyleMapCache.get(this);
-        if (!map) {
-          map = new TypedOM.StylePropertyMap(this.style, this);
-          attributeStyleMapCache.set(this, map);
-        }
-        return map;
-      },
-      configurable: true
-    });
-
+    // css-typed-om § 2.2 #computed-stylepropertymapreadonly-objects
+    // WebIDL § 3.7 #es-operations
     Object.defineProperty(window.Element.prototype, 'computedStyleMap', {
-      value(this: Element & { style: CSSStyleDeclaration }) {
+      value: function computedStyleMap(this: Element) {
+        if (!this || !(this instanceof window.Element)) {
+          throw new TypeError("Value of 'this' is not an Element");
+        }
         let map = computedStyleMapCache.get(this);
         if (!map) {
-          map = new ComputedStylePropertyMap(this.style, this);
+          map = new ComputedStylePropertyMap((this as unknown as { style: CSSStyleDeclaration }).style, this);
           computedStyleMapCache.set(this, map);
         }
         return map;
       },
+      writable: true,
+      enumerable: true,
       configurable: true
     });
   }
@@ -1695,6 +1690,60 @@ function patchElementPrototype(window: WindowType): void {
         }
         return 0;
       },
+      configurable: true
+    });
+
+    // css-typed-om § 2.3 #declared-stylepropertymap-objects
+    // cssom-1 § 6.8 #the-elementcssinlinestyle-mixin
+    // WebIDL § 3.6 #es-attributes
+    Object.defineProperty(window.HTMLElement.prototype, 'attributeStyleMap', {
+      get: Object.getOwnPropertyDescriptor({
+        get attributeStyleMap() {
+          const self = this as unknown as HTMLElement;
+          if (!self || !(self instanceof window.HTMLElement)) {
+            throw new TypeError("Value of 'this' is not an HTMLElement");
+          }
+          let map = attributeStyleMapCache.get(self);
+          if (!map) {
+            map = new TypedOM.StylePropertyMap((self as unknown as { style: CSSStyleDeclaration }).style, self);
+            attributeStyleMapCache.set(self, map);
+          }
+          return map;
+        }
+      }, 'attributeStyleMap')!.get,
+      enumerable: true,
+      configurable: true
+    });
+  }
+
+  const winObj = window as unknown as Record<string, unknown>;
+  const svgCtor = winObj.SVGElement as (Function & { prototype?: Record<string, unknown> }) | undefined;
+  if (svgCtor && svgCtor.prototype) {
+    // WebIDL § 3.6.3 #interface-prototype-object: constructor must point to interface object
+    if (svgCtor.prototype.constructor !== svgCtor) {
+      svgCtor.prototype.constructor = svgCtor;
+    }
+    patchElementStyle(svgCtor.prototype, window);
+
+    // css-typed-om § 2.3 #declared-stylepropertymap-objects
+    // cssom-1 § 6.8 #the-elementcssinlinestyle-mixin
+    // WebIDL § 3.6 #es-attributes
+    Object.defineProperty(svgCtor.prototype, 'attributeStyleMap', {
+      get: Object.getOwnPropertyDescriptor({
+        get attributeStyleMap() {
+          const self = this as unknown;
+          if (!self || (svgCtor && !(self instanceof (svgCtor as unknown as { new (): unknown })))) {
+            throw new TypeError("Value of 'this' is not an SVGElement");
+          }
+          let map = attributeStyleMapCache.get(self as object);
+          if (!map) {
+            map = new TypedOM.StylePropertyMap((self as unknown as { style: CSSStyleDeclaration }).style, self as Element);
+            attributeStyleMapCache.set(self as object, map);
+          }
+          return map;
+        }
+      }, 'attributeStyleMap')!.get,
+      enumerable: true,
       configurable: true
     });
   }

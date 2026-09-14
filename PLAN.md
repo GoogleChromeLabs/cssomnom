@@ -3137,6 +3137,36 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Updated `tests/dom-shim/tests/dom-stubs.test.ts` to verify `activeElement` defaults to `body` before focus and falls back to `body` after blur.
   - Preflight verification: `pnpm run preflight` 100% clean (0 TypeScript type errors, 0 linter warnings, all tests passing).
 
+---
+
+## Phase 130: WebIDL Entry Points Conformance for Typed OM [x]
+**Goal**: Align `CSSStyleRule.styleMap`, `Element.prototype.computedStyleMap()`, and `attributeStyleMap` with WebIDL property-descriptor and prototype location requirements.
+
+**Spec References**:
+- CSS Typed OM: § 2.3 (`#declared-stylepropertymap-objects`), § 2.2 (`#computed-stylepropertymapreadonly-objects`)
+- CSSOM 1: § 6.8 (`#the-elementcssinlinestyle-mixin`)
+- WebIDL: § 3.6 (`#es-attributes`), § 3.7 (`#es-operations`), § 3.6.3 (`#interface-prototype-object`)
+
+### Tasks
+- [x] **CSSStyleRule.prototype.styleMap Interface Attribute (`src/CSSOM.ts`)**:
+  - Replaced own instance property initialization with an enumerable prototype getter on `CSSStyleRule.prototype` with brand check throwing `TypeError` on invalid `this`.
+  - Cached `StylePropertyMap` lazily per instance (`[SameObject]`).
+- [x] **Element.prototype.computedStyleMap Descriptor (`tests/dom-shim/src/dom-stubs.ts`)**:
+  - Updated descriptor to `{ writable: true, enumerable: true, configurable: true, value }` per WebIDL regular operations.
+  - Added brand check throwing `TypeError` if `this` is not an `Element`.
+- [x] **attributeStyleMap Prototype Location & Descriptors (`tests/dom-shim/src/dom-stubs.ts`)**:
+  - Moved `attributeStyleMap` from `Element.prototype` to `HTMLElement.prototype` and `SVGElement.prototype` per the `ElementCSSInlineStyle` mixin specification.
+  - Configured `{ enumerable: true, configurable: true, get }` with brand checks throwing `TypeError` on incorrect `this`.
+  - Reconciled `SVGElement.prototype.constructor` to point to `SVGElement` per WebIDL § 3.6.3.
+  - Justified out-of-scope decision for `MathMLElement` (non-existent in LinkeDOM; avoiding fake mocks).
+- [x] **Verification & Preflight**:
+  - Added regression unit tests in `tests/typed-om-entrypoints-webidl.test.ts`.
+  - Verified `pnpm run preflight` exits 0 (clean lint, typecheck, safe-exec, unit tests).
+  - WPT `css/css-typed-om/idlharness.html` increased from 335/544 to 339/544 (+4 passes).
+  - WPT `css/cssom/idlharness.html` maintained at 117/497 passed.
+  - Spot-checked non-idlharness tests `the-stylepropertymap/declared/declared.tentative.html` (4/7), `inline/clear.html` (3/3), and `inline/get.html` (7/7).
+
+
 
 
 

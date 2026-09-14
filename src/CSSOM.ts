@@ -437,7 +437,7 @@ export class CSSStyleRule extends CSSGroupingRule {
   private _selectorText: string;
   private _selectorAST: import('./types.ts').SelectorList | null = null;
   private _style: CSSStyleDeclaration;
-  readonly styleMap: StylePropertyMap;
+  private _styleMap: StylePropertyMap | null = null;
 
   constructor(selectorText: string, styleDeclarations: Declaration[], rules: Rule[], parseRuleInBlock: (text: string) => Rule, selectorAST: import('./types.ts').SelectorList | null = null) {
     super(rules, parseRuleInBlock);
@@ -445,7 +445,18 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._selectorAST = selectorAST;
     this._style = new CSSStyleDeclaration(styleDeclarations);
     this._style.parentRule = this;
-    this.styleMap = new StylePropertyMap(this._style);
+  }
+
+  // css-typed-om § 2.3 #declared-stylepropertymap-objects
+  // WebIDL § 3.6 #es-attributes
+  get styleMap(): StylePropertyMap {
+    if (!this || !(this instanceof CSSStyleRule)) {
+      throw new TypeError("Value of 'this' is not a CSSStyleRule");
+    }
+    if (!this._styleMap) {
+      this._styleMap = new StylePropertyMap(this._style);
+    }
+    return this._styleMap;
   }
 
   get style(): CSSStyleDeclaration {
@@ -594,5 +605,10 @@ export class CSSStyleRule extends CSSGroupingRule {
     // Do nothing as per spec
   }
 }
+
+// WebIDL § 3.6 #es-attributes
+Object.defineProperty(CSSStyleRule.prototype, 'styleMap', {
+  enumerable: true
+});
 
 export * from './rules/at-rules.ts';
