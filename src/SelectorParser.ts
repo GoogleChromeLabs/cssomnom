@@ -125,6 +125,7 @@ export interface SelectorParserOptions {
   forbidPseudo?: boolean;
   declaredNamespaces?: Set<string>;
   strictSupports?: boolean;
+  allowVendorPseudos?: boolean;
 }
 
 /**
@@ -146,6 +147,7 @@ export class SelectorParser {
   private forbidPseudo: boolean;
   private declaredNamespaces?: Set<string>;
   private strictSupports: boolean;
+  private allowVendorPseudos: boolean;
 
   constructor(values: ComponentValue[], options: SelectorParserOptions = {}) {
     this.cursor = new ComponentValueCursor(values);
@@ -155,6 +157,7 @@ export class SelectorParser {
     this.forbidPseudo = options.forbidPseudo ?? false;
     this.declaredNamespaces = options.declaredNamespaces;
     this.strictSupports = options.strictSupports ?? false;
+    this.allowVendorPseudos = options.allowVendorPseudos ?? false;
   }
 
 
@@ -593,18 +596,23 @@ export class SelectorParser {
 
       const name = LEGACY_PSEUDO_CLASS_ALIASES[lowerName] || originalName;
       const effectiveLowerName = name.toLowerCase();
+      const isVendorPrefixed = /^-[a-zA-Z0-9]+-/.test(effectiveLowerName);
       
       if (isPseudoElement) {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
-        if (!PSEUDO_ELEMENTS.has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
+        // selectors-4 § 3.3 #pseudo-elements
+        // selectors-4 Appendix B Quirks: -webkit- prefixed pseudo-elements
+        const isAllowedVendor = (this.allowVendorPseudos && isVendorPrefixed) || (!this.strictSupports && effectiveLowerName.startsWith('-webkit-'));
+        if (!PSEUDO_ELEMENTS.has(effectiveLowerName) && !isAllowedVendor) {
           throw new DOMException(`Unknown pseudo-element ::${name}`, 'SyntaxError');
         }
         return { type: 'pseudo-element-selector', name };
       }
       
       // Check for legacy pseudo-elements that use single colon
+      // selectors-4 § 3.3 #pseudo-elements
       if (['before', 'after', 'first-line', 'first-letter'].includes(effectiveLowerName)) {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
@@ -612,7 +620,10 @@ export class SelectorParser {
         return { type: 'pseudo-element-selector', name };
       }
       
-      if (!PSEUDO_CLASSES.has(effectiveLowerName) && (this.strictSupports || !effectiveLowerName.startsWith('-webkit-'))) {
+      // selectors-4 § 3.2 #pseudo-classes
+      // selectors-4 Appendix B Quirks: -webkit- prefixed pseudo-classes
+      const isAllowedVendor = (this.allowVendorPseudos && isVendorPrefixed) || (!this.strictSupports && effectiveLowerName.startsWith('-webkit-'));
+      if (!PSEUDO_CLASSES.has(effectiveLowerName) && !isAllowedVendor) {
         throw new DOMException(`Unknown pseudo-class :${name}`, 'SyntaxError');
       }
       return { type: 'pseudo-class-selector', name };
@@ -620,12 +631,14 @@ export class SelectorParser {
       const func = token;
       const name = func.name;
       const lowerName = name.toLowerCase();
+      const isVendorPrefixed = /^-[a-zA-Z0-9]+-/.test(lowerName);
       
       if (isPseudoElement) {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
-        if (!PSEUDO_ELEMENTS.has(lowerName)) {
+        // selectors-4 § 3.3 #pseudo-elements
+        if (!PSEUDO_ELEMENTS.has(lowerName) && !(this.allowVendorPseudos && isVendorPrefixed)) {
           throw new DOMException(`Unknown pseudo-element ::${name}()`, 'SyntaxError');
         }
         
@@ -634,7 +647,8 @@ export class SelectorParser {
             insideHas: this.insideHas,
             forbidPseudo: true,
             declaredNamespaces: this.declaredNamespaces,
-            strictSupports: this.strictSupports
+            strictSupports: this.strictSupports,
+            allowVendorPseudos: this.allowVendorPseudos
           });
           subParser.cursor.skipWhitespace();
           const compound = subParser.consumeCompoundSelector();
@@ -655,7 +669,8 @@ export class SelectorParser {
         return { type: 'pseudo-element-selector', name, argument: func.value };
       }
       
-      if (!PSEUDO_CLASSES.has(lowerName) && lowerName !== 'matches') {
+      // selectors-4 § 3.2 #pseudo-classes
+      if (!PSEUDO_CLASSES.has(lowerName) && lowerName !== 'matches' && !(this.allowVendorPseudos && isVendorPrefixed)) {
         throw new DOMException(`Unknown pseudo-class :${name}()`, 'SyntaxError');
       }
       
@@ -673,7 +688,8 @@ export class SelectorParser {
           insideHas: isHas || this.insideHas,
           forbidPseudo: isLogicalPseudo || isHas || this.forbidPseudo,
           declaredNamespaces: this.declaredNamespaces,
-          strictSupports: this.strictSupports
+          strictSupports: this.strictSupports,
+          allowVendorPseudos: this.allowVendorPseudos
         });
         return { type: 'pseudo-class-selector', name, argument: subParser.parse() };
       }
@@ -682,7 +698,9 @@ export class SelectorParser {
         const subParser = new SelectorParser(func.value, {
           insideHas: this.insideHas,
           forbidPseudo: true,
-          declaredNamespaces: this.declaredNamespaces
+          declaredNamespaces: this.declaredNamespaces,
+          strictSupports: this.strictSupports,
+          allowVendorPseudos: this.allowVendorPseudos
         });
         subParser.cursor.skipWhitespace();
         const compound = subParser.consumeCompoundSelector();
@@ -720,7 +738,8 @@ export class SelectorParser {
             forbidPseudo: true,
             allowRelative: false,
             declaredNamespaces: this.declaredNamespaces,
-            strictSupports: this.strictSupports
+            strictSupports: this.strictSupports,
+            allowVendorPseudos: this.allowVendorPseudos
           });
           return { type: 'pseudo-class-selector', name, argument: subParserOf.parse(), nth };
         } else {

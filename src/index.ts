@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 export { Parser, parse } from './parser.ts';
+export type { ParserOptions } from './parser.ts';
 export { tokenize } from './tokenizer.ts';
 export { serialize } from './serializer.ts';
 export { getCascadedStyle } from './cascade.ts';

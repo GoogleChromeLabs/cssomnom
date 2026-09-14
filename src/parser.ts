@@ -26,6 +26,7 @@ import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream }
 
 export interface ParserOptions {
   atRules?: Record<string, string>;
+  allowVendorPseudos?: boolean;
 }
 import { SelectorParser } from './SelectorParser.ts';
 import { calculateSpecificity } from './specificity.ts';
@@ -209,13 +210,13 @@ export class Parser {
   // 5.4.3 Parse a stylesheet https://drafts.csswg.org/css-syntax/#parse-stylesheet
   public parseStyleSheet(): CSSStyleSheet {
     const rules = this.consumeListOfRules(true);
-    return CSSStyleSheet.createInternal(rules, parseRule);
+    return CSSStyleSheet.createInternal(rules, (text: string) => this.parseRule(text));
   }
 
   public parseRule(ruleString: string): Rule | null {
     const errors: ParseError[] = [];
     const tokens = tokenize(ruleString, false, errors);
-    const parser = new Parser(tokens);
+    const parser = new Parser(tokens, this.options);
     parser.errors.push(...errors);
     const rule = parser.consumeRule();
     
@@ -1502,12 +1503,20 @@ export class Parser {
     if (isNested) {
       selectorText = this.normalizeNestedSelector(prelude);
       if (selectorText === '') return null;
-      selectorAST = Parser.parseSelectorAST(selectorText, this.declaredNamespaces, true);
+      selectorAST = Parser.parseSelectorAST(selectorText, {
+        declaredNamespaces: this.declaredNamespaces,
+        allowRelative: true,
+        allowVendorPseudos: Boolean(this.options.allowVendorPseudos)
+      });
       if (selectorAST === null) return null;
     } else {
       if (!this.isValidSelector(prelude)) return null;
       try {
-        selectorAST = new SelectorParser(prelude, { declaredNamespaces: this.declaredNamespaces, allowRelative }).parse();
+        selectorAST = new SelectorParser(prelude, {
+          declaredNamespaces: this.declaredNamespaces,
+          allowRelative,
+          allowVendorPseudos: Boolean(this.options.allowVendorPseudos)
+        }).parse();
       } catch (e) {
         return null;
       }
@@ -1537,15 +1546,46 @@ export class Parser {
     return prelude;
   }
 
-  public static parseSelectorAST(text: string, declaredNamespaces?: Set<string>, allowRelative = false): import('./types.ts').SelectorList | null {
+  public static parseSelectorAST(
+    text: string,
+    options?: { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean }
+  ): import('./types.ts').SelectorList | null;
+  public static parseSelectorAST(
+    text: string,
+    declaredNamespaces?: Set<string>,
+    allowRelative?: boolean,
+    allowVendorPseudos?: boolean
+  ): import('./types.ts').SelectorList | null;
+  public static parseSelectorAST(
+    text: string,
+    declaredNamespacesOrOptions?: Set<string> | { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean },
+    allowRelative = false,
+    allowVendorPseudos = false
+  ): import('./types.ts').SelectorList | null {
+    let declaredNamespaces: Set<string> | undefined;
+    let isRelative = allowRelative;
+    let vendorPseudos = allowVendorPseudos;
+
+    if (declaredNamespacesOrOptions && !(declaredNamespacesOrOptions instanceof Set)) {
+      declaredNamespaces = declaredNamespacesOrOptions.declaredNamespaces;
+      isRelative = declaredNamespacesOrOptions.allowRelative ?? false;
+      vendorPseudos = declaredNamespacesOrOptions.allowVendorPseudos ?? false;
+    } else {
+      declaredNamespaces = declaredNamespacesOrOptions;
+    }
+
     const tokens = tokenize(text);
-    const parser = new Parser(tokens);
+    const parser = new Parser(tokens, { allowVendorPseudos: vendorPseudos });
     const prelude = Parser.#consumeSelectorTokens(parser);
     
     if (prelude === null) return null;
     
     try {
-      return new SelectorParser(prelude, { allowRelative, declaredNamespaces }).parse();
+      return new SelectorParser(prelude, {
+        allowRelative: isRelative,
+        declaredNamespaces,
+        allowVendorPseudos: vendorPseudos
+      }).parse();
     } catch (e) {
       return null;
     }
@@ -2169,13 +2209,18 @@ ParseHooks.parseRuleInBlock = (text, nested) => Parser.parseRuleInBlockText(text
 ParseHooks.parseRuleInScopeBlock = (text) => Parser.parseRuleInScopeBlockText(text);
 ParseHooks.parseComponentValues = (tokens) => new Parser(tokens).parseComponentValues();
 ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
-ParseHooks.parseSelectorAST = (text, declaredNamespaces, allowRelative) => Parser.parseSelectorAST(text, declaredNamespaces, allowRelative);
+ParseHooks.parseSelectorAST = (text, declaredNamespacesOrOptions, allowRelative, allowVendorPseudos) => {
+  if (declaredNamespacesOrOptions instanceof Set) {
+    return Parser.parseSelectorAST(text, declaredNamespacesOrOptions, allowRelative, allowVendorPseudos);
+  }
+  return Parser.parseSelectorAST(text, declaredNamespacesOrOptions);
+};
 ParseHooks.validateCustomPropertyValue = (values) => Parser.validateCustomPropertyValue(values);
 ParseHooks.validateDeclarationValue = (values) => validateDeclarationValue(values);
 ParseHooks.isValidUnicodeRangeValue = (values) => isValidUnicodeRangeValue(values);
 ParseHooks.assembleUnicodeRanges = (values) => assembleUnicodeRanges(values);
 ParseHooks.isValidDashedIdent = (name) => Parser.isValidDashedIdent(name);
 
-export function parse(css: string): CSSStyleSheet {
-  return new Parser(tokenize(css)).parseStyleSheet();
+export function parse(css: string, options?: ParserOptions): CSSStyleSheet {
+  return new Parser(tokenize(css), options).parseStyleSheet();
 }

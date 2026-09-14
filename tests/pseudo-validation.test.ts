@@ -16,7 +16,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert';
-import { Parser } from '../src/parser.ts';
+import { Parser, parse } from '../src/parser.ts';
 
 test('Validate pseudo-classes against generated list', () => {
   // Valid pseudo-classes
@@ -63,5 +63,48 @@ test('Allow logical pseudo-classes after pseudo-elements', () => {
   assert.ok(Parser.parseSelectorAST('div::before:where(.foo)'));
   assert.ok(Parser.parseSelectorAST('div::before:has(.foo)'));
 });
+
+test('Reject non-webkit vendor pseudos by default (strict mode)', () => {
+  // selectors-4 § 3.2 #pseudo-classes & § 3.3 #pseudo-elements
+  assert.strictEqual(Parser.parseSelectorAST(':-moz-ui-invalid'), null);
+  assert.strictEqual(Parser.parseSelectorAST(':-ms-input-placeholder'), null);
+  assert.strictEqual(Parser.parseSelectorAST('::-moz-selection'), null);
+
+  const sheet = parse('a:-moz-ui-invalid { color: red; } c:-ms-input-placeholder { color: blue; } d::-moz-selection { background: yellow; }');
+  assert.strictEqual(sheet.cssRules.length, 0);
+});
+
+test('Allow cross-browser vendor pseudos when allowVendorPseudos: true', () => {
+  // selectors-4 § 3.2 #pseudo-classes & § 3.3 #pseudo-elements
+  const css = 'a:-moz-ui-invalid { color: red; } b::-webkit-scrollbar { width: 0; } c:-ms-input-placeholder { color: blue; } d::-moz-selection { background: yellow; }';
+  const sheet = parse(css, { allowVendorPseudos: true });
+  assert.strictEqual(sheet.cssRules.length, 4);
+
+  assert.ok(Parser.parseSelectorAST(':-moz-ui-invalid', { allowVendorPseudos: true }));
+  assert.ok(Parser.parseSelectorAST('::-moz-selection', { allowVendorPseudos: true }));
+  assert.ok(Parser.parseSelectorAST(':-ms-input-placeholder', { allowVendorPseudos: true }));
+  assert.ok(Parser.parseSelectorAST(':-o-prefocus', { allowVendorPseudos: true }));
+});
+
+test('Non-vendor unknown pseudos remain rejected even when allowVendorPseudos: true', () => {
+  // selectors-4 § 3.2 #pseudo-classes & § 3.3 #pseudo-elements
+  assert.strictEqual(Parser.parseSelectorAST(':bogus', { allowVendorPseudos: true }), null);
+  assert.strictEqual(Parser.parseSelectorAST('::fake-thing', { allowVendorPseudos: true }), null);
+  assert.strictEqual(Parser.parseSelectorAST(':non-existent-pseudo-class', { allowVendorPseudos: true }), null);
+  assert.strictEqual(Parser.parseSelectorAST('::non-existent-pseudo-element', { allowVendorPseudos: true }), null);
+
+  const sheet = parse(':bogus { color: red; } ::fake-thing { color: blue; }', { allowVendorPseudos: true });
+  assert.strictEqual(sheet.cssRules.length, 0);
+});
+
+test('Functional vendor pseudos and nested vendor selectors with allowVendorPseudos: true', () => {
+  // selectors-4 § 3.2 #pseudo-classes
+  assert.ok(Parser.parseSelectorAST(':-moz-any(.foo, .bar)', { allowVendorPseudos: true }));
+  assert.ok(Parser.parseSelectorAST(':is(:-moz-ui-invalid)', { allowVendorPseudos: true }));
+
+  const sheet = parse('div { &:-moz-ui-invalid { color: red; } }', { allowVendorPseudos: true });
+  assert.strictEqual(sheet.cssRules.length, 1);
+});
+
 
 

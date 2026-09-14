@@ -17,6 +17,12 @@
 import type { Token, Rule, ComponentValue, SelectorList, MediaQuery } from './types.ts';
 import type { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 
+export type SelectorASTOptions = {
+  declaredNamespaces?: Set<string>;
+  allowRelative?: boolean;
+  allowVendorPseudos?: boolean;
+};
+
 export const ParseHooks = {
   parseStyleAttribute: (_tokens: Token[]): CSSStyleDeclaration => {
     throw new Error('parseStyleAttribute not injected');
@@ -42,7 +48,12 @@ export const ParseHooks = {
   parseSelector: (_text: string): string | null => {
     throw new Error('parseSelector not injected');
   },
-  parseSelectorAST: (_text: string, _declaredNamespaces?: Set<string>, _allowRelative?: boolean): SelectorList | null => {
+  parseSelectorAST: (
+    _text: string,
+    _declaredNamespacesOrOptions?: Set<string> | SelectorASTOptions,
+    _allowRelative?: boolean,
+    _allowVendorPseudos?: boolean
+  ): SelectorList | null => {
     throw new Error('parseSelectorAST not injected');
   },
   parseMediaQueryList: (_text: string): MediaQuery[] => {
