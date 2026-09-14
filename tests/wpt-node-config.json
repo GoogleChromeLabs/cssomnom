@@ -5,7 +5,6 @@
       "exclude": [
         "submodules/web-platform-tests/css/css-typed-om/background-image-gradient.html",
         "submodules/web-platform-tests/css/css-typed-om/cycle-in-unparsed-value-crash.html",
-        "submodules/web-platform-tests/css/css-typed-om/idlharness.html",
         "submodules/web-platform-tests/css/css-typed-om/stylevalue-normalization/normalize-image.html",
         "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/background-position.html",
         "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/object-position.html",

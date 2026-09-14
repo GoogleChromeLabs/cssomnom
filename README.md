@@ -316,12 +316,12 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **87.5%** (19,227 / 21,973 passed assertions across 1,768 test files).
-* **Chrome 154 Parity**: **87.5%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **85.9%** (19,346 / 22,517 passed assertions across 1,769 test files).
+* **Chrome 154 Parity**: **85.9%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
-| **`Typed OM`** | 12,226 | 11,547 | **94.4%** | 🟢 **+0.9%** (ahead of Chrome) |
+| **`Typed OM`** | 12,770 | 11,666 | **91.4%** | -2.2% |
 | **`CSSOM`** | 2,156 | 1,618 | **75.0%** | -22.1% |
 | **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
@@ -329,7 +329,7 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 | **`Variables`** | 499 | 411 | **82.4%** | -8.2% |
 | **`Selectors`** | 5,654 | 4,328 | **76.5%** | -9.4% |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **21,973** | **19,227** | **87.5%** | **-5.6%** |
+| **OVERALL** | **22,517** | **19,346** | **85.9%** | **-7.2%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.
