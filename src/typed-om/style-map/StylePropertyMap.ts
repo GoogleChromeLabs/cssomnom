@@ -49,7 +49,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
   }
 
   protected override _getDeclarations(): Declaration[] {
-    return this._style.declarations || [];
+    return this._style._declarations || this._style.declarations || [];
   }
 
   private _checkPendingSubstitution(property: string): void {

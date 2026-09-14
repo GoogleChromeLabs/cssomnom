@@ -32,7 +32,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
       if (typeof prop === 'string') {
         if (!isNaN(Number(prop))) {
           const index = Number(prop);
-          const decl = t.declarations[index];
+          const decl = t._declarations[index];
           return decl ? decl.name : undefined;
         }
         
@@ -92,7 +92,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
       if (typeof prop === 'string') {
         if (!isNaN(Number(prop))) {
           const index = Number(prop);
-          return index >= 0 && index < t.declarations.length;
+          return index >= 0 && index < t._declarations.length;
         }
         if (prop in t) return true;
         if (prop.startsWith('--')) return true;
@@ -111,7 +111,7 @@ export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
 export class CSSStyleDeclaration extends CSSStyleProperties {
   [index: number]: string;
   [property: string]: unknown;
-  protected _declarations: Declaration[];
+  public _declarations: Declaration[];
   private _declMap: Map<string, Declaration>;
   /** @internal */
   _readonly: boolean;
@@ -121,9 +121,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
   // cssom-1 § 6.6 #dom-cssstyledeclaration-parentrule
   get parentRule(): CSSRule | null {
-    if (!this || this === CSSStyleDeclaration.prototype || !(this instanceof CSSStyleDeclaration)) {
-      throw new TypeError("Failed to read the 'parentRule' property from 'CSSStyleDeclaration': The provided value is not of type 'CSSStyleDeclaration'.");
-    }
     return this._parentRule;
   }
 
@@ -198,10 +195,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       this._declarations.push(d);
       this._declMap.set(d.name, d);
     }
-  }
-
-  get declarations() {
-    return this._declarations;
   }
 
   get length() {

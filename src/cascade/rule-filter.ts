@@ -500,8 +500,8 @@ export function collectMatchedDeclarations(
                   sourceOrder: sourceOrderCounter++,
                 });
               }
-            } else if (Array.isArray((style as { declarations?: unknown[] }).declarations)) {
-              for (const d of (style as { declarations: Declaration[] }).declarations) {
+            } else if (Array.isArray((style as { _declarations?: unknown[] })._declarations)) {
+              for (const d of (style as { _declarations: Declaration[] })._declarations) {
                 const rawValStr = serialize(d.value);
                 matchedDeclarations.push({
                   name: d.name,
@@ -518,7 +518,7 @@ export function collectMatchedDeclarations(
           } else if ((rule as { block?: { value?: ComponentValue[] } }).block?.value) {
             const blockVal = (rule as { block?: { value?: ComponentValue[] } }).block!.value || [];
             const decls = ParseHooks.parseStyleAttribute(tokenize(serialize(blockVal)));
-            for (const d of decls.declarations) {
+            for (const d of decls._declarations) {
               const rawValStr = serialize(d.value);
               matchedDeclarations.push({
                 name: d.name,
@@ -870,7 +870,7 @@ export function collectInlineDeclarations(
 
   if (styleAttrText && styleAttrText.trim()) {
     const inlineDecls = ParseHooks.parseStyleAttribute(tokenize(styleAttrText));
-    for (const d of inlineDecls.declarations) {
+    for (const d of inlineDecls._declarations) {
       const isCustom = d.name.startsWith('--');
       let valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, isCustom).trim();
       if (isCustom && !valStr) {

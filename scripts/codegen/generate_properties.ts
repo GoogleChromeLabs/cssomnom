@@ -96,16 +96,10 @@ function main() {
     tsContent += `// cssom-1 § 6.6.1 #dom-cssstyledeclaration-cssfloat\n`;
     tsContent += `Object.defineProperty(CSSStyleProperties.prototype, 'cssFloat', {\n`;
     tsContent += `  get(this: unknown): string {\n`;
-    tsContent += `    if (!this || this === CSSStyleProperties.prototype || !(this instanceof CSSStyleProperties)) {\n`;
-    tsContent += `      throw new TypeError("Failed to read the 'cssFloat' property from 'CSSStyleProperties': The provided value is not of type 'CSSStyleProperties'.");\n`;
-    tsContent += `    }\n`;
     tsContent += `    const target = this as { getPropertyValue?: (p: string) => string; _float?: string };\n`;
     tsContent += `    return typeof target.getPropertyValue === 'function' ? target.getPropertyValue('float') : (target._float ?? '');\n`;
     tsContent += `  },\n`;
     tsContent += `  set(this: unknown, val: unknown): void {\n`;
-    tsContent += `    if (!this || this === CSSStyleProperties.prototype || !(this instanceof CSSStyleProperties)) {\n`;
-    tsContent += `      throw new TypeError("Failed to set the 'cssFloat' property on 'CSSStyleProperties': The provided value is not of type 'CSSStyleProperties'.");\n`;
-    tsContent += `    }\n`;
     tsContent += `    const target = this as { setProperty?: (p: string, v: string) => void; _float?: string };\n`;
     tsContent += `    const strVal = val === null || val === undefined ? '' : String(val);\n`;
     tsContent += `    if (typeof target.setProperty === 'function') {\n`;

@@ -23,11 +23,19 @@
 // WebIDL § 3.6.5 #constants-on-interface-prototype-object
 // WebIDL § 3.7 #es-operations
 
+const appliedCtors = new WeakSet<Function>();
+
 export interface WebIDLOptions {
-  /** If true, wraps attribute accessors with brand checks (WebIDL § 3.6.1/3.6.2) */
+  /** If true, wraps attribute accessors with brand checks (WebIDL § 3.6.1/3.6.2). Default: true */
   brandCheck?: boolean;
-  /** If true, enforces minimum argument arity on operations (WebIDL § 3.7) */
+  /** If true, enforces minimum argument arity on operations (WebIDL § 3.7). Default: true */
   arityCheck?: boolean;
+  /** Explicit interface name override for error messages (defaults to ctor.name). */
+  interfaceName?: string;
+  /** Property names to exclude from WebIDL transformation. */
+  exclude?: readonly string[];
+  /** Method names that return promises and should reject with TypeError on brand/arity failure instead of throwing. */
+  rejectOperations?: readonly string[];
 }
 
 /**
@@ -42,12 +50,21 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
   const proto = ctor.prototype;
   if (!proto) return;
 
+  // Idempotency guard: avoid double-wrapping prototype properties without inheriting across subclasses
+  if (appliedCtors.has(ctor)) {
+    return;
+  }
+  appliedCtors.add(ctor);
+
   const brandCheck = options.brandCheck ?? true;
   const arityCheck = options.arityCheck ?? true;
+  const interfaceName = options.interfaceName || ctor.name;
+  const excludeSet = new Set(options.exclude || []);
+  const rejectSet = new Set(options.rejectOperations || []);
 
   const names = Object.getOwnPropertyNames(proto);
   for (const name of names) {
-    if (name === 'constructor' || name === 'location' || name.startsWith('_')) {
+    if (name === 'constructor' || name.startsWith('_') || excludeSet.has(name)) {
       continue;
     }
 
@@ -66,7 +83,7 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
           // If this value is not an ECMAScript object that implements the interface, throw TypeError.
           if (!this || this === proto || !(this instanceof ctor)) {
             throw new TypeError(
-              `Failed to read the '${name}' property from '${ctor.name}': The provided value is not of type '${ctor.name}'.`
+              `Failed to read the '${name}' property from '${interfaceName}': The provided value is not of type '${interfaceName}'.`
             );
           }
           return origGet.call(this);
@@ -81,7 +98,7 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
           // If this value is not an ECMAScript object that implements the interface, throw TypeError.
           if (!this || this === proto || !(this instanceof ctor)) {
             throw new TypeError(
-              `Failed to set the '${name}' property on '${ctor.name}': The provided value is not of type '${ctor.name}'.`
+              `Failed to set the '${name}' property on '${interfaceName}': The provided value is not of type '${interfaceName}'.`
             );
           }
           return origSet.call(this, val);
@@ -109,9 +126,9 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
           // WebIDL § 3.7: If this value is not a platform object that implements interface, throw TypeError.
           if (brandCheck && (!this || this === proto || !(this instanceof ctor))) {
             const err = new TypeError(
-              `Failed to execute '${name}' on '${ctor.name}': The provided value is not of type '${ctor.name}'.`
+              `Failed to execute '${name}' on '${interfaceName}': The provided value is not of type '${interfaceName}'.`
             );
-            if (name === 'replace' && ctor.name === 'CSSStyleSheet') {
+            if (rejectSet.has(name)) {
               return Promise.reject(err);
             }
             throw err;
@@ -120,9 +137,9 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
           // If fewer arguments than required are passed, throw or reject with TypeError.
           if (arityCheck && arguments.length < minArgs) {
             const err = new TypeError(
-              `Failed to execute '${name}' on '${ctor.name}': ${minArgs} argument required, but only ${arguments.length} present.`
+              `Failed to execute '${name}' on '${interfaceName}': ${minArgs} argument${minArgs === 1 ? '' : 's'} required, but only ${arguments.length} present.`
             );
-            if (name === 'replace' && ctor.name === 'CSSStyleSheet') {
+            if (rejectSet.has(name)) {
               return Promise.reject(err);
             }
             throw err;
@@ -138,6 +155,29 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
         writable: true,
         enumerable: true,
         configurable: true
+      });
+    }
+  }
+}
+
+/**
+ * Ensures all regular prototype members (attributes and operations) on a WebIDL interface
+ * prototype object are enumerable, matching WebIDL specification requirements (WebIDL § 3.6, § 3.7).
+ */
+export function applyWebIDLPrototypeDescriptors(ctor: Function): void {
+  const proto = ctor.prototype;
+  if (!proto) return;
+
+  const names = Object.getOwnPropertyNames(proto);
+  for (const name of names) {
+    if (name === 'constructor' || name.startsWith('_')) {
+      continue;
+    }
+    const desc = Object.getOwnPropertyDescriptor(proto, name);
+    if (desc && !desc.enumerable) {
+      Object.defineProperty(proto, name, {
+        ...desc,
+        enumerable: true
       });
     }
   }

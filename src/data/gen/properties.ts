@@ -848,16 +848,10 @@ export class CSSStyleProperties {
 // cssom-1 § 6.6.1 #dom-cssstyledeclaration-cssfloat
 Object.defineProperty(CSSStyleProperties.prototype, 'cssFloat', {
   get(this: unknown): string {
-    if (!this || this === CSSStyleProperties.prototype || !(this instanceof CSSStyleProperties)) {
-      throw new TypeError("Failed to read the 'cssFloat' property from 'CSSStyleProperties': The provided value is not of type 'CSSStyleProperties'.");
-    }
     const target = this as { getPropertyValue?: (p: string) => string; _float?: string };
     return typeof target.getPropertyValue === 'function' ? target.getPropertyValue('float') : (target._float ?? '');
   },
   set(this: unknown, val: unknown): void {
-    if (!this || this === CSSStyleProperties.prototype || !(this instanceof CSSStyleProperties)) {
-      throw new TypeError("Failed to set the 'cssFloat' property on 'CSSStyleProperties': The provided value is not of type 'CSSStyleProperties'.");
-    }
     const target = this as { setProperty?: (p: string, v: string) => void; _float?: string };
     const strVal = val === null || val === undefined ? '' : String(val);
     if (typeof target.setProperty === 'function') {

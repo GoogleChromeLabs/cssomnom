@@ -389,7 +389,7 @@ export function pruneUnusedCss(
       }
       if (rule instanceof CSSStyleRule) {
         const sel = rule.selectorText.trim();
-        const hasCustomProps = rule.style.declarations.some(d => d.name.startsWith('--'));
+        const hasCustomProps = rule.style._declarations.some(d => d.name.startsWith('--'));
         const isRootSelector = sel === ':root' || sel === 'html' || sel === ':host';
         if (hasCustomProps && (isRootSelector || sel.startsWith(':root') || sel.startsWith('html'))) {
           retainedRules.push(header);

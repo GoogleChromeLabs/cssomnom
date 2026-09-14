@@ -273,7 +273,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
 
   if (propLower in SHORTHANDS_DATA && !hasVarFunction(trimmed)) {
     const parsed = ParseHooks.parseStyleAttribute(tokenize(`${property}: ${css}`));
-    if (parsed.declarations.length === 0) {
+    if (parsed._declarations.length === 0) {
       throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
     }
     if (!LOGICAL_2VAL_PROPERTIES.has(propLower)) {

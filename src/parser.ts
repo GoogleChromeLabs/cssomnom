@@ -660,7 +660,7 @@ export class Parser {
     let isFirst = true;
     for (const item of blockContents) {
       if (isFirst && item instanceof CSSNestedDeclarations) {
-        declarations.push(...item.style.declarations);
+        declarations.push(...item.style._declarations);
       } else {
         nestedRules.push(item);
       }
@@ -1491,7 +1491,7 @@ export class Parser {
     let isFirst = true;
     for (const item of blockContents) {
       if (isFirst && item instanceof CSSNestedDeclarations) {
-        declarations.push(...item.style.declarations);
+        declarations.push(...item.style._declarations);
       } else {
         nestedRules.push(item);
       }

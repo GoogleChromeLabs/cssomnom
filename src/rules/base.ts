@@ -142,10 +142,6 @@ export class CSSGroupingRule extends CSSRule {
   // cssom-1 § 6.4.3 #the-cssgroupingrule-interface
   // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
   insertRule(rule: string, index: number = 0): number {
-    // WebIDL § 3.7 #es-operations
-    if (arguments.length < 1) {
-      throw new TypeError("Failed to execute 'insertRule' on 'CSSGroupingRule': 1 argument required, but only 0 present.");
-    }
     // 1. Set length to the number of items in list.
     // 2. If index is greater than length (or index < 0), throw IndexSizeError.
     // NOTE: This boundary check MUST precede parsing per CSSOM 1 § 6.5.3 step 2!
@@ -189,7 +185,7 @@ export class CSSGroupingRule extends CSSRule {
       if (!isNested) {
         throw new DOMException('Syntax error: CSSNestedDeclarations cannot be inserted into top-level grouping rule', 'SyntaxError');
       }
-      const decls = (parsedRule as CSSNestedDeclarations).style.declarations;
+      const decls = (parsedRule as CSSNestedDeclarations).style._declarations;
       const validDecls = decls.filter((d: Declaration) => {
         const name = d.name.toLowerCase();
         return name.startsWith('--') || CSSStyleDeclaration.prototype._isPropertySupported(name);
@@ -212,10 +208,6 @@ export class CSSGroupingRule extends CSSRule {
   // cssom-1 § 6.16 #the-cssgroupingrule-interface
   // cssom-1 § 6.5.4 #remove-a-css-rule
   deleteRule(index: number): void {
-    // WebIDL § 3.7 #es-operations
-    if (arguments.length < 1) {
-      throw new TypeError("Failed to execute 'deleteRule' on 'CSSGroupingRule': 1 argument required, but only 0 present.");
-    }
     deleteRuleFromArray(this._rules, index);
   }
 }

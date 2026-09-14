@@ -33,9 +33,6 @@ export class StyleSheetList {
   }
 
   item(index: number): CSSStyleSheet | null {
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'item' on 'StyleSheetList': 1 argument required, but only 0 present.");
-    }
     return this._sheets[index] || null;
   }
 
@@ -77,9 +74,6 @@ export class MediaList {
   }
 
   item(index: number): string | null {
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'item' on 'MediaList': 1 argument required, but only 0 present.");
-    }
     const q = this._mediaQueries[index];
     return q ? serializeMediaQuery(q) : null;
   }
@@ -93,9 +87,6 @@ export class MediaList {
   }
 
   appendMedium(medium: string): void {
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'appendMedium' on 'MediaList': 1 argument required, but only 0 present.");
-    }
     const parsed = MediaParser.parse(medium);
     if (parsed.length !== 1) {
       return;
@@ -109,9 +100,6 @@ export class MediaList {
   }
 
   deleteMedium(medium: string): void {
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'deleteMedium' on 'MediaList': 1 argument required, but only 0 present.");
-    }
     const parsed = MediaParser.parse(medium);
     if (parsed.length !== 1) {
       throw new DOMException(`The medium '${medium}' does not exist in the MediaList.`, 'NotFoundError');
@@ -151,9 +139,6 @@ export class CSSRuleList {
   }
 
   item(index: number): CSSRule | null {
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'item' on 'CSSRuleList': 1 argument required, but only 0 present.");
-    }
     return (this._getRules()[index] as CSSRule) || null;
   }
 

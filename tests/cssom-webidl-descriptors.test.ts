@@ -29,6 +29,7 @@ import { parseHTML } from 'linkedom';
 import * as CSSOM from '../src/CSSOM.ts';
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { CSSStyleProperties } from '../src/data/gen/properties.ts';
+import { applyWebIDLInterface } from '../src/webidl.ts';
 import { patchWindowForTypedOM } from './dom-shim/src/index.ts';
 
 describe('WebIDL Interface Prototype Member Descriptors in CSSOM', () => {
@@ -173,23 +174,23 @@ describe('WebIDL Interface Prototype Member Descriptors in CSSOM', () => {
   });
 
   test('CSSRule legacy constants on interface object and prototype conform to WebIDL § 3.6.4/3.6.5', () => {
-    const constants = [
-      'STYLE_RULE',
-      'CHARSET_RULE',
-      'IMPORT_RULE',
-      'MEDIA_RULE',
-      'FONT_FACE_RULE',
-      'PAGE_RULE',
-      'MARGIN_RULE',
-      'NAMESPACE_RULE',
-      'KEYFRAMES_RULE',
-      'KEYFRAME_RULE',
-      'COUNTER_STYLE_RULE',
-      'SUPPORTS_RULE'
-    ] as const;
+    // Derive constant domain dynamically from interface object rather than hardcoding
+    const constantNames = Object.getOwnPropertyNames(CSSOM.CSSRule)
+      .filter((name) => /^[A-Z][A-Z0-9_]*_RULE$/.test(name))
+      .sort();
 
-    for (const name of constants) {
-      // On constructor
+    // cssom-1 § 6.4 & WebIDL § 3.6.4: All 13 legacy constants must be present including FONT_FEATURE_VALUES_RULE
+    assert.ok(
+      constantNames.length >= 13,
+      `Expected at least 13 legacy CSSRule constants, found ${constantNames.length}: ${constantNames.join(', ')}`
+    );
+    assert.ok(
+      constantNames.includes('FONT_FEATURE_VALUES_RULE'),
+      'FONT_FEATURE_VALUES_RULE (14) must be defined on CSSRule interface'
+    );
+
+    for (const name of constantNames) {
+      // On constructor (WebIDL § 3.6.4 #es-constants)
       const ctorDesc = Object.getOwnPropertyDescriptor(CSSOM.CSSRule, name);
       assert.ok(ctorDesc, `CSSRule.${name} must exist`);
       assert.strictEqual(ctorDesc.writable, false, `CSSRule.${name} must not be writable`);
@@ -197,14 +198,72 @@ describe('WebIDL Interface Prototype Member Descriptors in CSSOM', () => {
       assert.strictEqual(ctorDesc.configurable, false, `CSSRule.${name} must not be configurable`);
       assert.strictEqual(typeof ctorDesc.value, 'number', `CSSRule.${name} must be numeric value`);
 
-      // On prototype
+      // On prototype (WebIDL § 3.6.5 #constants-on-interface-prototype-object)
       const protoDesc = Object.getOwnPropertyDescriptor(CSSOM.CSSRule.prototype, name);
       assert.ok(protoDesc, `CSSRule.prototype.${name} must exist`);
       assert.strictEqual(protoDesc.writable, false, `CSSRule.prototype.${name} must not be writable`);
       assert.strictEqual(protoDesc.enumerable, true, `CSSRule.prototype.${name} must be enumerable`);
       assert.strictEqual(protoDesc.configurable, false, `CSSRule.prototype.${name} must not be configurable`);
       assert.strictEqual(typeof protoDesc.value, 'number', `CSSRule.prototype.${name} must be numeric value`);
+      assert.strictEqual(protoDesc.value, ctorDesc.value, `CSSRule.${name} and CSSRule.prototype.${name} values must match`);
     }
+
+    // Bidirectional drift guard: prototype must match constructor constants exactly
+    const protoConstantNames = Object.getOwnPropertyNames(CSSOM.CSSRule.prototype)
+      .filter((name) => /^[A-Z][A-Z0-9_]*_RULE$/.test(name))
+      .sort();
+    assert.deepStrictEqual(
+      protoConstantNames,
+      constantNames,
+      'Constants on CSSRule constructor and CSSRule.prototype must match exactly'
+    );
+  });
+
+  test('applyWebIDLInterface idempotency: double-wrapping is a no-op', () => {
+    class TestInterface {
+      op(a: string, b: string): string {
+        return a + b;
+      }
+      get attr(): string {
+        return 'val';
+      }
+    }
+
+    applyWebIDLInterface(TestInterface);
+    const opDesc1 = Object.getOwnPropertyDescriptor(TestInterface.prototype, 'op')!;
+    const attrDesc1 = Object.getOwnPropertyDescriptor(TestInterface.prototype, 'attr')!;
+
+    // Re-wrap the exact same constructor
+    applyWebIDLInterface(TestInterface);
+    const opDesc2 = Object.getOwnPropertyDescriptor(TestInterface.prototype, 'op')!;
+    const attrDesc2 = Object.getOwnPropertyDescriptor(TestInterface.prototype, 'attr')!;
+
+    assert.strictEqual(opDesc1.value, opDesc2.value, 'Operation wrapper function must not be re-wrapped');
+    assert.strictEqual(attrDesc1.get, attrDesc2.get, 'Attribute getter wrapper must not be re-wrapped');
+  });
+
+  test('operations error messages correctly pluralize required argument counts', () => {
+    const dummyInstance = new CSSOM.CSSStyleSheet();
+    assert.throws(
+      () => {
+        // @ts-expect-error - invalid arity
+        dummyInstance.insertRule();
+      },
+      (err: unknown) => {
+        return err instanceof TypeError && err.message.includes('1 argument required');
+      }
+    );
+
+    const decl = new CSSStyleDeclaration();
+    assert.throws(
+      () => {
+        // @ts-expect-error - invalid arity
+        decl.setProperty('color');
+      },
+      (err: unknown) => {
+        return err instanceof TypeError && err.message.includes('2 arguments required');
+      }
+    );
   });
 
   test('CSSGroupingRule.prototype.cssRules and CSSStyleDeclaration.prototype.parentRule inheritance', () => {

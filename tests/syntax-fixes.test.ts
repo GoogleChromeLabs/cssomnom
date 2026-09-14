@@ -109,7 +109,7 @@ test('Strip trailing whitespace after !important', () => {
   const stylesheet = parser.parseStyleSheet();
   const rule = stylesheet.cssRules[0] as CSSStyleRule;
 
-  const decl = rule.style.declarations.find(d => d.name === 'color');
+  const decl = rule.style._declarations.find(d => d.name === 'color');
   assert.ok(decl);
   const lastToken = decl.value[decl.value.length - 1];
   assert.notStrictEqual(lastToken?.type, 'whitespace', 'Last token should not be whitespace');

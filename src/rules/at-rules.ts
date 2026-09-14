@@ -345,7 +345,7 @@ export class CSSKeyframesRule extends CSSRule {
     }
     const body = ruleText.slice(openBrace + 1, closeBrace);
     const styleDecl = ParseHooks.parseStyleAttribute(tokenize(body));
-    const keyframe = new CSSKeyframeRule(keyText, styleDecl.declarations);
+    const keyframe = new CSSKeyframeRule(keyText, styleDecl._declarations);
     keyframe._parentRule = this;
     this._rules.push(keyframe);
   }
@@ -526,15 +526,9 @@ for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {
   Object.defineProperty(CSSPageDescriptors.prototype, prop, {
     // css-page-3 § 3.2 #the-csspagedescriptors-interface
     get(this: unknown): string {
-      if (!this || this === CSSPageDescriptors.prototype || !(this instanceof CSSPageDescriptors)) {
-        throw new TypeError(`Failed to read the '${prop}' property from 'CSSPageDescriptors': The provided value is not of type 'CSSPageDescriptors'.`);
-      }
       return (this as CSSPageDescriptors).getPropertyValue(cssProp);
     },
     set(this: unknown, val: unknown): void {
-      if (!this || this === CSSPageDescriptors.prototype || !(this instanceof CSSPageDescriptors)) {
-        throw new TypeError(`Failed to set the '${prop}' property on 'CSSPageDescriptors': The provided value is not of type 'CSSPageDescriptors'.`);
-      }
       (this as CSSPageDescriptors).setProperty(cssProp, val === null || val === undefined ? '' : String(val));
     },
     enumerable: true,

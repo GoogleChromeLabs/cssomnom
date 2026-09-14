@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 import test from 'node:test';
+import assert from 'node:assert/strict';
 import * as CSSOM from '../src/index.ts';
 
 test('API Surface Area', (t) => {
@@ -34,5 +35,14 @@ test('CSS methods', (t) => {
     .filter(k => typeof (CSSOM.CSS as unknown as Record<string, unknown>)[k] === 'function')
     .sort();
   t.assert.snapshot(methods);
+});
+
+test('CSSStyleDeclaration prototype does not leak internal helpers as enumerable WebIDL attributes', () => {
+  const keys = Object.keys(CSSOM.CSSStyleDeclaration.prototype);
+  assert.strictEqual(
+    keys.includes('declarations'),
+    false,
+    'declarations is an internal helper and must not be enumerable on CSSStyleDeclaration.prototype per CSSOM 1 § 6.6'
+  );
 });
 

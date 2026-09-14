@@ -89,7 +89,7 @@ import './numeric/numeric-methods.ts';
 import './color/color-reify.ts';
 import { CSSTransformValue } from './transform/CSSTransformValue.ts';
 import { setParseTransformListHook, DOMMatrix, DOMMatrixReadOnly } from '../DOMMatrix.ts';
-import { applyWebIDLPrototypeDescriptors } from './utils/webidl.ts';
+import { applyWebIDLPrototypeDescriptors } from '../webidl.ts';
 
 import { CSSStyleValue } from './values/CSSStyleValue.ts';
 import { CSSNumericValue } from './numeric/CSSNumericValue.ts';

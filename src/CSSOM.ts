@@ -267,10 +267,6 @@ export class CSSStyleSheet extends StyleSheet {
 
   // cssom-1 § 6.5.1 #dom-cssstylesheet-replace
   replace(text: string): Promise<CSSStyleSheet> {
-    // WebIDL § 3.7 #es-operations
-    if (arguments.length === 0) {
-      return Promise.reject(new TypeError("Failed to execute 'replace' on 'CSSStyleSheet': 1 argument required, but only 0 present."));
-    }
     if (!this._constructedFlag || this._disallowModificationFlag) {
       return Promise.reject(new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError"));
     }
@@ -293,10 +289,6 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 § 6.5.1 #dom-cssstylesheet-replacesync
   // cssom-1 § 6.5.1 #synchronously-replace-the-rules-of-a-cssstylesheet
   replaceSync(text: string): void {
-    // WebIDL § 3.7 #es-operations
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'replaceSync' on 'CSSStyleSheet': 1 argument required, but only 0 present.");
-    }
     if (!this._constructedFlag) {
       throw new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError");
     }
@@ -309,10 +301,6 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 § 6.3 #dom-cssstylesheet-insertrule
   // cssom-1 § 6.5.3 #insert-a-css-rule
   insertRule(rule: string, index: number = 0): number {
-    // WebIDL § 3.7 #es-operations
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'insertRule' on 'CSSStyleSheet': 1 argument required, but only 0 present.");
-    }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
     }
@@ -387,10 +375,6 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 § 6.3 #dom-cssstylesheet-deleterule
   // cssom-1 § 6.5.4 #remove-a-css-rule
   deleteRule(index: number): void {
-    // WebIDL § 3.7 #es-operations
-    if (arguments.length === 0) {
-      throw new TypeError("Failed to execute 'deleteRule' on 'CSSStyleSheet': 1 argument required, but only 0 present.");
-    }
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
     }
@@ -596,7 +580,7 @@ export class CSSStyleRule extends CSSGroupingRule {
 
   // 6.14 The CSSStyleRule Interface & css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
   get cssText() {
-    const declsStr = serializeDeclarations(this.style.declarations);
+    const declsStr = serializeDeclarations(this.style._declarations);
     
     if (this._rules.length > 0) {
       const bodyParts: string[] = [];
@@ -644,7 +628,13 @@ const cssomClasses = [
 ];
 
 for (const ctor of cssomClasses) {
-  applyWebIDLInterface(ctor as Function);
+  if (ctor === CSSStyleSheet) {
+    applyWebIDLInterface(ctor, { rejectOperations: ['replace'] });
+  } else if (ctor === CSSRule) {
+    applyWebIDLInterface(ctor, { exclude: ['location'] });
+  } else {
+    applyWebIDLInterface(ctor as Function);
+  }
 }
 
 export * from './rules/at-rules.ts';

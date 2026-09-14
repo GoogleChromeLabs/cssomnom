@@ -30,6 +30,7 @@ export interface StyleReadOnlyLike {
   [index: number]: string;
   getPropertyValue(property: string): string;
   item(index: number): string;
+  _declarations?: Declaration[];
   declarations?: Declaration[];
   [property: string]: unknown;
 }
@@ -48,6 +49,7 @@ export class StylePropertyMapReadOnly {
           return decl ? serialize(decl.value).trim() : '';
         },
         item: (index: number) => styleOrDecls[index]?.name || '',
+        _declarations: styleOrDecls,
         declarations: styleOrDecls,
         ...Object.fromEntries(styleOrDecls.map((d, i) => [i, d.name]))
       } as StyleReadOnlyLike;
@@ -58,7 +60,7 @@ export class StylePropertyMapReadOnly {
   }
 
   protected _getDeclarations(): Declaration[] {
-    return this._style.declarations || [];
+    return this._style._declarations || this._style.declarations || [];
   }
 
   // css-typed-om § 3.2 #the-stylepropertymap
