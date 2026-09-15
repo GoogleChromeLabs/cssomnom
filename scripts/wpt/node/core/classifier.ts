@@ -117,7 +117,15 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
     };
   }
 
+  const isSyntaxOrParsing =
+    combined.includes('@supports') ||
+    combined.includes('selectortext') ||
+    combined.includes('parse') ||
+    combined.includes('valid') ||
+    combined.includes('invalid');
+
   if (
+    !isSyntaxOrParsing &&
     (combined.includes('focus-visible') || combined.includes(':focus-visible')) &&
     (combined.includes('keyboard') || combined.includes('click') || combined.includes('mouse') || combined.includes('tab') || fileLower.includes('focus-visible'))
   ) {
@@ -129,6 +137,7 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
   }
 
   if (
+    !isSyntaxOrParsing &&
     (fileLower.includes('active-') || combined.includes(':active')) &&
     (combined.includes('toplayer') || combined.includes('display-none') || combined.includes('observable') || combined.includes('button'))
   ) {
@@ -228,7 +237,7 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
     };
   }
 
-  // 7. Visual Layout Engine Geometry (`getComputedStyle` dimension resolution)
+  // 7. Visual Layout Engine Geometry (`getComputedStyle` dimension resolution & box metrics)
   if (combined.includes('getcomputedstyle is not supported in the linkedom sandbox')) {
     return {
       isBrowserOnly: true,
@@ -243,6 +252,39 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
       category: 'LAYOUT_GEOMETRY',
       reason: 'Resolved layout inset and box dimensions require a 2D layout engine'
     };
+  }
+
+  if (fileLower.includes('check-layout') || combined.includes('checklayout')) {
+    return {
+      isBrowserOnly: true,
+      category: 'LAYOUT_GEOMETRY',
+      reason: 'checkLayout assertions test 2D layout geometry and element positioning'
+    };
+  }
+
+  const BOX_METRIC_PROPERTIES = [
+    'clientwidth',
+    'clientheight',
+    'offsetwidth',
+    'offsetheight',
+    'scrollwidth',
+    'scrollheight'
+  ];
+
+  for (const metric of BOX_METRIC_PROPERTIES) {
+    if (combined.includes(metric)) {
+      if (
+        (/^\s*["']?\d+(\.\d+)?["']?\s*$/.test(expected) &&
+          (/^\s*["']?(0|0px|auto|none|normal|)["']?\s*$/.test(actual) || /^\s*""\s*$/.test(actual))) ||
+        combined.includes('expected')
+      ) {
+        return {
+          isBrowserOnly: true,
+          category: 'LAYOUT_GEOMETRY',
+          reason: `Element box metric ${metric} requires visual layout engine`
+        };
+      }
+    }
   }
 
   // Check expected vs actual px dimension mismatches on layout properties

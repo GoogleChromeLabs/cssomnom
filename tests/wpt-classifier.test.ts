@@ -256,3 +256,57 @@ test('classifySubtestFeasibility: Pure CSSOM failures are NOT classified as brow
     assert.strictEqual(result.category, undefined);
   }
 });
+
+test('classifySubtestFeasibility: Phase 139 Heuristics Tuning', () => {
+  // 1. Pure syntax tests for :focus-visible must NOT be classified as browser-only
+  const focusVisibleSupports = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/selectors/focus-visible-001.html',
+    name: '@supports selector(:focus-visible) parsing check',
+    error: 'assert_equals: CSS.supports("selector(:focus-visible)") expected true but got false'
+  });
+  assert.strictEqual(focusVisibleSupports.isBrowserOnly, false);
+
+  const focusVisibleSelectorText = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/selectors/focus-visible-002.html',
+    name: 'CSSStyleRule.selectorText with :focus-visible',
+    error: 'assert_equals: rule.selectorText expected ":focus-visible" but got ":focus"'
+  });
+  assert.strictEqual(focusVisibleSelectorText.isBrowserOnly, false);
+
+  // 2. Pure syntax tests for :active must NOT be classified as browser-only
+  const activeSupports = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/selectors/active-toplayer-001.html',
+    name: '@supports selector(:active) valid check',
+    error: 'assert_equals: CSS.supports("selector(:active)") expected true but got false'
+  });
+  assert.strictEqual(activeSupports.isBrowserOnly, false);
+
+  // 3. Layout tests with bare integer dimensions (clientWidth, offsetHeight, etc.)
+  const clientWidthInt = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/cssom/box-metrics.html',
+    name: 'box.clientWidth dimension resolution',
+    expected: '100',
+    actual: '0',
+    error: 'assert_equals: clientWidth expected 100 but got 0'
+  });
+  assert.strictEqual(clientWidthInt.isBrowserOnly, true);
+  assert.strictEqual(clientWidthInt.category, 'LAYOUT_GEOMETRY');
+
+  const offsetHeightInt = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/cssom/offset-metrics.html',
+    name: 'target.offsetHeight visual layout resolution',
+    error: 'assert_equals: offsetHeight expected 50 but got 0'
+  });
+  assert.strictEqual(offsetHeightInt.isBrowserOnly, true);
+  assert.strictEqual(offsetHeightInt.category, 'LAYOUT_GEOMETRY');
+
+  // 4. check-layout tests
+  const checkLayoutFile = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/css-flexbox/check-layout-flex.html',
+    name: 'Flexbox item positioning checkLayout',
+    error: 'assert_equals: element at (10, 20) expected but got (0, 0)'
+  });
+  assert.strictEqual(checkLayoutFile.isBrowserOnly, true);
+  assert.strictEqual(checkLayoutFile.category, 'LAYOUT_GEOMETRY');
+});
+

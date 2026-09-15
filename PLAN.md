@@ -3314,9 +3314,9 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 139: WPT Feasibility Classifier Accuracy Tuning [ ]
+## Phase 139: WPT Feasibility Classifier Accuracy Tuning [x]
 **Goal**: Eliminate false browser-only and false feasible classifications in `scripts/wpt/node/core/classifier.ts`.
 
 ### Tasks
-- [ ] **Refine Browser-Only Heuristics**: Restrict `focus-visible` and `active-` classifications to prevent masking pure selector parsing bugs.
-- [ ] **Refine Feasible Layout Heuristics**: Correctly identify integer `clientWidth`/`clientHeight` checks and `check-layout-th.js` tests as layout dependencies.
+- [x] **Refine Browser-Only Heuristics**: Restrict `focus-visible` and `active-` classifications to prevent masking pure selector parsing bugs.
+- [x] **Refine Feasible Layout Heuristics**: Correctly identify integer `clientWidth`/`clientHeight` checks and `check-layout-th.js` tests as layout dependencies.
