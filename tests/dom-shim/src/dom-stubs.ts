@@ -1747,12 +1747,14 @@ function patchElementPrototype(window: WindowType): void {
   if (window.HTMLElement && window.HTMLElement.prototype) {
     patchElementStyle(window.HTMLElement.prototype as unknown as Record<string, unknown>, window);
 
+    // cssom-view-1 § 7 #dom-htmlelement-offsetwidth
     Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', {
       get(this: HTMLElement) {
         if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
           return 800;
         }
-        return (this.style?.width ? convertCssLengthToPx(this.style.width) : null) ?? 0;
+        const styleW = this.style?.width || (this.ownerDocument ? getCascadedStyle(this).getPropertyValue('width') : '');
+        return (styleW ? convertCssLengthToPx(styleW) : null) ?? 0;
       },
       configurable: true
     });

@@ -3276,12 +3276,12 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 135: DOM Stub Cascaded Style Resolution for `offsetWidth` [ ]
+## Phase 135: DOM Stub Cascaded Style Resolution for `offsetWidth` [x]
 **Goal**: Resolve `offsetWidth` against element cascaded style in `tests/dom-shim/src/dom-stubs.ts` to mirror `offsetHeight` behavior for selector matching assertions.
 
 ### Tasks
-- [ ] **Align `offsetWidth` with `offsetHeight`**: Update `offsetWidth` getter in `tests/dom-shim/src/dom-stubs.ts:1750-1768` to read `getCascadedStyle(this).getPropertyValue('width')` instead of only inspecting inline `style.width`.
-- [ ] **Verify WPT Selector Suite**: Validate pass rate progression across `css/selectors/i18n/css3-selectors-lang-*.html`.
+- [x] **Align `offsetWidth` with `offsetHeight`**: Update `offsetWidth` getter in `tests/dom-shim/src/dom-stubs.ts:1750-1768` to read `getCascadedStyle(this).getPropertyValue('width')` instead of only inspecting inline `style.width`.
+- [x] **Verify WPT Selector Suite**: Validate pass rate progression across `css/selectors/i18n/css3-selectors-lang-*.html`. (Improved pass rate from 0/42 to 16/42, with 100% on `css3-selectors-lang-001.html`).
 
 ---
 

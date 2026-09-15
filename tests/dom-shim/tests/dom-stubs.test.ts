@@ -204,3 +204,38 @@ test('patching does not clobber LinkeDOM internal constructor wiring (cloneNode 
   const clonedHost = host.cloneNode(true);
   assert.equal(clonedHost.childNodes.length, 2, 'deep element clone copies children');
 });
+
+test('HTMLElement.prototype.offsetWidth resolves width from cascaded style and inline style', () => {
+  const dom = parseHTML(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <style>
+          #box { width: 120px; }
+          #auto-box { color: red; }
+        </style>
+      </head>
+      <body>
+        <div id="box"></div>
+        <div id="inline-box" style="width: 250px;"></div>
+        <div id="override-box" style="width: 300px;"></div>
+        <div id="auto-box"></div>
+      </body>
+    </html>
+  `);
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+
+  const box = win.document.getElementById('box') as HTMLElement;
+  const inlineBox = win.document.getElementById('inline-box') as HTMLElement;
+  const overrideBox = win.document.getElementById('override-box') as HTMLElement;
+  const autoBox = win.document.getElementById('auto-box') as HTMLElement;
+
+  assert.strictEqual(box.offsetWidth, 120, 'offsetWidth resolves from <style> stylesheet');
+  assert.strictEqual(inlineBox.offsetWidth, 250, 'offsetWidth resolves from inline style');
+  assert.strictEqual(overrideBox.offsetWidth, 300, 'offsetWidth resolves inline style over cascaded style');
+  assert.strictEqual(autoBox.offsetWidth, 0, 'offsetWidth defaults to 0 when no width specified');
+  assert.strictEqual((win.document.documentElement as HTMLElement).offsetWidth, 800, 'documentElement defaults to 800');
+  assert.strictEqual((win.document.body as HTMLElement).offsetWidth, 800, 'body defaults to 800');
+});
+
