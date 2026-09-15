@@ -794,26 +794,53 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
 /**
  * Evaluates the relational :has() pseudo-class against relative and descendant selectors.
  * selectors-4 § 4.5 #relational
+ * selectors-4 § 17.3 #match-against-element
  */
 function matchHasPseudo(element: DOMElement, selectorList: SelectorList, scope?: DOMElement): boolean {
   const contextualScope = scope ?? element;
   for (const complex of selectorList.selectors) {
     if (complex.type === 'invalid-selector') continue;
+    const isSingleCompound = complex.items.length <= 2;
     if (complex.items[0]?.type === 'combinator') {
       const comb = (complex.items[0] as Combinator).value;
       if (comb === '>') {
-        const children = Array.from(element.children || []) as DOMElement[];
-        for (const child of children) {
-          if (matchComplexSelector(child, complex, contextualScope, element)) return true;
+        if (isSingleCompound) {
+          const children = Array.from(element.children || []) as DOMElement[];
+          for (const child of children) {
+            if (matchComplexSelector(child, complex, contextualScope, element)) return true;
+          }
+        } else {
+          const descendants = getAllDescendants(element);
+          for (const desc of descendants) {
+            if (matchComplexSelector(desc, complex, contextualScope, element)) return true;
+          }
         }
       } else if (comb === '+') {
-        if (element.nextElementSibling) {
-          if (matchComplexSelector(element.nextElementSibling, complex, contextualScope, element)) return true;
+        if (isSingleCompound) {
+          if (element.nextElementSibling) {
+            if (matchComplexSelector(element.nextElementSibling, complex, contextualScope, element)) return true;
+          }
+        } else {
+          let sib = element.nextElementSibling;
+          while (sib) {
+            if (matchComplexSelector(sib, complex, contextualScope, element)) return true;
+            const sibDescendants = getAllDescendants(sib);
+            for (const desc of sibDescendants) {
+              if (matchComplexSelector(desc, complex, contextualScope, element)) return true;
+            }
+            sib = sib.nextElementSibling;
+          }
         }
       } else if (comb === '~') {
         let sib = element.nextElementSibling;
         while (sib) {
           if (matchComplexSelector(sib, complex, contextualScope, element)) return true;
+          if (!isSingleCompound) {
+            const sibDescendants = getAllDescendants(sib);
+            for (const desc of sibDescendants) {
+              if (matchComplexSelector(desc, complex, contextualScope, element)) return true;
+            }
+          }
           sib = sib.nextElementSibling;
         }
       } else if (comb === ' ') {

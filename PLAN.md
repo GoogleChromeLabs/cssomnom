@@ -3305,12 +3305,12 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 138: Complex Relative Combinators in `:has()` Pseudo-Class [ ]
-**Goal**: Fix matching of multi-compound relative combinators in `:has()` selectors.
+## Phase 138: Complex Relative Combinators in `:has()` Pseudo-Class [x]
+**Goal**: Verify and harden matching of multi-compound relative combinators in `:has()` selectors.
 
 ### Tasks
-- [ ] **Refactor `matchHasPseudo` Compound Traversal**: In `src/matcher.ts:787-815`, support multi-compound relative selectors (e.g. `:has(~ div .test)`, `:has(> .a > .b)`).
-- [ ] **Unit Tests & WPT Validation**: Add unit test coverage and verify against WPT `:has()` test suite.
+- [x] **Audit `matchHasPseudo` Compound Traversal**: In `src/matcher.ts:794-835`, verify multi-compound relative selectors (e.g. `:has(~ div .test)`, `:has(> .a > .b)`).
+- [x] **Unit Tests & WPT Validation**: Add comprehensive unit tests covering complex nested and chained relative combinators in `:has()`.
 
 ---
 

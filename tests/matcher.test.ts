@@ -251,3 +251,34 @@ test('Matcher: querySelectorAll', () => {
   const badges = querySelectorAll(container, '.row > span.badge');
   assert.strictEqual(badges.length, 2);
 });
+
+test('Matcher: Complex relative combinators in :has()', () => {
+  const { document } = parseHTML(`
+    <div id="root">
+      <div id="subject"></div>
+      <div id="middle">
+        <div id="target"></div>
+      </div>
+      <div id="target-sibling"></div>
+    </div>
+    <div id="tree">
+      <div id="parent">
+        <div id="child">
+          <div id="grandchild"></div>
+        </div>
+      </div>
+    </div>
+  `);
+
+  const subject = document.getElementById('subject')!;
+  const parent = document.getElementById('parent')!;
+
+  // Multi-compound relative combinators:
+  // selectors-4 § 4.5 #relational
+  assert.strictEqual(matches(subject, ':has(~ #middle #target)'), true, ':has(~ #middle #target)');
+  assert.strictEqual(matches(subject, ':has(+ #middle #target)'), true, ':has(+ #middle #target)');
+  assert.strictEqual(matches(subject, ':has(~ #middle > #target)'), true, ':has(~ #middle > #target)');
+  assert.strictEqual(matches(subject, ':has(+ #middle + #target-sibling)'), true, ':has(+ #middle + #target-sibling)');
+  assert.strictEqual(matches(parent, ':has(> #child > #grandchild)'), true, ':has(> #child > #grandchild)');
+});
+
