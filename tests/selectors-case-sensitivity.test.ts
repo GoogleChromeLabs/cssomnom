@@ -19,9 +19,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
 import { matches, querySelector, toAsciiLowerCase } from '../src/matcher.ts';
-import { runWptFile } from '../scripts/wpt/node/run.ts';
-import path from 'node:path';
-import * as fs from 'node:fs';
 
 test('toAsciiLowerCase only folds ASCII A-Z', () => {
   assert.strictEqual(toAsciiLowerCase('DIV'), 'div');
@@ -115,17 +112,15 @@ test('Selectors 4 § 3.2: Attribute selector case-sensitivity with i and s flags
   assert.strictEqual(matches(div, '[data-test="K" i]'), false);
 });
 
-test('Selectors 4 § 3.2: WPT selectors-case-sensitive-001.html passes 100% (3/3 subtests)', async () => {
-  const wptPath = path.resolve(process.cwd(), 'submodules/web-platform-tests/css/selectors/selectors-case-sensitive-001.html');
-  if (!fs.existsSync(wptPath)) {
-    // Submodule not checked out (e.g. CI sparse checkout)
-    return;
-  }
-  const result = runWptFile(wptPath);
-  assert.strictEqual(result.tests.length, 3, 'Expected 3 subtests in selectors-case-sensitive-001.html');
+test('Selectors 4 § 3.2: Unicode uppercase element matching and non-folding in querySelector', () => {
+  const { document } = parseHTML('<div id="container"></div>');
+  const container = document.getElementById('container')!;
+  const testElement = document.createElement('\u212A');
+  container.appendChild(testElement);
+  const testElementWithNs = document.createElementNS('https://dummy.ns', '\u212A');
+  container.appendChild(testElementWithNs);
 
-  for (const t of result.tests) {
-    await t.fn();
-  }
-  result.cleanup();
+  assert.strictEqual(matches(testElement, '\\212A'), true, 'CSS selector should match for Unicode uppercase element');
+  assert.strictEqual(matches(testElementWithNs, '\\212A'), true, 'Elements with namespace should match Unicode uppercase selector');
+  assert.strictEqual(querySelector(document, 'k'), null, '`querySelector` should not use Unicode case-folding');
 });
