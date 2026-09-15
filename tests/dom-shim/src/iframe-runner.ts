@@ -370,6 +370,128 @@ export function runIframeDocumentWrite(
 const iframeContentDocumentMap = new WeakMap<object, DocumentType>();
 const iframeContentWindowMap = new WeakMap<object, WindowType>();
 const iframeSrcDocMap = new WeakMap<object, string>();
+const iframeSrcMap = new WeakMap<object, string>();
+const iframeLoadedSrcMap = new WeakMap<object, string>();
+
+function loadIframeResource(
+  iframeEl: object,
+  src: string,
+  mainWindow: WindowType,
+  _patchWindow: (win: WindowType) => void
+): void {
+  if (!src || src === 'about:blank' || src.startsWith('javascript:')) {
+    return;
+  }
+
+  const iframe = iframeEl as {
+    ownerDocument?: Document;
+    contentDocument?: DocumentType;
+    contentWindow?: WindowType;
+    dispatchEvent?: (ev: Event) => boolean;
+  };
+
+  const parentDoc = iframe.ownerDocument;
+  const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
+  const htmlDir =
+    (parentDoc as unknown as { _htmlDir?: string })?._htmlDir ||
+    (parentWin as unknown as { _htmlDir?: string })?._htmlDir ||
+    (mainWindow as unknown as { _htmlDir?: string })?._htmlDir ||
+    process.cwd();
+
+  let resolvedPath: string;
+  if (src.startsWith('/')) {
+    resolvedPath = path.join(WPT_ROOT, src);
+  } else {
+    resolvedPath = path.resolve(htmlDir, src);
+  }
+
+  let fileContent: string;
+  try {
+    fileContent = fs.readFileSync(resolvedPath, 'utf8');
+  } catch {
+    return;
+  }
+
+  const isXml =
+    resolvedPath.endsWith('.xhtml') ||
+    resolvedPath.endsWith('.xml') ||
+    src.endsWith('.xhtml') ||
+    src.endsWith('.xml');
+  const contentType = isXml ? 'application/xhtml+xml' : 'text/html';
+
+  const iframeDocument = iframe.contentDocument!;
+  const iframeWindow = iframe.contentWindow!;
+
+  Object.defineProperty(iframeDocument, 'contentType', {
+    value: contentType,
+    writable: true,
+    configurable: true
+  });
+
+  const htmlToParse = fileContent.includes('<html')
+    ? fileContent
+    : `<!doctype html><html><head>${fileContent}</head><body></body></html>`;
+  const parsedDom = parseHTML(htmlToParse);
+
+  if (iframeDocument.head && parsedDom.document.head) {
+    iframeDocument.head.innerHTML = parsedDom.document.head.innerHTML;
+  }
+  if (iframeDocument.body && parsedDom.document.body) {
+    iframeDocument.body.innerHTML = parsedDom.document.body.innerHTML;
+  }
+  if (parsedDom.document.title) {
+    iframeDocument.title = parsedDom.document.title;
+  }
+
+  const scriptDir = path.dirname(resolvedPath);
+  const scripts = extractScripts(fileContent, scriptDir);
+  const iframeTests: WptSandboxTest[] = [];
+
+  const iframeSandbox = createWptContext(iframeWindow, iframeDocument, iframeTests) as IframeSandboxContext;
+  iframeSandbox.parent = parentWin;
+  iframeSandbox.top = parentWin;
+  iframeSandbox.window = iframeWindow;
+  iframeSandbox.self = iframeWindow;
+  iframeSandbox.location = { href: 'file://' + resolvedPath };
+
+  const iframeContext = vm.createContext(iframeSandbox);
+  const initialKeys = new Set(Object.getOwnPropertyNames(iframeSandbox));
+
+  for (const s of scripts) {
+    if (s.code.trim()) {
+      try {
+        const script = new vm.Script(s.code, { filename: s.filename });
+        script.runInContext(iframeContext);
+      } catch {}
+    }
+  }
+
+  for (const key of Object.getOwnPropertyNames(iframeSandbox)) {
+    if (!initialKeys.has(key)) {
+      try {
+        (iframeWindow as unknown as Record<string, unknown>)[key] = iframeSandbox[key];
+      } catch {}
+    }
+  }
+
+  try {
+    const domContentLoadedEv = new iframeWindow.Event('DOMContentLoaded', { bubbles: true });
+    iframeWindow.dispatchEvent(domContentLoadedEv);
+    const loadEv = new iframeWindow.Event('load', { bubbles: true });
+    iframeWindow.dispatchEvent(loadEv);
+  } catch {}
+
+  queueMicrotask(() => {
+    try {
+      if (iframe.dispatchEvent) {
+        const EventConstructor = (parentWin.CustomEvent || parentWin.Event || CustomEvent || Event) as {
+          new (t: string): Event;
+        };
+        iframe.dispatchEvent(new EventConstructor('load'));
+      }
+    } catch {}
+  });
+}
 
 export function setupIframePrototype(
   htmlIframeProto: Record<string, unknown>,
@@ -413,6 +535,15 @@ export function setupIframePrototype(
         };
         iframeDocument.close = function () {};
         doc = iframeDocument;
+
+        // Check if iframe element already has a src attribute
+        const initialSrc =
+          iframeSrcMap.get(this) ||
+          (this as { getAttribute?: (name: string) => string | null }).getAttribute?.('src');
+        if (initialSrc && iframeLoadedSrcMap.get(this) !== initialSrc) {
+          iframeLoadedSrcMap.set(this, initialSrc);
+          loadIframeResource(this, initialSrc, mainWindow, patchWindow);
+        }
       }
       return doc;
     }
@@ -424,6 +555,27 @@ export function setupIframePrototype(
     get(this: object) {
       void (this as { contentDocument?: DocumentType }).contentDocument;
       return iframeContentWindowMap.get(this);
+    }
+  });
+
+  Object.defineProperty(htmlIframeProto, 'src', {
+    configurable: true,
+    enumerable: true,
+    get(this: object) {
+      return (
+        iframeSrcMap.get(this) ??
+        (this as { getAttribute?: (name: string) => string | null }).getAttribute?.('src') ??
+        ''
+      );
+    },
+    set(this: object, val: string) {
+      iframeSrcMap.set(this, val);
+      try {
+        (this as { setAttribute?: (k: string, v: string) => void }).setAttribute?.('src', val);
+      } catch {}
+      void (this as { contentDocument?: DocumentType }).contentDocument;
+      iframeLoadedSrcMap.set(this, val);
+      loadIframeResource(this, val, mainWindow, patchWindow);
     }
   });
 

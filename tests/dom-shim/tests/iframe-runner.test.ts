@@ -8,6 +8,7 @@ import {
   extractScripts,
   runIframeDocumentWrite
 } from '../src/index.ts';
+import { matches } from '../../../src/matcher.ts';
 
 test('extractScripts correctly parses inline and external script tags', () => {
   const html = `
@@ -99,3 +100,63 @@ test('runIframeDocumentWrite executes script in isolated context and dispatches 
   assert.ok(subtest);
   assert.strictEqual(subtest.status, 0, 'subtest should pass');
 });
+
+test('HTMLIFrameElement src loading populates contentDocument, sets contentType, and executes scripts', async () => {
+  const dom = parseHTML(`
+    <!DOCTYPE html>
+    <html>
+      <body>
+        <iframe id="xml" src="submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-xml.xhtml"></iframe>
+      </body>
+    </html>
+  `);
+  const win = dom.window;
+  patchWindowForTypedOM(win);
+
+  const iframe = win.document.getElementById('xml') as HTMLElement & {
+    src: string;
+    contentDocument?: Document & { contentType?: string };
+    contentWindow?: typeof win & { mode?: string };
+  };
+
+  assert.ok(iframe);
+  assert.strictEqual(iframe.src, 'submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-xml.xhtml');
+  assert.ok(iframe.contentDocument);
+  assert.strictEqual(iframe.contentDocument.contentType, 'application/xhtml+xml');
+  assert.ok(iframe.contentWindow);
+  assert.strictEqual(iframe.contentWindow.mode, 'XML', 'iframe script should execute in window context');
+
+  // Verify load event on dynamic src setting
+  let loadEventFired = false;
+  iframe.addEventListener('load', () => {
+    loadEventFired = true;
+  });
+
+  iframe.src = 'submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-quirks.html';
+  assert.strictEqual(iframe.src, 'submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-quirks.html');
+
+  // Wait for microtasks
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.strictEqual(loadEventFired, true, 'load event should fire on iframe when src finishes loading');
+  assert.strictEqual(iframe.contentWindow.mode, 'quirks mode');
+});
+
+test('XHTML document contentType enforces case-sensitivity in selector matching', () => {
+  const htmlDom = parseHTML('<!DOCTYPE html><html><body><DIV align="LEFT"></DIV></body></html>');
+  const xhtmlDom = parseHTML('<!DOCTYPE html><html><body><DIV align="LEFT"></DIV></body></html>');
+  (xhtmlDom.document as unknown as { contentType: string }).contentType = 'application/xhtml+xml';
+
+  const htmlDiv = htmlDom.document.querySelector('DIV')!;
+  const xhtmlDiv = xhtmlDom.document.querySelector('DIV')!;
+
+  // In HTML: tag name is case-insensitive, align value is case-insensitive
+  assert.strictEqual(matches(htmlDiv, 'div'), true, 'div matches DIV in HTML');
+  assert.strictEqual(matches(htmlDiv, '[align="left"]'), true, '[align="left"] matches align="LEFT" in HTML');
+
+  // In XHTML: tag name is case-sensitive, align value is case-sensitive
+  assert.strictEqual(matches(xhtmlDiv, 'div'), false, 'div does NOT match DIV in XHTML');
+  assert.strictEqual(matches(xhtmlDiv, '[align="left"]'), false, '[align="left"] does NOT match align="LEFT" in XHTML');
+  assert.strictEqual(matches(xhtmlDiv, 'DIV'), true, 'DIV matches DIV in XHTML');
+  assert.strictEqual(matches(xhtmlDiv, '[align="LEFT"]'), true, '[align="LEFT"] matches align="LEFT" in XHTML');
+});
+

@@ -3295,13 +3295,13 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 137: WPT Sandbox Iframe Resource Loading (`iframe.src`) [ ]
+## Phase 137: WPT Sandbox Iframe Resource Loading (`iframe.src`) [x]
 **Goal**: Implement `src` loading on HTML iframe stubs in the WPT runner sandbox to correctly evaluate multi-frame tests.
 
 ### Tasks
-- [ ] **Support `src` Property on HTMLIFrameElement**: In `tests/dom-shim/src/iframe-runner.ts`, add `src` getter/setter to load referenced resources into `contentDocument`.
-- [ ] **Handle XHTML Content Type**: Support `document.contentType === 'application/xhtml+xml'` in `src/matcher.ts` for XML case sensitivity.
-- [ ] **Verify Multi-Frame WPT Tests**: Validate `syntax.html` and `semantics.html` test suites.
+- [x] **Support `src` Property on HTMLIFrameElement**: In `tests/dom-shim/src/iframe-runner.ts`, add `src` getter/setter to load referenced resources into `contentDocument`.
+- [x] **Handle XHTML Content Type**: Support `document.contentType === 'application/xhtml+xml'` in `src/matcher.ts` for XML case sensitivity.
+- [x] **Verify Multi-Frame WPT Tests**: Validate `syntax.html` and `semantics.html` test suites.
 
 ---
 

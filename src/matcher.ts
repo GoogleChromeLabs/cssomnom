@@ -311,8 +311,9 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
     // selectors-4 § 3.7 #case-sensitive
     // html § 15.3.1 #case-sensitivity-of-selectors
     case 'type-selector': {
-      const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
-      const selName = toAsciiLowerCase(simple.name);
+      const isXml = element.ownerDocument?.contentType === 'application/xhtml+xml';
+      const elLocal = isXml ? (element.tagName || element.localName || '') : toAsciiLowerCase(element.localName || element.tagName || '');
+      const selName = isXml ? simple.name : toAsciiLowerCase(simple.name);
       if (selName !== '*' && elLocal !== selName) return false;
       if (simple.namespace !== undefined && simple.namespace !== '*') {
         const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
@@ -464,15 +465,29 @@ function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): bo
   }
 }
 
+// html § 15.3.1 #case-sensitivity-of-selectors
+// selectors-4 § 3.7 #case-sensitive
+const HTML_CASE_INSENSITIVE_ATTRIBUTES = new Set([
+  'accept', 'accept-charset', 'align', 'alink', 'axis', 'bgcolor', 'charset', 'checked',
+  'clear', 'codetype', 'color', 'compact', 'declare', 'defer', 'dir', 'direction',
+  'disabled', 'enctype', 'face', 'frame', 'hreflang', 'http-equiv', 'lang', 'language',
+  'link', 'media', 'method', 'multiple', 'nohref', 'noresize', 'noshade', 'nowrap',
+  'readonly', 'rel', 'rev', 'rules', 'scope', 'scrolling', 'selected', 'shape',
+  'target', 'text', 'type', 'valign', 'valuetype', 'vlink',
+]);
+
 /**
  * HTML Standard § 15.3.1 Case-sensitivity of selectors
  * https://html.spec.whatwg.org/multipage/semantics-other.html#case-sensitivity-of-selectors
+ * selectors-4 § 3.7 #case-sensitive
  */
 function isHTMLCaseInsensitiveAttribute(element: DOMElement, attrName: string): boolean {
-  const tag = toAsciiLowerCase(element.localName || element.tagName || '');
-  const attr = toAsciiLowerCase(attrName);
-  if (tag === 'input' && attr === 'type') return true;
-  return false;
+  // selectors-4 § 3.7 #case-sensitive
+  // html § 15.3.1 #case-sensitivity-of-selectors
+  if (element.ownerDocument?.contentType === 'application/xhtml+xml') {
+    return false;
+  }
+  return HTML_CASE_INSENSITIVE_ATTRIBUTES.has(toAsciiLowerCase(attrName));
 }
 
 /**
