@@ -312,7 +312,7 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
     // html § 15.3.1 #case-sensitivity-of-selectors
     case 'type-selector': {
       const isXml = element.ownerDocument?.contentType === 'application/xhtml+xml';
-      const elLocal = isXml ? (element.tagName || element.localName || '') : toAsciiLowerCase(element.localName || element.tagName || '');
+      const elLocal = isXml ? (element.localName || element.tagName || '') : toAsciiLowerCase(element.localName || element.tagName || '');
       const selName = isXml ? simple.name : toAsciiLowerCase(simple.name);
       if (selName !== '*' && elLocal !== selName) return false;
       if (simple.namespace !== undefined && simple.namespace !== '*') {

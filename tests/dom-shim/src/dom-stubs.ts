@@ -1220,7 +1220,8 @@ function patchStyleElementPrototype(window: WindowType): void {
   }
 
   const disabledGet = function (this: Element) {
-    if (!this || (this as unknown) === htmlStyleEl.prototype || !(this instanceof (win.HTMLStyleElement as Function))) {
+    const isStyle = (this instanceof (win.HTMLStyleElement as Function)) || (this as { localName?: string }).localName === 'style';
+    if (!this || (this as unknown) === htmlStyleEl.prototype || !isStyle) {
       throw new TypeError("Failed to read the 'disabled' property from 'HTMLStyleElement': The provided value is not of type 'HTMLStyleElement'.");
     }
     const sheet = styleSheetMap.get(this);
@@ -1229,7 +1230,8 @@ function patchStyleElementPrototype(window: WindowType): void {
   Object.defineProperty(disabledGet, 'name', { value: 'get disabled', configurable: true });
 
   const disabledSet = function (this: Element, val: boolean) {
-    if (!this || (this as unknown) === htmlStyleEl.prototype || !(this instanceof (win.HTMLStyleElement as Function))) {
+    const isStyle = (this instanceof (win.HTMLStyleElement as Function)) || (this as { localName?: string }).localName === 'style';
+    if (!this || (this as unknown) === htmlStyleEl.prototype || !isStyle) {
       throw new TypeError("Failed to set the 'disabled' property on 'HTMLStyleElement': The provided value is not of type 'HTMLStyleElement'.");
     }
     const sheet = styleSheetMap.get(this);
@@ -1246,8 +1248,9 @@ function patchStyleElementPrototype(window: WindowType): void {
     enumerable: true
   });
 
-  const sheetGet = function (this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document }) {
-    if (!this || (this as unknown) === htmlStyleEl.prototype || !(this instanceof (win.HTMLStyleElement as Function))) {
+  const sheetGet = function (this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document; localName?: string }) {
+    const isStyle = (this instanceof (win.HTMLStyleElement as Function)) || this.localName === 'style';
+    if (!this || (this as unknown) === htmlStyleEl.prototype || !isStyle) {
       throw new TypeError("Failed to read the 'sheet' property from 'HTMLStyleElement': The provided value is not of type 'HTMLStyleElement'.");
     }
     const currentText = this.textContent || '';
@@ -1274,6 +1277,35 @@ function patchStyleElementPrototype(window: WindowType): void {
     enumerable: true,
     get: sheetGet
   });
+
+  const elementProto = (win.Element as { prototype: Record<string, unknown> } | undefined)?.prototype;
+  if (elementProto && !('sheet' in elementProto)) {
+    Object.defineProperty(elementProto, 'sheet', {
+      configurable: true,
+      enumerable: true,
+      get(this: object & { localName?: string }) {
+        if (this.localName === 'style') {
+          return (sheetGet as (this: unknown) => unknown).call(this);
+        }
+        return undefined;
+      }
+    });
+    Object.defineProperty(elementProto, 'disabled', {
+      configurable: true,
+      enumerable: true,
+      get(this: object & { localName?: string }) {
+        if (this.localName === 'style') {
+          return disabledGet.call(this as unknown as Element);
+        }
+        return undefined;
+      },
+      set(this: object & { localName?: string }, val: boolean) {
+        if (this.localName === 'style') {
+          disabledSet.call(this as unknown as Element, val);
+        }
+      }
+    });
+  }
 }
 
 function detectFileEncoding(

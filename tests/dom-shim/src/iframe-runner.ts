@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import * as vm from 'node:vm';
-import { parseHTML } from 'linkedom';
+import { parseHTML, DOMParser } from 'linkedom';
 import { HarnessError, messageOf } from './wpt-assertions.ts';
 import { createWptContext, type WindowType, type DocumentType, type WptSandboxTest } from './testharness-bridge.ts';
 
@@ -419,28 +419,106 @@ function loadIframeResource(
     src.endsWith('.xml');
   const contentType = isXml ? 'application/xhtml+xml' : 'text/html';
 
-  const iframeDocument = iframe.contentDocument!;
-  const iframeWindow = iframe.contentWindow!;
+  let iframeDocument: DocumentType;
+  let iframeWindow: WindowType;
 
-  Object.defineProperty(iframeDocument, 'contentType', {
-    value: contentType,
-    writable: true,
-    configurable: true
-  });
+  if (isXml) {
+    const xmlDoc = (
+      new DOMParser() as unknown as {
+        parseFromString(s: string, t: string): Document & { body?: HTMLElement; head?: HTMLElement; title?: string };
+      }
+    ).parseFromString(fileContent, 'application/xhtml+xml');
+    const xmlWindow = (xmlDoc.defaultView || {}) as WindowType;
+    (xmlWindow as unknown as Record<string, unknown>).frameElement = iframeEl;
+    (xmlWindow as unknown as Record<string, unknown>).__lastWidth = 100;
+    (xmlWindow as unknown as Record<string, unknown>).__lastHeight = 100;
+    _patchWindow(xmlWindow);
 
-  const htmlToParse = fileContent.includes('<html')
-    ? fileContent
-    : `<!doctype html><html><head>${fileContent}</head><body></body></html>`;
-  const parsedDom = parseHTML(htmlToParse);
+    Object.defineProperty(xmlDoc, 'contentType', {
+      value: contentType,
+      writable: true,
+      configurable: true
+    });
 
-  if (iframeDocument.head && parsedDom.document.head) {
-    iframeDocument.head.innerHTML = parsedDom.document.head.innerHTML;
-  }
-  if (iframeDocument.body && parsedDom.document.body) {
-    iframeDocument.body.innerHTML = parsedDom.document.body.innerHTML;
-  }
-  if (parsedDom.document.title) {
-    iframeDocument.title = parsedDom.document.title;
+    if (!xmlDoc.body) {
+      Object.defineProperty(xmlDoc, 'body', {
+        get() {
+          return xmlDoc.querySelector('body');
+        },
+        configurable: true
+      });
+    }
+
+    if (!xmlDoc.head) {
+      Object.defineProperty(xmlDoc, 'head', {
+        get() {
+          return xmlDoc.querySelector('head');
+        },
+        configurable: true
+      });
+    }
+
+    if (xmlDoc.title === undefined) {
+      Object.defineProperty(xmlDoc, 'title', {
+        get() {
+          return xmlDoc.querySelector('title')?.textContent || '';
+        },
+        set(v: string) {
+          const t = xmlDoc.querySelector('title');
+          if (t) {
+            t.textContent = v;
+          }
+        },
+        configurable: true
+      });
+    }
+
+    // Route postMessage to parent window
+    xmlWindow.postMessage = function (this: typeof xmlWindow, data: unknown) {
+      const parentDoc = iframe.ownerDocument;
+      const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
+      const EventConstructor = (parentWin.CustomEvent || parentWin.Event || CustomEvent || Event) as { new (t: string): CustomEvent };
+      const event = new EventConstructor('message');
+      Object.defineProperty(event, 'data', { value: data, enumerable: true });
+      Object.defineProperty(event, 'source', { value: this, enumerable: true });
+      parentWin.dispatchEvent(event);
+    };
+
+    (xmlDoc as unknown as { write?: (s: string) => void }).write = function (srcStr: string) {
+      const parentDoc = iframe.ownerDocument;
+      const parentWin = (parentDoc?.defaultView as WindowType | undefined) || mainWindow;
+      runIframeDocumentWrite(xmlWindow, xmlDoc as unknown as DocumentType, srcStr, parentWin, _patchWindow);
+    };
+    (xmlDoc as unknown as { close?: () => void }).close = function () {};
+
+    iframeContentDocumentMap.set(iframeEl, xmlDoc as unknown as DocumentType);
+    iframeContentWindowMap.set(iframeEl, xmlWindow);
+    iframeDocument = xmlDoc as unknown as DocumentType;
+    iframeWindow = xmlWindow;
+  } else {
+    iframeDocument = iframe.contentDocument!;
+    iframeWindow = iframe.contentWindow!;
+
+    Object.defineProperty(iframeDocument, 'contentType', {
+      value: contentType,
+      writable: true,
+      configurable: true
+    });
+
+    const htmlToParse = fileContent.includes('<html')
+      ? fileContent
+      : `<!doctype html><html><head>${fileContent}</head><body></body></html>`;
+    const parsedDom = parseHTML(htmlToParse);
+
+    if (iframeDocument.head && parsedDom.document.head) {
+      iframeDocument.head.innerHTML = parsedDom.document.head.innerHTML;
+    }
+    if (iframeDocument.body && parsedDom.document.body) {
+      iframeDocument.body.innerHTML = parsedDom.document.body.innerHTML;
+    }
+    if (parsedDom.document.title) {
+      iframeDocument.title = parsedDom.document.title;
+    }
   }
 
   const scriptDir = path.dirname(resolvedPath);
@@ -543,6 +621,7 @@ export function setupIframePrototype(
         if (initialSrc && iframeLoadedSrcMap.get(this) !== initialSrc) {
           iframeLoadedSrcMap.set(this, initialSrc);
           loadIframeResource(this, initialSrc, mainWindow, patchWindow);
+          doc = iframeContentDocumentMap.get(this);
         }
       }
       return doc;

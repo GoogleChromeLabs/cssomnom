@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseHTML } from 'linkedom';
+import { parseHTML, DOMParser } from 'linkedom';
 import {
   patchWindowForTypedOM,
   extractScripts,
@@ -142,21 +142,32 @@ test('HTMLIFrameElement src loading populates contentDocument, sets contentType,
 });
 
 test('XHTML document contentType enforces case-sensitivity in selector matching', () => {
-  const htmlDom = parseHTML('<!DOCTYPE html><html><body><DIV align="LEFT"></DIV></body></html>');
-  const xhtmlDom = parseHTML('<!DOCTYPE html><html><body><DIV align="LEFT"></DIV></body></html>');
-  (xhtmlDom.document as unknown as { contentType: string }).contentType = 'application/xhtml+xml';
+  const htmlDom = parseHTML('<!DOCTYPE html><html><body><div align="LEFT"></div></body></html>');
+  const xhtmlDoc = (
+    new DOMParser() as unknown as { parseFromString(s: string, t: string): Document }
+  ).parseFromString(
+    '<html xmlns="http://www.w3.org/1999/xhtml"><body><div align="LEFT"></div></body></html>',
+    'application/xhtml+xml'
+  );
+  Object.defineProperty(xhtmlDoc, 'contentType', {
+    value: 'application/xhtml+xml',
+    writable: true,
+    configurable: true
+  });
 
-  const htmlDiv = htmlDom.document.querySelector('DIV')!;
-  const xhtmlDiv = xhtmlDom.document.querySelector('DIV')!;
+  const htmlDiv = htmlDom.document.querySelector('div')!;
+  const xhtmlDiv = xhtmlDoc.querySelector('div')!;
 
   // In HTML: tag name is case-insensitive, align value is case-insensitive
-  assert.strictEqual(matches(htmlDiv, 'div'), true, 'div matches DIV in HTML');
+  assert.strictEqual(matches(htmlDiv, 'div'), true, 'div matches div in HTML');
+  assert.strictEqual(matches(htmlDiv, 'DIV'), true, 'DIV matches div in HTML');
   assert.strictEqual(matches(htmlDiv, '[align="left"]'), true, '[align="left"] matches align="LEFT" in HTML');
+  assert.strictEqual(matches(htmlDiv, '[align="LEFT"]'), true, '[align="LEFT"] matches align="LEFT" in HTML');
 
   // In XHTML: tag name is case-sensitive, align value is case-sensitive
-  assert.strictEqual(matches(xhtmlDiv, 'div'), false, 'div does NOT match DIV in XHTML');
+  assert.strictEqual(matches(xhtmlDiv, 'div'), true, 'div matches div in XHTML');
+  assert.strictEqual(matches(xhtmlDiv, 'DIV'), false, 'DIV does NOT match div in XHTML');
   assert.strictEqual(matches(xhtmlDiv, '[align="left"]'), false, '[align="left"] does NOT match align="LEFT" in XHTML');
-  assert.strictEqual(matches(xhtmlDiv, 'DIV'), true, 'DIV matches DIV in XHTML');
   assert.strictEqual(matches(xhtmlDiv, '[align="LEFT"]'), true, '[align="LEFT"] matches align="LEFT" in XHTML');
 });
 
