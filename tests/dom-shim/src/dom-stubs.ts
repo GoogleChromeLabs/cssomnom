@@ -1748,6 +1748,10 @@ function patchElementPrototype(window: WindowType): void {
     patchElementStyle(window.HTMLElement.prototype as unknown as Record<string, unknown>, window);
 
     // cssom-view-1 § 7 #dom-htmlelement-offsetwidth
+    // Architectural Note: In this pure Node.js headless environment without a 2D layout engine,
+    // offsetWidth falls back to reading cascaded width as a test-oracle accommodation for WPT
+    // test assertions (e.g. `#box:lang(...) { width: 100px }` + `assert_equals(box.offsetWidth, 100)`).
+    // This is a test harness shim, not authentic layout geometry.
     Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', {
       get(this: HTMLElement) {
         if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {

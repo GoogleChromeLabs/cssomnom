@@ -212,6 +212,7 @@ test('HTMLElement.prototype.offsetWidth resolves width from cascaded style and i
       <head>
         <style>
           #box { width: 120px; }
+          #override-box { width: 100px; }
           #auto-box { color: red; }
         </style>
       </head>
@@ -233,8 +234,9 @@ test('HTMLElement.prototype.offsetWidth resolves width from cascaded style and i
 
   assert.strictEqual(box.offsetWidth, 120, 'offsetWidth resolves from <style> stylesheet');
   assert.strictEqual(inlineBox.offsetWidth, 250, 'offsetWidth resolves from inline style');
-  assert.strictEqual(overrideBox.offsetWidth, 300, 'offsetWidth resolves inline style over cascaded style');
-  assert.strictEqual(autoBox.offsetWidth, 0, 'offsetWidth defaults to 0 when no width specified');
+  assert.strictEqual(overrideBox.offsetWidth, 300, 'offsetWidth resolves inline style over cascaded stylesheet rule');
+  // Note: In headless test harness without a 2D layout engine, testing autoBox.offsetWidth === 0 verifies the headless stub's fallback when no width is styled
+  assert.strictEqual(autoBox.offsetWidth, 0, "offsetWidth tests the headless stub's fallback (0) when no width is styled");
   assert.strictEqual((win.document.documentElement as HTMLElement).offsetWidth, 800, 'documentElement defaults to 800');
   assert.strictEqual((win.document.body as HTMLElement).offsetWidth, 800, 'body defaults to 800');
 });
