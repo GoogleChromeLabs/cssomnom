@@ -106,7 +106,7 @@ test('HTMLIFrameElement src loading populates contentDocument, sets contentType,
     <!DOCTYPE html>
     <html>
       <body>
-        <iframe id="xml" src="submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-xml.xhtml"></iframe>
+        <iframe id="xml" src="tests/dom-shim/tests/fixtures/semantics-xml.xhtml"></iframe>
       </body>
     </html>
   `);
@@ -120,7 +120,7 @@ test('HTMLIFrameElement src loading populates contentDocument, sets contentType,
   };
 
   assert.ok(iframe);
-  assert.strictEqual(iframe.src, 'submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-xml.xhtml');
+  assert.strictEqual(iframe.src, 'tests/dom-shim/tests/fixtures/semantics-xml.xhtml');
   assert.ok(iframe.contentDocument);
   assert.strictEqual(iframe.contentDocument.contentType, 'application/xhtml+xml');
   assert.ok(iframe.contentWindow);
@@ -132,8 +132,8 @@ test('HTMLIFrameElement src loading populates contentDocument, sets contentType,
     loadEventFired = true;
   });
 
-  iframe.src = 'submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-quirks.html';
-  assert.strictEqual(iframe.src, 'submodules/web-platform-tests/css/selectors/attribute-selectors/attribute-case/resources/semantics-quirks.html');
+  iframe.src = 'tests/dom-shim/tests/fixtures/semantics-quirks.html';
+  assert.strictEqual(iframe.src, 'tests/dom-shim/tests/fixtures/semantics-quirks.html');
 
   // Wait for microtasks
   await new Promise(resolve => setTimeout(resolve, 20));
