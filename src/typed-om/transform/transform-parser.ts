@@ -46,6 +46,24 @@ export function parseNumeric(v: ComponentValue): CSSNumericValue {
   return new CSSUnitValue(0, 'number');
 }
 
+// CSS Values 4 § 6.2 #lengths
+// CSS Transforms 2 § 2 #transform-functions
+function normalizeLength(v: CSSNumericValue): CSSNumericValue {
+  if (v instanceof CSSUnitValue && v.unit === 'number' && v.value === 0) {
+    return new CSSUnitValue(0, 'px');
+  }
+  return v;
+}
+
+// CSS Values 4 § 6.1 #angles
+// CSS Transforms 2 § 2 #transform-functions
+function normalizeAngle(v: CSSNumericValue): CSSNumericValue {
+  if (v instanceof CSSUnitValue && v.unit === 'number' && v.value === 0) {
+    return new CSSUnitValue(0, 'deg');
+  }
+  return v;
+}
+
 export function parseTranslate(name: string, args: ComponentValue[]): CSSTranslate {
   if (name === 'translatex' || name === 'translatey' || name === 'translatez') {
     if (args.length !== 1) throw new TypeError(`${name}() expects 1 argument, got ${args.length}`);
@@ -55,13 +73,13 @@ export function parseTranslate(name: string, args: ComponentValue[]): CSSTransla
     if (args.length < 1 || args.length > 3) throw new TypeError(`translate() expects 1, 2, or 3 arguments, got ${args.length}`);
   }
 
-  const x = parseNumeric(args[0]);
+  const x = normalizeLength(parseNumeric(args[0]));
   let y: CSSNumericValue = new CSSUnitValue(0, 'px');
   let z: CSSNumericValue | undefined = undefined;
 
   if (name === 'translate' || name === 'translate3d') {
-    if (args.length > 1) y = parseNumeric(args[1]);
-    if (args.length > 2) z = parseNumeric(args[2]);
+    if (args.length > 1) y = normalizeLength(parseNumeric(args[1]));
+    if (args.length > 2) z = normalizeLength(parseNumeric(args[2]));
   } else if (name === 'translatex') {
     // defaults ok
   } else if (name === 'translatey') {
@@ -110,29 +128,29 @@ export function parseRotate(name: string, args: ComponentValue[]): CSSRotate {
   }
 
   if (name === 'rotatex') {
-    return new CSSRotate(new CSSUnitValue(1, 'number'), new CSSUnitValue(0, 'number'), new CSSUnitValue(0, 'number'), parseNumeric(args[0]));
+    return new CSSRotate(new CSSUnitValue(1, 'number'), new CSSUnitValue(0, 'number'), new CSSUnitValue(0, 'number'), normalizeAngle(parseNumeric(args[0])));
   }
   if (name === 'rotatey') {
-    return new CSSRotate(new CSSUnitValue(0, 'number'), new CSSUnitValue(1, 'number'), new CSSUnitValue(0, 'number'), parseNumeric(args[0]));
+    return new CSSRotate(new CSSUnitValue(0, 'number'), new CSSUnitValue(1, 'number'), new CSSUnitValue(0, 'number'), normalizeAngle(parseNumeric(args[0])));
   }
   if (name === 'rotatez') {
-    return new CSSRotate(new CSSUnitValue(0, 'number'), new CSSUnitValue(0, 'number'), new CSSUnitValue(1, 'number'), parseNumeric(args[0]));
+    return new CSSRotate(new CSSUnitValue(0, 'number'), new CSSUnitValue(0, 'number'), new CSSUnitValue(1, 'number'), normalizeAngle(parseNumeric(args[0])));
   }
   if (name === 'rotate') {
-    if (args.length === 1) return new CSSRotate(parseNumeric(args[0]));
-    return new CSSRotate(parseNumeric(args[0]), parseNumeric(args[1]), parseNumeric(args[2]), parseNumeric(args[3]));
+    if (args.length === 1) return new CSSRotate(normalizeAngle(parseNumeric(args[0])));
+    return new CSSRotate(parseNumeric(args[0]), parseNumeric(args[1]), parseNumeric(args[2]), normalizeAngle(parseNumeric(args[3])));
   }
   if (name === 'rotate3d') {
-    return new CSSRotate(parseNumeric(args[0]), parseNumeric(args[1]), parseNumeric(args[2]), parseNumeric(args[3]));
+    return new CSSRotate(parseNumeric(args[0]), parseNumeric(args[1]), parseNumeric(args[2]), normalizeAngle(parseNumeric(args[3])));
   }
-  return new CSSRotate(parseNumeric(args[0]));
+  return new CSSRotate(normalizeAngle(parseNumeric(args[0])));
 }
 
 export function parseSkew(name: string, args: ComponentValue[]): CSSTransformComponent {
-  if (name === 'skewx') return new CSSSkewX(parseNumeric(args[0]));
-  if (name === 'skewy') return new CSSSkewY(parseNumeric(args[0]));
-  const ax = parseNumeric(args[0]);
-  const ay = args.length > 1 ? parseNumeric(args[1]) : new CSSUnitValue(0, 'deg');
+  if (name === 'skewx') return new CSSSkewX(normalizeAngle(parseNumeric(args[0])));
+  if (name === 'skewy') return new CSSSkewY(normalizeAngle(parseNumeric(args[0])));
+  const ax = normalizeAngle(parseNumeric(args[0]));
+  const ay = args.length > 1 ? normalizeAngle(parseNumeric(args[1])) : new CSSUnitValue(0, 'deg');
   return new CSSSkew(ax, ay);
 }
 
@@ -142,7 +160,7 @@ export function parsePerspective(args: ComponentValue[]): CSSPerspective {
     return new CSSPerspective(new CSSKeywordValue('none'));
   }
 
-  return new CSSPerspective(parseNumeric(arg));
+  return new CSSPerspective(normalizeLength(parseNumeric(arg)));
 }
 
 export function parseMatrix(name: string, args: ComponentValue[]): CSSMatrixComponent {

@@ -317,12 +317,12 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **89.9%** (20,218 / 22,494 passed assertions across 1,769 test files).
-* **Chrome 154 Parity**: **89.9%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **90.1%** (20,259 / 22,487 passed assertions across 1,769 test files).
+* **Chrome 154 Parity**: **90.1%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
-| **`Typed OM`** | 12,765 | 12,135 | **95.1%** | 🟢 **+1.6%** (ahead of Chrome) |
+| **`Typed OM`** | 12,758 | 12,176 | **95.4%** | 🟢 **+1.9%** (ahead of Chrome) |
 | **`CSSOM`** | 2,141 | 1,989 | **92.9%** | -4.2% |
 | **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
@@ -330,7 +330,7 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 | **`Variables`** | 499 | 411 | **82.4%** | -8.2% |
 | **`Selectors`** | 5,654 | 4,344 | **76.8%** | -9.1% |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **22,494** | **20,218** | **89.9%** | **-3.2%** |
+| **OVERALL** | **22,487** | **20,259** | **90.1%** | **-3.0%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

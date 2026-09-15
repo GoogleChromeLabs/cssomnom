@@ -18,6 +18,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert';
 import {
+  CSSStyleValue,
   CSSUnitValue,
   CSSKeywordValue,
   CSSTranslate,
@@ -300,6 +301,109 @@ describe('CSS Typed OM Transforms toMatrix()', () => {
       // 3D scale shouldn't collapse even if all are equal
       const s3 = new CSSScale(new CSSUnitValue(2, 'number'), new CSSUnitValue(2, 'number'), new CSSUnitValue(2, 'number'));
       assert.strictEqual(s3.toString(), 'scale3d(2, 2, 2)');
+    });
+  });
+
+  describe('Unitless zero in transform component parsing', () => {
+    test('Parses translateX(0), translateY(0), translateZ(0)', () => {
+      const tx = CSSStyleValue.parse('transform', 'translateX(0)') as CSSTransformValue;
+      assert.ok(tx instanceof CSSTransformValue);
+      const c1 = tx[0] as CSSTranslate;
+      assert.ok(c1 instanceof CSSTranslate);
+      assert.strictEqual(c1.x.toString(), '0px');
+
+      const ty = CSSStyleValue.parse('transform', 'translateY(0)') as CSSTransformValue;
+      const c2 = ty[0] as CSSTranslate;
+      assert.ok(c2 instanceof CSSTranslate);
+      assert.strictEqual(c2.y.toString(), '0px');
+
+      const tz = CSSStyleValue.parse('transform', 'translateZ(0)') as CSSTransformValue;
+      const c3 = tz[0] as CSSTranslate;
+      assert.ok(c3 instanceof CSSTranslate);
+      assert.strictEqual(c3.z.toString(), '0px');
+    });
+
+    test('Parses translate(0, 0) and translate3d(0, 0, 0)', () => {
+      const t2d = CSSStyleValue.parse('transform', 'translate(0, 0)') as CSSTransformValue;
+      const c1 = t2d[0] as CSSTranslate;
+      assert.ok(c1 instanceof CSSTranslate);
+      assert.strictEqual(c1.x.toString(), '0px');
+      assert.strictEqual(c1.y.toString(), '0px');
+
+      const t3d = CSSStyleValue.parse('transform', 'translate3d(0, 0, 0)') as CSSTransformValue;
+      const c2 = t3d[0] as CSSTranslate;
+      assert.ok(c2 instanceof CSSTranslate);
+      assert.strictEqual(c2.x.toString(), '0px');
+      assert.strictEqual(c2.y.toString(), '0px');
+      assert.strictEqual(c2.z.toString(), '0px');
+    });
+
+    test('Parses rotate(0), rotateX(0), rotateY(0), rotateZ(0), rotate3d(1, 0, 0, 0)', () => {
+      const r = CSSStyleValue.parse('transform', 'rotate(0)') as CSSTransformValue;
+      const c1 = r[0] as CSSRotate;
+      assert.ok(c1 instanceof CSSRotate);
+      assert.strictEqual(c1.angle.toString(), '0deg');
+
+      const rx = CSSStyleValue.parse('transform', 'rotateX(0)') as CSSTransformValue;
+      const c2 = rx[0] as CSSRotate;
+      assert.ok(c2 instanceof CSSRotate);
+      assert.strictEqual(c2.angle.toString(), '0deg');
+
+      const ry = CSSStyleValue.parse('transform', 'rotateY(0)') as CSSTransformValue;
+      const c3 = ry[0] as CSSRotate;
+      assert.ok(c3 instanceof CSSRotate);
+      assert.strictEqual(c3.angle.toString(), '0deg');
+
+      const rz = CSSStyleValue.parse('transform', 'rotateZ(0)') as CSSTransformValue;
+      const c4 = rz[0] as CSSRotate;
+      assert.ok(c4 instanceof CSSRotate);
+      assert.strictEqual(c4.angle.toString(), '0deg');
+
+      const r3d = CSSStyleValue.parse('transform', 'rotate3d(1, 0, 0, 0)') as CSSTransformValue;
+      const c5 = r3d[0] as CSSRotate;
+      assert.ok(c5 instanceof CSSRotate);
+      assert.strictEqual(c5.angle.toString(), '0deg');
+    });
+
+    test('Parses skew(0), skew(0, 0), skewX(0), skewY(0)', () => {
+      const sk = CSSStyleValue.parse('transform', 'skew(0)') as CSSTransformValue;
+      const c1 = sk[0] as CSSSkew;
+      assert.ok(c1 instanceof CSSSkew);
+      assert.strictEqual(c1.ax.toString(), '0deg');
+      assert.strictEqual(c1.ay.toString(), '0deg');
+
+      const sk2 = CSSStyleValue.parse('transform', 'skew(0, 0)') as CSSTransformValue;
+      const c2 = sk2[0] as CSSSkew;
+      assert.ok(c2 instanceof CSSSkew);
+      assert.strictEqual(c2.ax.toString(), '0deg');
+      assert.strictEqual(c2.ay.toString(), '0deg');
+
+      const skx = CSSStyleValue.parse('transform', 'skewX(0)') as CSSTransformValue;
+      const c3 = skx[0] as CSSSkewX;
+      assert.ok(c3 instanceof CSSSkewX);
+      assert.strictEqual(c3.ax.toString(), '0deg');
+
+      const sky = CSSStyleValue.parse('transform', 'skewY(0)') as CSSTransformValue;
+      const c4 = sky[0] as CSSSkewY;
+      assert.ok(c4 instanceof CSSSkewY);
+      assert.strictEqual(c4.ay.toString(), '0deg');
+    });
+
+    test('Parses perspective(0)', () => {
+      const p = CSSStyleValue.parse('transform', 'perspective(0)') as CSSTransformValue;
+      const c1 = p[0] as CSSPerspective;
+      assert.ok(c1 instanceof CSSPerspective);
+      assert.strictEqual(c1.length.toString(), '0px');
+    });
+
+    test('Parses individual translate and rotate properties with unitless zero', () => {
+      const t = CSSStyleValue.parse('translate', '0') as CSSTranslate;
+      assert.ok(t instanceof CSSTranslate);
+      assert.strictEqual(t.x.toString(), '0px');
+
+      const r = CSSStyleValue.parse('rotate', '0') as CSSRotate;
+      assert.ok(r instanceof CSSRotate);
+      assert.strictEqual(r.angle.toString(), '0deg');
     });
   });
 });

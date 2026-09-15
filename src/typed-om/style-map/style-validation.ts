@@ -31,6 +31,7 @@ import { STANDARD_PROPERTIES_SYNTAX } from '../../data/gen/standard-syntax.ts';
 import { SHORTHANDS } from '../../shorthands.ts';
 import { NAMED_COLORS } from '../../data/gen/colors.ts';
 import { validateProperty } from '../utils/validation.ts';
+import { CSSStyleDeclaration } from '../../CSSStyleDeclaration.ts';
 import {
   matchesLength,
   matchesPercentage,
@@ -149,19 +150,27 @@ interface DummyStyle {
   setProperty(p: string, v: string): void;
 }
 
-let dummyStyle: DummyStyle | null = null;
+let cachedDoc: unknown = null;
+let cachedDocStyle: DummyStyle | null = null;
+let fallbackStyle: DummyStyle | null = null;
+
+// Dynamic document resolution prevents caching an inert stub across realm switches or in pure Node
 export function getDummyStyle(): DummyStyle {
-  if (!dummyStyle) {
-    if (typeof globalThis.document === 'undefined') {
-      return {
-        cssText: '',
-        setProperty() {},
-        getPropertyValue() { return ''; },
-      };
+  const currentDoc = typeof globalThis.document !== 'undefined' ? globalThis.document : null;
+  if (currentDoc && typeof currentDoc.createElement === 'function') {
+    if (cachedDoc !== currentDoc || !cachedDocStyle) {
+      cachedDoc = currentDoc;
+      cachedDocStyle = currentDoc.createElement('div').style;
     }
-    dummyStyle = globalThis.document.createElement('div').style;
+    return cachedDocStyle;
   }
-  return dummyStyle;
+  cachedDoc = null;
+  cachedDocStyle = null;
+
+  if (!fallbackStyle) {
+    fallbackStyle = new CSSStyleDeclaration() as unknown as DummyStyle;
+  }
+  return fallbackStyle;
 }
 
 export function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {

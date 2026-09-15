@@ -3285,13 +3285,13 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 136: Typed OM Module-Load Document Cache & Transform Unitless Zero [ ]
+## Phase 136: Typed OM Module-Load Document Cache & Transform Unitless Zero [x]
 **Goal**: Eliminate static module-load environment caching in `style-validation.ts` and handle unitless zero in transform component parsers.
 
 ### Tasks
-- [ ] **Dynamic Document Resolution in `getDummyStyle()`**: In `src/typed-om/style-map/style-validation.ts`, dynamically resolve document access instead of caching an empty stub at import time.
-- [ ] **Rectify Unitless Zero in Transform Parsers**: Support unitless zero (`0` -> `0px`/`0deg`) in transform function parsers (`translateX`, `rotateX`, `skew`, `perspective`).
-- [ ] **Verify WPT Typed OM Suite**: Validate conformance gains across `css-typed-om/idlharness.html` and numeric value tests.
+- [x] **Dynamic Document Resolution in `getDummyStyle()`**: In `src/typed-om/style-map/style-validation.ts`, dynamically resolve document access with `CSSStyleDeclaration` probe fallback instead of caching an empty stub at import time.
+- [x] **Rectify Unitless Zero in Transform Parsers**: Support unitless zero (`0` -> `0px`/`0deg`) in transform function parsers (`translateX`, `rotateX`, `skew`, `perspective`) per CSS Values 4 § 6.2 and CSS Transforms 2 § 2.
+- [x] **Verify WPT Typed OM Suite**: Validate conformance gains across `numeric-factory.tentative.html`, `transform.html`, `transformvalue-normalization.tentative.html`, and `idlharness.html`.
 
 ---
 
