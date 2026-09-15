@@ -144,11 +144,11 @@ export function isEquivalent(a: string, b: string): boolean {
   return clean(a) === clean(b);
 }
 
-interface DummyStyle {
+type DummyStyle = {
   cssText: string;
   getPropertyValue(p: string): string;
-  setProperty(p: string, v: string): void;
-}
+  setProperty(p: string, v: string, priority?: string): void;
+};
 
 let cachedDoc: unknown = null;
 let cachedDocStyle: DummyStyle | null = null;
@@ -162,13 +162,13 @@ export function getDummyStyle(): DummyStyle {
       cachedDoc = currentDoc;
       cachedDocStyle = currentDoc.createElement('div').style;
     }
-    return cachedDocStyle;
+    return cachedDocStyle!;
   }
   cachedDoc = null;
   cachedDocStyle = null;
 
   if (!fallbackStyle) {
-    fallbackStyle = new CSSStyleDeclaration() as unknown as DummyStyle;
+    fallbackStyle = new CSSStyleDeclaration();
   }
   return fallbackStyle;
 }
