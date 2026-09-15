@@ -254,35 +254,36 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
     };
   }
 
-  if (fileLower.includes('check-layout') || combined.includes('checklayout')) {
-    return {
-      isBrowserOnly: true,
-      category: 'LAYOUT_GEOMETRY',
-      reason: 'checkLayout assertions test 2D layout geometry and element positioning'
-    };
-  }
+  if (!isSyntaxOrParsing) {
+    if (fileLower.includes('check-layout') || combined.includes('checklayout')) {
+      return {
+        isBrowserOnly: true,
+        category: 'LAYOUT_GEOMETRY',
+        reason: 'checkLayout assertions test 2D layout geometry and element positioning'
+      };
+    }
 
-  const BOX_METRIC_PROPERTIES = [
-    'clientwidth',
-    'clientheight',
-    'offsetwidth',
-    'offsetheight',
-    'scrollwidth',
-    'scrollheight'
-  ];
+    const BOX_METRIC_PROPERTIES = [
+      'clientwidth',
+      'clientheight',
+      'offsetwidth',
+      'offsetheight',
+      'scrollwidth',
+      'scrollheight'
+    ];
 
-  for (const metric of BOX_METRIC_PROPERTIES) {
-    if (combined.includes(metric)) {
-      if (
-        (/^\s*["']?\d+(\.\d+)?["']?\s*$/.test(expected) &&
-          (/^\s*["']?(0|0px|auto|none|normal|)["']?\s*$/.test(actual) || /^\s*""\s*$/.test(actual))) ||
-        combined.includes('expected')
-      ) {
-        return {
-          isBrowserOnly: true,
-          category: 'LAYOUT_GEOMETRY',
-          reason: `Element box metric ${metric} requires visual layout engine`
-        };
+    for (const metric of BOX_METRIC_PROPERTIES) {
+      if (combined.includes(metric)) {
+        if (
+          /^\s*["']?\d+(\.\d+)?["']?\s*$/.test(expected) &&
+          (/^\s*["']?(0|0px|auto|none|normal|)["']?\s*$/.test(actual) || /^\s*""\s*$/.test(actual))
+        ) {
+          return {
+            isBrowserOnly: true,
+            category: 'LAYOUT_GEOMETRY',
+            reason: `Element box metric ${metric} requires visual layout engine`
+          };
+        }
       }
     }
   }

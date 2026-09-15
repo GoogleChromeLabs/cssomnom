@@ -295,6 +295,8 @@ test('classifySubtestFeasibility: Phase 139 Heuristics Tuning', () => {
   const offsetHeightInt = classifySubtestFeasibility({
     file: 'submodules/web-platform-tests/css/cssom/offset-metrics.html',
     name: 'target.offsetHeight visual layout resolution',
+    expected: '50',
+    actual: '0',
     error: 'assert_equals: offsetHeight expected 50 but got 0'
   });
   assert.strictEqual(offsetHeightInt.isBrowserOnly, true);
@@ -308,5 +310,26 @@ test('classifySubtestFeasibility: Phase 139 Heuristics Tuning', () => {
   });
   assert.strictEqual(checkLayoutFile.isBrowserOnly, true);
   assert.strictEqual(checkLayoutFile.category, 'LAYOUT_GEOMETRY');
+
+  // 5. Syntax/parsing failure mentioning box metrics must NOT be classified as browser-only
+  const syntaxWithMetric = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/selectors/has-attr.html',
+    name: 'CSS.supports("selector(:has([offsetWidth]))") parse validation',
+    expected: 'true',
+    actual: 'false',
+    error: 'assert_equals: CSS.supports("selector(:has([offsetWidth]))") expected true but got false'
+  });
+  assert.strictEqual(syntaxWithMetric.isBrowserOnly, false);
+  assert.strictEqual(syntaxWithMetric.category, undefined);
+
+  const selectorTextWithMetric = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/cssom/rule-serialization.html',
+    name: 'CSSStyleRule.selectorText with offsetWidth attribute selector',
+    expected: '":has([offsetWidth])"',
+    actual: '""',
+    error: 'assert_equals: rule.selectorText expected ":has([offsetWidth])" but got ""'
+  });
+  assert.strictEqual(selectorTextWithMetric.isBrowserOnly, false);
+  assert.strictEqual(selectorTextWithMetric.category, undefined);
 });
 
