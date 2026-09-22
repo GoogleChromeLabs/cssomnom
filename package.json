@@ -79,7 +79,7 @@
     "submodules:update": "git submodule update --init --recursive",
     "submodules:upgrade": "git submodule update --init --remote && pnpm run submodules:update",
     "codegen": "node scripts/codegen/generate_all.ts",
-    "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run external:extract && pnpm run preflight"
+    "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run external:extract && pnpm run preflight && pnpm run wpt:baseline"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",

@@ -4,12 +4,13 @@ This document explains how to maintain the CSSOM parser repository, including up
 
 ## Workflow
 
-The maintenance workflow typically involves three steps:
+The maintenance workflow typically involves:
 
-1.  **Update Submodules**: Pull the latest changes from the W3C CSSWG drafts and Web Platform Tests.
+1.  **Update Submodules & Dependencies**: Pull the latest changes from the W3C CSSWG drafts and Web Platform Tests (`submodules/`), and update dependencies.
 2.  **Run Codegen & Generate Fixtures**: Extract spec data and test fixtures from updated submodules.
 3.  **Audit & Revise Feasibility Manifest**: Re-evaluate browser-dependent exclusions against the feasibility criteria.
-4.  **Run Tests & Sync Progress**: Verify unit tests and update WPT conformance logs.
+4.  **Run Tests & Snapshot Baseline**: Verify unit tests and snapshot the passing WPT subtest baseline (`pnpm run wpt:baseline`) to guard against test-level regressions.
+5.  **Sync Progress**: Update WPT conformance progress tables in `README.md` and `wpt-progress.md`.
 
 ### Convenient Commands
 
@@ -62,12 +63,15 @@ pnpm run wpt parity --spec=cssom
 pnpm run wpt:run
 ```
 
-**5. Run Tests & Update Progress:**
+**5. Run Tests, Update Baseline & Sync Progress:**
 ```bash
 # Run preflight unit tests and linter
 pnpm run preflight
 
-# Update WPT conformance progress table
+# Snapshot the passing subtest baseline (updates tests/fixtures/baselines/wpt-passing-set-baseline.json)
+pnpm run wpt:baseline
+
+# Update WPT conformance progress table and README.md summary
 pnpm run wpt:progress
 ```
 
@@ -83,7 +87,7 @@ When specifications are updated in the submodules, we need to ensure our impleme
 
 ## WPT Submodule Upgrades & Feasibility Auditing
 
-When `submodules/web-platform-tests/` is upgraded:
+When `submodules/web-platform-tests/` or dependencies are upgraded:
 
 1.  **Anti-Greenwashing Invariant**: Never exclude tests merely because they fail or require complex AST handling. Tests are excluded in `tests/wpt-node-config.json` *only* for runner blockers (reftests, VM loader crashes, indefinite timeouts).
 2.  **Cluster Triage & Feasibility Classification**: Run the failure clustering tool and audit any new failure patterns per [`scripts/wpt/node/README.md`](./scripts/wpt/node/README.md):
@@ -94,7 +98,8 @@ When `submodules/web-platform-tests/` is upgraded:
     # 2. Verify and test classifier rules
     pnpm test:node
     ```
-3.  **Synchronize Progress**: Run `pnpm run wpt:progress` to update the historical conformance progress log.
+3.  **Refresh Passing Subtest Baseline**: Run `pnpm run wpt:baseline` to update [`tests/fixtures/baselines/wpt-passing-set-baseline.json`](tests/fixtures/baselines/wpt-passing-set-baseline.json). This records the full passing subtest set so regressions can be detected on specific tests via `pnpm run wpt:verify`.
+4.  **Synchronize Progress**: Run `pnpm run wpt:progress` to update the historical conformance progress log and `README.md`.
 
 ## Spec Compliance Auditing via Subagents
 
