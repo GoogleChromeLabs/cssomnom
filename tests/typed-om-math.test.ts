@@ -487,7 +487,7 @@ test('CSS.rad and CSS.turn factories do not convert to degrees', () => {
   assert.strictEqual(turnVal.unit, 'turn');
 });
 
-test('CSSNumericValue.parse preserves mathematical AST structure', () => {
+test('CSSNumericValue.parse preserves calculation tree structure', () => {
   const val = CSSNumericValue.parse('calc(1px + 2em)');
   assert.ok(val instanceof CSSMathSum);
   const values = (val as CSSMathSum).values;

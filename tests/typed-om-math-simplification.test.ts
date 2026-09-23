@@ -29,7 +29,7 @@ import {
 } from '../src/typed-om.ts';
 import { simplify } from '../src/math-parser.ts';
 
-describe('Phase 117: CSS Math Tree Simplification & Canonical Typed OM AST Parsing', () => {
+describe('Phase 117: CSS Calculation Tree Simplification & Canonical Typed OM Numeric Tree Parsing', () => {
   describe('CSSNumericValue.parse() single value & homogeneous sum simplification (CSS Values 4 § 10.7)', () => {
     it('parses dimension token into CSSUnitValue', () => {
       const result = CSSNumericValue.parse('10px');

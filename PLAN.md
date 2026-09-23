@@ -375,7 +375,7 @@ Objective: Address remaining compliance gaps identified in Round 4 audits to ach
 
 #### Step 1: CSSOM & Interfaces
 - [x] **CSSStyleRule**: Refactor `selectorText` setter to use a dedicated `Parser.parseSelector` instead of the rule-parsing hack.
-- [ ] **CSSStyleProperties**: (Optional/Future) Implement camel-cased property attributes on `style` object.
+- [x] **CSSStyleProperties**: Implement camel-cased property attributes on `style` object via Proxy (`src/CSSStyleDeclaration.ts`).
 
 #### Step 2: Parser & Syntax
 - [x] **Syntax**: Implement `unicode-range` tokenization properly in `AbstractTokenizer` (instead of parser workaround).
@@ -405,7 +405,7 @@ Objective: Address remaining minor compliance gaps and edge cases identified in 
 
 #### Step 3: Logical Properties & CSSOM
 - [x] **Logical**: Support logical border-radius properties in `logicalShorthands` (e.g., `border-start-start-radius` etc.).
-- [ ] **CSSOM**: (Optional) Implement `CSSStyleProperties` via Proxy to support camel-cased property access on `style` object.
+- [x] **CSSOM**: Implemented `CSSStyleProperties` via Proxy to support camel-cased property access on `style` object.
 
 #### Step 4: Values & Typed OM
 - [x] **Math Functions**: Ensure specified values that simplify to a single numeric value still serialize wrapped in `calc()` (e.g., `calc(50px)`).
@@ -1703,7 +1703,7 @@ Objective: Review and resolve compliance gaps in CSS Typed OM Level 1 validated 
 #### Phase 72.2: Math & Numeric Types Conformance [x]
 - [x] Fix `addTypesForSum` percent hint resolution to loop over all base types.
 - [x] Prevent `CSS.rad` and `CSS.turn` factories from converting inputs to degrees.
-- [x] Preserve mathematical AST structure in `CSSNumericValue.parse()` by removing eager simplification.
+- [x] Preserve calculation tree structure in `CSSNumericValue.parse()` by removing eager simplification.
 - [x] Validate unit arguments in the `CSSUnitValue` constructor.
 - [x] Validate argument lengths in math value constructors (Sum, Product, Min, Max).
 - [x] Validate argument types in the `CSSMathProduct` constructor.
@@ -2857,8 +2857,8 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 117: CSS Math Tree Simplification & Canonical Typed OM AST Parsing
-**Goal**: Implement parse-time homogeneous unit simplification and canonical math tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
+## Phase 117: CSS Calculation Tree Simplification & Canonical Typed OM Numeric Tree Parsing
+**Goal**: Implement parse-time homogeneous unit simplification and canonical calculation tree normalization per CSS Values 4 § 10.7 and CSS Typed OM Level 1 § 4.4, eliminating ~140 spec gaps in `numeric-objects/parse.tentative.html`.
 
 ### Tasks
 - [x] **Homogeneous Unit Simplification in `CSSNumericValue.parse()` (CSS Values 4 § 10.7)**:

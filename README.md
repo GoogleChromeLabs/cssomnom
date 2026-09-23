@@ -277,6 +277,7 @@ These APIs are custom utilities for static analysis, cascading, variable resolut
     - `Parser.parseRuleText(css)`: Parses a single CSS rule string into a `Rule` object.
     - `Parser.parseStyleSheetText(css)`: Parses a stylesheet string into `Rule[]`.
     - `Parser.parseRuleInBlockText(css, nested?)`: Parses a rule within a nested/block context.
+    - `Parser.parseRuleInScopeBlockText(css)`: Parses a rule within a `@scope` block context.
     - `Parser.parseSelector(css)`: Validates and serializes a selector string.
     - `Parser.parseSelectorAST(css)`: Parses a selector string into structured `SelectorList` nodes.
     - `Parser.calculateSpecificity(selector)`: Calculates selector specificity `[a, b, c]`.
@@ -298,6 +299,11 @@ These APIs are custom utilities for static analysis, cascading, variable resolut
 
 **API Surface Verification**
 The public API surface area is locked down and verified by [api-surface.test.ts](./tests/api-surface.test.ts). Any additions or removals of public exports must be reflected in that test to ensure intentional API changes.
+
+---
+
+### Circular Dependency Inversion (`ParseHooks`)
+To preserve clean architectural separation and prevent circular import cycles between the core parser (`src/parser.ts`) and high-level CSSOM/Typed OM modules (`src/CSSOM.ts`, `src/typed-om.ts`), the codebase employs Dependency Inversion via `ParseHooks` (`src/parse-hooks.ts`). Higher-level classes delegate parser operations to `ParseHooks`, which are populated at bootstrap by `src/parser.ts`.
 
 ---
 
