@@ -379,6 +379,43 @@ test('CSSImportRule with layer and supports', () => {
   assert.equal(rule4.media.mediaText, 'print');
 });
 
+test('CSSImportRule with unquoted url() token and dot-separated layer names', () => {
+  const ast1 = Parser.parseStyleSheetText('@import url(nonexist.css) layer;');
+  const rule1 = ast1[0] as unknown as CSSImportRule;
+  assert.equal(rule1.href, 'nonexist.css');
+  assert.equal(rule1.layerName, '');
+  assert.equal(rule1.media.mediaText, '');
+  assert.equal(rule1.cssText, '@import url("nonexist.css") layer;');
+
+  const ast2 = Parser.parseStyleSheetText('@import url(nonexist.css) layer(A.B);');
+  const rule2 = ast2[0] as unknown as CSSImportRule;
+  assert.equal(rule2.href, 'nonexist.css');
+  assert.equal(rule2.layerName, 'A.B');
+  assert.equal(rule2.media.mediaText, '');
+  assert.equal(rule2.cssText, '@import url("nonexist.css") layer(A.B);');
+
+  // Invalid layer declarations fall back to media query
+  const ast3 = Parser.parseStyleSheetText('@import url("nonexist.css") layer();');
+  const rule3 = ast3[0] as unknown as CSSImportRule;
+  assert.equal(rule3.layerName, null);
+  assert.notEqual(rule3.media.length, 0);
+
+  const ast4 = Parser.parseStyleSheetText('@import url("nonexist.css") layer(A B);');
+  const rule4 = ast4[0] as unknown as CSSImportRule;
+  assert.equal(rule4.layerName, null);
+  assert.notEqual(rule4.media.length, 0);
+
+  const ast5 = Parser.parseStyleSheetText('@import url("nonexist.css") layer(A . B);');
+  const rule5 = ast5[0] as unknown as CSSImportRule;
+  assert.equal(rule5.layerName, null);
+  assert.notEqual(rule5.media.length, 0);
+
+  const ast6 = Parser.parseStyleSheetText('@import url("nonexist.css") layer(A, B, C);');
+  const rule6 = ast6[0] as unknown as CSSImportRule;
+  assert.equal(rule6.layerName, null);
+  assert.notEqual(rule6.media.length, 0);
+});
+
 test('CSSNamespaceRule interface', () => {
   const ast = Parser.parseStyleSheetText('@namespace svg url("http://www.w3.org/2000/svg");');
   const rule = ast[0] as unknown as CSSNamespaceRule;

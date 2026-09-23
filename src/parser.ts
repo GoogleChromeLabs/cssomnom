@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, FunctionToken, CustomMediaQuery, RuleSourceLocation, ElementLike } from './types.ts';
+import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, UrlToken, FunctionToken, CustomMediaQuery, RuleSourceLocation, ElementLike } from './types.ts';
 
 
 import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
@@ -810,6 +810,9 @@ export class Parser {
       if (first.type === 'string') {
         href = first.value;
         i++;
+      } else if (first.type === 'url') {
+        href = (first as UrlToken).value;
+        i++;
       } else if (first.type === 'function' && (first as CSSFunction).name === 'url') {
          // handle url()
          const urlArg = (first as CSSFunction).value.find(v => v.type === 'string');
@@ -835,7 +838,42 @@ export class Parser {
         layerName = '';
         i++;
       } else if (layerName === null && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'layer') {
-        layerName = serialize((val as CSSFunction).value).trim();
+        // css-cascade-5 § 5: layer(<layer-name>)
+        // <layer-name> = <ident> [ '.' <ident> ]* with NO intervening whitespace
+        // Empty layer() is invalid.
+        const fnTokens = (val as CSSFunction).value;
+        if (fnTokens.length === 0) {
+          // Invalid layer(): falls back to media query
+          break;
+        }
+
+        let isValid = true;
+        const nameParts: string[] = [];
+        for (let idx = 0; idx < fnTokens.length; idx++) {
+          const tok = fnTokens[idx];
+          if (idx % 2 === 0) {
+            // Expect ident token
+            if (tok.type !== 'ident') {
+              isValid = false;
+              break;
+            }
+            nameParts.push(tok.value);
+          } else {
+            // Expect delim token with value '.'
+            if (tok.type !== 'delim' || tok.value !== '.') {
+              isValid = false;
+              break;
+            }
+            nameParts.push('.');
+          }
+        }
+
+        if (!isValid) {
+          // Invalid layer name: falls through to media query list
+          break;
+        }
+
+        layerName = nameParts.join('');
         i++;
       } else if (supportsText === null && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'supports') {
         supportsText = serialize((val as CSSFunction).value).trim();
