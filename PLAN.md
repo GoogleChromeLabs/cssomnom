@@ -3320,3 +3320,178 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 ### Tasks
 - [x] **Refine Browser-Only Heuristics**: Restrict `focus-visible` and `active-` classifications to prevent masking pure selector parsing bugs.
 - [x] **Refine Feasible Layout Heuristics**: Correctly identify integer `clientWidth`/`clientHeight` checks and `check-layout-th.js` tests as layout dependencies.
+
+---
+
+## Phase 140: WPT Conformance Boost — CSS Variables Spec Compliance & Cycle Invalidation [ ]
+**Goal**: Advance `css-variables` conformance from 411 / 499 (82.4%) to 471+ / 494 (95.3%+ feasible) by fixing declaration-value pre-validation, registered property CSS-wide keywords, guaranteed-invalid cascade invalidation, replaced element math simplification, and `css-variables-2` dynamic name substitution.
+
+**Spec References**:
+- CSS Custom Properties for Cascading Variables Module Level 1: `submodules/csswg-drafts/css-variables-1/Overview.bs`
+  - § 2 Custom Properties (`#defining-custom-properties`)
+  - § 3 Using Cascading Variables: The `var()` Notation (`#using-variables`)
+  - § 3.1 Invalid Substitution Values (`#invalid-variables`)
+- CSS Values and Units Module Level 5: `submodules/csswg-drafts/css-values-5/Overview.bs`
+  - § 4.1 Invalid Substitution Values (`#invalid-substitution`)
+- CSS Properties and Values API Level 1: `submodules/css-houdini-drafts/css-properties-values-api/Overview.bs`
+  - § 5 Calculation of Computed Values (`#calculation-of-computed-values`)
+- WPT Test Suites: `submodules/web-platform-tests/css/css-variables/`
+
+### Sub-Phases & Atomic Tasks
+
+#### Phase 140.1: Quick Wins — Declaration Value Pre-Validation & CSS-Wide Keywords (+17 tests) [ ]
+- [ ] **Enforce `validateDeclarationValue` in `CSSStyleDeclaration.setProperty()` (+7 tests)**:
+  - In `src/CSSStyleDeclaration.ts:522-526`, `setProperty()` currently early-exits `true` whenever `var(` is present, skipping `validateDeclarationValue`.
+  - Update `setProperty()` to pass parsed component values to `ParseHooks.validateDeclarationValue(compVals)` before storing.
+  - Reject invalid `var()` syntaxes like `var(--x {--y})`, `var({--x} --y)`, `var()`, `var({})`, `var(, 10px)`.
+  - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-variables/var-parsing.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/var-parsing.html) (7/7 passing, +7 tests).
+- [ ] **Registered Custom Property CSS-Wide Keyword & Defaulting Resolution (+8 tests)**:
+  - In `src/cascade/variable-resolver.ts:284-291`, consult `PropertyRegistry.get(name)` for custom properties:
+    - If `initial`: return `def?.initialValue ?? null` (instead of returning `null` unconditionally).
+    - If `unset` or `revert`: if `!def?.inherits`, resolve to `def?.initialValue ?? null`; if `def?.inherits`, inherit from parent element.
+  - In `substituteVariables`: when `var(--prop)` is looked up and not present in `customProps`, check `PropertyRegistry.get(varName)?.initialValue`.
+  - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-variables/variable-css-wide-keywords.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-css-wide-keywords.html) (8/8 passing, +8 tests).
+- [ ] **Token-Aware Shadow Property Serialization (+2 tests)**:
+  - In `src/cascade/computed-style.ts:296-317`, replace naive `rawVal.split(/\s+/)` with token-aware traversal using `tokenize(rawVal)`.
+  - Prevent splitting across commas inside functional values like `rgb(0, 128, 0)` in `box-shadow`.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-substitution-shadow-properties.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-shadow-properties.html) (+2 tests).
+
+#### Phase 140.2: Core Cascade Invalidation & Guaranteed-Invalid Propagation (+14 tests) [ ]
+- [ ] **Guaranteed-Invalid Invalidation on Cascade Rollback (+4 tests)**:
+  - In `src/cascade/variable-resolver.ts:256-260`: when a custom property declaration fails variable substitution (`subVal === null` due to cycle or referencing an unset variable without fallback), do **not** `continue` down the cascade loop to inherit or use an earlier rule!
+  - Per CSS Variables 1 § 3.1, mark the property as invalid at computed-value time, storing `resolvedCustomProps.set(name, '')` (the guaranteed-invalid value) and return `null`.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variables-substitute-guaranteed-invalid.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variables-substitute-guaranteed-invalid.html) and [`variable-substitution-variable-declaration.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-variable-declaration.html) (+4 tests).
+- [ ] **Shorthand Invalidation at Computed-Value Time (+6 tests)**:
+  - In `src/cascade/value-processor.ts:88-92`: when `expandShorthandWithVariables` encounters an invalid `var()` in a shorthand (e.g. `margin: var(--invalid)`), mark each longhand as invalid at computed-value time on that element.
+  - Longhands must compute to their initial/inherited value (`0px`), overriding previous rules on the element rather than letting the cascade fall back to earlier declarations (e.g. `margin: 77px`).
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-substitution-shorthands.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-shorthands.html) (+6 tests).
+- [ ] **Pseudo-Element Restricted Properties (+4 tests)**:
+  - Enforce that `position` cannot be altered by `::first-letter` / `::first-line` per CSS Pseudo-Elements 4 § 2 and always computes to `static`.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-first-letter.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-first-letter.html) and [`variable-first-line.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-first-line.html) (+4 tests).
+
+#### Phase 140.3: Value Processing & Geometry Simplification (+17 tests) [ ]
+- [ ] **`calc()` Simplification on Replaced Element Sizing (+6 tests)**:
+  - In `CSSComputedStyleDeclaration.getPropertyValue('width')` and `'height'`, simplify constant `calc(...)` expressions like `calc(10px + 20px)` into `30px` using `CSSMathOperations`.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-substitution-replaced-size.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-replaced-size.html) (+6 tests).
+- [ ] **`perspective-origin` Dimension Resolution (+6 tests)**:
+  - In `src/cascade/computed-style.ts`, implement resolved value computation for `perspective-origin`: resolve percentage tokens against the element's box dimensions per CSS Transforms 2 § 3.2.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html) (+6 tests).
+- [ ] **SVG Presentation Attribute Default Value Alignment (+5 tests)**:
+  - In `src/cascade/computed-style.ts`, update SVG-specific property default mappings for `clip`, `baseline-shift`, `flood-color`, `lighting-color`, `stop-color`, `stroke` when queried on SVG element instances.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-presentation-attribute.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-presentation-attribute.html) (+5 tests).
+
+#### Phase 140.4: `css-variables-2` Dynamic Name Substitution (+12 tests) [ ]
+- [ ] **Arbitrary Substitution Value for `var()` Name**:
+  - In `src/cascade/variable-resolver.ts:100-125`, evaluate nested substitution functions in the first argument of `var()` (e.g. `var(var(--myvar))` or `var({var(--myvar)})`) recursively before validating as a custom property ident.
+  - Strip outer whitespace and `{}` blocks from the substituted string.
+  - If the resulting string matches `^--[a-zA-Z0-9_-]+$`, resolve that property; otherwise treat as invalid and trigger fallback.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-reference-name-substitution.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-reference-name-substitution.html) (+8 tests), [`variable-reference-name-substitution-attr-taint.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-reference-name-substitution-attr-taint.html) (+4 tests), and [`var-ident-function.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/var-ident-function.html) (+1 test).
+
+---
+
+## Phase 141: WPT Conformance Boost — CSS Cascade Layer Ordering & Grammar Alignment [ ]
+**Goal**: Advance `css-cascade` conformance from 412 / 494 (83.4%) to 462 / 462 (100% feasible, 93.5% raw) by fixing WebIDL prototypes, `@layer` grammar strictness, computed `line-height` resolution, `@scope` relative syntax serialization, implicit sub-layer sorting, and layered at-rule resolution.
+
+**Spec References**:
+- CSS Cascading and Inheritance Level 5: `submodules/csswg-drafts/css-cascade-5/Overview.bs`
+  - § 6.4 Cascade Layers (`#layering`)
+  - § 6.4.2 Layer Names (`#layer-names`)
+  - § 6.4.3 Layer Ordering (`#layer-ordering`)
+  - § 6.4.4 Declaring Layers (`#declaring-layers`)
+- CSS Cascading and Inheritance Level 6: `submodules/csswg-drafts/css-cascade-6/Overview.bs`
+  - § 3 Scoping (`#scoping`)
+- CSSOM Level 1: `submodules/csswg-drafts/cssom-1/Overview.bs`
+  - § 6.4.4.1 The `CSSLayerBlockRule` Interface
+  - § 6.4.4.2 The `CSSLayerStatementRule` Interface
+- WPT Test Suites: `submodules/web-platform-tests/css/css-cascade/`
+
+### Sub-Phases & Atomic Tasks
+
+#### Phase 141.1: Quick Wins — WebIDL Harness, @layer Grammar & Scope Syntax (+21 tests) [ ]
+- [ ] **IDL Harness Alignment for Cascade Rules (+11 tests)**:
+  - In `src/rules/at-rules.ts`:
+    - `CSSLayerBlockRule`: Move `name` from instance assignment to prototype getter `get name(): string { return this._name; }`. Define `get [Symbol.toStringTag]() { return 'CSSLayerBlockRule'; }`.
+    - `CSSLayerStatementRule`: Move `nameList` from instance property to prototype getter `get nameList(): readonly string[] { return this._nameList; }` returning a frozen array. Define `get [Symbol.toStringTag]() { return 'CSSLayerStatementRule'; }`.
+    - `CSSScopeRule`: Define `get [Symbol.toStringTag]() { return 'CSSScopeRule'; }`.
+  - In `src/webidl.ts`: Set `Object.defineProperty(ctor, 'length', { value: 0, configurable: true })` for non-constructible interface objects.
+  - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-cascade/idlharness.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/idlharness.html) (+11 tests).
+- [ ] **`@layer` Grammar Strictness Validation (+4 tests)**:
+  - In `src/parser.ts:458-464` (`handleLayerRule`):
+    - Block rule (`@layer <name>? { ... }`): Verify prelude has at most 1 valid `<layer-name>` without spaces around `.`. Reject comma tokens (`@layer A, B { }`).
+    - Statement rule (`@layer <name>#;`): Reject empty prelude (`@layer;`). Ensure each comma-separated item strictly matches `<ident>('.'<ident>)*` without whitespace.
+  - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-cascade/parsing/layer.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/parsing/layer.html) (+4 tests).
+- [ ] **Computed `line-height` Unit Resolution (+4 tests)**:
+  - In `src/cascade/computed-style.ts:331` and `tests/dom-shim/src/dom-stubs.ts:2284`, resolve relative units like `2em` or unitless multipliers by multiplying against the element's computed `font-size` (`18px * 2 = 36px`).
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/important-vs-inline-002.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/important-vs-inline-002.html) (+4 tests).
+- [ ] **`@scope` Relative Selector Serialization (+2 tests)**:
+  - In `src/parser.ts:1690-1694` (`normalizeNestedSelector`): Check if enclosing rule context is an `@scope` rule. When inside `@scope`, preserve relative combinator syntax (`> .foo`) without prepending `& `.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/at-scope-relative-syntax.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/at-scope-relative-syntax.html) (+2 tests).
+
+#### Phase 141.2: Layer Ordering & Cascade Precedence (+20 tests) [ ]
+- [ ] **Implicit Sub-layer Sorting (+12 tests)**:
+  - In `src/cascade/layer-manager.ts` and `src/cascade/rule-filter.ts:467`:
+    - Implement `css-cascade-5 § 6.4.3`: unlayered style rules within an `@layer` block are assigned to an implicit sub-layer that is sorted **after** any explicitly nested layers.
+    - Normal rules in the implicit sub-layer must win over explicit nested layers.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/layer-basic.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-basic.html) (+12 tests).
+- [ ] **Media-Conditioned Layer Scanning (+6 tests)**:
+  - In `scanLayers()`, pass the active media query environment so conditionally defined layers inside `@media` only establish layer precedence if their condition evaluates to true per `css-cascade-5 § 6.4.3`.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/layer-media-query.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-media-query.html) (+6 tests).
+- [ ] **HTML UA Stylesheet Heading Margins (+2 tests)**:
+  - In `getUaDefault()`, add default block margins for heading tags (`h1`-`h6`, `p`, `blockquote`) matching HTML rendering specifications.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/revert-val-005.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/revert-val-005.html) (+2 tests).
+
+#### Phase 141.3: Name-Defining Rules & Shadow DOM Cascade (+9 tests) [ ]
+- [ ] **Layered At-Rule Resolution (`@property`, `@keyframes`, `@font-face`) (+5 tests)**:
+  - Associate layer metadata with `@property` and `@keyframes` registrations; resolve winning definitions according to layer precedence rather than naive first-come order.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/layer-property-override.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-property-override.html), [`layer-keyframes-override.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-keyframes-override.html), and [`layer-font-face-override.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-font-face-override.html) (+5 tests).
+- [ ] **Shadow DOM `revert-rule` & `::part()` Rollback (+4 tests)**:
+  - Track shadow tree origin and rule identity in `MatchedDeclaration` so `revert-rule` rolls back cleanly across `::part()` boundaries.
+  - Implement cycle detection between `revert-rule !important` and `revert-layer` resolving to `unset`.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/revert-rule-shadow.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/revert-rule-shadow.html) and [`revert-rule-cycle.tentative.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/revert-rule-cycle.tentative.html) (+4 tests).
+
+---
+
+## Phase 142: WPT Conformance Boost — Core CSSOM WebIDL Harness & Dynamic Stylesheet Lifecycle [ ]
+**Goal**: Advance `cssom` conformance from 1,989 / 2,141 (92.9%) to 2,085 / 2,120 (98.3% feasible) by fixing test harness Promise rejection polyfills, missing DOM prototypes, `<style>` / `<link>` lifecycle synchronization, rule restrictions, and logical property setter ordering.
+
+**Spec References**:
+- CSSOM Level 1: `submodules/csswg-drafts/cssom-1/Overview.bs`
+  - § 4.6 The `LinkStyle` Interface
+  - § 6.4.3 The `CSSImportRule` Interface
+  - § 6.5.1 The `CSSStyleDeclaration` Interface (`#dom-cssstyledeclaration-setproperty`)
+  - § 6.6 The `MediaList` Interface
+- WebIDL Level 1: `submodules/css-houdini-drafts/` & W3C WebIDL
+- WPT Test Suites: `submodules/web-platform-tests/css/cssom/`
+
+### Sub-Phases & Atomic Tasks
+
+#### Phase 142.1: Test Harness WebIDL Bridge & Global Prototypes (+53 tests) [ ]
+- [ ] **Polyfill `promise_rejects_dom` and `promise_rejects_js` on Test Harness (+25 tests)**:
+  - In `tests/dom-shim/src/wpt-assertions.ts`, implement `promise_rejects_dom` and `promise_rejects_js` matching WPT `testharness.js` specifications.
+  - Prevents async constructable stylesheet rejection tests (e.g. `sheet.replace('invalid')`) from crashing the harness.
+  - *Target*: Unblocks constructable stylesheet rejection tests across `submodules/web-platform-tests/css/cssom/` (+25 tests).
+- [ ] **Expose Missing Interface Prototypes on Mock Window (+20 tests)**:
+  - In `tests/dom-shim/src/dom-stubs.ts`: expose `SVGStyleElement`, `MathMLElement`, and ensure `Document.prototype` inherits `Node.prototype` with proper accessor descriptors.
+  - *Target*: Fixes missing interface prototype tests in [`submodules/web-platform-tests/css/cssom/idlharness.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/idlharness.html) (+20 tests).
+- [ ] **Prototype Property Descriptors & Stringification (+8 tests)**:
+  - In `src/rules/at-rules.ts`: ensure `CSSMediaRule.prototype.media` is a prototype getter and `CSSFontFaceRule.prototype.style` is correctly descriptor-bound with `Symbol.toStringTag`.
+  - *Target*: Completes `idlharness.html` interface checks (+8 tests).
+
+#### Phase 142.2: DOM Shim Stylesheet Lifecycle & Alternate Sheets (+18 tests) [ ]
+- [ ] **Synchronize `<style>` and `<link>` Attributes with Properties (+4 tests)**:
+  - In `tests/dom-shim/src/dom-stubs.ts:1264`, check both `el.getAttribute('media')` and `(el as HTMLStyleElement).media` property when populating stylesheet media.
+  - *Target*: 100% pass on [`submodules/web-platform-tests/css/cssom/medialist-interfaces-001.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/medialist-interfaces-001.html) (+4 tests).
+- [ ] **Support Alternate Stylesheet State & `ownerNode` Decoupling (+14 tests)**:
+  - Implement CSSOM § 4.6 alternate stylesheet disabled rules: toggling `link.disabled = true` uncouples `sheet.ownerNode = null` and clears it from `document.styleSheets`.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-002.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-002.html) through `007.html` (+14 tests).
+
+#### Phase 142.3: CSSOM Rule Restrictions & Declaration Polish (+16 tests) [ ]
+- [ ] **Enforce Property Restrictions on `@page` and `@keyframes` (+2 tests)**:
+  - In `CSSPageRule` and `CSSKeyframeRule`, configure property validator hooks to drop non-applicable properties (`transform` in `@page`, `animation-name` in `@keyframes`).
+  - *Target*: 100% pass on [`submodules/web-platform-tests/css/cssom/rule-restrictions.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/rule-restrictions.html) (+2 tests).
+- [ ] **`CSSStyleDeclaration` Logical Property Grouping (+7 tests)**:
+  - In `src/CSSStyleDeclaration.ts:setProperty()`, preserve declaration ordering relative to logical property groups per CSSOM § 6.5.1.
+  - *Target*: Fixes [`submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-logical.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-logical.html) (+7 tests).
+- [ ] **Constructable Stylesheet Document Adoption Verification (+7 tests)**:
+  - Implement document adoption checks when modifying constructable stylesheets.
+  - *Target*: Fixes constructable stylesheet adoption tests in `submodules/web-platform-tests/css/cssom/` (+7 tests).
