@@ -129,12 +129,25 @@ export function compareParity(options: ParityOptions = {}): ParityReport {
   // 1. Load Node dataset
   let nodeDataset: TestRunDataset | null = options.nodeDataset ?? null;
   if (!nodeDataset) {
-    const cacheDir = options.nodeCachePath ? path.dirname(options.nodeCachePath) : undefined;
-    nodeDataset = loadDatasetFromCache(cacheDir);
+    if (options.nodeCachePath && fs.existsSync(options.nodeCachePath)) {
+      try {
+        nodeDataset = JSON.parse(fs.readFileSync(options.nodeCachePath, 'utf-8')) as TestRunDataset;
+      } catch {
+        nodeDataset = null;
+      }
+    }
+    if (!nodeDataset) {
+      const cacheDir = options.nodeCachePath ? path.dirname(options.nodeCachePath) : undefined;
+      nodeDataset = loadDatasetFromCache(cacheDir);
+    }
     if (!nodeDataset) {
       const targetPath = options.nodeCachePath || '.wpt-cache/last-run.json';
       if (fs.existsSync(targetPath)) {
-        nodeDataset = JSON.parse(fs.readFileSync(targetPath, 'utf-8')) as TestRunDataset;
+        try {
+          nodeDataset = JSON.parse(fs.readFileSync(targetPath, 'utf-8')) as TestRunDataset;
+        } catch {
+          nodeDataset = null;
+        }
       }
     }
   }
@@ -143,6 +156,10 @@ export function compareParity(options: ParityOptions = {}): ParityReport {
     throw new Error(
       'Node test dataset not found (.wpt-cache/last-run.json). Run "pnpm run wpt" first to establish Node results.'
     );
+  }
+
+  if (nodeDataset.isPartial && !options.filterBySpec) {
+    console.warn('⚠️  Notice: Loaded partial test run cache. Parity analysis will only cover tested files. Run "pnpm run wpt" for a full suite comparison.');
   }
 
   // 2. Load Injected Browser report

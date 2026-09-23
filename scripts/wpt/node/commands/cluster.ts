@@ -27,13 +27,18 @@ export async function clusterCommand(options: ClusterCommandOptions = {}): Promi
     const config = loadWptConfig();
     const files = crawlSpecFiles(config, { filterBySpec: options.filterBySpec });
     dataset = await executeWptTests(files, { concurrency: options.concurrency });
-    saveDatasetToCache(dataset);
+    const isPartial = Boolean(options.filterBySpec);
+    dataset.isPartial = isPartial;
+    saveDatasetToCache(dataset, { isPartial });
   } else {
     dataset = loadDatasetFromCache();
     if (!dataset) {
       console.error('❌ No cached test run found (.wpt-cache/last-run.json).');
       console.error('👉 Run "pnpm run wpt" to generate a run, or pass "--live" (e.g. "pnpm run wpt:cluster --live").');
       process.exit(1);
+    }
+    if (dataset.isPartial) {
+      console.warn('⚠️  Notice: Loaded partial test run cache. Run "pnpm run wpt" for a complete full-run analysis.');
     }
   }
 

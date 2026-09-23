@@ -32,7 +32,15 @@ import {
 import {
   saveDatasetToCache,
   loadDatasetFromCache,
+  loadFullDatasetFromCache,
+  loadPartialDatasetFromCache,
   hasValidCache,
+  getCacheFilePath,
+  getFullCacheFilePath,
+  getPartialCacheFilePath,
+  LAST_RUN_FILENAME,
+  LAST_FULL_RUN_FILENAME,
+  LAST_PARTIAL_RUN_FILENAME,
 } from '../scripts/wpt/node/core/cache.ts';
 
 import {
@@ -291,6 +299,165 @@ describe('WPT CLI Core Modules', () => {
         assert.ok(loaded);
         assert.strictEqual(loaded.commitHash, 'abcdef1');
         assert.strictEqual(loaded.totalPassing, 10);
+        assert.strictEqual(LAST_RUN_FILENAME, 'last-run.json');
+        assert.strictEqual(LAST_FULL_RUN_FILENAME, 'last-full-run.json');
+        assert.strictEqual(LAST_PARTIAL_RUN_FILENAME, 'last-partial-run.json');
+        assert.strictEqual(fs.existsSync(path.join(tempDir, '.wpt-cache', LAST_RUN_FILENAME)), true);
+        assert.strictEqual(fs.existsSync(path.join(tempDir, '.wpt-cache', LAST_FULL_RUN_FILENAME)), true);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('distinguishes between full and partial runs; partial runs do not clobber full run cache', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-cache-test-partial-'));
+      try {
+        const fullDataset: TestRunDataset = {
+          timestamp: '2026-09-23 10:00:00',
+          commitHash: 'full123',
+          isDirty: false,
+          specSummaries: {
+            cssom: { passing: 900, total: 1000, files: 50 },
+            'css-typed-om': { passing: 11000, total: 12000, files: 200 },
+          },
+          totalPassing: 11900,
+          totalTests: 13000,
+          totalFiles: 250,
+          fileResults: [],
+        };
+
+        // 1. Full run saves to last-run.json and last-full-run.json
+        saveDatasetToCache(fullDataset, { isPartial: false, baseDir: tempDir });
+        const lastRunPath = getCacheFilePath(tempDir);
+        const lastFullPath = getFullCacheFilePath(tempDir);
+        const lastPartialPath = getPartialCacheFilePath(tempDir);
+
+        assert.strictEqual(getCacheFilePath(tempDir, false), lastRunPath);
+        assert.strictEqual(getCacheFilePath(tempDir, true), lastPartialPath);
+        assert.strictEqual(fs.existsSync(lastRunPath), true);
+        assert.strictEqual(fs.existsSync(lastFullPath), true);
+        assert.strictEqual(fs.existsSync(lastPartialPath), false);
+
+        // 2. Partial run (e.g., single test or filtered spec)
+        const partialDataset: TestRunDataset = {
+          timestamp: '2026-09-23 10:05:00',
+          commitHash: 'full123',
+          isDirty: false,
+          specSummaries: {
+            'css-nesting': { passing: 1, total: 1, files: 1 },
+          },
+          totalPassing: 1,
+          totalTests: 1,
+          totalFiles: 1,
+          fileResults: [],
+        };
+
+        saveDatasetToCache(partialDataset, { isPartial: true, baseDir: tempDir });
+
+        // Verify partial cache file was written
+        assert.strictEqual(fs.existsSync(lastPartialPath), true);
+
+        // Crucial: full run cache was NOT clobbered!
+        const fullFromDisk = JSON.parse(fs.readFileSync(lastFullPath, 'utf-8')) as TestRunDataset;
+        assert.strictEqual(fullFromDisk.totalTests, 13000);
+        assert.strictEqual(fullFromDisk.commitHash, 'full123');
+
+        const lastRunFromDisk = JSON.parse(fs.readFileSync(lastRunPath, 'utf-8')) as TestRunDataset;
+        assert.strictEqual(lastRunFromDisk.totalTests, 13000);
+
+        // Loading cache prefers the full run dataset
+        const loaded = loadDatasetFromCache(tempDir);
+        assert.ok(loaded);
+        assert.strictEqual(loaded.totalTests, 13000);
+        assert.strictEqual(loaded.isPartial, false);
+
+        // Explicit full load returns full dataset
+        const loadedFull = loadFullDatasetFromCache(tempDir);
+        assert.ok(loadedFull);
+        assert.strictEqual(loadedFull.totalTests, 13000);
+
+        // Explicit partial load returns partial dataset
+        const loadedPartial = loadPartialDatasetFromCache(tempDir);
+        assert.ok(loadedPartial);
+        assert.strictEqual(loadedPartial.totalTests, 1);
+        assert.strictEqual(loadedPartial.isPartial, true);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('full runs overwrite the full cache', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-cache-test-overwrite-'));
+      try {
+        const fullDataset1: TestRunDataset = {
+          timestamp: '2026-09-23 09:00:00',
+          commitHash: 'hash1',
+          isDirty: false,
+          specSummaries: {},
+          totalPassing: 100,
+          totalTests: 100,
+          totalFiles: 10,
+          fileResults: [],
+        };
+        saveDatasetToCache(fullDataset1, { isPartial: false, baseDir: tempDir });
+        assert.strictEqual(loadDatasetFromCache(tempDir)?.commitHash, 'hash1');
+
+        const fullDataset2: TestRunDataset = {
+          timestamp: '2026-09-23 11:00:00',
+          commitHash: 'hash2',
+          isDirty: false,
+          specSummaries: {},
+          totalPassing: 120,
+          totalTests: 120,
+          totalFiles: 12,
+          fileResults: [],
+        };
+        saveDatasetToCache(fullDataset2, { isPartial: false, baseDir: tempDir });
+        assert.strictEqual(loadDatasetFromCache(tempDir)?.commitHash, 'hash2');
+        assert.strictEqual(loadDatasetFromCache(tempDir)?.totalPassing, 120);
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
+
+    test('loads partial dataset as fallback when no full run exists', () => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wpt-cache-test-fallback-'));
+      try {
+        const partialDataset: TestRunDataset = {
+          timestamp: '2026-09-23 11:30:00',
+          commitHash: 'partial_only',
+          isDirty: false,
+          specSummaries: {},
+          totalPassing: 5,
+          totalTests: 5,
+          totalFiles: 1,
+          fileResults: [],
+        };
+
+        saveDatasetToCache(partialDataset, { isPartial: true, baseDir: tempDir });
+
+        const lastFullPath = getFullCacheFilePath(tempDir);
+        const lastRunPath = getCacheFilePath(tempDir);
+        const lastPartialPath = getPartialCacheFilePath(tempDir);
+
+        assert.strictEqual(fs.existsSync(lastFullPath), false);
+        assert.strictEqual(fs.existsSync(lastRunPath), false);
+        assert.strictEqual(fs.existsSync(lastPartialPath), true);
+
+        // Default load falls back to partial dataset
+        const loaded = loadDatasetFromCache(tempDir);
+        assert.ok(loaded);
+        assert.strictEqual(loaded.commitHash, 'partial_only');
+        assert.strictEqual(loaded.isPartial, true);
+
+        // Strict load requiring full run returns null
+        const loadedStrict = loadDatasetFromCache({ baseDir: tempDir, allowPartial: false });
+        assert.strictEqual(loadedStrict, null);
+        assert.strictEqual(loadFullDatasetFromCache(tempDir), null);
+
+        // hasValidCache with requireFull=false vs requireFull=true
+        assert.strictEqual(hasValidCache(tempDir, false), true);
+        assert.strictEqual(hasValidCache(tempDir, true), false);
       } finally {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }

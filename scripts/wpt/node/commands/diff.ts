@@ -27,13 +27,18 @@ export async function diffCommand(options: DiffCommandOptions = {}): Promise<voi
     const config = loadWptConfig();
     const files = crawlSpecFiles(config, { filterBySpec: options.filterBySpec, filterByPath: options.filterByPath });
     dataset = await executeWptTests(files, { concurrency: options.concurrency });
-    saveDatasetToCache(dataset);
+    const isPartial = Boolean(options.filterBySpec || options.filterByPath);
+    dataset.isPartial = isPartial;
+    saveDatasetToCache(dataset, { isPartial });
   } else {
     dataset = loadDatasetFromCache();
     if (!dataset) {
       console.error('❌ No cached test run found (.wpt-cache/last-run.json).');
       console.error('👉 Run "pnpm run wpt" to generate a run, or pass "--live" (e.g. "pnpm run wpt:diff --live").');
       process.exit(1);
+    }
+    if (dataset.isPartial) {
+      console.warn('⚠️  Notice: Loaded partial test run cache. Run "pnpm run wpt" for a complete full-run analysis.');
     }
   }
 

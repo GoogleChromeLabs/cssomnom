@@ -63,6 +63,7 @@ export interface TestRunDataset {
   timestamp: string;
   commitHash: string;
   isDirty: boolean;
+  isPartial?: boolean;
   specSummaries: Record<string, SpecSummary>;
   totalPassing: number;
   totalTests: number;

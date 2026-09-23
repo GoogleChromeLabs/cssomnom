@@ -35,7 +35,7 @@ export async function runCommand(options: RunCommandOptions = {}): Promise<TestR
   const files = crawlSpecFiles(config, { filterBySpec: options.filterBySpec, filterByPath: options.filterByPath });
   if (files.length === 0) {
     console.log('No test files found matching criteria.');
-    return { timestamp: new Date().toISOString(), commitHash: '', isDirty: false, specSummaries: {}, totalPassing: 0, totalTests: 0, totalFiles: 0, fileResults: [] };
+    return { timestamp: new Date().toISOString(), commitHash: '', isDirty: false, isPartial: true, specSummaries: {}, totalPassing: 0, totalTests: 0, totalFiles: 0, fileResults: [] };
   }
 
   if (!options.json) {
@@ -43,7 +43,11 @@ export async function runCommand(options: RunCommandOptions = {}): Promise<TestR
   }
 
   const dataset = await executeWptTests(files, { concurrency: options.concurrency });
-  saveDatasetToCache(dataset);
+  const isFiltered = Boolean(options.filterBySpec || options.filterByPath);
+  const totalConfiguredFiles = isFiltered ? crawlSpecFiles(config).length : files.length;
+  const isPartial = Boolean(isFiltered || files.length < totalConfiguredFiles);
+  dataset.isPartial = isPartial;
+  saveDatasetToCache(dataset, { isPartial });
 
   if (options.json) {
     console.log(JSON.stringify(dataset, null, 2));
