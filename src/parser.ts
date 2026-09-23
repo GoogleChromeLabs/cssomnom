@@ -445,8 +445,11 @@ export class Parser {
 
 
 
+  private scopeContextDepth: number = 0;
+
   private consumeNestedRules(block: SimpleBlock, isNestedStyleRule: boolean): Rule[] {
-    return this.consumeBlockContents(new ArrayComponentValueStream(block.value), isNestedStyleRule, isNestedStyleRule, false);
+    const allowRelative = !isNestedStyleRule && this.scopeContextDepth > 0;
+    return this.consumeBlockContents(new ArrayComponentValueStream(block.value), isNestedStyleRule || allowRelative, isNestedStyleRule, allowRelative);
   }
 
   private handleGroupingAtRule(rule: ASTAtRule, block: SimpleBlock | undefined, nested: boolean, ctor: new (prelude: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) => Rule): Rule | null {
@@ -455,18 +458,85 @@ export class Parser {
     return new ctor(serialize(rule.prelude).trim(), childRules, parseRuleInBlock);
   }
 
+  private parseLayerNameFromTokens(tokens: ComponentValue[]): string | null {
+    let start = 0;
+    while (start < tokens.length && tokens[start].type === 'whitespace') start++;
+    let end = tokens.length - 1;
+    while (end >= start && (tokens[end].type === 'whitespace' || tokens[end].type === 'EOF')) end--;
+    if (start > end) return null;
+
+    let name = '';
+    let expectIdent = true;
+    for (let i = start; i <= end; i++) {
+      const t = tokens[i];
+      if (expectIdent) {
+        if (t.type !== 'ident') return null;
+        name += (t as { value: string }).value;
+        expectIdent = false;
+      } else {
+        if (t.type !== 'delim' || (t as { value: string }).value !== '.') return null;
+        name += '.';
+        expectIdent = true;
+      }
+    }
+    return expectIdent ? null : name;
+  }
+
+  // css-cascade-5 § 6.4.4 #declaring-layers
   private handleLayerRule(rule: ASTAtRule, block?: SimpleBlock, nested: boolean = false): Rule | null {
     if (block) {
-      return this.handleGroupingAtRule(rule, block, nested, CSSLayerBlockRule);
+      // css-cascade-5 § 6.4.4: @layer <layer-name>? { ... }
+      // The prelude is either empty (anonymous layer) or a single <layer-name>.
+      let start = 0;
+      const prelude = rule.prelude;
+      while (start < prelude.length && prelude[start].type === 'whitespace') start++;
+      let end = prelude.length - 1;
+      while (end >= start && (prelude[end].type === 'whitespace' || prelude[end].type === 'EOF')) end--;
+      let layerName = '';
+      if (start <= end) {
+        const parsed = this.parseLayerNameFromTokens(prelude.slice(start, end + 1));
+        if (parsed === null) return null;
+        layerName = parsed;
+      }
+      const childRules = this.consumeNestedRules(block, nested);
+      return new CSSLayerBlockRule(layerName, childRules, parseRuleInBlock);
     }
-    const nameList = serialize(rule.prelude).trim().split(',').map(s => s.trim()).filter(s => s.length > 0);
+
+    // css-cascade-5 § 6.4.4: @layer <layer-name>#;
+    // A statement rule prelude must have at least one layer-name, comma-separated.
+    const segments: ComponentValue[][] = [];
+    let current: ComponentValue[] = [];
+    for (const t of rule.prelude) {
+      if (t.type === 'comma') {
+        segments.push(current);
+        current = [];
+      } else {
+        current.push(t);
+      }
+    }
+    segments.push(current);
+    if (segments.length === 0) return null;
+
+    const nameList: string[] = [];
+    for (const seg of segments) {
+      const name = this.parseLayerNameFromTokens(seg);
+      if (name === null) return null;
+      nameList.push(name);
+    }
+    if (nameList.length === 0) return null;
     return new CSSLayerStatementRule(nameList);
   }
 
   // css-nesting-1 § 4.1 #nesting-at-scope (Issue 9740)
   private handleScopeRule(rule: ASTAtRule, block?: SimpleBlock, _nested: boolean = false): Rule | null {
     if (!block) return null;
-    const childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
+    this.scopeContextDepth++;
+    let childRules: Rule[];
+    try {
+      childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
+    } finally {
+      this.scopeContextDepth--;
+    }
     
     let startSelector: string | null = null;
     let endSelector: string | null = null;
@@ -1840,6 +1910,7 @@ export class Parser {
     const wrapped = `{ ${text} }`;
     const tokens = tokenize(wrapped);
     const parser = new Parser(tokens);
+    parser.scopeContextDepth = 1;
     const block = parser.consumeBlock(parser.consumeToken());
     const contents = parser.consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
     if (contents.length !== 1) {

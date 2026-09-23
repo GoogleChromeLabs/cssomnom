@@ -346,6 +346,14 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         if (lowerRaw === 'thick') return '5px';
         if (lowerRaw === '0') return '0px';
       }
+      if (dashed === 'line-height') {
+        if (lowerRaw.endsWith('em')) {
+          const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
+          const num = parseFloat(lowerRaw);
+          if (!isNaN(num)) return `${num * fs}px`;
+        }
+        return rawVal;
+      }
       return rawVal;
     }
 

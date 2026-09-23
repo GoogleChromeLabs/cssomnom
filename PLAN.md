@@ -3407,23 +3407,23 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ### Sub-Phases & Atomic Tasks
 
-#### Phase 141.1: Quick Wins — WebIDL Harness, @layer Grammar & Scope Syntax (+21 tests) [ ]
-- [ ] **IDL Harness Alignment for Cascade Rules (+11 tests)**:
+#### Phase 141.1: Quick Wins — WebIDL Harness, @layer Grammar & Scope Syntax (+21 tests) [x]
+- [x] **IDL Harness Alignment for Cascade Rules (+11 tests)**:
   - In `src/rules/at-rules.ts`:
     - `CSSLayerBlockRule`: Move `name` from instance assignment to prototype getter `get name(): string { return this._name; }`. Define `get [Symbol.toStringTag]() { return 'CSSLayerBlockRule'; }`.
     - `CSSLayerStatementRule`: Move `nameList` from instance property to prototype getter `get nameList(): readonly string[] { return this._nameList; }` returning a frozen array. Define `get [Symbol.toStringTag]() { return 'CSSLayerStatementRule'; }`.
     - `CSSScopeRule`: Define `get [Symbol.toStringTag]() { return 'CSSScopeRule'; }`.
   - In `src/webidl.ts`: Set `Object.defineProperty(ctor, 'length', { value: 0, configurable: true })` for non-constructible interface objects.
   - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-cascade/idlharness.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/idlharness.html) (+11 tests).
-- [ ] **`@layer` Grammar Strictness Validation (+4 tests)**:
+- [x] **`@layer` Grammar Strictness Validation (+4 tests)**:
   - In `src/parser.ts:458-464` (`handleLayerRule`):
     - Block rule (`@layer <name>? { ... }`): Verify prelude has at most 1 valid `<layer-name>` without spaces around `.`. Reject comma tokens (`@layer A, B { }`).
     - Statement rule (`@layer <name>#;`): Reject empty prelude (`@layer;`). Ensure each comma-separated item strictly matches `<ident>('.'<ident>)*` without whitespace.
   - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-cascade/parsing/layer.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/parsing/layer.html) (+4 tests).
-- [ ] **Computed `line-height` Unit Resolution (+4 tests)**:
+- [x] **Computed `line-height` Unit Resolution (+4 tests)**:
   - In `src/cascade/computed-style.ts:331` and `tests/dom-shim/src/dom-stubs.ts:2284`, resolve relative units like `2em` or unitless multipliers by multiplying against the element's computed `font-size` (`18px * 2 = 36px`).
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/important-vs-inline-002.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/important-vs-inline-002.html) (+4 tests).
-- [ ] **`@scope` Relative Selector Serialization (+2 tests)**:
+- [x] **`@scope` Relative Selector Serialization (+2 tests)**:
   - In `src/parser.ts:1690-1694` (`normalizeNestedSelector`): Check if enclosing rule context is an `@scope` rule. When inside `@scope`, preserve relative combinator syntax (`> .foo`) without prepending `& `.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/at-scope-relative-syntax.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/at-scope-relative-syntax.html) (+2 tests).
 

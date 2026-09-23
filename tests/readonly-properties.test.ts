@@ -87,8 +87,10 @@ describe('Readonly properties', () => {
   it('should make CSSLayerStatementRule nameList readonly', () => {
     const rule = new CSSLayerStatementRule(['layer1']) as unknown as import('../src/types.ts').CSSLayerStatementRule;
     
-    // @ts-expect-error - nameList should be readonly
-    rule.nameList = [];
+    assert.throws(() => {
+      // @ts-expect-error - nameList should be readonly
+      rule.nameList = [];
+    }, TypeError);
     
     assert.ok(true);
   });
@@ -135,8 +137,10 @@ describe('Readonly properties', () => {
 
   it('should make CSSLayerBlockRule name readonly', () => {
     const rule = new CSSLayerBlockRule('name', [], () => ({} as unknown as Rule));
-    // @ts-expect-error - name should be readonly
-    rule.name = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - name should be readonly
+      rule.name = 'foo';
+    }, TypeError);
     assert.ok(true);
   });
 

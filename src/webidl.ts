@@ -62,6 +62,14 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
   const excludeSet = new Set(options.exclude || []);
   const rejectSet = new Set(options.rejectOperations || []);
 
+  // WebIDL § 3.6: Non-constructible interface objects have length 0 with { writable: false, enumerable: false, configurable: true }
+  Object.defineProperty(ctor, 'length', {
+    value: 0,
+    writable: false,
+    enumerable: false,
+    configurable: true
+  });
+
   const names = Object.getOwnPropertyNames(proto);
   for (const name of names) {
     if (name === 'constructor' || name.startsWith('_') || excludeSet.has(name)) {

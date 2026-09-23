@@ -147,31 +147,58 @@ export class CSSContainerRule extends CSSConditionRule {
   set cssText(_value: string) {}
 }
 
+// css-cascade-5 § 6.4.4 #the-csslayerblockrule-interface
 export class CSSLayerBlockRule extends CSSGroupingRule {
-  readonly name: string;
+  private _name: string;
 
   constructor(name: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
-    this.name = name;
+    this._name = name;
+  }
+
+  get name(): string {
+    return this._name;
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSLayerBlockRule';
   }
 
   get cssText() {
-    return serializeGroupingRule('layer', this.name, this._rules);
+    const serializedName = this._name
+      ? this._name.split('.').map(p => serializeIdentifier(p)).join('.')
+      : '';
+    return serializeGroupingRule('layer', serializedName, this._rules);
   }
 
   set cssText(_value: string) {}
 }
 
+// css-cascade-5 § 6.4.5 #the-csslayerstatementrule-interface
 export class CSSLayerStatementRule extends CSSRule {
-  readonly nameList: readonly string[];
+  private _nameList: readonly string[];
 
-  constructor(nameList: string[]) {
+  constructor(nameList?: string[]) {
+    if (!nameList || arguments.length === 0) {
+      throw new TypeError('Illegal constructor');
+    }
     super();
-    this.nameList = nameList;
+    this._nameList = nameList;
+  }
+
+  get nameList(): readonly string[] {
+    return Object.freeze([...this._nameList]);
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSLayerStatementRule';
   }
 
   get cssText() {
-    return `@layer ${this.nameList.join(', ')};`;
+    const serializedNames = this._nameList
+      .map(name => name.split('.').map(p => serializeIdentifier(p)).join('.'))
+      .join(', ');
+    return `@layer ${serializedNames};`;
   }
 
   set cssText(_value: string) {}
@@ -198,6 +225,10 @@ export class CSSScopeRule extends CSSGroupingRule {
     super(rules, parseRuleInBlock);
     this.startSelector = startSelector;
     this.endSelector = endSelector;
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSScopeRule';
   }
 
   get start(): string | null {

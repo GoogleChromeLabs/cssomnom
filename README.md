@@ -323,20 +323,20 @@ To preserve clean architectural separation and prevent circular import cycles be
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **93.7%** (21,061 / 22,487 passed assertions across 1,769 test files).
-* **Chrome 154 Parity**: **93.7%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **93.8%** (21,091 / 22,487 passed assertions across 1,769 test files).
+* **Chrome 154 Parity**: **93.8%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
 | **`Typed OM`** | 12,758 | 12,176 | **95.4%** | 🟢 **+1.9%** (ahead of Chrome) |
-| **`CSSOM`** | 2,141 | 1,989 | **92.9%** | -4.2% |
+| **`CSSOM`** | 2,141 | 1,998 | **93.3%** | -3.8% |
 | **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
-| **`Cascade`** | 494 | 413 | **83.6%** | -16.3% |
+| **`Cascade`** | 494 | 434 | **87.9%** | -12.0% |
 | **`Variables`** | 499 | 440 | **88.2%** | -2.4% |
 | **`Selectors`** | 5,654 | 5,108 | **90.3%** | 🟢 **+4.4%** (ahead of Chrome) |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **22,487** | **21,061** | **93.7%** | 🟢 **+0.6%** |
+| **OVERALL** | **22,487** | **21,091** | **93.8%** | 🟢 **+0.7%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

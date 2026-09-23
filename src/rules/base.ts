@@ -169,7 +169,22 @@ export class CSSGroupingRule extends CSSRule {
       }
     }
 
-    const parsedRule = this._parseRuleInBlock(rule, isNested);
+    let isDirectlyInScope = this.constructor.name === 'CSSScopeRule';
+    if (!isDirectlyInScope && this.constructor.name !== 'CSSStyleRule') {
+      let parent = this.parentRule;
+      while (parent) {
+        if (parent.constructor.name === 'CSSStyleRule') break;
+        if (parent.constructor.name === 'CSSScopeRule') {
+          isDirectlyInScope = true;
+          break;
+        }
+        parent = parent.parentRule;
+      }
+    }
+
+    const parsedRule = isDirectlyInScope
+      ? ParseHooks.parseRuleInScopeBlock(rule)
+      : this._parseRuleInBlock(rule, isNested);
     if (!parsedRule) {
       // 5. If new rule is a syntax error, throw a SyntaxError exception.
       throw new DOMException('Syntax error', 'SyntaxError');
