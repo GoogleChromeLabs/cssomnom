@@ -82,12 +82,12 @@
     "maintain": "pnpm update --latest && pnpm run submodules:upgrade && pnpm run codegen && pnpm run external:extract && pnpm run preflight && pnpm run wpt:baseline"
   },
   "devDependencies": {
-    "@types/node": "^26.5.1",
-    "@webref/css": "^8.7.4",
+    "@types/node": "^26.6.2",
+    "@webref/css": "^8.7.5",
     "linkedom": "^0.18.13",
-    "mdn-data": "^2.35.0",
-    "oxlint": "^1.82.0",
-    "puppeteer-core": "^25.10.0",
+    "mdn-data": "^2.36.0",
+    "oxlint": "^1.85.0",
+    "puppeteer-core": "^25.11.0",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2"
   }
