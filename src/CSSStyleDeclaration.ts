@@ -519,7 +519,13 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       this._declMap.delete('all');
     }
 
+    const compVals = ParseHooks.parseComponentValues(tokens);
     if (!property.startsWith('--')) {
+      // css-syntax-3 § 5.4.5 Consume a declaration #consume-declaration
+      // css-variables-1 § 3 Using Cascading Variables: The var() Notation #using-variables
+      if (ParseHooks.validateDeclarationValue && !ParseHooks.validateDeclarationValue(compVals)) {
+        return;
+      }
       if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, valueStr)) {
         return;
       }
@@ -527,7 +533,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
-      const compVals = ParseHooks.parseComponentValues(tokens);
       const hasVar = valueStr.includes('var(') || valueStr.includes('env(');
       if (!hasVar) {
         const expanded = shorthand.expand(compVals);

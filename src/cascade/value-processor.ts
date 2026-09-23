@@ -88,7 +88,17 @@ export function expandShorthandWithVariables(
     const res = substituteVariables(subVal, resolvedCustomProps, new Set(), cyclicProps);
     if (res === null) {
       // css-variables-1 § 3.1: Invalid at computed-value time
-      return [];
+      // When a shorthand contains an invalid var(), each longhand is invalid at computed-value time
+      // and reverts to its initial value (e.g. 0px for margin).
+      const results: MatchedDeclaration[] = [];
+      for (const lh of shorthand.longhands) {
+        results.push({
+          ...decl,
+          name: lh,
+          value: 'initial',
+        });
+      }
+      return results;
     }
     subVal = res;
   }

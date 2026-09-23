@@ -22,6 +22,7 @@ import type { ComponentValue, SimpleBlock, Token, CSSFunction } from '../types.t
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import type { MatchedDeclaration } from './types.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
+import { PropertyRegistry } from '../PropertyRegistry.ts';
 
 const STANDARD_ENV_VARS: Record<string, string> = {
   'safe-area-inset-top': '0px',
@@ -178,12 +179,18 @@ export function substituteVariables(
               const substitutedTokens = tokenize(rawCustomVal);
               pushTokens(substitutedTokens);
             }
-          } else if (fallbackTokens) {
-            const resolvedFallback = resolveNodes(fallbackTokens);
-            if (resolvedFallback === null) return null;
-            pushTokens(resolvedFallback);
           } else {
-            return null;
+            const def = PropertyRegistry.get(varName);
+            if (def?.initialValue !== undefined) {
+              const substitutedTokens = tokenize(def.initialValue);
+              pushTokens(substitutedTokens);
+            } else if (fallbackTokens) {
+              const resolvedFallback = resolveNodes(fallbackTokens);
+              if (resolvedFallback === null) return null;
+              pushTokens(resolvedFallback);
+            } else {
+              return null;
+            }
           }
           continue;
         }
@@ -254,8 +261,12 @@ export function resolveCustomProperties(
         }
 
         if (subVal === null || cyclicProps.has(name)) {
-          if (cyclicProps.has(name)) return null;
-          continue;
+          // css-variables-1 § 3.1 #guaranteed-invalid
+          // css-variables-1 § 4.4 #cycles
+          // When variable substitution fails, property is invalid at computed-value time.
+          // Store guaranteed-invalid value ('') and do NOT continue down earlier rules in cascade.
+          resolvedCustomProps.set(name, '');
+          return null;
         }
 
         const trimmed = subVal.trim();
@@ -271,20 +282,45 @@ export function resolveCustomProperties(
             i = prevIdx + 1;
             continue;
           } else {
+            const def = PropertyRegistry.get(name);
+            if (def && !def.inherits) {
+              const initVal = def.initialValue ?? null;
+              resolvedCustomProps.set(name, initVal ?? '');
+              return initVal;
+            }
             const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
             resolvedCustomProps.set(name, parentVal);
             return parentVal || null;
           }
         }
+        // css-properties-values-api-1 § 5 #determining-computed-value-of-registered-custom-property
+        const def = PropertyRegistry.get(name);
         if (trimmed === 'revert') {
+          if (def && !def.inherits) {
+            const initVal = def.initialValue ?? null;
+            resolvedCustomProps.set(name, initVal ?? '');
+            return initVal;
+          }
           const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
           resolvedCustomProps.set(name, parentVal);
           return parentVal || null;
         }
         if (trimmed === 'initial') {
-          return null;
+          const initVal = def?.initialValue ?? null;
+          resolvedCustomProps.set(name, initVal ?? '');
+          return initVal;
         }
-        if (trimmed === 'inherit' || trimmed === 'unset') {
+        if (trimmed === 'unset') {
+          if (def && !def.inherits) {
+            const initVal = def.initialValue ?? null;
+            resolvedCustomProps.set(name, initVal ?? '');
+            return initVal;
+          }
+          const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
+          resolvedCustomProps.set(name, parentVal);
+          return parentVal || null;
+        }
+        if (trimmed === 'inherit') {
           const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
           resolvedCustomProps.set(name, parentVal);
           return parentVal || null;
@@ -296,11 +332,24 @@ export function resolveCustomProperties(
       }
     }
 
-    // No local declaration: inherit from parent
-    const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
-    if (parentVal) {
-      resolvedCustomProps.set(name, parentVal);
-      return parentVal;
+    // No local declaration: inherit from parent or use registered initialValue
+    const def = PropertyRegistry.get(name);
+    if (def && !def.inherits) {
+      const initVal = def.initialValue ?? null;
+      if (initVal !== null) {
+        resolvedCustomProps.set(name, initVal);
+        return initVal;
+      }
+    } else {
+      const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
+      if (parentVal) {
+        resolvedCustomProps.set(name, parentVal);
+        return parentVal;
+      }
+      if (def?.initialValue) {
+        resolvedCustomProps.set(name, def.initialValue);
+        return def.initialValue;
+      }
     }
 
     return null;

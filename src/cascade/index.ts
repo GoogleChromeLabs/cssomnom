@@ -169,7 +169,7 @@ export function getCascadedStyle(
     } else {
       const parsedPseudo = normalizePseudoElement(pseudoElement);
       if (!parsedPseudo || !parsedPseudo.valid || !parsedPseudo.isKnown) {
-        return new CSSComputedStyleDeclaration([], true, null, element);
+        return new CSSComputedStyleDeclaration([], true, null, element, null);
       }
       normalizedPseudoStr = parsedPseudo.normalized;
     }
@@ -336,7 +336,7 @@ export function getCascadedStyle(
     }
   }
 
-  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, true, parentCascaded, element);
+  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, true, parentCascaded, element, normalizedPseudoStr);
 
   (resultStyle as CSSComputedStyleDeclaration & InternalStyleDeclaration)._readonly = true;
 

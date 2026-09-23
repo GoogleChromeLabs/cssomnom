@@ -3339,33 +3339,33 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ### Sub-Phases & Atomic Tasks
 
-#### Phase 140.1: Quick Wins — Declaration Value Pre-Validation & CSS-Wide Keywords (+17 tests) [ ]
-- [ ] **Enforce `validateDeclarationValue` in `CSSStyleDeclaration.setProperty()` (+7 tests)**:
+#### Phase 140.1: Quick Wins — Declaration Value Pre-Validation & CSS-Wide Keywords (+17 tests) [x]
+- [x] **Enforce `validateDeclarationValue` in `CSSStyleDeclaration.setProperty()` (+7 tests)**:
   - In `src/CSSStyleDeclaration.ts:522-526`, `setProperty()` currently early-exits `true` whenever `var(` is present, skipping `validateDeclarationValue`.
   - Update `setProperty()` to pass parsed component values to `ParseHooks.validateDeclarationValue(compVals)` before storing.
   - Reject invalid `var()` syntaxes like `var(--x {--y})`, `var({--x} --y)`, `var()`, `var({})`, `var(, 10px)`.
   - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-variables/var-parsing.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/var-parsing.html) (7/7 passing, +7 tests).
-- [ ] **Registered Custom Property CSS-Wide Keyword & Defaulting Resolution (+8 tests)**:
+- [x] **Registered Custom Property CSS-Wide Keyword & Defaulting Resolution (+8 tests)**:
   - In `src/cascade/variable-resolver.ts:284-291`, consult `PropertyRegistry.get(name)` for custom properties:
     - If `initial`: return `def?.initialValue ?? null` (instead of returning `null` unconditionally).
     - If `unset` or `revert`: if `!def?.inherits`, resolve to `def?.initialValue ?? null`; if `def?.inherits`, inherit from parent element.
   - In `substituteVariables`: when `var(--prop)` is looked up and not present in `customProps`, check `PropertyRegistry.get(varName)?.initialValue`.
   - *Target*: 100% pass on [`submodules/web-platform-tests/css/css-variables/variable-css-wide-keywords.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-css-wide-keywords.html) (8/8 passing, +8 tests).
-- [ ] **Token-Aware Shadow Property Serialization (+2 tests)**:
+- [x] **Token-Aware Shadow Property Serialization (+2 tests)**:
   - In `src/cascade/computed-style.ts:296-317`, replace naive `rawVal.split(/\s+/)` with token-aware traversal using `tokenize(rawVal)`.
   - Prevent splitting across commas inside functional values like `rgb(0, 128, 0)` in `box-shadow`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-substitution-shadow-properties.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-shadow-properties.html) (+2 tests).
 
-#### Phase 140.2: Core Cascade Invalidation & Guaranteed-Invalid Propagation (+14 tests) [ ]
-- [ ] **Guaranteed-Invalid Invalidation on Cascade Rollback (+4 tests)**:
+#### Phase 140.2: Core Cascade Invalidation & Guaranteed-Invalid Propagation (+14 tests) [x]
+- [x] **Guaranteed-Invalid Invalidation on Cascade Rollback (+4 tests)**:
   - In `src/cascade/variable-resolver.ts:256-260`: when a custom property declaration fails variable substitution (`subVal === null` due to cycle or referencing an unset variable without fallback), do **not** `continue` down the cascade loop to inherit or use an earlier rule!
   - Per CSS Variables 1 § 3.1, mark the property as invalid at computed-value time, storing `resolvedCustomProps.set(name, '')` (the guaranteed-invalid value) and return `null`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variables-substitute-guaranteed-invalid.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variables-substitute-guaranteed-invalid.html) and [`variable-substitution-variable-declaration.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-variable-declaration.html) (+4 tests).
-- [ ] **Shorthand Invalidation at Computed-Value Time (+6 tests)**:
+- [x] **Shorthand Invalidation at Computed-Value Time (+6 tests)**:
   - In `src/cascade/value-processor.ts:88-92`: when `expandShorthandWithVariables` encounters an invalid `var()` in a shorthand (e.g. `margin: var(--invalid)`), mark each longhand as invalid at computed-value time on that element.
   - Longhands must compute to their initial/inherited value (`0px`), overriding previous rules on the element rather than letting the cascade fall back to earlier declarations (e.g. `margin: 77px`).
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-substitution-shorthands.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-shorthands.html) (+6 tests).
-- [ ] **Pseudo-Element Restricted Properties (+4 tests)**:
+- [x] **Pseudo-Element Restricted Properties (+4 tests)**:
   - Enforce that `position` cannot be altered by `::first-letter` / `::first-line` per CSS Pseudo-Elements 4 § 2 and always computes to `static`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-first-letter.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-first-letter.html) and [`variable-first-line.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-first-line.html) (+4 tests).
 

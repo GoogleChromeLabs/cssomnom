@@ -16,6 +16,8 @@
  */
 
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
+import { tokenize } from '../tokenizer.ts';
+import { Parser } from '../parser.ts';
 import { serialize } from '../serializer.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import {
@@ -98,16 +100,19 @@ export function shouldPreserveAutoMinSize(element: unknown): boolean {
 export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
   private _parentStyle: CSSStyleDeclaration | null;
   private _element: unknown;
+  private _pseudoElement: string | null;
 
   constructor(
     declarations: Declaration[] = [],
     readonlyFlag: boolean = false,
     parentStyle: CSSStyleDeclaration | null = null,
-    element: unknown = null
+    element: unknown = null,
+    pseudoElement: string | null = null
   ) {
     super(declarations, readonlyFlag);
     this._parentStyle = parentStyle;
     this._element = element;
+    this._pseudoElement = pseudoElement;
     this._parentRule = null;
   }
 
@@ -213,14 +218,17 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
 
     // cssom-1 § 6.8 & CSS 2.1 § 10.3.3: Resolving auto margins in block layout
     if (dashed === 'margin-top' || dashed === 'margin-bottom') {
-      const direct = super.getPropertyValue(dashed);
-      if (direct === 'auto') {
+      const direct = super.getPropertyValue(dashed).trim();
+      if (direct === 'auto' || direct === '0' || direct === '0px') {
         return '0px';
       }
     }
 
     if (dashed === 'margin-left' || dashed === 'margin-right') {
-      const direct = super.getPropertyValue(dashed);
+      const direct = super.getPropertyValue(dashed).trim();
+      if (direct === '0' || direct === '0px') {
+        return '0px';
+      }
       if (direct === 'auto' && this._element && typeof this._element === 'object') {
         const el = this._element as { parentElement?: unknown; parentNode?: unknown };
         const parent = el.parentElement || el.parentNode;
@@ -250,6 +258,12 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return '0px';
       }
+    }
+
+    // css-pseudo-4 § 2: Restricted properties on ::first-letter and ::first-line
+    // Position cannot be altered by ::first-letter or ::first-line and always computes to static
+    if (dashed === 'position' && (this._pseudoElement === '::first-letter' || this._pseudoElement === '::first-line')) {
+      return 'static';
     }
 
     const rawVal = super.getPropertyValue(dashed).trim();
@@ -293,8 +307,12 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return getUaDefault(dashed, this._element);
       }
-      if (dashed === 'box-shadow') {
-        const tokens = rawVal.split(/\s+/);
+      if (dashed === 'box-shadow' || dashed === 'text-shadow') {
+        // css-backgrounds-3 § 3.10 #box-shadow, css-text-decor-3 § 4 #text-shadow
+        // Token-aware parsing preserves rgb(...) colors intact
+        const p = new Parser(tokenize(rawVal)).parseComponentValues();
+        const nonWsNodes = p.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+        const tokens = nonWsNodes.map(t => serialize([t]));
         const normalizedTokens = tokens.map(t => {
           const lower = t.toLowerCase();
           if (lower in SYSTEM_COLORS) {
