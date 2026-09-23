@@ -3498,99 +3498,67 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 143: Janitor Sweep — `src/parser.ts` Monolith De-accretion & Outline Orchestration [ ]
-**Goal**: De-accrete `src/parser.ts` (currently 2,267 lines), reducing cognitive complexity and line count by ~25-35% without altering behavior, aligned with `~/.gemini/TASTE.md` and the `janitor` skill.
+## Phase 143: Janitor Sweep — `src/parser.ts` De-accretion & Simplification [ ]
+**Objective**: Systematically refactor and trim `src/parser.ts` (currently 2,267 lines) to reverse historical accretion, reduce cognitive complexity, and improve code clarity aligned with `~/.gemini/TASTE.md` and the `janitor` skill.
 
-**Context & Accretion Analysis**:
-`src/parser.ts` has grown by additive accretion over 140 phases: ad-hoc handler functions, repeated token scanning loops, legacy workarounds, defensive fallback cascades, and sprawling at-rule dispatch logic. Top-level methods have lost outline orchestration.
+**Context**: As the central entrypoint across 140+ feature and spec conformance phases, `src/parser.ts` has accumulated significant defensive sediment, repetitive token walkers, and sprawling at-rule branches.
+
+**Guidelines & Invariants**:
+- **Autonomy**: The Janitor agent determines the optimal refactoring strategy (e.g. extracting helper modules, consolidating loops, or simplifying dispatch tables).
+- **Net-Negative Reduction**: Strive for meaningful reduction in line count and nesting depth.
+- **Strict Parity**: Must maintain 100% behavioral parity with zero WPT regressions (`pnpm run wpt:verify`) and clean preflight (`pnpm run preflight`).
 
 ### Tasks
-- [ ] **Establish Characterization & Zero-Regression Baseline**:
-  - Run `pnpm run preflight` and snapshot full WPT verification baseline (`pnpm run wpt:verify`) ensuring zero regressions across all 21,031 passing assertions.
-- [ ] **Extract Dedicated At-Rule Handler Delegates**:
-  - Move sprawling, self-contained at-rule parsers from `src/parser.ts` into cohesive delegate functions (planned under parser delegates):
-    - `@import` parsing (`handleImportRule`, lines 795–942, ~150 lines).
-    - `@scope` parsing (`handleScopeRule`, lines 466–522).
-    - `@keyframes` parsing (`handleKeyframesRule`, lines 390–456).
-    - `@font-feature-values` / `@counter-style` / `@view-transition` rules (lines 524–650).
-  - Retain the centralized `AT_RULE_HANDLERS` dispatch table in `src/parser.ts` referencing these pure functions.
-- [ ] **De-duplicate Token Scanning & Delimiter Walkers**:
-  - Replace repetitive `while (i < tokens.length && tokens[i].type === 'whitespace') i++` ladders with a reusable stream/helper (`skipWhitespace`, `peekNonWhitespace`).
-  - Collapse repetitive simple-block opening/closing checks across at-rule and nested declaration handlers.
-- [ ] **Enforce Outline Orchestration on Core Algorithms**:
-  - Refactor `parseStyleSheet()`, `consumeRule()`, `consumeDeclaration()`, and `consumeBlockContents()` so each method reads like a 15–30 line outline of the normative CSS Syntax 3 algorithm (CSS Syntax 3 § 5.4), delegating discrete sub-steps to named pure helpers.
-- [ ] **Strip Dead Compatibility Layers & Temporary Workarounds**:
-  - Search for and delete obsolete fallback branches left behind from early phases before `ParseHooks` and modern spec modules were stabilized.
-- [ ] **Verification & Net-Negative Audit**:
-  - Confirm `pnpm run preflight` passes 100%.
-  - Run `pnpm run wpt:verify` to confirm zero regressions across all 8 WPT suites.
-  - Measure line count reduction in `src/parser.ts` and overall net-negative diff.
+- [ ] Establish characterization baseline with `pnpm run preflight` and `pnpm run wpt:verify`.
+- [ ] Conduct Janitor refactoring pass on `src/parser.ts` to reduce complexity and remove dead/defensive boilerplate.
+- [ ] Verify zero regressions across all 8 WPT suites and commit net-negative improvements.
 
 ---
 
-## Phase 144: Janitor Sweep — `src/shorthands.ts` Data-Driven De-duplication [ ]
-**Goal**: Refactor `src/shorthands.ts` (currently 2,249 lines), replacing repetitive hand-rolled expansion and serialization boilerplate with declarative, data-driven grammar maps from `@webref/css`.
+## Phase 144: Janitor Sweep — `src/shorthands.ts` Simplification [ ]
+**Objective**: Refactor and streamline `src/shorthands.ts` (currently 2,249 lines), eliminating duplicate expansion and serialization logic while maintaining complete CSS property shorthand fidelity.
 
-**Context & Accretion Analysis**:
-`src/shorthands.ts` is the second largest file in the codebase, containing massive parallel blocks of repetitive code for 4-sided properties (margin, padding, border-width, border-style, border-color, inset, scroll-margin, scroll-padding), border shorthands (border, border-top/right/bottom/left, outline, column-rule), and background/font/flex/grid expansions.
+**Context**: High repetition exists across 4-sided properties (margins, paddings, borders, insets) and directional property expansions.
+
+**Guidelines & Invariants**:
+- **Autonomy**: Let the Janitor agent evaluate opportunities to unify boilerplate (parameterized helpers, declarative maps, or modern Array/Set primitives).
+- **Strict Parity**: Verify zero regressions against shorthand and lightning CSS suites.
 
 ### Tasks
-- [ ] **Establish Characterization & Zero-Regression Baseline**:
-  - Verify existing tests in `tests/shorthands.test.ts` and `tests/external-lightning.test.ts`.
-- [ ] **Unify 4-Sided Box Expansion & Serialization**:
-  - Replace copy-pasted 1-to-4 value expansion logic across `margin`, `padding`, `border-width`, `border-style`, `border-color`, `inset`, `scroll-margin`, `scroll-padding` with a single parameterized 4-sided expansion helper (`expandFourSidedShorthand(tokens, longhands)`).
-  - Unify 4-sided value serialization/compression (`serializeFourSidedShorthand(top, right, bottom, left)`).
-- [ ] **De-duplicate Directional Border Shorthands**:
-  - Generalize `border-top`, `border-right`, `border-bottom`, `border-left`, `border-inline-start`, `border-inline-end`, `border-block-start`, `border-block-end` into a shared directional border handler parameterized by side.
-- [ ] **Modernize Array & Set Primitives**:
-  - Replace mutable loops and legacy `reduce` grouping with modern native primitives (`Object.groupBy`, `arr.toSorted()`, Set composition `setA.intersection(setB)`).
-- [ ] **Verification & Zero-Regression Audit**:
-  - Confirm `pnpm run preflight` passes.
-  - Run `pnpm run wpt:verify` to confirm zero regressions across Typed OM and CSSOM suites.
+- [ ] Establish characterization baseline with `pnpm run preflight` and existing shorthand tests.
+- [ ] Conduct Janitor refactoring pass on `src/shorthands.ts` to de-duplicate logic and clean up boilerplate.
+- [ ] Verify zero regressions across unit tests and WPT conformance suites.
 
 ---
 
-## Phase 145: Janitor Sweep — `src/serializer.ts` & `src/MediaParser.ts` Simplification [ ]
-**Goal**: Clean and trim `src/serializer.ts` (1,249 lines) and `src/MediaParser.ts` (1,397 lines), removing redundant serialization hooks, eliminating dead defensive checks, and simplifying operator precedence parsing.
+## Phase 145: Janitor Sweep — `src/serializer.ts` & `src/MediaParser.ts` Streamlining [ ]
+**Objective**: Clean and simplify `src/serializer.ts` (1,249 lines) and `src/MediaParser.ts` (1,397 lines), reducing sprawling branches and modernizing token stringification.
 
-**Context & Accretion Analysis**:
-`src/serializer.ts` contains duplicate string builders, obsolete quote-escaping normalizers, and special-case stringification branches accumulated across Typed OM and CSSOM phases. `src/MediaParser.ts` contains sprawling recursive descent methods with redundant backtracking buffers.
+**Context**: Both files have accumulated complex backtracking loops, duplicate string formatting routines, and legacy helpers.
+
+**Guidelines & Invariants**:
+- **Autonomy**: The Janitor agent plans and executes targeted de-accretion to clarify control flow and eliminate redundant state tracking.
+- **Strict Parity**: Verify zero regressions on serialization tests and WPT `mediaqueries` suite.
 
 ### Tasks
-- [ ] **Establish Characterization Baseline**:
-  - Verify `tests/serialization.test.ts`, `tests/media-queries.test.ts`, and WPT mediaqueries suite (`412 / 417 passing`).
-- [ ] **`src/serializer.ts` Simplification**:
-  - Unify component value serialization: simplify token stringification dispatch into a concise lookup table.
-  - De-duplicate identifier escaping and string quoting: consolidate `escapeIdentifier()` and `serializeString()` into single authoritative implementations.
-  - Remove redundant defensive checks for impossible token combinations.
-- [ ] **`src/MediaParser.ts` Simplification**:
-  - Streamline range context comparison parsing (`<`, `<=`, `>`, `>=`, `=`) by unifying comparison operator token extraction.
-  - Simplify media feature expression evaluation and `<general-enclosed>` fallback handling into clean guard clauses.
-- [ ] **Verification & Zero-Regression Audit**:
-  - Run `pnpm run preflight` and `node scripts/wpt/node/cli.ts run --spec=mediaqueries --verify-exact-baseline`.
+- [ ] Establish characterization baseline with `pnpm run preflight` and `pnpm run wpt --spec=mediaqueries`.
+- [ ] Conduct Janitor refactoring pass across `src/serializer.ts` and `src/MediaParser.ts`.
+- [ ] Verify zero regressions across all test suites.
 
 ---
 
-## Phase 146: Janitor Sweep — `src/rules/at-rules.ts` & Rule Hierarchy Consolidation [ ]
-**Goal**: Modularize and trim `src/rules/at-rules.ts` (1,133 lines), extracting distinct rule interfaces into dedicated submodules and standardizing WebIDL prototype descriptors.
+## Phase 146: Janitor Sweep — `src/rules/at-rules.ts` Modularization [ ]
+**Objective**: Clean up and modularize `src/rules/at-rules.ts` (1,133 lines) to improve code organization, decouple distinct spec domain rules, and standardize WebIDL interfaces.
 
-**Context & Accretion Analysis**:
-`src/rules/at-rules.ts` houses almost all CSS at-rule classes in a single monolith (`CSSImportRule`, `CSSMediaRule`, `CSSFontFaceRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSSupportsRule`, `CSSCounterStyleRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSContainerRule`, `CSSFontFeatureValuesRule`, `CSSScopeRule`, `CSSStartingStyleRule`, `CSSViewTransitionRule`).
+**Context**: Houses 15 distinct at-rule implementations in a single file with varying property descriptor patterns.
+
+**Guidelines & Invariants**:
+- **Autonomy**: The Janitor agent decides the best modular structure (e.g., partitioning into domain-focused submodules or consolidating prototype descriptors) while preserving all public and internal exports.
+- **Strict Parity**: Verify zero regressions across `tests/cssom-interfaces.test.ts` and WPT `cssom` / `css-cascade` suites.
 
 ### Tasks
-- [ ] **Establish Baseline Verification**:
-  - Run `tests/cssom-interfaces.test.ts` and `pnpm run wpt --spec=cssom`.
-- [ ] **Modularize Rule Classes by Spec Domain**:
-  - Partition rule classes into cohesive submodules in `src/rules/`:
-    - Grouping rules (`CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`).
-    - Cascade rules (`CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSScopeRule`).
-    - Import & namespace rules (`CSSImportRule`, `CSSNamespaceRule`).
-    - Font rules (`CSSFontFaceRule`, `CSSFontFeatureValuesRule`).
-    - Animation rules (`CSSKeyframesRule`, `CSSKeyframeRule`, `CSSViewTransitionRule`).
-  - Re-export all classes from `src/rules/at-rules.ts` to preserve existing internal and external import paths.
-- [ ] **Standardize Prototype Properties & WebIDL Descriptors**:
-  - Ensure all rule classes consistently use prototype getters (instead of instance properties) for readonly WebIDL attributes (`name`, `media`, `href`, `conditionText`, `nameList`, `style`).
-  - Standardize `[Symbol.toStringTag]` getters across all rule classes.
-- [ ] **Verification & Zero-Regression Audit**:
-  - Run `pnpm run preflight` and `pnpm run wpt:verify` to confirm zero regressions across all 21,031 passing assertions.
+- [ ] Establish baseline verification with `pnpm run preflight`.
+- [ ] Conduct Janitor refactoring pass on `src/rules/at-rules.ts`.
+- [ ] Verify zero regressions across all test suites and confirm export backward-compatibility.
+
 
