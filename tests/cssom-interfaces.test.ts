@@ -414,6 +414,23 @@ test('CSSImportRule with unquoted url() token and dot-separated layer names', ()
   const rule6 = ast6[0] as unknown as CSSImportRule;
   assert.equal(rule6.layerName, null);
   assert.notEqual(rule6.media.length, 0);
+
+  // Trailing dot is invalid per css-cascade-5 § 5.1
+  const ast7 = Parser.parseStyleSheetText('@import url("nonexist.css") layer(A.);');
+  const rule7 = ast7[0] as unknown as CSSImportRule;
+  assert.equal(rule7.layerName, null);
+  assert.notEqual(rule7.media.length, 0);
+
+  // CSS-wide keywords are reserved and invalid in <layer-name>
+  const ast8 = Parser.parseStyleSheetText('@import url("nonexist.css") layer(initial);');
+  const rule8 = ast8[0] as unknown as CSSImportRule;
+  assert.equal(rule8.layerName, null);
+  assert.notEqual(rule8.media.length, 0);
+
+  const ast9 = Parser.parseStyleSheetText('@import url("nonexist.css") layer(A.revert);');
+  const rule9 = ast9[0] as unknown as CSSImportRule;
+  assert.equal(rule9.layerName, null);
+  assert.notEqual(rule9.media.length, 0);
 });
 
 test('CSSNamespaceRule interface', () => {

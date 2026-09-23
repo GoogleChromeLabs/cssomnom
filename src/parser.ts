@@ -842,18 +842,21 @@ export class Parser {
         // <layer-name> = <ident> [ '.' <ident> ]* with NO intervening whitespace
         // Empty layer() is invalid.
         const fnTokens = (val as CSSFunction).value;
-        if (fnTokens.length === 0) {
+        // css-cascade-5 § 5.1: <layer-name> = <ident> [ '.' <ident> ]*
+        // Requires an odd number of tokens (must begin and end with <ident>, no trailing dot)
+        if (fnTokens.length === 0 || fnTokens.length % 2 === 0) {
           // Invalid layer(): falls back to media query
           break;
         }
 
+        const CSS_WIDE_KEYWORDS = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default']);
         let isValid = true;
         const nameParts: string[] = [];
         for (let idx = 0; idx < fnTokens.length; idx++) {
           const tok = fnTokens[idx];
           if (idx % 2 === 0) {
-            // Expect ident token
-            if (tok.type !== 'ident') {
+            // Expect ident token that is not a reserved CSS-wide keyword (css-cascade-5 § 5.1)
+            if (tok.type !== 'ident' || CSS_WIDE_KEYWORDS.has(tok.value.toLowerCase())) {
               isValid = false;
               break;
             }
