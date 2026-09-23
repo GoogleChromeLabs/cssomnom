@@ -40,9 +40,10 @@ progress_before=$(hash_of wpt-progress.md)
 readme_before=$(hash_of README.md)
 
 if ! pnpm run wpt:progress; then
-  echo "warning: wpt:progress failed; committing without refreshed conformance numbers." >&2
-  exit 0
+  echo "error: wpt:progress failed (regressions detected or runner error). Aborting commit." >&2
+  exit 1
 fi
+
 
 for f in wpt-progress.md README.md; do
   case "$f" in

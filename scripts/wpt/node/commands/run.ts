@@ -6,7 +6,7 @@ import { loadWptConfig, validateSpecName, getBaselinePath, VALID_SPECS } from '.
 import { crawlSpecFiles } from '../core/crawler.ts';
 import { executeWptTests } from '../core/executor.ts';
 import { saveDatasetToCache } from '../core/cache.ts';
-import { clusterFailures, extractExpectationDiffs, auditBaseline } from '../core/parser.ts';
+import { clusterFailures, extractExpectationDiffs, auditBaseline, filterBaseline } from '../core/parser.ts';
 import { updateProgressLog } from '../core/progress.ts';
 import type { TestRunDataset } from '../core/types.ts';
 
@@ -14,6 +14,7 @@ export interface RunCommandOptions {
   filterBySpec?: string;
   filterByPath?: string;
   verifyExactBaseline?: boolean;
+  noVerify?: boolean;
   showFailureClusters?: boolean;
   showExpectationDiff?: boolean;
   writeProgressMarkdown?: boolean;
@@ -23,6 +24,7 @@ export interface RunCommandOptions {
   limit?: number;
   concurrency?: number;
 }
+
 
 
 export async function runCommand(options: RunCommandOptions = {}): Promise<TestRunDataset> {
@@ -106,23 +108,34 @@ export async function runCommand(options: RunCommandOptions = {}): Promise<TestR
     }
   }
 
-  if (options.verifyExactBaseline) {
-    const baselinePath = getBaselinePath();
-    if (!fs.existsSync(baselinePath)) throw new Error(`Baseline not found at ${baselinePath}. Run with --write-passing-set-baseline first.`);
-    const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf-8')) as Record<string, string[]>;
+  const baselinePath = getBaselinePath();
+  if (fs.existsSync(baselinePath)) {
+    const rawBaseline = JSON.parse(fs.readFileSync(baselinePath, 'utf-8')) as Record<string, string[]>;
+    const executedFiles = dataset.fileResults.map(r => r.file);
+    const baseline = filterBaseline(rawBaseline, executedFiles);
     const currentPassingMap: Record<string, string[]> = {};
     for (const r of dataset.fileResults) if (r.passingSubtests.length > 0) currentPassingMap[r.file] = r.passingSubtests;
     const audit = auditBaseline(baseline, currentPassingMap);
     console.log(`\n--- ZERO-REGRESSION AUDIT REPORT ---`);
     console.log(`Baseline: ${audit.baselineCount} | Current: ${audit.currentCount} | New: +${audit.newPasses.length} | Regressions: -${audit.regressions.length}`);
     if (audit.regressions.length > 0) {
-      console.error('\n🔴 REGRESSIONS DETECTED:');
-      for (const r of audit.regressions.slice(0, 20)) console.error(`  - ${r.file} -> ${r.test}`);
-      process.exit(1);
+      if (options.noVerify) {
+        console.warn('\n⚠️  WARNING: REGRESSIONS DETECTED (--no-verify / --allow-regressions active, continuing):');
+        for (const r of audit.regressions.slice(0, 20)) console.warn(`  - ${r.file} -> ${r.test}`);
+        if (audit.regressions.length > 20) console.warn(`  ... and ${audit.regressions.length - 20} more regressions`);
+      } else {
+        console.error('\n🔴 REGRESSIONS DETECTED:');
+        for (const r of audit.regressions.slice(0, 20)) console.error(`  - ${r.file} -> ${r.test}`);
+        if (audit.regressions.length > 20) console.error(`  ... and ${audit.regressions.length - 20} more regressions`);
+        process.exit(1);
+      }
     } else {
       console.log('\n🟢 ZERO REGRESSIONS: 100% of baseline passing tests continue to pass!');
     }
+  } else if (options.verifyExactBaseline) {
+    throw new Error(`Baseline not found at ${baselinePath}. Run with --write-passing-set-baseline first.`);
   }
+
 
   if (options.writePassingSetBaseline) {
     const baselinePath = getBaselinePath();

@@ -206,6 +206,20 @@ export function extractExpectationDiffs(fileResults: ParsedFileResult[]): Expect
   return items;
 }
 
+export function filterBaseline(
+  baseline: Record<string, string[]>,
+  executedFiles: Iterable<string>
+): Record<string, string[]> {
+  const executedSet = new Set(executedFiles);
+  const filtered: Record<string, string[]> = {};
+  for (const [file, passes] of Object.entries(baseline)) {
+    if (executedSet.has(file)) {
+      filtered[file] = passes;
+    }
+  }
+  return filtered;
+}
+
 export function auditBaseline(baseline: Record<string, string[]>, currentPassingMap: Record<string, string[]>): BaselineAuditReport {
   const regressions: { file: string; test: string }[] = [];
   const newPasses: { file: string; test: string }[] = [];
@@ -228,3 +242,4 @@ export function auditBaseline(baseline: Record<string, string[]>, currentPassing
   const isMonotonic = regressions.length === 0 && currentCount >= baselineCount;
   return { baselineCount, currentCount, newPasses, regressions, isMonotonic };
 }
+

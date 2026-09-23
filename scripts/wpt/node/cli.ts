@@ -14,6 +14,8 @@ const RUN_OPTS = {
   'filter-by-path': { type: 'string', short: 'p' },
   'path': { type: 'string' },
   'verify-exact-baseline': { type: 'boolean' },
+  'no-verify': { type: 'boolean' },
+  'allow-regressions': { type: 'boolean' },
   'show-failure-clusters': { type: 'boolean' },
   'show-expectation-diff': { type: 'boolean' },
   'write-progress-markdown': { type: 'boolean' },
@@ -24,6 +26,7 @@ const RUN_OPTS = {
   'concurrency': { type: 'string', short: 'c' },
   'help': { type: 'boolean', short: 'h' },
 } as const;
+
 
 const CLUSTER_OPTS = {
   'filter-by-spec': { type: 'string', short: 's' },
@@ -85,7 +88,7 @@ function printHelp(command?: string) {
     console.log(`\nUsage: node scripts/wpt/node/cli.ts fetch-upstream [options]\n\nOptions:\n  -r, --revision <sha>                Specific WPT git revision SHA\n  --run-id <id>                       Specific wpt.fyi Run ID\n  --product <name>                    Browser product name (default: chrome)\n  --label <name>                      wpt.fyi run label (default: master)\n  -s, --spec, --filter-by-spec <name> Filter results to a specific spec suite\n  -o, --cache-path <path>             Output path for cached report (default: .wpt-cache/report-chrome-upstream.json)\n  --dry-run                           Preview fetch results without saving to disk\n  -h, --help                          Show this help message\n\nValid Specs: ${VALID_SPECS.join(', ')}\n`);
     return;
   }
-  console.log(`\ncssomnom Agent-Native WPT Test CLI\n\nUsage:\n  node scripts/wpt/node/cli.ts [command] [options]\n  pnpm run wpt [command] [options]\n\nCommands:\n  run (default)   Execute single-pass WPT test runner across suites\n  cluster         Analyze failure pattern clusters (cached/live)\n  diff            Analyze near-miss expectation diffs (cached/live)\n  parity          Cross-browser differential parity matrix (Node.js vs Headless Chrome vs Upstream)\n  fetch-upstream  Ingest official Chrome WPT baseline data from wpt.fyi\n\nRun Options:\n  -s, --spec, --filter-by-spec <name>      Filter to a specific spec suite\n  -p, --path, --filter-by-path <path>      Filter by file path / substring\n  --verify-exact-baseline                  Verify 0 regressions against baseline (exits 1 on regression)\n  --show-failure-clusters                  Group error signatures and output cluster table\n  --show-expectation-diff                  Diff results against expected values (+/-)\n  --write-progress-markdown                Generate and update wpt-progress.md\n  --write-passing-set-baseline             Update passing set baseline with monotonicity check\n  --json                                   Emit structured JSON output\n  --dry-run                                Preview file changes without writing to disk\n  --limit <N>                              Max rows for clusters/diffs (default: 20)\n  -c, --concurrency <N>                    Worker pool concurrency limit\n  -h, --help                               Show this help message\n\nValid Specs:\n  ${VALID_SPECS.join(', ')}\n\nExamples:\n  pnpm run wpt\n  pnpm run wpt --spec=selectors\n  pnpm run wpt --verify-exact-baseline\n  pnpm run wpt cluster --spec=css-typed-om\n  pnpm run wpt diff --spec=selectors\n  pnpm run wpt parity --spec=css-typed-om\n  pnpm run wpt fetch-upstream --spec=css-typed-om\n`);
+  console.log(`\ncssomnom Agent-Native WPT Test CLI\n\nUsage:\n  node scripts/wpt/node/cli.ts [command] [options]\n  pnpm run wpt [command] [options]\n\nCommands:\n  run (default)   Execute single-pass WPT test runner across suites\n  cluster         Analyze failure pattern clusters (cached/live)\n  diff            Analyze near-miss expectation diffs (cached/live)\n  parity          Cross-browser differential parity matrix (Node.js vs Headless Chrome vs Upstream)\n  fetch-upstream  Ingest official Chrome WPT baseline data from wpt.fyi\n\nRun Options:\n  -s, --spec, --filter-by-spec <name>      Filter to a specific spec suite\n  -p, --path, --filter-by-path <path>      Filter by file path / substring\n  --verify-exact-baseline                  Verify 0 regressions against baseline (enabled by default)\n  --no-verify, --allow-regressions         Bypass non-zero exit on regressions\n  --show-failure-clusters                  Group error signatures and output cluster table\n  --show-expectation-diff                  Diff results against expected values (+/-)\n  --write-progress-markdown                Generate and update wpt-progress.md\n  --write-passing-set-baseline             Update passing set baseline with monotonicity check\n  --json                                   Emit structured JSON output\n  --dry-run                                Preview file changes without writing to disk\n  --limit <N>                              Max rows for clusters/diffs (default: 20)\n  -c, --concurrency <N>                    Worker pool concurrency limit\n  -h, --help                               Show this help message\n\nValid Specs:\n  ${VALID_SPECS.join(', ')}\n\nExamples:\n  pnpm run wpt\n  pnpm run wpt --spec=selectors\n  pnpm run wpt --no-verify\n  pnpm run wpt cluster --spec=css-typed-om\n  pnpm run wpt diff --spec=selectors\n  pnpm run wpt parity --spec=css-typed-om\n  pnpm run wpt fetch-upstream --spec=css-typed-om\n`);
 }
 
 async function main() {
@@ -157,6 +160,7 @@ async function main() {
         filterBySpec: values['filter-by-spec'] ?? values.spec,
         filterByPath: values['filter-by-path'] ?? values.path,
         verifyExactBaseline: values['verify-exact-baseline'],
+        noVerify: values['no-verify'] || values['allow-regressions'],
         showFailureClusters: values['show-failure-clusters'],
         showExpectationDiff: values['show-expectation-diff'],
         writeProgressMarkdown: values['write-progress-markdown'],
@@ -167,6 +171,7 @@ async function main() {
         concurrency: values.concurrency ? parseInt(values.concurrency, 10) : undefined,
       });
     }
+
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`\x1b[31mError: ${msg}\x1b[0m\n`);

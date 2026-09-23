@@ -23,9 +23,11 @@ import {
   parseRunnerOutput,
   clusterFailures,
   extractExpectationDiffs,
+  filterBaseline,
   auditBaseline,
   countDeclaredTests,
 } from '../scripts/wpt/node/core/parser.ts';
+
 
 import {
   saveDatasetToCache,
@@ -242,10 +244,26 @@ describe('WPT CLI Core Modules', () => {
       assert.strictEqual(audit2.isMonotonic, false);
     });
 
+    test('filters baseline to executed test files', () => {
+      const fullBaseline = {
+        'file1.html': ['test-1', 'test-2'],
+        'file2.html': ['test-3'],
+        'file3.html': ['test-4', 'test-5'],
+      };
+      const executed = ['file1.html', 'file3.html'];
+      const filtered = filterBaseline(fullBaseline, executed);
+
+      assert.deepStrictEqual(Object.keys(filtered).sort(), ['file1.html', 'file3.html']);
+      assert.deepStrictEqual(filtered['file1.html'], ['test-1', 'test-2']);
+      assert.deepStrictEqual(filtered['file3.html'], ['test-4', 'test-5']);
+      assert.strictEqual(filtered['file2.html'], undefined);
+    });
+
     test('counts declared tests in html file', () => {
       assert.strictEqual(countDeclaredTests(undefined), 1);
       assert.strictEqual(countDeclaredTests('non-existent-file.html'), 1);
     });
+
   });
 
   describe('core/cache.ts', () => {
@@ -1334,8 +1352,75 @@ describe('WPT CLI Core Modules', () => {
       assert.strictEqual(spec2, 'selectors');
       assert.strictEqual(path2, 'focus');
     });
+
+    test('supports --no-verify and --allow-regressions in RUN_OPTS', () => {
+      const RUN_OPTS = {
+        'verify-exact-baseline': { type: 'boolean' },
+        'no-verify': { type: 'boolean' },
+        'allow-regressions': { type: 'boolean' },
+      } as const;
+
+      const resNoVerify = parseArgs({ args: ['--no-verify'], options: RUN_OPTS });
+      assert.strictEqual(resNoVerify.values['no-verify'], true);
+      assert.strictEqual(resNoVerify.values['allow-regressions'], undefined);
+
+      const resAllowReg = parseArgs({ args: ['--allow-regressions'], options: RUN_OPTS });
+      assert.strictEqual(resAllowReg.values['allow-regressions'], true);
+      assert.strictEqual(resAllowReg.values['no-verify'], undefined);
+
+      const resLegacy = parseArgs({ args: ['--verify-exact-baseline'], options: RUN_OPTS });
+      assert.strictEqual(resLegacy.values['verify-exact-baseline'], true);
+    });
+
+    test('scoped baseline auditing ignores un-executed suites', () => {
+      // Full baseline spanning multiple specs/files
+      const fullBaseline = {
+        'submodules/web-platform-tests/css/css-nesting/test-a.html': ['pass-1', 'pass-2'],
+        'submodules/web-platform-tests/css/css-typed-om/test-b.html': ['pass-3'],
+        'submodules/web-platform-tests/css/selectors/test-c.html': ['pass-4'],
+      };
+
+      // Execution only ran css-nesting files
+      const executedFiles = ['submodules/web-platform-tests/css/css-nesting/test-a.html'];
+      const filteredBaseline = filterBaseline(fullBaseline, executedFiles);
+
+      // Current passing map contains passes for test-a
+      const currentPassingMap = {
+        'submodules/web-platform-tests/css/css-nesting/test-a.html': ['pass-1', 'pass-2', 'pass-new'],
+      };
+
+      // Auditing against filtered baseline: no regressions, only new passes!
+      const audit = auditBaseline(filteredBaseline, currentPassingMap);
+      assert.strictEqual(audit.regressions.length, 0);
+      assert.strictEqual(audit.newPasses.length, 1);
+      assert.strictEqual(audit.isMonotonic, true);
+      assert.strictEqual(audit.baselineCount, 2);
+      assert.strictEqual(audit.currentCount, 3);
+    });
+
+    test('scoped baseline auditing detects regressions within the executed scope', () => {
+      const fullBaseline = {
+        'submodules/web-platform-tests/css/css-nesting/test-a.html': ['pass-1', 'pass-2'],
+        'submodules/web-platform-tests/css/css-typed-om/test-b.html': ['pass-3'],
+      };
+
+      const executedFiles = ['submodules/web-platform-tests/css/css-nesting/test-a.html'];
+      const filteredBaseline = filterBaseline(fullBaseline, executedFiles);
+
+      // Dropped pass-2 in test-a
+      const currentPassingMap = {
+        'submodules/web-platform-tests/css/css-nesting/test-a.html': ['pass-1'],
+      };
+
+      const audit = auditBaseline(filteredBaseline, currentPassingMap);
+      assert.strictEqual(audit.regressions.length, 1);
+      assert.strictEqual(audit.regressions[0].file, 'submodules/web-platform-tests/css/css-nesting/test-a.html');
+      assert.strictEqual(audit.regressions[0].test, 'pass-2');
+      assert.strictEqual(audit.isMonotonic, false);
+    });
   });
 });
+
 
 
 
