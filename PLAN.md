@@ -3606,7 +3606,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 4. **Statistical Significance via Bootstrap 95% Confidence Intervals & Multi-Round A/A Validation**:
    - Replaced fixed fitted thresholds with fresh subprocess runs per ref executed in an interleaved (ABAB...) order across worktrees.
    - A 3,000-repetition bootstrap computes the 95% confidence interval of the median throughput delta. Any result whose 95% CI excludes 0 is flagged as significant: changes with `|delta| >= 2.0%` are categorized as `faster` or `slower`, while `|delta| < 2.0%` are pre-registered and labeled as `significant, small`.
-   - **Validation via Multi-Round A/A Runs**: Evaluated across 3 rounds × 14 benchmarks = 42 total trials on identical commit `f8c80d0` (10 interleaved runs per trial). Observed **1 false positive out of 42 trials (2.4% observed false-positive rate)**, well within the 95% binomial confidence bound (6.9% upper bound).
+   - **Validation via Multi-Round A/A Runs**: Evaluated across 3 rounds × 14 benchmarks = 42 total trials on identical commit `f8c80d0` (10 interleaved runs per trial). Observed **1 false positive out of 42 trials (2.4% observed false-positive rate)**, exact one-sided 95% upper bound ≈ 11% (the 6.9% figure previously stated here is the bound for 0/42).
 5. **Synthetic Pre-Tokenized Parser Throughput**:
    - `parse: synthetic large tokens` exhibits a small (~1-4%) slowdown on raw synthetic pre-tokenized token arrays across repeated runs (`-1.6%`, 95% CI: `[-9.5%, +14.9%]`). This effect does not appear in combined `tokenize + parse` or any real-world stylesheet benchmarks.
 6. **True Full Round-Trip Benchmark**:
@@ -3654,3 +3654,11 @@ Moved from earlier deferred items (Phase 13 "Avoid Re-tokenization", and CSS Syn
 ### Tasks
 - [ ] **Avoid re-tokenization**: remove serialize→`tokenize()` round trips on already-parsed values. Known sites: shorthand expansion in [`CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts) (`tokenize(val)` for longhands), `parseStyleAttribute(tokenize(serialize(blockVal)))` in [`rule-filter.ts`](./src/cascade/rule-filter.ts), re-parsers in [`parser.ts`](./src/parser.ts) (`new Parser(tokenize(text, …))`, `` tokenize(`{ ${text} }`) ``), and name re-tokenization in [`variable-resolver.ts`](./src/cascade/variable-resolver.ts). Audit the 73 `tokenize(` call sites in `src/` and keep only true string entry points.
 - [ ] **Operate on token stream**: evaluate refactoring the parser to consume the token stream directly (css-syntax-3 § 5 parser algorithms) instead of pre-grouped component values. Large change; only pursue if benchmarks justify it.
+
+## Phase 151 (Future): Benchmark Sensitivity [ ]
+**Status**: Parked (user deprioritized benchmark work after Phase 148). Pick up before Phase 150, since Phase 150 needs to detect small parser changes.
+
+Phase 148's final harness (`a816dff`) was not re-audited. Known gaps:
+- [ ] **Low power**: 95% CIs in the Phase 148 table are roughly ±10–15% wide, so only large changes (like the +53% serializer speedup) are detectable. Reduce per-run variance (e.g. more iterations per sample, CPU pinning, quieter machine) until A/A CIs are a few percent wide.
+- [ ] **`parse: synthetic large tokens`**: earlier runs showed a CI-excluding-zero ~2–4% slowdown pre- vs post-janitor; the 15-run table shows -1.6% with CI [-9.5%, +14.9%]. Unresolved; re-measure once power improves, and profile with `--cpu-prof` before attributing a cause.
+- [ ] **Review open questions**: whether pre-sample `globalThis.gc()` hides allocation cost from wall time, and whether the `|delta| < 2.0%` "significant, small" label was chosen a priori.
