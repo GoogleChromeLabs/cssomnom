@@ -355,6 +355,7 @@ pnpm test
 
 ## Project Documents
 
+- `ARCHITECTURE.md`: High-level codebase architecture, module ownership, and orientation map.
 - `PLAN.md`: High-level project plan and roadmap (older completed phases in `PLAN.archive.md`).
 - `AGENTS.md`: Instructions and context for AI agents working on this repo.
 - `LOOP.md`: Details the multi-agent PR lifecycle loops.
