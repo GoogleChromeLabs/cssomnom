@@ -35,43 +35,86 @@ import { getCascadedStyle } from './cascade.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { PropertyRegistry, matchesSyntax } from './PropertyRegistry.ts';
 
-/**
- * Extracts the start offset of a component value (Token or SimpleBlock).
- */
 function getComponentValueStartIndex(item?: ComponentValue): number | undefined {
   if (!item) return undefined;
-  if (item.type === 'simple-block') {
-    return item.associatedToken?.startIndex;
-  }
-  if ('startIndex' in item && typeof item.startIndex === 'number') {
-    return item.startIndex;
-  }
-  return undefined;
+  return item.type === 'simple-block'
+    ? item.associatedToken?.startIndex
+    : ('startIndex' in item && typeof item.startIndex === 'number' ? item.startIndex : undefined);
 }
 
-/**
- * Extracts the end offset of a component value (Token or SimpleBlock).
- */
 function getComponentValueEndIndex(item?: ComponentValue): number | undefined {
   if (!item) return undefined;
-  if (item.type === 'simple-block') {
-    return item.endIndex ?? item.associatedToken?.endIndex;
-  }
-  if ('endIndex' in item && typeof item.endIndex === 'number') {
-    return item.endIndex;
-  }
-  return undefined;
+  return item.type === 'simple-block'
+    ? (item.endIndex ?? item.associatedToken?.endIndex)
+    : ('endIndex' in item && typeof item.endIndex === 'number' ? item.endIndex : undefined);
 }
 
-/**
- * Computes RuleSourceLocation from a starting character index and SimpleBlock.
- */
 function createBlockLocation(start: number, block: SimpleBlock): RuleSourceLocation {
   const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
   const bodyStart = block.associatedToken.endIndex;
   const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
   return { start, end, bodyStart, bodyEnd };
 }
+
+function trimComponentValues(values: ComponentValue[], trimEof = false): ComponentValue[] {
+  let start = 0;
+  while (start < values.length && values[start].type === 'whitespace') start++;
+  let end = values.length - 1;
+  while (end >= start && (values[end].type === 'whitespace' || (trimEof && values[end].type === 'EOF'))) end--;
+  return start > end ? [] : values.slice(start, end + 1);
+}
+
+function splitComponentValuesByComma(values: ComponentValue[], allowDelimComma = false): ComponentValue[][] {
+  const result: ComponentValue[][] = [[]];
+  for (const v of values) {
+    if (v.type === 'comma' || (allowDelimComma && v.type === 'delim' && v.value === ',')) {
+      result.push([]);
+    } else {
+      result[result.length - 1].push(v);
+    }
+  }
+  return result;
+}
+
+function extractUriFromComponentValue(token: ComponentValue): string | null {
+  if (token.type === 'string') return token.value;
+  if (token.type === 'url') return (token as UrlToken).value;
+  if (token.type === 'function' && (token as CSSFunction).name === 'url') {
+    const fn = token as CSSFunction;
+    const urlArg = fn.value.find(v => v.type === 'string');
+    if (urlArg) return (urlArg as StringToken).value;
+    return fn.value.map(v => serialize([v])).join('').trim();
+  }
+  return null;
+}
+
+function splitLeadingDeclarations(blockContents: Rule[]): { declarations: Declaration[]; nestedRules: Rule[] } {
+  const declarations: Declaration[] = [];
+  const nestedRules: Rule[] = [];
+  for (let i = 0; i < blockContents.length; i++) {
+    const item = blockContents[i];
+    if (i === 0 && item instanceof CSSNestedDeclarations) {
+      declarations.push(...item.style._declarations);
+    } else {
+      nestedRules.push(item);
+    }
+  }
+  return { declarations, nestedRules };
+}
+
+const CSS_WIDE_KEYWORDS = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default']);
+const KEYFRAMES_DISALLOWED_NAMES = new Set(['none', 'initial', 'inherit', 'unset', 'revert', 'default']);
+const FONT_FEATURE_VALUE_BLOCKS: Record<string, 'annotation' | 'ornaments' | 'stylistic' | 'swash' | 'characterVariant' | 'styleset' | 'historicalForms'> = {
+  annotation: 'annotation',
+  ornaments: 'ornaments',
+  stylistic: 'stylistic',
+  swash: 'swash',
+  'character-variant': 'characterVariant',
+  charactervariant: 'characterVariant',
+  styleset: 'styleset',
+  'historical-forms': 'historicalForms',
+  historicalforms: 'historicalForms',
+};
 
 /**
  * Skeleton Parser for CSSOM.
@@ -172,11 +215,12 @@ export class Parser {
     this.tokens.next();
   }
 
+  private skipWhitespace(): void {
+    while (this.nextToken.type === 'whitespace') {
+      this.discardToken();
+    }
+  }
 
-  /**
-   * Parse a list of component values.
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-component-values
-   */
   // 5.4.9 Parse a list of component values https://drafts.csswg.org/css-syntax/#parse-list-of-component-values
   public parseComponentValues(): ComponentValue[] {
     const values: ComponentValue[] = [];
@@ -186,28 +230,11 @@ export class Parser {
     return values;
   }
 
-  /**
-   * Parse a comma-separated list of component values.
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-comma-separated-list-of-component-values
-   */
   // 5.4.10 Parse a comma-separated list of component values https://drafts.csswg.org/css-syntax/#parse-comma-separated-list-of-component-values
   public parseCommaSeparatedListOfComponentValues(): ComponentValue[][] {
-    const values = this.parseComponentValues();
-    const result: ComponentValue[][] = [[]];
-    for (const v of values) {
-      if (v.type === 'comma') {
-        result.push([]);
-      } else {
-        result[result.length - 1].push(v);
-      }
-    }
-    return result;
+    return splitComponentValuesByComma(this.parseComponentValues());
   }
 
-  /**
-   * Parse a stylesheet.
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-a-stylesheet
-   */
   // 5.4.3 Parse a stylesheet https://drafts.csswg.org/css-syntax/#parse-stylesheet
   public parseStyleSheet(): CSSStyleSheet {
     const rules = this.consumeListOfRules(true);
@@ -220,107 +247,43 @@ export class Parser {
     const parser = new Parser(tokens, this.options);
     parser.errors.push(...errors);
     const rule = parser.consumeRule();
-    
-    // Check for trailing garbage
-    while (parser.nextToken.type === 'whitespace') {
-      parser.discardToken();
-    }
-    if (parser.nextToken.type !== 'EOF') {
-      throw new DOMException('Syntax error', 'SyntaxError');
-    }
-    
+    parser.ensureEOF();
     return rule;
   }
 
-  /**
-   * Parse a list of declarations (style attribute value).
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-a-list-of-declarations
-   */
   // 5.4.5 Parse a list of declarations https://drafts.csswg.org/css-syntax/#parse-block-contents
   public parseStyleAttribute(): CSSStyleDeclaration {
-    const componentValues = this.parseComponentValues();
-    const declarations = this.consumeDeclarationsFromBlockContents(componentValues);
-    
+    const declarations = this.consumeDeclarationsFromBlockContents(this.parseComponentValues());
     return new CSSStyleDeclaration(declarations);
   }
 
-  /**
-   * Parse a stylesheet's contents.
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-stylesheet-contents
-   */
   // 5.4.4 Parse a stylesheet's contents https://drafts.csswg.org/css-syntax/#parse-stylesheet-contents
   public parseStyleSheetContents(): Rule[] {
     return this.consumeListOfRules(true);
   }
 
-  /**
-   * Parse a block's contents.
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-block-contents
-   */
   // 5.4.5 Parse a block's contents https://drafts.csswg.org/css-syntax/#parse-block-contents
   public parseBlockContents(): Rule[] {
-    const values = this.parseComponentValues();
-    return this.consumeBlockContents(new ArrayComponentValueStream(values), true, false);
+    return this.consumeBlockContents(new ArrayComponentValueStream(this.parseComponentValues()), true, false);
   }
 
-  /**
-   * Parse a declaration.
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-declaration
-   */
   // 5.4.7 Parse a declaration https://drafts.csswg.org/css-syntax/#parse-declaration
   public parseDeclaration(): Declaration | null {
-    while (this.nextToken.type === 'whitespace') {
-      this.discardToken();
-    }
-    if (this.nextToken.type !== 'ident') {
-      return null;
-    }
+    this.skipWhitespace();
+    if (this.nextToken.type !== 'ident') return null;
     const stream = new LazyComponentValueStream(() => this.consumeComponentValue(), 'EOF');
     return this.consumeDeclarationFromStream(stream);
   }
 
-  /**
-   * Parse a component value.
-   * @see https://drafts.csswg.org/css-syntax-3/#parse-component-value
-   */
   // 5.4.8 Parse a component value https://drafts.csswg.org/css-syntax/#parse-component-value
   public parseComponentValue(): ComponentValue | null {
-    while (true) {
-      const token = this.nextToken;
-      if (token.type === 'whitespace') {
-        this.discardToken();
-      } else {
-        break;
-      }
-    }
-    
-    if (this.nextToken.type === 'EOF') {
-      return null;
-    }
-    
+    this.skipWhitespace();
+    if (this.nextToken.type === 'EOF') return null;
     const value = this.consumeComponentValue();
-    
-    while (true) {
-      const token = this.nextToken;
-      if (token.type === 'whitespace') {
-        this.discardToken();
-      } else {
-        break;
-      }
-    }
-    
-    const finalToken = this.nextToken;
-    if ((finalToken as Token).type === 'EOF') {
-      return value;
-    }
-
-    return null;
+    this.skipWhitespace();
+    return (this.nextToken as Token).type === 'EOF' ? value : null;
   }
 
-  /**
-   * Consume a list of rules.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-list-of-rules
-   */
   // 5.5.1 Consume a stylesheet's contents https://drafts.csswg.org/css-syntax/#consume-stylesheet-contents
   public consumeListOfRules(topLevel: boolean): Rule[] {
     const rules: Rule[] = [];
@@ -330,13 +293,8 @@ export class Parser {
         this.discardToken();
       } else if (token.type === 'EOF') {
         return rules;
-      } else if (token.type === 'CDO' || token.type === 'CDC') {
-        if (topLevel) {
-          this.discardToken();
-        } else {
-          const rule = this.consumeRule();
-          if (rule) rules.push(rule);
-        }
+      } else if ((token.type === 'CDO' || token.type === 'CDC') && topLevel) {
+        this.discardToken();
       } else {
         const rule = this.consumeRule();
         if (rule) rules.push(rule);
@@ -344,42 +302,65 @@ export class Parser {
     }
   }
 
-  /**
-   * Consume a rule.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-rule
-   * // 5.4.6 https://drafts.csswg.org/css-syntax/#parse-rule
-   */
+  // 5.4.6 https://drafts.csswg.org/css-syntax/#parse-rule
   public consumeRule(nested: boolean = false): Rule | null {
-    while (this.nextToken.type === 'whitespace') {
-      this.discardToken();
-    }
-    if (this.nextToken.type === 'EOF') {
-      return null;
-    }
-    if (this.nextToken.type === 'at-keyword') {
-      return this.consumeAtRule(nested);
-    } else {
-      return this.consumeQualifiedRule(nested);
-    }
+    this.skipWhitespace();
+    if (this.nextToken.type === 'EOF') return null;
+    return this.nextToken.type === 'at-keyword'
+      ? this.consumeAtRule(nested)
+      : this.consumeQualifiedRule(nested);
   }
 
+  private finalizeAtRule(
+    rule: ASTAtRule,
+    block: SimpleBlock | undefined,
+    nested: boolean,
+    location: RuleSourceLocation,
+    isTopLevelTokenStream: boolean
+  ): Rule | null {
+    if (!this.isSupportedAtRule(rule.name, nested)) return null;
+    const handler = this.getAtRuleHandler(rule.name);
+    if (handler) {
+      const res = handler(this, rule, block, nested);
+      if (res instanceof CSSRule && !res.location) {
+        res._location = location;
+      }
+      return res;
+    }
+    if (nested) return null;
 
-  /**
-   * Consume an at-rule.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-at-rule
-   */
+    if (block && isTopLevelTokenStream && this.options?.atRules?.[rule.name]) {
+      const type = this.options.atRules[rule.name];
+      if (type === 'declaration') {
+        rule.childRules = this.consumeDeclarationsFromBlockContents(block.value);
+        return rule;
+      }
+      if (type === 'rule') {
+        rule.childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
+        return rule;
+      }
+    }
+
+    let cssRules: CSSRule[] | undefined;
+    if (block && !isTopLevelTokenStream) {
+      rule.childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), nested);
+      cssRules = rule.childRules as CSSRule[];
+    }
+    const atRule = new CSSAtRule(rule.name, rule.prelude, block, cssRules);
+    atRule._location = location;
+    return atRule;
+  }
+
   // 5.5.2 Consume an at-rule https://drafts.csswg.org/css-syntax/#consume-at-rule
   private consumeAtRule(nested: boolean = false): Rule | null {
     const token = this.consumeToken();
     if (token.type !== 'at-keyword') return null;
-    const atRuleName = token.value;
     const rule: ASTAtRule = {
       type: 'at-rule',
-      name: atRuleName,
+      name: token.value,
       prelude: [],
       childRules: [],
     };
-
     const start = token.startIndex ?? 0;
 
     while (true) {
@@ -387,64 +368,19 @@ export class Parser {
       if (next.type === 'semicolon' || next.type === 'EOF') {
         const end = next.endIndex ?? next.startIndex ?? start;
         this.discardToken();
-        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
-        const handler = this.getAtRuleHandler(atRuleName);
-        if (handler) {
-          const res = handler(this, rule, undefined, nested);
-          if (res && res instanceof CSSRule && !res.location) {
-            res._location = { start, end };
-          }
-          return res;
-        }
-        if (nested) return null;
-        const atRule = new CSSAtRule(rule.name, rule.prelude);
-        atRule._location = { start, end };
-        return atRule;
+        return this.finalizeAtRule(rule, undefined, nested, { start, end }, true);
       } else if (next.type === '}') {
         if (nested) return null;
         this.consumeToken();
         rule.prelude.push(next);
       } else if (next.type === '{') {
         const block = this.consumeBlock(this.consumeToken());
-        const location = createBlockLocation(start, block);
-
-        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
-        
-        const handler = this.getAtRuleHandler(atRuleName);
-        if (handler) {
-          const res = handler(this, rule, block, nested);
-          if (res && res instanceof CSSRule && !res.location) {
-            res._location = location;
-          }
-          return res;
-        }
-
-        if (nested) return null;
-
-        if (this.options?.atRules?.[atRuleName]) {
-          const type = this.options.atRules[atRuleName];
-          if (type === 'declaration') {
-            const decls = this.consumeDeclarationsFromBlockContents(block.value);
-            rule.childRules = decls;
-            return rule;
-          } else if (type === 'rule') {
-            const rules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
-            rule.childRules = rules;
-            return rule;
-          }
-        }
-        
-        const atRule = new CSSAtRule(rule.name, rule.prelude, block);
-        atRule._location = location;
-        return atRule;
+        return this.finalizeAtRule(rule, block, nested, createBlockLocation(start, block), true);
       } else {
         rule.prelude.push(this.consumeComponentValue());
       }
     }
   }
-
-
-
 
   private scopeContextDepth: number = 0;
 
@@ -459,73 +395,59 @@ export class Parser {
     return new ctor(serialize(rule.prelude).trim(), childRules, parseRuleInBlock);
   }
 
-  private parseLayerNameFromTokens(tokens: ComponentValue[]): string | null {
-    let start = 0;
-    while (start < tokens.length && tokens[start].type === 'whitespace') start++;
-    let end = tokens.length - 1;
-    while (end >= start && (tokens[end].type === 'whitespace' || tokens[end].type === 'EOF')) end--;
-    if (start > end) return null;
+  private parseLayerNameFromTokens(tokens: ComponentValue[], forbidCssWide = false): string | null {
+    const trimmed = trimComponentValues(tokens, true);
+    if (trimmed.length === 0 || trimmed.length % 2 === 0) return null;
 
-    let name = '';
-    let expectIdent = true;
-    for (let i = start; i <= end; i++) {
-      const t = tokens[i];
-      if (expectIdent) {
-        if (t.type !== 'ident') return null;
-        name += (t as { value: string }).value;
-        expectIdent = false;
+    const parts: string[] = [];
+    for (let i = 0; i < trimmed.length; i++) {
+      const t = trimmed[i];
+      if (i % 2 === 0) {
+        if (t.type !== 'ident' || (forbidCssWide && CSS_WIDE_KEYWORDS.has(t.value.toLowerCase()))) return null;
+        parts.push(t.value);
       } else {
-        if (t.type !== 'delim' || (t as { value: string }).value !== '.') return null;
-        name += '.';
-        expectIdent = true;
+        if (t.type !== 'delim' || t.value !== '.') return null;
+        parts.push('.');
       }
     }
-    return expectIdent ? null : name;
+    return parts.join('');
   }
 
   // css-cascade-5 § 6.4.4 #declaring-layers
   private handleLayerRule(rule: ASTAtRule, block?: SimpleBlock, nested: boolean = false): Rule | null {
     if (block) {
-      // css-cascade-5 § 6.4.4: @layer <layer-name>? { ... }
-      // The prelude is either empty (anonymous layer) or a single <layer-name>.
-      let start = 0;
-      const prelude = rule.prelude;
-      while (start < prelude.length && prelude[start].type === 'whitespace') start++;
-      let end = prelude.length - 1;
-      while (end >= start && (prelude[end].type === 'whitespace' || prelude[end].type === 'EOF')) end--;
+      const trimmed = trimComponentValues(rule.prelude, true);
       let layerName = '';
-      if (start <= end) {
-        const parsed = this.parseLayerNameFromTokens(prelude.slice(start, end + 1));
+      if (trimmed.length > 0) {
+        const parsed = this.parseLayerNameFromTokens(trimmed);
         if (parsed === null) return null;
         layerName = parsed;
       }
-      const childRules = this.consumeNestedRules(block, nested);
-      return new CSSLayerBlockRule(layerName, childRules, parseRuleInBlock);
+      return new CSSLayerBlockRule(layerName, this.consumeNestedRules(block, nested), parseRuleInBlock);
     }
 
-    // css-cascade-5 § 6.4.4: @layer <layer-name>#;
-    // A statement rule prelude must have at least one layer-name, comma-separated.
-    const segments: ComponentValue[][] = [];
-    let current: ComponentValue[] = [];
-    for (const t of rule.prelude) {
-      if (t.type === 'comma') {
-        segments.push(current);
-        current = [];
-      } else {
-        current.push(t);
-      }
-    }
-    segments.push(current);
-    if (segments.length === 0) return null;
-
+    const segments = splitComponentValuesByComma(rule.prelude);
     const nameList: string[] = [];
     for (const seg of segments) {
       const name = this.parseLayerNameFromTokens(seg);
       if (name === null) return null;
       nameList.push(name);
     }
-    if (nameList.length === 0) return null;
-    return new CSSLayerStatementRule(nameList);
+    return nameList.length > 0 ? new CSSLayerStatementRule(nameList) : null;
+  }
+
+  private parseScopeSelectorBlock(block: SimpleBlock): string | null {
+    try {
+      new SelectorParser(block.value, {
+        allowRelative: true,
+        forbidPseudo: true,
+        declaredNamespaces: this.declaredNamespaces
+      }).parse();
+      const text = serialize(block.value).trim();
+      return text ? `(${text})` : '';
+    } catch {
+      return null;
+    }
   }
 
   // css-nesting-1 § 4.1 #nesting-at-scope (Issue 9740)
@@ -538,89 +460,75 @@ export class Parser {
     } finally {
       this.scopeContextDepth--;
     }
-    
+
     let startSelector: string | null = null;
     let endSelector: string | null = null;
-    
     const prelude = rule.prelude;
     let i = 0;
     while (i < prelude.length && prelude[i].type === 'whitespace') i++;
-    
+
     if (i < prelude.length && prelude[i].type === 'simple-block' && (prelude[i] as SimpleBlock).associatedToken.type === '(') {
-      const block = prelude[i] as SimpleBlock;
-      try {
-        new SelectorParser(block.value, {
-          allowRelative: true,
-          forbidPseudo: true,
-          declaredNamespaces: this.declaredNamespaces
-        }).parse();
-        startSelector = serialize(block.value).trim();
-      } catch (e) {
-        return null;
-      }
-      if (startSelector) {
-        startSelector = `(${startSelector})`;
-      }
+      startSelector = this.parseScopeSelectorBlock(prelude[i] as SimpleBlock);
+      if (startSelector === null) return null;
       i++;
     }
-    
+
     while (i < prelude.length && prelude[i].type === 'whitespace') i++;
-    
+
     if (i < prelude.length && prelude[i].type === 'ident' && String((prelude[i] as Token).value).toLowerCase() === 'to') {
       i++;
       while (i < prelude.length && prelude[i].type === 'whitespace') i++;
       if (i < prelude.length && prelude[i].type === 'simple-block' && (prelude[i] as SimpleBlock).associatedToken.type === '(') {
-        const block = prelude[i] as SimpleBlock;
-        try {
-          new SelectorParser(block.value, {
-            allowRelative: true,
-            forbidPseudo: true,
-            declaredNamespaces: this.declaredNamespaces
-          }).parse();
-          endSelector = serialize(block.value).trim();
-        } catch (e) {
-          return null;
-        }
-        if (endSelector) {
-          endSelector = `(${endSelector})`;
-        }
+        endSelector = this.parseScopeSelectorBlock(prelude[i] as SimpleBlock);
+        if (endSelector === null) return null;
         i++;
       } else {
         return null;
       }
     }
-    
+
     while (i < prelude.length && prelude[i].type === 'whitespace') i++;
-    if (i < prelude.length) {
-      return null;
-    }
-    
+    if (i < prelude.length) return null;
+
     return new CSSScopeRule(startSelector, endSelector, childRules, parseRuleInScopeBlock);
   }
 
-  private handleViewTransitionRule(rule: ASTAtRule, block: SimpleBlock): Rule {
-    const declarations = this.consumeDeclarationsFromBlockContents(block.value);
-    return new CSSViewTransitionRule(declarations);
+  private handleViewTransitionRule(_rule: ASTAtRule, block: SimpleBlock): Rule {
+    return new CSSViewTransitionRule(this.consumeDeclarationsFromBlockContents(block.value));
+  }
+
+  private parseKeyframeSelector(prelude: ComponentValue[]): string | null {
+    const lists = splitComponentValuesByComma(prelude);
+    const normalizedParts: string[] = [];
+    for (const list of lists) {
+      const trimmed = trimComponentValues(list);
+      if (trimmed.length !== 1) return null;
+      const v = trimmed[0];
+      if (v.type === 'ident') {
+        const valStr = v.value.toLowerCase();
+        if (valStr === 'from') normalizedParts.push('0%');
+        else if (valStr === 'to') normalizedParts.push('100%');
+        else return null;
+      } else if (v.type === 'percentage') {
+        const val = (v as import('./types.ts').PercentageToken).value;
+        if (val < 0 || val > 100) return null;
+        normalizedParts.push(`${val}%`);
+      } else {
+        return null;
+      }
+    }
+    return normalizedParts.length > 0 ? normalizedParts.join(', ') : null;
   }
 
   private handleKeyframesRule(rule: ASTAtRule, block: SimpleBlock): Rule | null {
     const preludeClean = rule.prelude.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-    if (preludeClean.length !== 1) {
-      return null;
-    }
+    if (preludeClean.length !== 1) return null;
     const first = preludeClean[0];
     let keyframesName = '';
     if (first.type === 'ident') {
-      const valLower = first.value.toLowerCase();
-      const disallowed = ['none', 'initial', 'inherit', 'unset', 'revert', 'default'];
-      if (disallowed.includes(valLower)) {
-        return null;
-      }
+      if (KEYFRAMES_DISALLOWED_NAMES.has(first.value.toLowerCase())) return null;
       keyframesName = first.value;
-    } else if (first.type === 'string') {
-      if (first.value === '') {
-        return null;
-      }
+    } else if (first.type === 'string' && first.value !== '') {
       keyframesName = first.value;
     } else {
       return null;
@@ -628,7 +536,7 @@ export class Parser {
 
     const keyframeRules: CSSKeyframeRule[] = [];
     const stream = new ArrayComponentValueStream(block.value);
-    
+
     while (true) {
       const val = stream.peek();
       if (val.type === 'whitespace' || val.type === 'semicolon') {
@@ -636,129 +544,55 @@ export class Parser {
         continue;
       }
       if (val.type === 'EOF') break;
-      
+
       const prelude: ComponentValue[] = [];
       let blockVal: SimpleBlock | null = null;
-      
       while (true) {
         const next = stream.peek();
         if (next.type === 'EOF') break;
         if (next.type === 'simple-block' && (next as SimpleBlock).associatedToken.type === '{') {
-          stream.next();
-          blockVal = next as SimpleBlock;
+          blockVal = stream.next() as SimpleBlock;
           break;
-        } else {
-          prelude.push(stream.next());
         }
+        prelude.push(stream.next());
       }
-      
-      if (blockVal) {
-        const lists: ComponentValue[][] = [[]];
-        for (const v of prelude) {
-          if (v.type === 'comma') {
-            lists.push([]);
-          } else {
-            lists[lists.length - 1].push(v);
-          }
-        }
-        
-        let valid = true;
-        const normalizedParts: string[] = [];
-        for (const list of lists) {
-          let start = 0;
-          while (start < list.length && list[start].type === 'whitespace') start++;
-          let end = list.length - 1;
-          while (end >= start && list[end].type === 'whitespace') end--;
-          
-          const trimmed = list.slice(start, end + 1);
-          if (trimmed.length !== 1) {
-            valid = false;
-            break;
-          }
-          const v = trimmed[0];
-          if (v.type === 'ident') {
-            const valStr = v.value.toLowerCase();
-            if (valStr === 'from') {
-              normalizedParts.push('0%');
-            } else if (valStr === 'to') {
-              normalizedParts.push('100%');
-            } else {
-              valid = false;
-              break;
-            }
-          } else if (v.type === 'percentage') {
-            const val = (v as import('./types.ts').PercentageToken).value;
-            if (val < 0 || val > 100) {
-              valid = false;
-              break;
-            }
-            normalizedParts.push(`${val}%`);
-          } else {
-            valid = false;
-            break;
-          }
-        }
-        
-        if (valid && normalizedParts.length > 0) {
-          const selectorText = normalizedParts.join(', ');
-          const declarations = this.consumeDeclarationsFromBlockContents(blockVal.value);
-          const keyframeRule = new CSSKeyframeRule(selectorText, declarations);
-          const kfStart = getComponentValueStartIndex(prelude[0]) ?? blockVal.associatedToken.startIndex ?? 0;
-          const kfEnd = blockVal.endIndex ?? blockVal.associatedToken.startIndex ?? kfStart;
-          const kfBodyStart = blockVal.associatedToken.endIndex;
-          const kfBodyEnd = blockVal.endIndex !== undefined ? (blockVal.isClosed ? blockVal.endIndex - 1 : blockVal.endIndex) : undefined;
-          keyframeRule._location = { start: kfStart, end: kfEnd, bodyStart: kfBodyStart, bodyEnd: kfBodyEnd };
-          keyframeRules.push(keyframeRule);
-        }
-      } else {
-        break;
+
+      if (!blockVal) break;
+      const selectorText = this.parseKeyframeSelector(prelude);
+      if (selectorText) {
+        const declarations = this.consumeDeclarationsFromBlockContents(blockVal.value);
+        const keyframeRule = new CSSKeyframeRule(selectorText, declarations);
+        const kfStart = getComponentValueStartIndex(prelude[0]) ?? blockVal.associatedToken.startIndex ?? 0;
+        keyframeRule._location = createBlockLocation(kfStart, blockVal);
+        keyframeRules.push(keyframeRule);
       }
     }
 
     return new CSSKeyframesRule(keyframesName, keyframeRules);
   }
 
-  private handleFontFaceRule(rule: ASTAtRule, block: SimpleBlock): Rule {
-    const declarations = this.consumeDeclarationsFromBlockContents(block.value);
-    return new CSSFontFaceRule(declarations);
+  private handleFontFaceRule(_rule: ASTAtRule, block: SimpleBlock): Rule {
+    return new CSSFontFaceRule(this.consumeDeclarationsFromBlockContents(block.value));
   }
 
   private handlePageRule(rule: ASTAtRule, block: SimpleBlock): Rule {
     const blockContents = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
-    const declarations: import('./types.ts').Declaration[] = [];
-    const nestedRules: Rule[] = [];
-    
-    let isFirst = true;
-    for (const item of blockContents) {
-      if (isFirst && item instanceof CSSNestedDeclarations) {
-        declarations.push(...item.style._declarations);
-      } else {
-        nestedRules.push(item);
-      }
-      isFirst = false;
-    }
-    
+    const { declarations, nestedRules } = splitLeadingDeclarations(blockContents);
     return new CSSPageRule(serialize(rule.prelude).trim(), declarations, nestedRules, parseRule);
   }
 
   private handleMarginRule(rule: ASTAtRule, block: SimpleBlock): Rule {
-    const declarations = this.consumeDeclarationsFromBlockContents(block.value);
-    return new CSSMarginRule(rule.name, declarations, INTERNAL_RULE_TOKEN);
+    return new CSSMarginRule(rule.name, this.consumeDeclarationsFromBlockContents(block.value), INTERNAL_RULE_TOKEN);
   }
 
   // css-counter-styles-3 § 8.1 #csscounterstylerule
   private handleCounterStyleRule(rule: ASTAtRule, block: SimpleBlock): Rule {
-    const name = serialize(rule.prelude).trim();
-    const declarations = this.consumeDeclarationsFromBlockContents(block.value);
-    return new CSSCounterStyleRule(name, declarations);
+    return new CSSCounterStyleRule(serialize(rule.prelude).trim(), this.consumeDeclarationsFromBlockContents(block.value));
   }
 
   // css-fonts-4 § 8 #cssfontfeaturevaluesrule-interface
   private handleFontFeatureValuesRule(rule: ASTAtRule, block: SimpleBlock): Rule {
-    const fontFamily = serialize(rule.prelude).trim();
-    const fontFeatureRule = new CSSFontFeatureValuesRule(fontFamily);
-
-    // Consume feature value blocks inside @font-feature-values body
+    const fontFeatureRule = new CSSFontFeatureValuesRule(serialize(rule.prelude).trim());
     const stream = new ArrayComponentValueStream(block.value);
     while (stream.peek().type !== 'EOF') {
       const token = stream.peek();
@@ -768,34 +602,19 @@ export class Parser {
       }
       if (token.type === 'at-keyword') {
         const atToken = stream.next() as import('./types.ts').AtKeywordToken;
-        const blockName = atToken.value.toLowerCase();
-        // Skip whitespace
+        const target = FONT_FEATURE_VALUE_BLOCKS[atToken.value.toLowerCase()];
         while (stream.peek().type === 'whitespace' || stream.peek().type === 'comment') {
           stream.next();
         }
         const next = stream.peek();
         if (next.type === 'simple-block' && (next as SimpleBlock).associatedToken.type === '{') {
           const childBlock = stream.next() as SimpleBlock;
-          const decls = this.consumeDeclarationsFromBlockContents(childBlock.value);
-          for (const d of decls) {
-            const values = d.value
-              .filter(v => v.type === 'number')
-              .map(v => (v as import('./types.ts').NumberToken).value);
-
-            if (blockName === 'annotation') {
-              fontFeatureRule.annotation.set(d.name, values);
-            } else if (blockName === 'ornaments') {
-              fontFeatureRule.ornaments.set(d.name, values);
-            } else if (blockName === 'stylistic') {
-              fontFeatureRule.stylistic.set(d.name, values);
-            } else if (blockName === 'swash') {
-              fontFeatureRule.swash.set(d.name, values);
-            } else if (blockName === 'character-variant' || blockName === 'charactervariant') {
-              fontFeatureRule.characterVariant.set(d.name, values);
-            } else if (blockName === 'styleset') {
-              fontFeatureRule.styleset.set(d.name, values);
-            } else if (blockName === 'historical-forms' || blockName === 'historicalforms') {
-              fontFeatureRule.historicalForms.set(d.name, values);
+          if (target) {
+            for (const d of this.consumeDeclarationsFromBlockContents(childBlock.value)) {
+              const values = d.value
+                .filter(v => v.type === 'number')
+                .map(v => (v as import('./types.ts').NumberToken).value);
+              fontFeatureRule[target].set(d.name, values);
             }
           }
         }
@@ -803,26 +622,14 @@ export class Parser {
         stream.next();
       }
     }
-
     return fontFeatureRule;
   }
 
   private handlePropertyRule(rule: ASTAtRule, block: SimpleBlock): Rule | null {
-    const prelude = rule.prelude;
-    let name = '';
-    let hasName = false;
-    
-    for (const v of prelude) {
-      if (v.type === 'whitespace') continue;
-      if (!hasName && v.type === 'ident' && v.value.startsWith('--') && v.value !== '--') {
-        name = v.value;
-        hasName = true;
-      } else {
-        return null;
-      }
-    }
-    
-    if (!hasName) return null;
+    const nonWsPrelude = trimComponentValues(rule.prelude);
+    if (nonWsPrelude.length !== 1 || nonWsPrelude[0].type !== 'ident') return null;
+    const name = nonWsPrelude[0].value;
+    if (!name.startsWith('--') || name === '--') return null;
 
     const declarations = this.consumeDeclarationsFromBlockContents(block.value);
     let syntax: string | null = null;
@@ -833,11 +640,10 @@ export class Parser {
       const val = serialize(d.value).trim();
       const descName = d.name.toLowerCase();
       if (descName === 'syntax') {
-        const nonWsTokens = d.value.filter(v => v.type !== 'whitespace');
+        const nonWsTokens = trimComponentValues(d.value);
         if (nonWsTokens.length === 1 && nonWsTokens[0].type === 'string') {
           syntax = nonWsTokens[0].value;
         }
-
       } else if (descName === 'inherits') {
         if (val === 'true') inherits = true;
         else if (val === 'false') inherits = false;
@@ -847,59 +653,71 @@ export class Parser {
     }
 
     if (syntax === null || inherits === null) return null;
-    
     try {
-      PropertyRegistry.validate({
-        name,
-        syntax,
-        inherits,
-        initialValue: initialValue ?? undefined
-      });
-    } catch (e) {
-      // @property rule is invalid if validation fails
+      PropertyRegistry.validate({ name, syntax, inherits, initialValue: initialValue ?? undefined });
+    } catch {
       return null;
     }
-
     return new CSSPropertyRule(name, syntax, inherits, initialValue);
+  }
+
+  private parseImportScopeArgs(scopeArgs: ComponentValue[]): { scopeStart: string | null; scopeEnd: string | null } {
+    let scopeStart: string | null = null;
+    let scopeEnd: string | null = null;
+    let k = 0;
+    while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
+    if (k < scopeArgs.length && scopeArgs[k].type === 'simple-block' && (scopeArgs[k] as SimpleBlock).associatedToken.type === '(') {
+      scopeStart = serialize((scopeArgs[k] as SimpleBlock).value).trim();
+      k++;
+    } else {
+      const startTokens: ComponentValue[] = [];
+      while (k < scopeArgs.length) {
+        const tok = scopeArgs[k];
+        if (tok.type === 'ident' && String(tok.value).toLowerCase() === 'to') break;
+        startTokens.push(tok);
+        k++;
+      }
+      const s = serialize(startTokens).trim();
+      if (s) scopeStart = s;
+    }
+
+    while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
+    if (k < scopeArgs.length && scopeArgs[k].type === 'ident' && String(scopeArgs[k].value).toLowerCase() === 'to') {
+      k++;
+      while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
+      if (k < scopeArgs.length && scopeArgs[k].type === 'simple-block' && (scopeArgs[k] as SimpleBlock).associatedToken.type === '(') {
+        scopeEnd = serialize((scopeArgs[k] as SimpleBlock).value).trim();
+      } else {
+        const e = serialize(scopeArgs.slice(k)).trim();
+        if (e) scopeEnd = e;
+      }
+    }
+    if (scopeStart) scopeStart = scopeStart.replace(/^\(/, '').replace(/\)$/, '').trim();
+    if (scopeEnd) scopeEnd = scopeEnd.replace(/^\(/, '').replace(/\)$/, '').trim();
+    return { scopeStart, scopeEnd };
   }
 
   private handleImportRule(rule: ASTAtRule): Rule {
     let href = '';
-    let mediaText = '';
     let layerName: string | null = null;
     let supportsText: string | null = null;
     let isScoped = false;
     let scopeStart: string | null = null;
     let scopeEnd: string | null = null;
-    
+
     const prelude = rule.prelude;
     let i = 0;
-    while(i < prelude.length && prelude[i].type === 'whitespace') i++;
-    
-    if (i < prelude.length) {
-      const first = prelude[i];
-      if (first.type === 'string') {
-        href = first.value;
-        i++;
-      } else if (first.type === 'url') {
-        href = (first as UrlToken).value;
-        i++;
-      } else if (first.type === 'function' && (first as CSSFunction).name === 'url') {
-         // handle url()
-         const urlArg = (first as CSSFunction).value.find(v => v.type === 'string');
-         if (urlArg) href = (urlArg as StringToken).value;
+    while (i < prelude.length && prelude[i].type === 'whitespace') i++;
 
-         else {
-            // raw url
-            const raw = (first as CSSFunction).value.map(v => serialize([v])).join('');
-            href = raw.trim();
-         }
-         i++;
+    if (i < prelude.length) {
+      const extracted = extractUriFromComponentValue(prelude[i]);
+      if (extracted !== null) {
+        href = extracted;
+        i++;
       }
     }
-    
-    // css-cascade-6 § 5 #at-import
-    // layer, scope, and supports can appear in any order before media queries
+
+    // css-cascade-6 § 5 #at-import: layer, scope, and supports can appear in any order before media queries
     while (i < prelude.length) {
       while (i < prelude.length && prelude[i].type === 'whitespace') i++;
       if (i >= prelude.length) break;
@@ -909,45 +727,11 @@ export class Parser {
         layerName = '';
         i++;
       } else if (layerName === null && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'layer') {
-        // css-cascade-5 § 5: layer(<layer-name>)
-        // <layer-name> = <ident> [ '.' <ident> ]* with NO intervening whitespace
-        // Empty layer() is invalid.
         const fnTokens = (val as CSSFunction).value;
-        // css-cascade-5 § 5.1: <layer-name> = <ident> [ '.' <ident> ]*
-        // Requires an odd number of tokens (must begin and end with <ident>, no trailing dot)
-        if (fnTokens.length === 0 || fnTokens.length % 2 === 0) {
-          // Invalid layer(): falls back to media query
-          break;
-        }
-
-        const CSS_WIDE_KEYWORDS = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default']);
-        let isValid = true;
-        const nameParts: string[] = [];
-        for (let idx = 0; idx < fnTokens.length; idx++) {
-          const tok = fnTokens[idx];
-          if (idx % 2 === 0) {
-            // Expect ident token that is not a reserved CSS-wide keyword (css-cascade-5 § 5.1)
-            if (tok.type !== 'ident' || CSS_WIDE_KEYWORDS.has(tok.value.toLowerCase())) {
-              isValid = false;
-              break;
-            }
-            nameParts.push(tok.value);
-          } else {
-            // Expect delim token with value '.'
-            if (tok.type !== 'delim' || tok.value !== '.') {
-              isValid = false;
-              break;
-            }
-            nameParts.push('.');
-          }
-        }
-
-        if (!isValid) {
-          // Invalid layer name: falls through to media query list
-          break;
-        }
-
-        layerName = nameParts.join('');
+        if (fnTokens.some(t => t.type === 'whitespace')) break;
+        const parsed = this.parseLayerNameFromTokens(fnTokens, true);
+        if (parsed === null) break;
+        layerName = parsed;
         i++;
       } else if (supportsText === null && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'supports') {
         supportsText = serialize((val as CSSFunction).value).trim();
@@ -957,89 +741,30 @@ export class Parser {
         i++;
       } else if (!isScoped && val.type === 'function' && (val as CSSFunction).name.toLowerCase() === 'scope') {
         isScoped = true;
-        const scopeArgs = (val as CSSFunction).value;
-        let k = 0;
-        while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
-        if (k < scopeArgs.length && scopeArgs[k].type === 'simple-block' && (scopeArgs[k] as SimpleBlock).associatedToken.type === '(') {
-          const b = scopeArgs[k] as SimpleBlock;
-          scopeStart = serialize(b.value).trim();
-          k++;
-        } else {
-          const startTokens: ComponentValue[] = [];
-          while (k < scopeArgs.length) {
-            const tok = scopeArgs[k];
-            if (tok.type === 'ident' && String(tok.value).toLowerCase() === 'to') break;
-            startTokens.push(tok);
-            k++;
-          }
-          const s = serialize(startTokens).trim();
-          if (s) scopeStart = s;
-        }
-
-        while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
-        if (k < scopeArgs.length && scopeArgs[k].type === 'ident' && String(scopeArgs[k].value).toLowerCase() === 'to') {
-          k++;
-          while (k < scopeArgs.length && scopeArgs[k].type === 'whitespace') k++;
-          if (k < scopeArgs.length && scopeArgs[k].type === 'simple-block' && (scopeArgs[k] as SimpleBlock).associatedToken.type === '(') {
-            const b = scopeArgs[k] as SimpleBlock;
-            scopeEnd = serialize(b.value).trim();
-            k++;
-          } else {
-            const endTokens = scopeArgs.slice(k);
-            const e = serialize(endTokens).trim();
-            if (e) scopeEnd = e;
-          }
-        }
-        if (scopeStart) {
-          scopeStart = scopeStart.replace(/^\(/, '').replace(/\)$/, '').trim();
-        }
-        if (scopeEnd) {
-          scopeEnd = scopeEnd.replace(/^\(/, '').replace(/\)$/, '').trim();
-        }
+        ({ scopeStart, scopeEnd } = this.parseImportScopeArgs((val as CSSFunction).value));
         i++;
       } else {
         break;
       }
     }
-    
-    // The rest is media query list
-    let remaining = '';
-    while (i < prelude.length) {
-       remaining += serialize([prelude[i]]);
-       i++;
-    }
-    mediaText = remaining.trim();
-    
+
+    const mediaText = serialize(prelude.slice(i)).trim();
     return new CSSImportRule(href, mediaText, layerName, supportsText, scopeStart, scopeEnd, isScoped, INTERNAL_RULE_TOKEN);
   }
 
   private handleNamespaceRule(rule: ASTAtRule): Rule {
-    const prelude = rule.prelude;
-    const tokens = prelude.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
+    const tokens = rule.prelude.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
     let prefix = '';
     let namespaceURI = '';
 
-    const extractUri = (token: ComponentValue): string => {
-      if (token.type === 'string' || token.type === 'url') {
-        return token.value;
-      }
-      if (token.type === 'function' && (token as CSSFunction).name === 'url') {
-        const urlArg = (token as CSSFunction).value.find(v => v.type === 'string');
-        if (urlArg) return (urlArg as StringToken).value;
-        const raw = (token as CSSFunction).value.map(v => serialize([v])).join('');
-        return raw.trim();
-      }
-      return '';
-    };
-
     if (tokens.length === 1) {
-      namespaceURI = extractUri(tokens[0]);
+      namespaceURI = extractUriFromComponentValue(tokens[0]) ?? '';
     } else if (tokens.length >= 2) {
       if (tokens[0].type === 'ident') {
         prefix = tokens[0].value;
-        namespaceURI = extractUri(tokens[1]);
+        namespaceURI = extractUriFromComponentValue(tokens[1]) ?? '';
       } else {
-        namespaceURI = extractUri(tokens[0]);
+        namespaceURI = extractUriFromComponentValue(tokens[0]) ?? '';
       }
     }
 
@@ -1056,14 +781,11 @@ export class Parser {
     if (i >= prelude.length) return null;
 
     const nameToken = prelude[i];
-    if (nameToken.type !== 'ident' || !nameToken.value.startsWith('--')) {
-      return null;
-    }
+    if (nameToken.type !== 'ident' || !nameToken.value.startsWith('--')) return null;
     const name = nameToken.value;
     i++;
 
     const remainingTokens = prelude.slice(i).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-
     let query: CustomMediaQuery;
     if (remainingTokens.length === 0) {
       query = new MediaList('');
@@ -1074,9 +796,7 @@ export class Parser {
     } else {
       const mediaText = serialize(prelude.slice(i)).trim();
       const parsed = ParseHooks.parseMediaQueryList(mediaText);
-      if (parsed.length === 0 || parsed.some(q => q.invalid)) {
-        return null;
-      }
+      if (parsed.length === 0 || parsed.some(q => q.invalid)) return null;
       query = new MediaList(mediaText);
     }
 
@@ -1195,64 +915,15 @@ export class Parser {
         }
       } else {
         const pos = stream.position;
-        let isDecl = false;
-        if (nested) {
-          const first = stream.peek();
-          if (first.type === 'ident') {
-            if (first.value.startsWith('--') && first.value !== '--') {
-              isDecl = true;
-            } else if (first.value !== '--') {
-              const lookaheadPos = stream.position;
-              stream.next();
-              while (stream.peek().type === 'whitespace') stream.next();
-              if (stream.peek().type === 'colon') {
-                stream.next();
-                const lookaheadTokens: ComponentValue[] = [first, { type: 'colon', value: ':' } as Token];
-                let foundSemicolon = false;
-                let foundBlock = false;
-                while (true) {
-                  const next = stream.peek();
-                  if (next.type === 'EOF' || next.type === '}') {
-                    foundSemicolon = true;
-                    break;
-                  }
-                  if (next.type === 'semicolon') {
-                    foundSemicolon = true;
-                    break;
-                  }
-                  if (next.type === 'simple-block' && (next as SimpleBlock).associatedToken?.type === '{') {
-                    foundBlock = true;
-                    break;
-                  }
-                  lookaheadTokens.push(stream.next());
-                }
-                if (foundSemicolon) {
-                  isDecl = true;
-                } else if (foundBlock) {
-                  const selectorCandidate = serialize(lookaheadTokens).trim();
-                  const isValidSelector = Parser.parseSelectorAST(selectorCandidate) !== null;
-                  isDecl = !isValidSelector;
-                }
-              }
-              stream.position = lookaheadPos;
-            }
-          }
-        }
-
+        const isDecl = nested && this.isNestedDeclarationAhead(stream);
         if (isDecl) {
           const decl = this.consumeDeclarationFromStream(stream);
-          if (decl) {
-            decls.push(decl);
-          }
+          if (decl) decls.push(decl);
         } else {
           stream.position = pos;
           const rule = this.consumeNestedQualifiedRuleFromStream(stream, isNestedStyleRule, 'semicolon', allowRelative);
-          if (rule) {
-            flushDecls();
-            rules.push(rule);
-          } else {
-            flushDecls();
-          }
+          flushDecls();
+          if (rule) rules.push(rule);
         }
       }
     }
@@ -1260,36 +931,51 @@ export class Parser {
     return rules;
   }
 
+  private isNestedDeclarationAhead(stream: ComponentValueStream): boolean {
+    const first = stream.peek();
+    if (first.type !== 'ident' || first.value === '--') return false;
+    if (first.value.startsWith('--')) return true;
+
+    const lookaheadPos = stream.position;
+    try {
+      stream.next();
+      while (stream.peek().type === 'whitespace') stream.next();
+      if (stream.peek().type !== 'colon') return false;
+      stream.next();
+
+      const lookaheadTokens: ComponentValue[] = [first, { type: 'colon', value: ':' } as Token];
+      while (true) {
+        const next = stream.peek();
+        if (next.type === 'EOF' || next.type === '}' || next.type === 'semicolon') {
+          return true;
+        }
+        if (next.type === 'simple-block' && (next as SimpleBlock).associatedToken?.type === '{') {
+          const selectorCandidate = serialize(lookaheadTokens).trim();
+          return Parser.parseSelectorAST(selectorCandidate) === null;
+        }
+        lookaheadTokens.push(stream.next());
+      }
+    } finally {
+      stream.position = lookaheadPos;
+    }
+  }
+
   private consumeDeclarationFromStream(stream: ComponentValueStream): Declaration | null {
     const firstValue = stream.peek();
     if (firstValue.type !== 'ident') return null;
     stream.next();
     const name = firstValue.value;
+    if (name === '--') return null;
 
-    
-    if (name === '--') {
-      return null;
-    }
-    
-    while (stream.peek().type === 'whitespace') {
-      stream.next();
-    }
-    
-    if (stream.peek().type !== 'colon') {
-      return null;
-    }
+    while (stream.peek().type === 'whitespace') stream.next();
+    if (stream.peek().type !== 'colon') return null;
     stream.next();
-    
-    while (stream.peek().type === 'whitespace') {
-      stream.next();
-    }
-    
+    while (stream.peek().type === 'whitespace') stream.next();
+
     const declValue: ComponentValue[] = [];
     while (true) {
       const val = stream.peek();
-      if (val.type === 'EOF' || val.type === 'semicolon') {
-        break;
-      }
+      if (val.type === 'EOF' || val.type === 'semicolon') break;
       if (
         !name.startsWith('--') &&
         val.type === 'simple-block' &&
@@ -1301,79 +987,62 @@ export class Parser {
       }
       declValue.push(stream.next());
     }
-    
+
     let important = false;
-    let lastIndex = declValue.length - 1;
-    
     const lastNonWsIndex = (end: number) => {
       let j = end;
-      while (j >= 0 && declValue[j].type === 'whitespace') {
-        j--;
-      }
+      while (j >= 0 && declValue[j].type === 'whitespace') j--;
       return j;
     };
-    
-    const i1 = lastNonWsIndex(lastIndex);
+
+    const i1 = lastNonWsIndex(declValue.length - 1);
     const t1 = declValue[i1];
-    if (i1 >= 0 && t1 && t1.type === 'ident' && t1.value.toLowerCase() === 'important') {
+    if (i1 >= 0 && t1?.type === 'ident' && t1.value.toLowerCase() === 'important') {
       const i2 = lastNonWsIndex(i1 - 1);
       const t2 = declValue[i2];
-      if (i2 >= 0 && t2 && t2.type === 'delim' && t2.value === '!') {
+      if (i2 >= 0 && t2?.type === 'delim' && t2.value === '!') {
         important = true;
         declValue.splice(i2);
       }
     }
 
     // css-syntax-3 § 5.5.5 #consume-a-declaration Step 7
-    // While the last item in decl's value is a whitespace-token, remove that token.
     while (declValue.length > 0 && declValue[declValue.length - 1].type === 'whitespace') {
       declValue.pop();
     }
 
-    if (!name.startsWith('--')) {
-      const hasCurlyBlock = declValue.some(v => v.type === 'simple-block' && (v as SimpleBlock).associatedToken.type === '{');
-      if (hasCurlyBlock) {
-        const nonWsCount = declValue.reduce((count, v) => v.type !== 'whitespace' ? count + 1 : count, 0);
-        if (nonWsCount > 1) {
-          return null;
-        }
-      }
-    }
     if (name.startsWith('--')) {
-      if (name === '--' || !Parser.validateCustomPropertyValue(declValue)) {
-        return null;
-      }
+      if (!Parser.validateCustomPropertyValue(declValue)) return null;
     } else {
-      if (!validateDeclarationValue(declValue)) {
+      const hasCurlyBlock = declValue.some(v => v.type === 'simple-block' && (v as SimpleBlock).associatedToken.type === '{');
+      if (hasCurlyBlock && declValue.reduce((count, v) => v.type !== 'whitespace' ? count + 1 : count, 0) > 1) {
         return null;
       }
+      if (!validateDeclarationValue(declValue)) return null;
     }
+
     if (name.toLowerCase() === 'unicode-range') {
       const text = getOriginalText(declValue);
       const errors: ParseError[] = [];
-      const reTokens = tokenize(text, true, errors);
-      const reParser = new Parser(reTokens);
+      const reParser = new Parser(tokenize(text, true, errors));
       reParser.errors.push(...errors);
       const reParsed = reParser.parseComponentValues();
-      if (!isValidUnicodeRangeValue(reParsed)) {
-        return null;
-      }
+      if (!isValidUnicodeRangeValue(reParsed)) return null;
       this.errors.push(...reParser.errors);
       declValue.splice(0, declValue.length, ...reParsed);
     }
 
     return {
       type: 'declaration',
-      name: name,
+      name,
       value: declValue,
-      important: important,
+      important,
       raw: name.startsWith('--') ? getOriginalText(declValue) : undefined,
     };
   }
+
   public static isValidDashedIdent(name: string): boolean {
-    if (typeof name !== 'string' || !name.startsWith('--') || name === '--') return false;
-    if (/\s/.test(name)) return false;
-    return true;
+    return typeof name === 'string' && name.startsWith('--') && name !== '--' && !/\s/.test(name);
   }
 
   public static isCustomPropertyDeclaration(prelude: ComponentValue[]): boolean {
@@ -1385,74 +1054,52 @@ export class Parser {
     if (idx >= prelude.length) return false;
     const secondNonWs = prelude[idx++];
 
-    return (
-      firstNonWs.type === 'ident' &&
-      firstNonWs.value.startsWith('--') &&
-      secondNonWs.type === 'colon'
-    );
+    return firstNonWs.type === 'ident' && firstNonWs.value.startsWith('--') && secondNonWs.type === 'colon';
   }
 
   public static validateCustomPropertyValue(values: ComponentValue[], topLevel = true): boolean {
     for (const v of values) {
       if (v.type === 'bad-string' || v.type === 'bad-url') return false;
       if (v.type === ')' || v.type === ']' || v.type === '}') return false;
-      if (topLevel && v.type === 'delim' && (v as Token).value === '!') return false;
-      if (topLevel && v.type === 'semicolon') return false;
-      
-      if (v.type === 'simple-block') {
-        if (!Parser.validateCustomPropertyValue((v as SimpleBlock).value, false)) return false;
-      } else if (v.type === 'function') {
-        const func = v as CSSFunction;
-        if (!Parser.validateCustomPropertyValue(func.value, false)) return false;
-      }
+      if (topLevel && ((v.type === 'delim' && (v as Token).value === '!') || v.type === 'semicolon')) return false;
+
+      if (v.type === 'simple-block' && !Parser.validateCustomPropertyValue((v as SimpleBlock).value, false)) return false;
+      if (v.type === 'function' && !Parser.validateCustomPropertyValue((v as CSSFunction).value, false)) return false;
     }
     return true;
   }
 
   private consumeNestedQualifiedRuleFromStream(stream: ComponentValueStream, nested: boolean = true, stopToken?: string, allowRelative: boolean = nested): Rule | null {
     const prelude: ComponentValue[] = [];
-    
     while (true) {
       const val = stream.peek();
-      if (val.type === 'EOF' || val.type === '}') {
-        return null;
-      }
-      if (stopToken && val.type === stopToken) {
+      if (val.type === 'EOF' || val.type === '}' || (stopToken && val.type === stopToken)) {
         return null;
       }
       if (val.type === 'simple-block' && (val as SimpleBlock).associatedToken.type === '{') {
         stream.next();
-        
         if (Parser.isCustomPropertyDeclaration(prelude)) {
-           this.consumeRemnantsOfABadDeclaration(stream, nested);
-           return null;
+          this.consumeRemnantsOfABadDeclaration(stream, nested);
+          return null;
         }
-
         const block = val as SimpleBlock;
         const blockContents = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
         const start = getComponentValueStartIndex(prelude[0]) ?? block.associatedToken.startIndex ?? 0;
-        const location = createBlockLocation(start, block);
-        const rule = this.createStyleRule(prelude, blockContents, nested, allowRelative, location);
-        if (!rule) return null;
-        return rule;
-      } else {
-        prelude.push(stream.next());
+        return this.createStyleRule(prelude, blockContents, nested, allowRelative, createBlockLocation(start, block));
       }
+      prelude.push(stream.next());
     }
   }
 
   private consumeAtRuleFromStream(stream: ComponentValueStream, nested: boolean = false): Rule | null {
     const token = stream.next();
     if (token.type !== 'at-keyword') return null;
-    const atRuleName = token.value;
-
     const rule: ASTAtRule = {
       type: 'at-rule',
-      name: atRuleName,
+      name: token.value,
       prelude: [],
       childRules: [],
     };
-    
     const start = (token as Token).startIndex ?? 0;
 
     while (true) {
@@ -1460,89 +1107,28 @@ export class Parser {
       if (val.type === 'semicolon') {
         const semiToken = stream.next() as Token;
         const end = semiToken.endIndex ?? semiToken.startIndex ?? start;
-        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
-        const handler = this.getAtRuleHandler(atRuleName);
-        if (handler) {
-          const handledRule = handler(this, rule, undefined, nested);
-          if (!handledRule) return null;
-          if (handledRule instanceof CSSRule && !handledRule.location) {
-            handledRule._location = { start, end };
-          }
-          return handledRule;
-        }
-        if (nested) return null;
-        const atRule = new CSSAtRule(rule.name, rule.prelude);
-        atRule._location = { start, end };
-        return atRule;
+        return this.finalizeAtRule(rule, undefined, nested, { start, end }, false);
       } else if (val.type === 'EOF' || val.type === '}') {
         const end = (val as Token).startIndex ?? start;
-        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
-        const handler = this.getAtRuleHandler(atRuleName);
-        if (handler) {
-          const handledRule = handler(this, rule, undefined, nested);
-          if (!handledRule) return null;
-          if (handledRule instanceof CSSRule && !handledRule.location) {
-            handledRule._location = { start, end };
-          }
-          return handledRule;
-        }
-        if (nested) return null;
-        const atRule = new CSSAtRule(rule.name, rule.prelude);
-        atRule._location = { start, end };
-        return atRule;
+        return this.finalizeAtRule(rule, undefined, nested, { start, end }, false);
       } else if (val.type === 'simple-block' && (val as SimpleBlock).associatedToken.type === '{') {
-        stream.next();
-        const block = val as SimpleBlock;
-        const location = createBlockLocation(start, block);
-
-        if (!this.isSupportedAtRule(atRuleName, nested)) return null;
-        
-        const handler = this.getAtRuleHandler(atRuleName);
-        if (handler) {
-          const handledRule = handler(this, rule, block, nested);
-          if (!handledRule) return null;
-          if (handledRule instanceof CSSRule && !handledRule.location) {
-            handledRule._location = location;
-          }
-          return handledRule;
-        }
-        if (nested) return null;
-        rule.childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), nested);
-        const cssRules = rule.childRules.map(r => r as CSSRule);
-        const atRule = new CSSAtRule(rule.name, rule.prelude, block, cssRules);
-        atRule._location = location;
-        return atRule;
+        const block = stream.next() as SimpleBlock;
+        return this.finalizeAtRule(rule, block, nested, createBlockLocation(start, block), false);
       } else {
         rule.prelude.push(stream.next());
       }
     }
   }
 
-  private skipToNextSemicolonOrBlock(stream: ComponentValueStream): void {
-    while (true) {
-      const val = stream.next();
-      if (val.type === 'EOF' || val.type === 'semicolon') {
-        break;
-      }
-    }
-  }
-
-  /**
-   * Consume the remnants of a bad declaration.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-remnants-of-a-bad-declaration
-   */
+  // css-syntax-3 § 5.5.5 #consume-remnants-of-a-bad-declaration
   private consumeRemnantsOfABadDeclaration(stream: ComponentValueStream, nested: boolean = false): void {
     while (true) {
       const val = stream.peek();
       if (val.type === 'EOF' || val.type === 'semicolon') {
         stream.next();
         break;
-      } else if (val.type === '}') {
-        if (nested) {
-          break;
-        } else {
-          stream.next();
-        }
+      } else if (val.type === '}' && nested) {
+        break;
       } else {
         stream.next();
       }
@@ -1550,70 +1136,34 @@ export class Parser {
   }
 
   private isValidSelector(prelude: ComponentValue[]): boolean {
-    let start = 0;
-    let end = prelude.length - 1;
-    while (start <= end && prelude[start].type === 'whitespace') start++;
-    while (end >= start && prelude[end].type === 'whitespace') end--;
-    
-    if (start > end) return false;
+    const trimmed = trimComponentValues(prelude);
+    if (trimmed.length === 0) return false;
 
-    for (let i = start; i <= end; i++) {
-      const val = prelude[i];
-      if (val.type === 'number' || val.type === 'dimension') {
-        return false;
-      }
-
-    }
-
-    const lastToken = prelude[end];
-    if (lastToken.type === 'delim' && (lastToken.value === '.' || lastToken.value === '#')) {
-      return false;
-    }
-    if (lastToken.type === 'colon') {
+    const lastToken = trimmed[trimmed.length - 1];
+    if ((lastToken.type === 'delim' && (lastToken.value === '.' || lastToken.value === '#')) || lastToken.type === 'colon') {
       return false;
     }
 
-    for (let i = start; i <= end; i++) {
-      const val = prelude[i];
-      if (val.type === 'delim' && val.value === '.') {
-        let next = i + 1;
-        if (next > end || prelude[next].type !== 'ident') {
-          return false;
-        }
+    for (let i = 0; i < trimmed.length; i++) {
+      const val = trimmed[i];
+      if (val.type === 'number' || val.type === 'dimension') return false;
+      if (val.type === 'delim') {
+        if (val.value === '#') return false;
+        if (val.value === '.' && (i + 1 >= trimmed.length || trimmed[i + 1].type !== 'ident')) return false;
       }
-      if (val.type === 'delim' && val.value === '#') {
-        return false;
-      }
-      if (val.type === 'colon') {
-        let next = i + 1;
-        if (next <= end) {
-           const nextVal = prelude[next];
-           if (nextVal.type !== 'ident' && nextVal.type !== 'function' && nextVal.type !== 'colon') {
-             return false;
-           }
-        }
+      if (val.type === 'colon' && i + 1 < trimmed.length) {
+        const nextVal = trimmed[i + 1];
+        if (nextVal.type !== 'ident' && nextVal.type !== 'function' && nextVal.type !== 'colon') return false;
       }
     }
-
     return true;
   }
 
   private createStyleRule(prelude: ComponentValue[], blockContents: Rule[], isNested: boolean = false, allowRelative: boolean = isNested, location?: RuleSourceLocation): CSSStyleRule | null {
-    const declarations: Declaration[] = [];
-    const nestedRules: Rule[] = [];
-    
-    let isFirst = true;
-    for (const item of blockContents) {
-      if (isFirst && item instanceof CSSNestedDeclarations) {
-        declarations.push(...item.style._declarations);
-      } else {
-        nestedRules.push(item);
-      }
-      isFirst = false;
-    }
-
+    const { declarations, nestedRules } = splitLeadingDeclarations(blockContents);
     let selectorText = '';
     let selectorAST: import('./types.ts').SelectorList | null = null;
+
     if (isNested) {
       selectorText = this.normalizeNestedSelector(prelude);
       if (selectorText === '') return null;
@@ -1631,31 +1181,24 @@ export class Parser {
           allowRelative,
           allowVendorPseudos: Boolean(this.options.allowVendorPseudos)
         }).parse();
-      } catch (e) {
+      } catch {
         return null;
       }
       selectorText = serialize(prelude).trim();
     }
+
     const rule = new CSSStyleRule(selectorText, declarations, nestedRules, parseRuleInBlock, selectorAST);
-    if (location) {
-      rule._location = location;
-    }
+    if (location) rule._location = location;
     return rule;
   }
-
-  // ... (normalizeNestedSelector, consumeBlock, etc.)
 
   static #consumeSelectorTokens(parser: Parser): ComponentValue[] | null {
     const prelude: ComponentValue[] = [];
     while (true) {
       const next = parser.nextToken;
-      if (next.type === 'EOF') {
-        break;
-      } else if (next.type === '{' || next.type === '}' || next.type === 'at-keyword') {
-        return null;
-      } else {
-        prelude.push(parser.consumeComponentValue());
-      }
+      if (next.type === 'EOF') break;
+      if (next.type === '{' || next.type === '}' || next.type === 'at-keyword') return null;
+      prelude.push(parser.consumeComponentValue());
     }
     return prelude;
   }
@@ -1676,107 +1219,56 @@ export class Parser {
     allowRelative = false,
     allowVendorPseudos = false
   ): import('./types.ts').SelectorList | null {
-    let declaredNamespaces: Set<string> | undefined;
-    let isRelative = allowRelative;
-    let vendorPseudos = allowVendorPseudos;
+    const isOptionsObj = declaredNamespacesOrOptions && !(declaredNamespacesOrOptions instanceof Set);
+    const declaredNamespaces = isOptionsObj ? declaredNamespacesOrOptions.declaredNamespaces : declaredNamespacesOrOptions;
+    const isRelative = isOptionsObj ? (declaredNamespacesOrOptions.allowRelative ?? false) : allowRelative;
+    const vendorPseudos = isOptionsObj ? (declaredNamespacesOrOptions.allowVendorPseudos ?? false) : allowVendorPseudos;
 
-    if (declaredNamespacesOrOptions && !(declaredNamespacesOrOptions instanceof Set)) {
-      declaredNamespaces = declaredNamespacesOrOptions.declaredNamespaces;
-      isRelative = declaredNamespacesOrOptions.allowRelative ?? false;
-      vendorPseudos = declaredNamespacesOrOptions.allowVendorPseudos ?? false;
-    } else {
-      declaredNamespaces = declaredNamespacesOrOptions;
-    }
-
-    const tokens = tokenize(text);
-    const parser = new Parser(tokens, { allowVendorPseudos: vendorPseudos });
+    const parser = new Parser(tokenize(text), { allowVendorPseudos: vendorPseudos });
     const prelude = Parser.#consumeSelectorTokens(parser);
-    
     if (prelude === null) return null;
-    
+
     try {
       return new SelectorParser(prelude, {
         allowRelative: isRelative,
         declaredNamespaces,
         allowVendorPseudos: vendorPseudos
       }).parse();
-    } catch (e) {
+    } catch {
       return null;
     }
   }
 
-
   // css-nesting-1 § 3 #nest-selector & § 4 #cssom
   private normalizeNestedSelector(prelude: ComponentValue[]): string {
-    const segments: ComponentValue[][] = [];
-    let currentSegment: ComponentValue[] = [];
-    
-    for (const val of prelude) {
-      if (val.type === 'comma' || (val.type === 'delim' && val.value === ',')) {
-        segments.push(currentSegment);
-        currentSegment = [];
-      } else {
-        currentSegment.push(val);
-      }
-    }
-    if (currentSegment.length > 0) {
-      segments.push(currentSegment);
-    }
-    const hasAmpersand = (values: ComponentValue[]): boolean => {
-      return values.some(val => {
-        if (val.type === 'delim' && (val as Token).value === '&') {
-          return true;
-        }
-        if (val.type === 'simple-block') {
-          return hasAmpersand((val as SimpleBlock).value);
-        }
-        if (val.type === 'function') {
-          return hasAmpersand((val as CSSFunction).value);
-        }
-        return false;
-      });
-    };
+    const segments = splitComponentValuesByComma(prelude, true);
+    if (segments.length === 1 && segments[0].length === 0) return '';
 
-    const normalizedSegments = segments.map(segment => {
-      let start = 0;
-      while (start < segment.length && segment[start].type === 'whitespace') {
-        start++;
-      }
-      let end = segment.length - 1;
-      while (end >= start && segment[end].type === 'whitespace') {
-        end--;
-      }
-      const trimmed = segment.slice(start, end + 1);
-      
-      if (trimmed.length === 0) return null;
-      
-      const containsAmpersand = hasAmpersand(trimmed);
-      
-      const firstNode = trimmed[0];
-      const secondNode = trimmed[1];
-      const startsWithCombinator = trimmed.length > 0 && (
-        (firstNode.type === 'delim' && (['>', '+', '~'].includes(firstNode.value))) ||
-        (firstNode.type === 'delim' && firstNode.value === '|' && secondNode?.type === 'delim' && secondNode.value === '|')
+    const hasAmpersand = (values: ComponentValue[]): boolean =>
+      values.some(val =>
+        (val.type === 'delim' && (val as Token).value === '&') ||
+        (val.type === 'simple-block' && hasAmpersand((val as SimpleBlock).value)) ||
+        (val.type === 'function' && hasAmpersand((val as CSSFunction).value))
       );
 
-        
-      if (startsWithCombinator) {
-        return '& ' + serialize(trimmed);
-      } else if (!containsAmpersand) {
-        return '& ' + serialize(trimmed);
-      } else {
-        return serialize(trimmed);
-      }
-    });
-    
-    if (normalizedSegments.some(s => s === null)) return '';
+    const normalizedSegments: string[] = [];
+    for (const segment of segments) {
+      const trimmed = trimComponentValues(segment);
+      if (trimmed.length === 0) return '';
+
+      const firstNode = trimmed[0];
+      const secondNode = trimmed[1];
+      const startsWithCombinator =
+        (firstNode.type === 'delim' && ['>', '+', '~'].includes(firstNode.value)) ||
+        (firstNode.type === 'delim' && firstNode.value === '|' && secondNode?.type === 'delim' && secondNode.value === '|');
+
+      const serialized = serialize(trimmed);
+      normalizedSegments.push(startsWithCombinator || !hasAmpersand(trimmed) ? `& ${serialized}` : serialized);
+    }
+
     return normalizedSegments.join(', ');
   }
 
-  /**
-   * Consume a simple block.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-block
-   */
   // 5.5.9 Consume a simple block https://drafts.csswg.org/css-syntax/#consume-simple-block
   private consumeBlock(startToken: Token): SimpleBlock {
     const block: SimpleBlock = {
@@ -1785,7 +1277,7 @@ export class Parser {
       value: [],
     };
     const mirror = getMirrorToken(startToken.type);
-    
+
     while (true) {
       const next = this.nextToken;
       if (next.type === mirror) {
@@ -1804,10 +1296,6 @@ export class Parser {
     }
   }
 
-  /**
-   * Consume a function.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-function
-   */
   // 5.5.10 Consume a function https://drafts.csswg.org/css-syntax/#consume-function
   private consumeFunction(nameToken: FunctionToken): CSSFunction {
     const func: CSSFunction = {
@@ -1816,7 +1304,6 @@ export class Parser {
       value: [],
     };
 
-    
     while (true) {
       const next = this.nextToken;
       if (next.type === ')') {
@@ -1831,77 +1318,55 @@ export class Parser {
     }
   }
 
-
-
-
-  /**
-   * Consume a component value.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-component-value
-   */
   // 5.5.8 Consume a component value https://drafts.csswg.org/css-syntax/#consume-component-value
   public consumeComponentValue(): ComponentValue {
     const token = this.consumeToken();
     if (token.type === '{' || token.type === '[' || token.type === '(') {
       return this.consumeBlock(token);
-    } else if (token.type === 'function') {
-      return this.consumeFunction(token);
-    } else {
-      return token;
     }
+    if (token.type === 'function') {
+      return this.consumeFunction(token);
+    }
+    return token;
   }
 
   public ensureEOF(): void {
-    while (this.nextToken.type === 'whitespace') {
-      this.discardToken();
-    }
+    this.skipWhitespace();
     if (this.nextToken.type !== 'EOF') {
       throw new DOMException('Syntax error', 'SyntaxError');
     }
   }
 
   public static parseSelector(text: string): string | null {
-    const tokens = tokenize(text);
-    const parser = new Parser(tokens);
-    const prelude = Parser.#consumeSelectorTokens(parser);
-    
+    const prelude = Parser.#consumeSelectorTokens(new Parser(tokenize(text)));
     if (prelude === null) return null;
-    
-    const selector = serialize(prelude).trim();
-    
-    return selector || null;
+    return serialize(prelude).trim() || null;
   }
 
   public static parseRuleText(text: string): Rule {
-    const tokens = tokenize(text);
-    const parser = new Parser(tokens);
+    const parser = new Parser(tokenize(text));
     const rule = parser.consumeRule();
     if (!rule) throw new DOMException('Syntax error', 'SyntaxError');
-    
-    // Check for trailing garbage
-    while (parser.nextToken.type === 'whitespace') {
-      parser.discardToken();
-    }
-    if (parser.nextToken.type !== 'EOF') {
-      throw new DOMException('Syntax error', 'SyntaxError');
-    }
-    
+    parser.ensureEOF();
     return rule;
   }
 
   public static parseStyleSheetText(text: string): Rule[] {
-    const tokens = tokenize(text);
-    const parser = new Parser(tokens);
-    return parser.consumeListOfRules(true);
+    return new Parser(tokenize(text)).consumeListOfRules(true);
   }
 
   // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
   // cssom-1 § 6.4.3 #the-cssgroupingrule-interface
-  public static parseRuleInBlockText(text: string, nested = true): Rule {
-    const wrapped = `{ ${text} }`;
-    const tokens = tokenize(wrapped);
-    const parser = new Parser(tokens);
+  public static parseRuleInBlockText(text: string, nested = true, inScope = false): Rule {
+    const parser = new Parser(tokenize(`{ ${text} }`));
+    if (inScope) parser.scopeContextDepth = 1;
     const block = parser.consumeBlock(parser.consumeToken());
-    const contents = parser.consumeBlockContents(new ArrayComponentValueStream(block.value), nested, nested);
+    const contents = parser.consumeBlockContents(
+      new ArrayComponentValueStream(block.value),
+      inScope ? true : nested,
+      inScope ? false : nested,
+      inScope
+    );
     if (contents.length !== 1) {
       throw new DOMException('Syntax error', 'SyntaxError');
     }
@@ -1910,19 +1375,8 @@ export class Parser {
 
   // css-cascade-6 § 3 #scoped-styles
   public static parseRuleInScopeBlockText(text: string): Rule {
-    const wrapped = `{ ${text} }`;
-    const tokens = tokenize(wrapped);
-    const parser = new Parser(tokens);
-    parser.scopeContextDepth = 1;
-    const block = parser.consumeBlock(parser.consumeToken());
-    const contents = parser.consumeBlockContents(new ArrayComponentValueStream(block.value), true, false, true);
-    if (contents.length !== 1) {
-      throw new DOMException('Syntax error', 'SyntaxError');
-    }
-    return contents[0];
+    return Parser.parseRuleInBlockText(text, true, true);
   }
-
-
 
   public static calculateSpecificity(selector: string | import('./types.ts').SelectorList): [number, number, number][] {
     return calculateSpecificity(selector);
@@ -1932,10 +1386,10 @@ export class Parser {
     return getCascadedStyle(element, rules);
   }
 
-  /**
-   * Resolves a CSS value string by expanding var() functions using the provided style declaration.
-   * @see https://drafts.csswg.org/css-variables-1/#using-variables
-   */
+  static #parseValuesFromString(text: string): ComponentValue[] {
+    return new Parser(tokenize(text)).parseComponentValues();
+  }
+
   public static resolveVariables(style: CSSStyleDeclaration, property: string, envMap?: Record<string, string>): string {
     const value = style.getPropertyValue(property);
     if (!value) return '';
@@ -1943,10 +1397,7 @@ export class Parser {
   }
 
   static #resolveVariablesInString(style: CSSStyleDeclaration, value: string, seen: Set<string>, envMap?: Record<string, string>): string {
-    const tokens = tokenize(value);
-    const parser = new Parser(tokens);
-    const componentValues = parser.parseComponentValues();
-    const resolved = Parser.#resolveVariablesInComponentValues(style, componentValues, seen, envMap);
+    const resolved = Parser.#resolveVariablesInComponentValues(style, Parser.#parseValuesFromString(value), seen, envMap);
     if (resolved.some(v => v.type === 'ident' && typeof v.value === 'string' && (v.value === '\0guaranteed-invalid' || v.value.startsWith('\0cycle:')))) {
       return '';
     }
@@ -1962,46 +1413,29 @@ export class Parser {
   }
 
   static #resolveOneVariable(style: CSSStyleDeclaration, v: ComponentValue, seen: Set<string>, envMap?: Record<string, string>): ComponentValue[] {
-    if (v.type === 'function' && (v as CSSFunction).name === 'var') {
-      return Parser.#resolveVarFunction(style, v as CSSFunction, seen, envMap);
-    }
-    if (v.type === 'function' && (v as CSSFunction).name === 'env') {
-      return Parser.#resolveEnvFunction(style, v as CSSFunction, seen, envMap);
-    }
     if (v.type === 'function') {
       const fn = v as CSSFunction;
-      return [{
-        ...fn,
-        value: Parser.#resolveVariablesInComponentValues(style, fn.value, seen, envMap)
-      } as CSSFunction];
+      if (fn.name === 'var') return Parser.#resolveVarFunction(style, fn, seen, envMap);
+      if (fn.name === 'env') return Parser.#resolveEnvFunction(style, fn, seen, envMap);
+      return [{ ...fn, value: Parser.#resolveVariablesInComponentValues(style, fn.value, seen, envMap) } as CSSFunction];
     }
     if (v.type === 'simple-block') {
       const block = v as SimpleBlock;
-      return [{
-        ...block,
-        value: Parser.#resolveVariablesInComponentValues(style, block.value, seen, envMap)
-      } as SimpleBlock];
+      return [{ ...block, value: Parser.#resolveVariablesInComponentValues(style, block.value, seen, envMap) } as SimpleBlock];
     }
     return [v];
   }
 
-  /**
-   * @see https://drafts.csswg.org/css-variables-1/#replace-a-var
-   */
+  // https://drafts.csswg.org/css-variables-1/#replace-a-var
   static #resolveVarFunction(style: CSSStyleDeclaration, fn: CSSFunction, seen: Set<string>, envMap?: Record<string, string>): ComponentValue[] {
     const commaIdx = fn.value.findIndex(v => v.type === 'comma');
     const tokensBeforeComma = commaIdx === -1 ? fn.value : fn.value.slice(0, commaIdx);
     const argsBeforeComma = tokensBeforeComma.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-    
-    if (argsBeforeComma.length !== 1) {
-      return []; // Invalid var() function
-    }
-    
+    if (argsBeforeComma.length !== 1) return [];
+
     const firstArg = argsBeforeComma[0];
-    if (firstArg.type !== 'ident' || !Parser.isValidDashedIdent(firstArg.value)) {
-      return []; // Invalid var() function
-    }
-    
+    if (firstArg.type !== 'ident' || !Parser.isValidDashedIdent(firstArg.value)) return [];
+
     const varName = firstArg.value;
     const hasFallback = commaIdx !== -1;
     const fallback = hasFallback ? fn.value.slice(commaIdx + 1) : [];
@@ -2013,18 +1447,12 @@ export class Parser {
     const rawValue = style.getPropertyValue(varName);
     if (rawValue && rawValue.trim() !== '') {
       seen.add(varName);
-      
       let componentValues = Parser.#customPropertyAstCache.get(rawValue);
       if (!componentValues) {
-        const tokens = tokenize(rawValue);
-        const parser = new Parser(tokens);
-        componentValues = parser.parseComponentValues();
-        
+        componentValues = Parser.#parseValuesFromString(rawValue);
         if (Parser.#customPropertyAstCache.size >= Parser.#MAX_CACHE_SIZE) {
           const firstKey = Parser.#customPropertyAstCache.keys().next().value;
-          if (firstKey !== undefined) {
-            Parser.#customPropertyAstCache.delete(firstKey);
-          }
+          if (firstKey !== undefined) Parser.#customPropertyAstCache.delete(firstKey);
         }
         Parser.#customPropertyAstCache.set(rawValue, componentValues);
       }
@@ -2032,65 +1460,46 @@ export class Parser {
       const resolved = Parser.#resolveVariablesInComponentValues(style, componentValues, seen, envMap);
       seen.delete(varName);
 
-      // Check for cycles
       const cycleToken = resolved.find(t => t.type === 'ident' && typeof t.value === 'string' && t.value.startsWith('\0cycle:'));
       if (cycleToken) {
-        const target = (cycleToken.value as string).slice(7);
-        if (target === varName) {
-          if (hasFallback) {
-            return Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap);
-          }
-          return [{ type: 'ident', value: '\0guaranteed-invalid' }];
+        if ((cycleToken.value as string).slice(7) === varName) {
+          return hasFallback
+            ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap)
+            : [{ type: 'ident', value: '\0guaranteed-invalid' }];
         }
         return resolved;
       }
 
-      // Check if resolved to guaranteed-invalid
       if (resolved.length === 1 && resolved[0].type === 'ident' && resolved[0].value === '\0guaranteed-invalid') {
-        if (hasFallback) {
-          return Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap);
-        }
-        return resolved;
+        return hasFallback ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap) : resolved;
       }
 
-      // Validate syntax
       const def = PropertyRegistry.get(varName);
       if (def) {
-        const syntax = def.syntax || '*';
         const cleanResolved = resolved.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
         const isCSSWideKeyword = cleanResolved.length === 1 && cleanResolved[0].type === 'ident' &&
           ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(cleanResolved[0].value.toLowerCase());
-        
-        if (!isCSSWideKeyword && !matchesSyntax(cleanResolved, syntax)) {
-          if (def.initialValue !== undefined) {
-            const tokens = tokenize(def.initialValue);
-            const parser = new Parser(tokens);
-            return parser.parseComponentValues();
-          }
-          return [{ type: 'ident', value: '\0guaranteed-invalid' }];
+        if (!isCSSWideKeyword && !matchesSyntax(cleanResolved, def.syntax || '*')) {
+          return def.initialValue !== undefined
+            ? Parser.#parseValuesFromString(def.initialValue)
+            : [{ type: 'ident', value: '\0guaranteed-invalid' }];
         }
       }
-
       return resolved;
     }
 
     const def = PropertyRegistry.get(varName);
     if (def && def.initialValue !== undefined) {
-      const tokens = tokenize(def.initialValue);
-      const parser = new Parser(tokens);
-      return parser.parseComponentValues();
+      return Parser.#parseValuesFromString(def.initialValue);
     }
 
-    if (hasFallback) {
-      return Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap);
-    }
-    return [{ type: 'ident', value: '\0guaranteed-invalid' }];}
+    return hasFallback
+      ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap)
+      : [{ type: 'ident', value: '\0guaranteed-invalid' }];
+  }
 
-  /**
-   * @see https://drafts.csswg.org/css-env-1/#env-function
-   */
+  // https://drafts.csswg.org/css-env-1/#env-function
   static #resolveEnvFunction(style: CSSStyleDeclaration, fn: CSSFunction, seen: Set<string>, envMap?: Record<string, string>): ComponentValue[] {
-    // env( <custom-ident> <integer [0,∞]>*, <declaration-value>? )
     const identIdx = fn.value.findIndex(v => v.type === 'ident');
     if (identIdx === -1) return [fn];
 
@@ -2099,29 +1508,20 @@ export class Parser {
     for (let i = identIdx + 1; i < fn.value.length; i++) {
       const v = fn.value[i];
       if (v.type === 'comma') break;
-      if (v.type === 'number') {
-        indices.push((v as Token).value.toString());
-      }
+      if (v.type === 'number') indices.push((v as Token).value.toString());
     }
 
     const fullKey = indices.length > 0 ? `${envName} ${indices.join(' ')}` : envName;
     const rawValue = envMap?.[fullKey];
-
     const commaIdx = fn.value.findIndex(v => v.type === 'comma');
     const fallback = commaIdx !== -1 ? fn.value.slice(commaIdx + 1) : [];
 
     if (rawValue !== undefined) {
-      const tokens = tokenize(rawValue);
-      const parser = new Parser(tokens);
-      const componentValues = parser.parseComponentValues();
-      return Parser.#resolveVariablesInComponentValues(style, componentValues, seen, envMap);
+      return Parser.#resolveVariablesInComponentValues(style, Parser.#parseValuesFromString(rawValue), seen, envMap);
     }
-
-    if (fallback.length > 0) {
-      return Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap);
-    }
-
-    return [];
+    return fallback.length > 0
+      ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap)
+      : [];
   }
 }
 

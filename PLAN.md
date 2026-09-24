@@ -3498,7 +3498,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 143: Janitor Sweep — `src/parser.ts` De-accretion & Simplification [ ]
+## Phase 143: Janitor Sweep — `src/parser.ts` De-accretion & Simplification [x]
 **Objective**: Systematically refactor and trim `src/parser.ts` (currently 2,267 lines) to reverse historical accretion, reduce cognitive complexity, and improve code clarity aligned with `~/.gemini/TASTE.md` and the `janitor` skill.
 
 **Context**: As the central entrypoint across 140+ feature and spec conformance phases, `src/parser.ts` has accumulated significant defensive sediment, repetitive token walkers, and sprawling at-rule branches.
@@ -3509,9 +3509,9 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - **Strict Parity**: Must maintain 100% behavioral parity with zero WPT regressions (`pnpm run wpt:verify`) and clean preflight (`pnpm run preflight`).
 
 ### Tasks
-- [ ] Establish characterization baseline with `pnpm run preflight` and `pnpm run wpt:verify`.
-- [ ] Conduct Janitor refactoring pass on `src/parser.ts` to reduce complexity and remove dead/defensive boilerplate.
-- [ ] Verify zero regressions across all 8 WPT suites and commit net-negative improvements.
+- [x] Establish characterization baseline with `pnpm run preflight` and `pnpm run wpt:verify`.
+- [x] Conduct Janitor refactoring pass on `src/parser.ts` to reduce complexity and remove dead/defensive boilerplate.
+- [x] Verify zero regressions across all 8 WPT suites and commit net-negative improvements.
 
 ---
 
