@@ -134,6 +134,15 @@ export class StyleSheetListImpl extends Array<CSSStyleSheet> {
 
 // State WeakMaps to eliminate instance monkey-patching
 export const styleSheetMap = new WeakMap<object, CSSStyleSheet | null>();
+// HTML § 4.8.4 #dom-link-disabled
+// cssom-1 § 4.6 #the-linkstyle-interface
+export const explicitlyEnabledMap = new WeakMap<object, boolean>();
+
+export function isAlternateStylesheet(linkEl: Element): boolean {
+  const rel = (linkEl.getAttribute ? linkEl.getAttribute('rel') || '' : '').toLowerCase().trim();
+  const tokens = rel.split(/\s+/);
+  return tokens.includes('alternate') && tokens.includes('stylesheet');
+}
 const styleSheetSourceMap = new WeakMap<object, string | null>();
 const attributeStyleMapCache = new WeakMap<object, TypedOM.StylePropertyMap>();
 const computedStyleMapCache = new WeakMap<object, ComputedStylePropertyMap>();
@@ -501,7 +510,9 @@ export function updateOwnerDocument(node: unknown, targetDoc: Document): void {
 
 function invalidateStyleElementSheet(n: unknown): void {
   if (!n || typeof n !== 'object') return;
-  const obj = n as { nodeName?: string; tagName?: string; parentNode?: unknown };
+  if ((n as { _suppressStyleInvalidation?: boolean })._suppressStyleInvalidation) return;
+  const obj = n as { nodeName?: string; tagName?: string; parentNode?: unknown; _suppressStyleInvalidation?: boolean };
+  if (obj._suppressStyleInvalidation) return;
   if (obj.nodeName === 'STYLE' || obj.tagName === 'STYLE') {
     styleSheetMap.set(obj, null);
     styleSheetSourceMap.set(obj, null);
@@ -588,8 +599,16 @@ function dispatchNodeMutationEffects(
     dispatchEvent?: (ev: Event) => boolean;
   };
   if (nodeEl.nodeName === 'LINK' || nodeEl.nodeName === 'IFRAME') {
-    if (nodeEl.nodeName !== 'LINK' || (nodeEl.getAttribute?.('rel') === 'stylesheet' && !nodeEl.hasAttribute?.('disabled'))) {
+    const rel = (nodeEl.getAttribute?.('rel') || '').toLowerCase().trim();
+    const relTokens = rel.split(/\s+/);
+    const isStylesheetLink = nodeEl.nodeName === 'LINK' && relTokens.includes('stylesheet');
+    if (nodeEl.nodeName === 'IFRAME' || (isStylesheetLink && !nodeEl.hasAttribute?.('disabled'))) {
+      if ((nodeEl as { _hasPendingLoad?: boolean })._hasPendingLoad) {
+        return;
+      }
+      (nodeEl as { _hasPendingLoad?: boolean })._hasPendingLoad = true;
       queueMicrotask(() => {
+        (nodeEl as { _hasPendingLoad?: boolean })._hasPendingLoad = false;
         try {
           if (nodeEl.dispatchEvent) {
             const winContext = doc ? (doc as Document).defaultView || window : window;
@@ -745,7 +764,7 @@ function createAdoptedStyleSheetsAccessor(window: WindowType) {
 }
 
 function isInsideTemplate(el: Element | null): boolean {
-  let curr: unknown = el;
+  let curr: unknown = (el as { parentElement?: unknown; parentNode?: unknown })?.parentElement || (el as { parentNode?: unknown })?.parentNode;
   while (curr && typeof curr === 'object') {
     const tag = (curr as { tagName?: string; nodeName?: string }).tagName || (curr as { nodeName?: string }).nodeName;
     if (tag === 'TEMPLATE') return true;
@@ -754,6 +773,8 @@ function isInsideTemplate(el: Element | null): boolean {
   return false;
 }
 
+// HTML § 4.8.4.14 #link-type-stylesheet
+// cssom-1 § 4.6 #the-linkstyle-interface
 function collectStyleSheets(root: Document | DocumentFragment): StyleSheetList {
   const isDoc = 'documentElement' in root;
   const styles = Array.from(root.querySelectorAll('style')).filter(s => {
@@ -762,9 +783,12 @@ function collectStyleSheets(root: Document | DocumentFragment): StyleSheetList {
     return sheet && (!isDoc || !sheet.disabled);
   });
   const linkSelector = isDoc ? 'link[rel="stylesheet"], link[rel~="stylesheet"]' : 'link[rel="stylesheet"]';
-  const links = Array.from(root.querySelectorAll(linkSelector)).filter(l => {
+  const allLinks = Array.from(root.querySelectorAll(linkSelector));
+  const links = allLinks.filter(l => {
     if (isDoc && isInsideTemplate(l)) return false;
-    return !l.hasAttribute('disabled');
+    if (l.hasAttribute('disabled')) return false;
+    if (isAlternateStylesheet(l) && !explicitlyEnabledMap.get(l)) return false;
+    return true;
   });
 
   const list: CSSStyleSheet[] = [];
@@ -775,7 +799,10 @@ function collectStyleSheets(root: Document | DocumentFragment): StyleSheetList {
   }
   for (const linkEl of links) {
     if (linkEl && 'sheet' in linkEl && linkEl.sheet) {
-      list.push(linkEl.sheet as unknown as CSSStyleSheet);
+      const sheet = linkEl.sheet as unknown as CSSStyleSheet;
+      if (sheet.ownerNode === linkEl) {
+        list.push(sheet);
+      }
     }
   }
   return new StyleSheetList(list);
@@ -787,6 +814,7 @@ function collectStyleSheets(root: Document | DocumentFragment): StyleSheetList {
 
 export function registerElementId(el: Element, id: string, win?: WindowType): void {
   if (!id || PROTECTED_HARNESS_NAMES.has(id) || id in Object.prototype) return;
+  if ((el as { isConnected?: boolean }).isConnected === false || isInsideTemplate(el)) return;
   const doc = el.ownerDocument || (win?.document as Document);
   const winContext = (win || doc?.defaultView) as unknown as Record<string, unknown>;
   const sb =
@@ -796,15 +824,21 @@ export function registerElementId(el: Element, id: string, win?: WindowType): vo
   const defineGetter = (target: Record<string, unknown>) => {
     try {
       const desc = Object.getOwnPropertyDescriptor(target, id);
+      const isOurGetter = desc?.get && (desc.get as { _isNamedElement?: boolean })._isNamedElement;
+      if (desc && !isOurGetter && desc.value !== undefined) {
+        return;
+      }
       if (!desc || desc.configurable) {
+        const getter = function () {
+          if (doc && typeof doc.getElementById === 'function') {
+            const matched = doc.getElementById(id);
+            if (matched && (matched as { isConnected?: boolean }).isConnected !== false && !isInsideTemplate(matched as Element)) return matched;
+          }
+          return undefined;
+        };
+        (getter as { _isNamedElement?: boolean })._isNamedElement = true;
         Object.defineProperty(target, id, {
-          get() {
-            if (doc && typeof doc.getElementById === 'function') {
-              const matched = doc.getElementById(id);
-              if (matched) return matched;
-            }
-            return undefined;
-          },
+          get: getter,
           set(v: unknown) {
             Object.defineProperty(target, id, {
               value: v,
@@ -835,25 +869,28 @@ export function unregisterElementId(el: Element, id: string, win?: WindowType): 
   const doc = el.ownerDocument || (win?.document as Document);
   if (doc && typeof doc.getElementById === 'function') {
     const existing = doc.getElementById(id);
-    if (existing) return;
+    if (existing && (existing as { isConnected?: boolean }).isConnected !== false) return;
   }
   const winContext = (win || doc?.defaultView) as unknown as Record<string, unknown>;
   const sb =
     (winContext as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox ||
     (doc as unknown as { __sandbox?: Record<string, unknown> })?.__sandbox;
 
+  const isOurGetter = (target: Record<string, unknown>) => {
+    const desc = Object.getOwnPropertyDescriptor(target, id);
+    return desc?.get && (desc.get as { _isNamedElement?: boolean })._isNamedElement;
+  };
+
   if (sb) {
     try {
-      const desc = Object.getOwnPropertyDescriptor(sb, id);
-      if (desc?.configurable) {
+      if (isOurGetter(sb)) {
         delete sb[id];
       }
     } catch {}
   }
   if (winContext) {
     try {
-      const desc = Object.getOwnPropertyDescriptor(winContext, id);
-      if (desc?.configurable) {
+      if (isOurGetter(winContext)) {
         delete winContext[id];
       }
     } catch {}
@@ -956,6 +993,19 @@ function patchElementStyle(targetProto: Record<string, unknown>, window: WindowT
           isSyncingStyle = false;
         }
       }
+      if (name === 'media') {
+        const sheet = styleSheetMap.get(this);
+        if (sheet && sheet.media) {
+          sheet.media.mediaText = String(value);
+        }
+      }
+      if (name === 'disabled' && (this.nodeName === 'LINK' || this.localName === 'link')) {
+        explicitlyEnabledMap.set(this, false);
+        const sheet = styleSheetMap.get(this);
+        if (sheet) {
+          (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
+        }
+      }
       return origSetAttribute.call(this, name, value);
     };
   }
@@ -977,6 +1027,20 @@ function patchElementStyle(targetProto: Record<string, unknown>, window: WindowT
           lastSeenAttrMap.set(this, null);
         } finally {
           isSyncingStyle = false;
+        }
+      }
+      if (name === 'media') {
+        const sheet = styleSheetMap.get(this);
+        if (sheet && sheet.media) {
+          sheet.media.mediaText = '';
+        }
+      }
+      if (name === 'disabled' && (this.nodeName === 'LINK' || this.localName === 'link')) {
+        const sheet = styleSheetMap.get(this);
+        if (sheet) {
+          if (!isAlternateStylesheet(this) || explicitlyEnabledMap.get(this)) {
+            (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+          }
         }
       }
       return origRemoveAttribute.call(this, name);
@@ -1036,6 +1100,20 @@ function dispatchFocusEvent(
 // patchDomPrototypes Sub-Helpers
 // ---------------------------------------------------------------------------
 
+function extractNodesToDispatch(nodes: unknown[]): unknown[] {
+  const result: unknown[] = [];
+  for (const n of nodes) {
+    if (n && typeof n === 'object') {
+      if ((n as { nodeType?: number }).nodeType === 11 && (n as { childNodes?: ArrayLike<unknown> }).childNodes) {
+        result.push(...Array.from((n as { childNodes: ArrayLike<unknown> }).childNodes));
+      } else {
+        result.push(n);
+      }
+    }
+  }
+  return result;
+}
+
 function patchNodeTreeMutations(window: WindowType): void {
   const win = window as unknown as Record<string, unknown>;
   const dummyEl = (win.document as { createElement?: (tag: string) => Element })?.createElement?.('div');
@@ -1048,8 +1126,11 @@ function patchNodeTreeMutations(window: WindowType): void {
       proto.appendChild = function (this: unknown, node: unknown) {
         invalidateStyleElementSheet(this);
         const doc = getTargetDocument(this);
+        const nodesToDispatch = extractNodesToDispatch([node]);
         const res = originalAppendChild.call(this, node);
-        dispatchNodeMutationEffects(node, doc, false, window);
+        for (const n of nodesToDispatch) {
+          dispatchNodeMutationEffects(n, doc, false, window);
+        }
         return res;
       };
     }
@@ -1059,8 +1140,61 @@ function patchNodeTreeMutations(window: WindowType): void {
       proto.insertBefore = function (this: unknown, node: unknown, child?: unknown) {
         invalidateStyleElementSheet(this);
         const doc = getTargetDocument(this);
+        const nodesToDispatch = extractNodesToDispatch([node]);
         const res = child !== undefined ? originalInsertBefore.call(this, node, child) : originalInsertBefore.call(this, node);
-        dispatchNodeMutationEffects(node, doc, false, window);
+        for (const n of nodesToDispatch) {
+          dispatchNodeMutationEffects(n, doc, false, window);
+        }
+        return res;
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(proto, 'append')) {
+      const originalAppend = proto.append as (...nodes: unknown[]) => unknown;
+      proto.append = function (this: unknown, ...nodes: unknown[]) {
+        invalidateStyleElementSheet(this);
+        const doc = getTargetDocument(this);
+        const nodesToDispatch = extractNodesToDispatch(nodes);
+        const res = originalAppend.apply(this, nodes);
+        for (const n of nodesToDispatch) {
+          dispatchNodeMutationEffects(n, doc, false, window);
+        }
+        return res;
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(proto, 'prepend')) {
+      const originalPrepend = proto.prepend as (...nodes: unknown[]) => unknown;
+      proto.prepend = function (this: unknown, ...nodes: unknown[]) {
+        invalidateStyleElementSheet(this);
+        const doc = getTargetDocument(this);
+        const nodesToDispatch = extractNodesToDispatch(nodes);
+        const res = originalPrepend.apply(this, nodes);
+        for (const n of nodesToDispatch) {
+          dispatchNodeMutationEffects(n, doc, false, window);
+        }
+        return res;
+      };
+    }
+
+    if (Object.prototype.hasOwnProperty.call(proto, 'replaceChildren')) {
+      const originalReplaceChildren = proto.replaceChildren as (...nodes: unknown[]) => unknown;
+      proto.replaceChildren = function (this: unknown, ...nodes: unknown[]) {
+        const oldChildren = (this as { childNodes?: ArrayLike<unknown> })?.childNodes
+          ? Array.from((this as { childNodes: ArrayLike<unknown> }).childNodes)
+          : [];
+        if (oldChildren.length > 0 || nodes.length > 0) {
+          invalidateStyleElementSheet(this);
+        }
+        const doc = getTargetDocument(this);
+        const nodesToDispatch = extractNodesToDispatch(nodes);
+        for (const oldChild of oldChildren) {
+          dispatchNodeMutationEffects(oldChild, doc, true, window);
+        }
+        const res = originalReplaceChildren.apply(this, nodes);
+        for (const n of nodesToDispatch) {
+          dispatchNodeMutationEffects(n, doc, false, window);
+        }
         return res;
       };
     }
@@ -1206,14 +1340,20 @@ function patchStyleElementPrototype(window: WindowType): void {
       : undefined);
 
   const createTextMutatorSetter = (origSet: (val: unknown) => void) => {
-    return function (this: object & { childNodes?: unknown[]; hasChildNodes?: () => boolean; textContent?: string }, val: unknown) {
+    return function (this: object & { childNodes?: unknown[]; hasChildNodes?: () => boolean; textContent?: string; _suppressStyleInvalidation?: boolean }, val: unknown) {
       const hasChildren = (this.childNodes && this.childNodes.length > 0) || (typeof this.hasChildNodes === 'function' && this.hasChildNodes()) || Boolean(this.textContent);
       const isNoOpEmpty = !hasChildren && (val === '' || val === null || val === undefined);
       if (!isNoOpEmpty) {
         styleSheetMap.set(this, null);
         styleSheetSourceMap.set(this, null);
+      } else {
+        this._suppressStyleInvalidation = true;
       }
-      return origSet.call(this, val);
+      try {
+        return origSet.call(this, val);
+      } finally {
+        this._suppressStyleInvalidation = false;
+      }
     };
   };
 
@@ -1260,7 +1400,27 @@ function patchStyleElementPrototype(window: WindowType): void {
     enumerable: true
   });
 
-  const sheetGet = function (this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document; localName?: string }) {
+  // HTML § 4.12.3 #dom-style-media
+  // cssom-1 § 6.6 #the-medialist-interface
+  Object.defineProperty(htmlStyleEl.prototype, 'media', {
+    configurable: true,
+    enumerable: true,
+    get(this: Element) {
+      return this.getAttribute ? this.getAttribute('media') || '' : '';
+    },
+    set(this: Element, val: string) {
+      const strVal = String(val);
+      if (this.setAttribute) {
+        this.setAttribute('media', strVal);
+      }
+      const sheet = styleSheetMap.get(this);
+      if (sheet && sheet.media) {
+        sheet.media.mediaText = strVal;
+      }
+    }
+  });
+
+  const sheetGet = function (this: object & { textContent?: string | null; getAttribute?: (attr: string) => string | null; ownerDocument?: Document; localName?: string; media?: string }) {
     const isStyle = (this instanceof (win.HTMLStyleElement as Function)) || this.localName === 'style';
     if (!this || (this as unknown) === htmlStyleEl.prototype || !isStyle) {
       throw new TypeError("Failed to read the 'sheet' property from 'HTMLStyleElement': The provided value is not of type 'HTMLStyleElement'.");
@@ -1273,7 +1433,8 @@ function patchStyleElementPrototype(window: WindowType): void {
       const rules = parseStyleSheet(currentText);
       sheet = CSSStyleSheet.createInternal(rules, parseRule);
       (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
-      const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
+      // cssom-1 § 6.6 #the-medialist-interface
+      const mediaText = (this as { media?: string }).media || (this.getAttribute ? this.getAttribute('media') || '' : '');
       if (mediaText) {
         sheet.media.mediaText = mediaText;
       }
@@ -1537,7 +1698,8 @@ function loadLinkStyleSheet(
   if (resolvedHref) {
     (sheet as unknown as { _href: string | null })._href = resolvedHref;
   }
-  const mediaText = linkEl.getAttribute ? linkEl.getAttribute('media') || '' : '';
+  // cssom-1 § 6.6 #the-medialist-interface
+  const mediaText = (linkEl as { media?: string }).media || (linkEl.getAttribute ? linkEl.getAttribute('media') || '' : '');
   if (mediaText) {
     sheet.media.mediaText = mediaText;
   }
@@ -1549,6 +1711,28 @@ function patchLinkElementPrototype(window: WindowType): void {
   const htmlLinkEl = win.HTMLLinkElement as { prototype: Record<string, unknown> } | undefined;
   if (!htmlLinkEl) return;
 
+  // HTML § 4.8.4 #dom-link-media
+  // cssom-1 § 6.6 #the-medialist-interface
+  Object.defineProperty(htmlLinkEl.prototype, 'media', {
+    configurable: true,
+    enumerable: true,
+    get(this: Element) {
+      return this.getAttribute ? this.getAttribute('media') || '' : '';
+    },
+    set(this: Element, val: string) {
+      const strVal = String(val);
+      if (this.setAttribute) {
+        this.setAttribute('media', strVal);
+      }
+      const sheet = styleSheetMap.get(this);
+      if (sheet && sheet.media) {
+        sheet.media.mediaText = strVal;
+      }
+    }
+  });
+
+  // HTML § 4.8.4 #dom-link-disabled
+  // cssom-1 § 4.6 #the-linkstyle-interface
   const linkDisabledGet = function (this: Element) {
     if (!this || (this as unknown) === htmlLinkEl.prototype || !(this instanceof (win.HTMLLinkElement as Function))) {
       throw new TypeError("Failed to read the 'disabled' property from 'HTMLLinkElement': The provided value is not of type 'HTMLLinkElement'.");
@@ -1561,21 +1745,38 @@ function patchLinkElementPrototype(window: WindowType): void {
     if (!this || (this as unknown) === htmlLinkEl.prototype || !(this instanceof (win.HTMLLinkElement as Function))) {
       throw new TypeError("Failed to set the 'disabled' property on 'HTMLLinkElement': The provided value is not of type 'HTMLLinkElement'.");
     }
+    const hasDisabledAttr = this.hasAttribute('disabled');
     if (val) {
       this.setAttribute('disabled', '');
+      explicitlyEnabledMap.set(this, false);
+      (this as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = false;
       const sheet = styleSheetMap.get(this);
       if (sheet) {
         (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
+        (sheet as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = false;
       }
     } else {
+      // HTML § 4.8.4:
+      // "On setting, if the element does not have a disabled attribute, and the given value is false, then return."
+      if (!hasDisabledAttr) {
+        return;
+      }
       this.removeAttribute('disabled');
-      const sheet = styleSheetMap.get(this);
-      if (sheet) {
+      explicitlyEnabledMap.set(this, true);
+      (this as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = true;
+      let sheet = styleSheetMap.get(this);
+      if (!sheet) {
+        sheet = loadLinkStyleSheet(this, window);
+        styleSheetMap.set(this, sheet);
+      } else {
         (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+      }
+      if (sheet) {
+        (sheet as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = true;
       }
       queueMicrotask(() => {
         try {
-          if (this.dispatchEvent) {
+          if (this.dispatchEvent && ((this as { parentNode?: unknown }).parentNode || (this as { isConnected?: boolean }).isConnected)) {
             const doc = (this as unknown as { ownerDocument?: Document }).ownerDocument;
             const winContext = doc ? (doc as Document).defaultView || window : window;
             const eventConstructor = winContext as unknown as { Event: new (type: string) => Event };

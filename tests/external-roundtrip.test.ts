@@ -104,7 +104,9 @@ const knownCSSTreeSkips = new Map<string, string>([
   ['CDO/CDC', csstreeCDOReason],
   ['rule with a bad-string token (issue #93)', 'CSSTree specific test case for error recovery with bad strings.'],
   ['issue #250', csstreeNormReason],
-  ['issue111.test1', 'Undeclared namespace prefix x is invalid, which our spec-compliant parser drops.']
+  ['issue111.test1', 'Undeclared namespace prefix x is invalid, which our spec-compliant parser drops.'],
+  ['issue90.test1', 'Spec Reality: CSS Page 3 § 3 restricts @page declarations to page descriptors/margins; invalid property p is dropped.'],
+  ['issue90.test2', 'Spec Reality: CSS Page 3 § 3 restricts @page declarations to page descriptors/margins; invalid property p is dropped.']
 ]);
 
 function runPostCSSTests(tests: RoundTripTestItem[]) {

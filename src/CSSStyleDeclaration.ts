@@ -20,7 +20,7 @@ import { tokenize } from './tokenizer.ts';
 import type { Declaration, CSSRule, ComponentValue } from './types.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
-import { resolveLogicalProperty } from './data/gen/LogicalMapping.ts';
+import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
@@ -118,6 +118,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   /** @internal */
   _parentRule: CSSRule | null = null;
   public _onChange: ((force?: boolean) => void) | null = null;
+  protected get _filterDeclarationsInConstructor(): boolean {
+    return false;
+  }
 
   // cssom-1 § 6.6 #dom-cssstyledeclaration-parentrule
   get parentRule(): CSSRule | null {
@@ -132,6 +135,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const addDeclarationRecursive = (decl: Declaration) => {
       if (decl.name === '--') return;
       const normalizedName = decl.name.startsWith('--') ? decl.name : decl.name.toLowerCase();
+      if (this._filterDeclarationsInConstructor && !normalizedName.startsWith('--') && !this._isPropertySupported(normalizedName)) {
+        return;
+      }
       decl.name = normalizedName;
       const shorthand = SHORTHANDS[decl.name];
       if (shorthand) {
@@ -582,10 +588,17 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         existing.raw = valueStr ?? undefined;
       }
       
+      // cssom-1 § 6.5.1 #set-a-css-declaration
       const idx = this._declarations.indexOf(existing);
       if (idx !== -1) {
-        const hasAllLater = this._declarations.slice(idx + 1).some(d => d.name === 'all');
-        if (hasAllLater) {
+        const info = LOGICAL_PROPERTY_INFO[property];
+        const needsAppend = this._declarations.slice(idx + 1).some(d => {
+          if (d.name === 'all') return true;
+          if (!info) return false;
+          const otherInfo = LOGICAL_PROPERTY_INFO[d.name];
+          return otherInfo && otherInfo.group === info.group && otherInfo.logic !== info.logic;
+        });
+        if (needsAppend) {
           this._declarations.splice(idx, 1);
           this._declarations.push(existing);
         }

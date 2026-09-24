@@ -3477,19 +3477,19 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - In `src/rules/at-rules.ts`: ensure `CSSMediaRule.prototype.media` is a prototype getter and `CSSFontFaceRule.prototype.style` is correctly descriptor-bound with `Symbol.toStringTag`.
   - *Target*: Completes `idlharness.html` interface checks (+8 tests).
 
-#### Phase 142.2: DOM Shim Stylesheet Lifecycle & Alternate Sheets (+18 tests) [ ]
-- [ ] **Synchronize `<style>` and `<link>` Attributes with Properties (+4 tests)**:
+#### Phase 142.2: DOM Shim Stylesheet Lifecycle & Alternate Sheets (+18 tests) [x]
+- [x] **Synchronize `<style>` and `<link>` Attributes with Properties (+4 tests)**:
   - In `tests/dom-shim/src/dom-stubs.ts:1264`, check both `el.getAttribute('media')` and `(el as HTMLStyleElement).media` property when populating stylesheet media.
   - *Target*: 100% pass on [`submodules/web-platform-tests/css/cssom/medialist-interfaces-001.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/medialist-interfaces-001.html) (+4 tests).
-- [ ] **Support Alternate Stylesheet State & `ownerNode` Decoupling (+14 tests)**:
+- [x] **Support Alternate Stylesheet State & `ownerNode` Decoupling (+14 tests)**:
   - Implement CSSOM § 4.6 alternate stylesheet disabled rules: toggling `link.disabled = true` uncouples `sheet.ownerNode = null` and clears it from `document.styleSheets`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-002.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-002.html) through `007.html` (+14 tests).
 
 #### Phase 142.3: CSSOM Rule Restrictions & Declaration Polish (+16 tests) [ ]
-- [ ] **Enforce Property Restrictions on `@page` and `@keyframes` (+2 tests)**:
+- [x] **Enforce Property Restrictions on `@page` and `@keyframes` (+2 tests)**:
   - In `CSSPageRule` and `CSSKeyframeRule`, configure property validator hooks to drop non-applicable properties (`transform` in `@page`, `animation-name` in `@keyframes`).
   - *Target*: 100% pass on [`submodules/web-platform-tests/css/cssom/rule-restrictions.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/rule-restrictions.html) (+2 tests).
-- [ ] **`CSSStyleDeclaration` Logical Property Grouping (+7 tests)**:
+- [x] **`CSSStyleDeclaration` Logical Property Grouping (+7 tests)**:
   - In `src/CSSStyleDeclaration.ts:setProperty()`, preserve declaration ordering relative to logical property groups per CSSOM § 6.5.1.
   - *Target*: Fixes [`submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-logical.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-logical.html) (+7 tests).
 - [ ] **Constructable Stylesheet Document Adoption Verification (+7 tests)**:

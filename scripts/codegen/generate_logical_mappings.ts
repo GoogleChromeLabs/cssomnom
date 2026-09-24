@@ -102,6 +102,25 @@ function main() {
 
     tsContent += `\n`;
     tsContent += `/**\n`;
+    tsContent += ` * Logical property groups and mapping logic.\n`;
+    tsContent += ` * @see https://drafts.csswg.org/css-logical-1/#logical-property-group\n`;
+    tsContent += ` */\n`;
+    tsContent += `export const LOGICAL_PROPERTY_INFO: Record<string, { group: string; logic: 'logical' | 'physical' }> = {\n`;
+    const propertyInfoEntries: [string, { group: string; logic: 'logical' | 'physical' }][] = [];
+    for (const [groupName, props] of Object.entries(groups)) {
+        for (const prop of props) {
+            const isLogical = prop in mappings;
+            propertyInfoEntries.push([prop, { group: groupName, logic: isLogical ? 'logical' : 'physical' }]);
+        }
+    }
+    propertyInfoEntries.sort((a, b) => a[0].localeCompare(b[0]));
+    for (const [prop, info] of propertyInfoEntries) {
+        tsContent += `  '${prop}': { group: '${info.group}', logic: '${info.logic}' },\n`;
+    }
+    tsContent += `};\n`;
+
+    tsContent += `\n`;
+    tsContent += `/**\n`;
     tsContent += ` * Resolves a logical property to its physical counterpart based on writing mode and direction.\n`;
     tsContent += ` */\n`;
     tsContent += `export function resolveLogicalProperty(name: string, writingMode: string = 'horizontal-tb', direction: string = 'ltr'): string {\n`;

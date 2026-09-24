@@ -23,7 +23,7 @@ import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { CSSRule, CSSGroupingRule } from './base.ts';
 import { CSSStyleSheet } from '../CSSOM.ts';
 import { MediaList, CSSRuleList } from './collections.ts';
-import { serializeGroupingRule, FONT_FACE_DESCRIPTORS, PAGE_DESCRIPTORS } from './utils.ts';
+import { serializeGroupingRule, FONT_FACE_DESCRIPTORS } from './utils.ts';
 import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
 
 // css-conditional-3 § 3 #the-cssconditionrule-interface
@@ -424,6 +424,20 @@ export class CSSKeyframesRule extends CSSRule {
   }
 }
 
+// css-animations-1 § 4.2 #keyframes
+class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
+  protected override get _filterDeclarationsInConstructor(): boolean {
+    return true;
+  }
+
+  override _isPropertySupported(property: string): boolean {
+    if (property === 'animation-name') {
+      return false;
+    }
+    return super._isPropertySupported(property);
+  }
+}
+
 export class CSSKeyframeRule extends CSSRule {
   private _keyText!: string;
   private _style: CSSStyleDeclaration;
@@ -431,7 +445,7 @@ export class CSSKeyframeRule extends CSSRule {
   constructor(keyText: string, styleDeclarations: Declaration[]) {
     super();
     this.keyText = keyText;
-    this._style = new CSSStyleDeclaration(styleDeclarations);
+    this._style = new CSSKeyframeStyleDeclaration(styleDeclarations);
     this._style._parentRule = this;
   }
 
@@ -548,9 +562,51 @@ export class CSSFontFaceRule extends CSSRule {
   }
 }
 
+// css-page-3 § 3 #conform-partial
+const PAGE_ALLOWED_PROPERTIES = new Set<string>([
+  // Page descriptors (css-page-3 § 3.2)
+  'size',
+  'page-orientation',
+  'marks',
+  'bleed',
+  'page-margin-safety',
+  // Page margin properties (css-page-3 § 3)
+  'margin',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'margin-block',
+  'margin-block-start',
+  'margin-block-end',
+  'margin-inline',
+  'margin-inline-start',
+  'margin-inline-end',
+  // Page-break properties (css-page-3 § 3)
+  'page-break-before',
+  'page-break-after',
+  'page-break-inside',
+  'break-before',
+  'break-after',
+  'break-inside',
+  // Orphans and widows
+  'orphans',
+  'widows',
+  // Page / counters
+  'page',
+  'counter-increment',
+  'counter-reset',
+  'counter-set',
+  'quotes',
+]);
+
 const PAGE_DESCRIPTORS_INTERNAL = Symbol('CSSPageDescriptors.internal');
 
 export class CSSPageDescriptors extends CSSStyleDeclaration {
+  protected override get _filterDeclarationsInConstructor(): boolean {
+    return true;
+  }
+
   constructor(declarations?: Declaration[], internalToken?: symbol) {
     if (internalToken !== PAGE_DESCRIPTORS_INTERNAL) {
       throw new TypeError('Illegal constructor');
@@ -574,8 +630,9 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
   declare bleed: string;
   declare pageMarginSafety?: string;
 
+  // css-page-3 § 3 #conform-partial
   override _isPropertySupported(property: string): boolean {
-    return super._isPropertySupported(property) || PAGE_DESCRIPTORS.has(property);
+    return PAGE_ALLOWED_PROPERTIES.has(property);
   }
 
   // cssom-1 § 6.4.4 #the-csspagedescriptors-interface
