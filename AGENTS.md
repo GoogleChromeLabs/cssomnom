@@ -1,5 +1,5 @@
 ## Project Overview
-Building a spec-compliant CSSOM (CSS Object Model) parser in pure TypeScript. See [ARCHITECTURE.md](./ARCHITECTURE.md) for the end-to-end pipeline and codebase orientation map.
+Building a spec-compliant CSSOM (CSS Object Model) parser in pure TypeScript. **Start every task by reading [ARCHITECTURE.md](./ARCHITECTURE.md)**, the code map, to find the right files before opening source.
 
 ### Coding Rules
 - **Execution**: Run node scripts directly: `node script.ts`. Do NOT use `npx tsx` or `ts-node`.
