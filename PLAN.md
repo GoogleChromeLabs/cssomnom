@@ -3595,39 +3595,45 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 1. **Measured Noise Floor in Unisolated In-Process Runs**: Initial single-process A/A testing (`f8c80d0` vs `f8c80d0` in the same Node instance) exhibited a **~41% noise floor**. Root causes:
    - Cumulative V8 heap footprint (>600MB) causing subsequent benchmarks to experience aggressive scavenge / mark-sweep GC cycles.
    - Hidden class and Inline Cache (IC) pollution across disparate benchmark workloads.
-2. **Methodological Mitigation**:
-   - **Isolated Subprocess per Workload**: Switched to `safeExecTestFile` from [`scripts/wpt/node/safe-child-process.ts`](./scripts/wpt/node/safe-child-process.ts), spawning an independent Node process per benchmark with a fresh V8 heap.
-   - **Interleaved Execution**: Alternated execution order (`A -> B` on even benchmarks, `B -> A` on odd benchmarks) to cancel out host thermal throttling and monotonic clock bias.
-   - **Trimmed Statistical Aggregation**: Increased sample count to 15, with 10% trimmed distribution (discarding top 2 GC scavenge spikes and bottom 1 cache fluke).
-   - **Submodule Symlink Preservation**: Automatically mapped parent `submodules/` into worktrees with absolute symlinks to prevent fixture fallback differences.
-3. **Verified Empirical Noise Floor**:
-   - Workloads running >100ms settled to **±0.1% to ±1.5%** variance.
-   - Short/micro workloads (<100ms or tight loops) exhibited up to **±10.5% to ±13.1%** jitter due to initial JIT tier-up compilation timing and memory layout variance across fresh process boots.
-   - Established the empirical significance threshold at **±15%** for declaring real performance regressions/speedups across independent processes.
+2. **Investigation of the Tokenizer Variance & Root Cause**:
+   - Initial isolated runs reported a spurious `+37.6%` speedup for `tokenize: modern.css`. However, `git diff f8c80d0 1db8d91 -- src/tokenizer.ts src/AbstractTokenizer.ts src/types.ts` is empty—the source code was 100% byte-identical!
+   - **Root Cause Isolated**: 300 iterations of tokenizing a 7.7KB file (producing >630,000 token objects per sample) generated ~8.7MB of temporary objects per sample, crossing V8's default semi-space capacity. In some process boots, scavenge sweeps occurred during 8 of 15 samples, while in other boots they occurred during only 2 of 15 samples, shifting the median by 25–35ms.
+   - **Fix Applied**: Reduced iterations to 20 per sample (generating <42,000 objects per sample, safely within V8's young-gen semi-space without crossing GC scavenge thresholds) with 10 warmup rounds and 20 total samples with a 25% top-tail trim (discarding top 5 samples).
+   - **Result**: The A/A delta for `tokenize: modern.css` collapsed from 37% down to **+0.3% to +4.5%**, completely within noise.
+3. **Control Guard (Source Diff Tracking)**:
+   - Updated [`scripts/benchmarks/compare.ts`](./scripts/benchmarks/compare.ts) to map every benchmark to its underlying source files (`BENCHMARK_EXERCISED_FILES`) and run `git diff <base>..<target>` on startup.
+   - Any benchmark whose underlying source files are byte-identical is marked as a control; if it trips a significance threshold, `compare.ts` emits a loud `[CONTROL WARNING: SOURCE UNCHANGED]`.
+4. **Per-Benchmark Empirical Threshold Matrix**:
+   - Heavy parsing & round-trip workloads (`parse: synthetic large`, `tokenize + parse: geocities.css`, `round-trip`, `cascade`): settled to **±5.0%**.
+   - Shorthands and serialization (`serialize: modern.css`, `CSSStyleDeclaration`): settled to **±6.0%**.
+   - Medium parsing & large synthetic tokenization (`tokenize: synthetic large`, `whatwg styles.css`, `modern.css`, `postcss cases`): settled to **±8.0% - ±10.0%**.
+   - Micro selector matching (`matcher: complex selectors matches()`): settled to **±12.0%** due to sub-millisecond execution times and V8 JIT tier-up variance across fresh boots.
+   - In repeated A/A validation runs against identical commits (`f8c80d0` vs `f8c80d0`), **all 14 workloads reported "flat (within noise)"**.
 
 ### Pre-Janitor (`f8c80d0`) vs Post-Janitor (`1db8d91`) Comparison Results
 
-| Benchmark | `f8c80d0` (ms) | `1db8d91` (ms) | Delta (ops/s) | `f8c80d0` (op/s) | `1db8d91` (op/s) | Significance |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| `tokenize: synthetic large (163KB)` | 104.86 ±6.50 | 91.44 ±8.01 | +14.7% | 95.4 | 109.4 | flat (within noise floor) |
-| `tokenize: modern.css (7.7KB)` | 105.37 ±6.44 | 76.57 ±0.49 | +37.6% | 2847.0 | 3918.1 | **+37.6%** (faster) |
-| `parse: synthetic large tokens (163KB)` | 472.54 ±7.55 | 481.68 ±7.85 | -1.9% | 21.2 | 20.8 | flat (within noise floor) |
-| `tokenize + parse: synthetic large (163KB)` | 633.36 ±11.78 | 645.23 ±16.98 | -1.8% | 15.8 | 15.5 | flat (within noise floor) |
-| `tokenize + parse: geocities.css (15KB)` | 289.01 ±9.73 | 294.27 ±9.03 | -1.8% | 276.8 | 271.9 | flat (within noise floor) |
-| `tokenize + parse: whatwg styles.css (11KB)` | 191.92 ±4.24 | 214.66 ±10.57 | -10.6% | 416.8 | 372.7 | flat (within noise floor) |
-| `tokenize + parse: modern.css (7.7KB)` | 130.87 ±7.57 | 131.01 ±9.00 | -0.1% | 611.3 | 610.6 | flat (within noise floor) |
-| `tokenize + parse: postcss cases (4.4KB)` | 106.86 ±6.03 | 107.46 ±4.13 | -0.6% | 935.8 | 930.6 | flat (within noise floor) |
-| `CSSStyleDeclaration: setProperty shorthands & read` | 234.15 ±6.44 | 233.39 ±2.46 | +0.3% | 640.6 | 642.7 | flat (within noise floor) |
-| `serialize: modern.css rules cssText` | 131.56 ±5.63 | 86.51 ±3.63 | +52.1% | 760.1 | 1156.0 | **+52.1%** (faster) |
-| `round-trip: parse -> serialize -> reparse (geocities.css)` | 616.37 ±11.29 | 558.68 ±9.90 | +10.3% | 97.3 | 107.4 | flat (within noise floor) |
-| `matcher: complex selectors matches()` | 24.19 ±7.57 | 24.36 ±7.51 | -0.7% | 41341.5 | 41052.3 | flat (within noise floor) |
-| `cascade: getCascadedStyle()` | 332.77 ±8.13 | 338.13 ±16.51 | -1.6% | 450.8 | 443.6 | flat (within noise floor) |
-| `typed-om: parse values & math` | 30.62 ±1.00 | 32.63 ±1.74 | -6.2% | 19598.2 | 18386.8 | flat (within noise floor) |
+| Benchmark | `f8c80d0` (ms) | `1db8d91` (ms) | Delta (ops/s) | `f8c80d0` (op/s) | `1db8d91` (op/s) | Noise Thr | Significance |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `tokenize: synthetic large (163KB)` | 106.43 ±7.37 | 109.41 ±6.05 | -2.7% | 94.0 | 91.4 | ±12.0% | flat (within noise) [source unchanged] |
+| `tokenize: modern.css (7.7KB)` | 5.00 ±0.25 | 5.04 ±0.23 | -0.7% | 3996.6 | 3969.6 | ±8.0% | flat (within noise) [source unchanged] |
+| `parse: synthetic large tokens (163KB)` | 481.07 ±5.68 | 476.61 ±3.51 | +0.9% | 20.8 | 21.0 | ±5.0% | flat (within noise) |
+| `tokenize + parse: synthetic large (163KB)` | 616.90 ±8.46 | 653.36 ±9.41 | -5.6% | 16.2 | 15.3 | ±5.0% | **-5.6%** (slower) |
+| `tokenize + parse: geocities.css (15KB)` | 272.01 ±5.03 | 283.89 ±7.21 | -4.2% | 294.1 | 281.8 | ±5.0% | flat (within noise) |
+| `tokenize + parse: whatwg styles.css (11KB)` | 196.10 ±5.41 | 197.18 ±4.44 | -0.5% | 408.0 | 405.7 | ±8.0% | flat (within noise) |
+| `tokenize + parse: modern.css (7.7KB)` | 133.67 ±5.58 | 125.35 ±8.44 | +6.6% | 598.5 | 638.2 | ±10.0% | flat (within noise) |
+| `tokenize + parse: postcss cases (4.4KB)` | 105.05 ±4.42 | 104.48 ±3.47 | +0.5% | 952.0 | 957.1 | ±10.0% | flat (within noise) |
+| `CSSStyleDeclaration: setProperty shorthands & read` | 233.62 ±1.14 | 233.25 ±1.13 | +0.2% | 642.1 | 643.1 | ±6.0% | flat (within noise) |
+| `serialize: modern.css rules cssText` | 127.45 ±1.02 | 83.68 ±0.83 | +52.3% | 784.6 | 1195.1 | ±6.0% | **+52.3%** (faster) |
+| `round-trip: parse -> serialize -> reparse (geocities.css)` | 598.16 ±7.74 | 541.49 ±5.44 | +10.5% | 100.3 | 110.8 | ±5.0% | **+10.5%** (faster) |
+| `matcher: complex selectors matches()` | 22.88 ±4.95 | 20.86 ±4.54 | +9.7% | 43697.9 | 47949.7 | ±12.0% | flat (within noise) [source unchanged] |
+| `cascade: getCascadedStyle()` | 314.43 ±4.39 | 317.07 ±3.88 | -0.8% | 477.1 | 473.1 | ±5.0% | flat (within noise) |
+| `typed-om: parse values & math` | 29.34 ±0.63 | 32.42 ±1.64 | -9.5% | 20449.1 | 18504.4 | ±10.0% | flat (within noise) [source unchanged] |
 
 ### Key Findings & Regression Analysis
-- **Zero Real Regressions**: No benchmark workload suffered a regression beyond the empirical noise floor. Core parsing throughput across synthetic and real-world stylesheets (`geocities.css`, `modern.css`, `postcss`, large synthetic) is essentially identical within ±2%.
-- **Massive Serialization Speedup (+52.1%)**: `serialize: modern.css rules cssText` improved by **+52.1%** (from 760.1 to 1,156.0 ops/sec). The elimination of redundant intermediate AST wrapper classes and defensive string concatenations in Phase 144 (`src/serializer.ts`) significantly reduced memory allocations and hot-path branch overhead.
-- **Tokenizer Streamlining (+37.6%)**: Modern stylesheet tokenization improved by **+37.6%**, directly benefiting from the simplification of character lookahead loops in Phase 143.
+- **Controls Confirmed**: `tokenize: modern.css`, `tokenize: synthetic large`, `matcher`, and `typed-om` correctly reported as "flat (within noise) [source unchanged]" with zero false alarms.
+- **Massive Serialization Speedup (+52.3%)**: `serialize: modern.css rules cssText` improved by **+52.3%** (from 784.6 to 1,195.1 ops/sec), and end-to-end `round-trip` improved by **+10.5%**. This is directly attributable to commit `ffd3eed` in Phase 145 (`src/serializer.ts`), which eliminated intermediate wrapper classes, simplified selector serialization branches, and flattened AST string concatenations.
+- **Parser Throughput Neutral**: Real-world parsing (`geocities.css`, `whatwg styles.css`, `modern.css`, `postcss cases`) remained strictly throughput-neutral across the Phase 143 parser simplification.
+- **Slight Large Synthetic Tokenize+Parse Regress (-5.6%)**: `tokenize + parse: synthetic large (163KB)` showed a minor -5.6% slowdown (at the edge of the ±5% noise floor). On pure pre-tokenized tokens (`parse: synthetic large tokens`), performance is flat (+0.9%), indicating this slight delta is related to component value array handling between tokenizer and parser on huge files.
 
 ## Phase 149: HTML UA Stylesheet as a Real Cascade Origin [ ]
 **Objective**: `src/data/gen/ua-stylesheet.ts` is parsed, but only consumed by `getUaDefault()` as a per-tag property lookup. Feed the parsed sheet into the cascade as the actual user-agent origin (css-cascade-5 § 6.2 #cascading-origins) so selectors, specificity, ordering, and `revert` behave per spec, and delete the special-casing that exists to fake it (margin normalization in `getUaTagStyles()`, and `getUaDefault()` itself if possible).

@@ -100,9 +100,18 @@ function calculateStats(name: string, sampleTimes: number[], iterationsPerSample
   const minMs = sorted[0];
   const maxMs = sorted[n - 1];
 
-  // If we have >= 9 samples, trim top 2 (GC spikes) and bottom 1 (cache flukes)
-  // to measure steady-state execution speed without intermittent GC pauses.
-  const trimmed = n >= 9 ? sorted.slice(1, n - 2) : sorted;
+  // For 20 samples, trim top 5 (25% top tail to eliminate GC pauses)
+  // and bottom 2 (10% bottom tail to eliminate fluke cache hits).
+  // This measures the steady-state V8 execution speed cleanly.
+  let trimmed: number[];
+  if (n >= 18) {
+    trimmed = sorted.slice(2, n - 5);
+  } else if (n >= 9) {
+    trimmed = sorted.slice(1, n - 2);
+  } else {
+    trimmed = sorted;
+  }
+
   const tn = trimmed.length;
   const medianMs = tn % 2 === 1 ? trimmed[Math.floor(tn / 2)] : (trimmed[tn / 2 - 1] + trimmed[tn / 2]) / 2;
   const sum = trimmed.reduce((acc, v) => acc + v, 0);
@@ -137,7 +146,7 @@ function runBench(
   options: { warmupRounds?: number; samples?: number; iterations?: number } = {}
 ): BenchmarkStats {
   const warmupRounds = options.warmupRounds ?? 8;
-  const samples = options.samples ?? 15;
+  const samples = options.samples ?? 20;
   const iterations = options.iterations ?? 10;
 
   // 1. Warmup: run multiple rounds to ensure JIT tier-up and IC stabilization
@@ -226,7 +235,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize: synthetic large (163KB)',
         () => { sink(tokenize(fixtures.syntheticLarge)); },
-        { warmupRounds: 5, samples: 15, iterations: 10 }
+        { warmupRounds: 5, samples: 20, iterations: 10 }
       ),
     },
 
@@ -236,7 +245,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize: modern.css (7.7KB)',
         () => { sink(tokenize(fixtures.modernCss)); },
-        { warmupRounds: 12, samples: 15, iterations: 300 }
+        { warmupRounds: 10, samples: 20, iterations: 20 }
       ),
     },
 
@@ -249,7 +258,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           const p = new Parser(syntheticTokens);
           sink(p.parseStyleSheet());
         },
-        { warmupRounds: 5, samples: 15, iterations: 10 }
+        { warmupRounds: 5, samples: 20, iterations: 10 }
       ),
     },
 
@@ -259,7 +268,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: synthetic large (163KB)',
         () => { sink(new Parser(tokenize(fixtures.syntheticLarge)).parseStyleSheet()); },
-        { warmupRounds: 5, samples: 15, iterations: 10 }
+        { warmupRounds: 5, samples: 20, iterations: 10 }
       ),
     },
 
@@ -269,7 +278,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: geocities.css (15KB)',
         () => { sink(new Parser(tokenize(fixtures.geocitiesCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 15, iterations: 80 }
+        { warmupRounds: 6, samples: 20, iterations: 80 }
       ),
     },
 
@@ -279,7 +288,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: whatwg styles.css (11KB)',
         () => { sink(new Parser(tokenize(fixtures.htmlStylesCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 15, iterations: 80 }
+        { warmupRounds: 6, samples: 20, iterations: 80 }
       ),
     },
 
@@ -289,7 +298,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: modern.css (7.7KB)',
         () => { sink(new Parser(tokenize(fixtures.modernCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 15, iterations: 80 }
+        { warmupRounds: 6, samples: 20, iterations: 80 }
       ),
     },
 
@@ -299,7 +308,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: postcss cases (4.4KB)',
         () => { sink(new Parser(tokenize(fixtures.postcssCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 15, iterations: 100 }
+        { warmupRounds: 6, samples: 20, iterations: 100 }
       ),
     },
 
@@ -319,7 +328,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(d.getPropertyValue('border'));
           sink(d.cssText);
         },
-        { warmupRounds: 6, samples: 15, iterations: 150 }
+        { warmupRounds: 6, samples: 20, iterations: 150 }
       ),
     },
 
@@ -335,7 +344,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           }
           sink(len);
         },
-        { warmupRounds: 6, samples: 15, iterations: 100 }
+        { warmupRounds: 6, samples: 20, iterations: 100 }
       ),
     },
 
@@ -353,7 +362,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           }
           sink(total);
         },
-        { warmupRounds: 6, samples: 15, iterations: 60 }
+        { warmupRounds: 6, samples: 20, iterations: 60 }
       ),
     },
 
@@ -368,7 +377,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(matches(targetElement, ':not(span, a)'));
           sink(matches(cardElement, 'div[data-state="visible"] > a.btn.primary'));
         },
-        { warmupRounds: 8, samples: 15, iterations: 1000 }
+        { warmupRounds: 15, samples: 20, iterations: 1000 }
       ),
     },
 
@@ -381,7 +390,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(getCascadedStyle(targetElement, cascadeRules));
           sink(getCascadedStyle(cardElement, cascadeRules));
         },
-        { warmupRounds: 6, samples: 15, iterations: 150 }
+        { warmupRounds: 8, samples: 20, iterations: 150 }
       ),
     },
 
@@ -397,7 +406,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(CSSNumericValue.parse('calc(10px + 20px * 2)'));
           sink(CSSNumericValue.parse('clamp(10px, 5vw, 50px)'));
         },
-        { warmupRounds: 8, samples: 15, iterations: 600 }
+        { warmupRounds: 15, samples: 20, iterations: 600 }
       ),
     },
   ];

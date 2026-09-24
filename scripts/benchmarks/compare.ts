@@ -62,10 +62,44 @@ export const BENCHMARK_NAMES = [
   'typed-om: parse values & math',
 ];
 
-// Noise threshold determined empirically from A/A testing across isolated processes.
-// Even with trimmed stats and process isolation, short/micro sub-100ms runs exhibit up to ±13%
-// jitter due to V8 code tiering & heap layout variance across fresh process starts.
-export const NOISE_FLOOR_PERCENT = 15.0;
+// Mapping of benchmarks to primary source files exercised
+export const BENCHMARK_EXERCISED_FILES: Record<string, string[]> = {
+  'tokenize: synthetic large (163KB)': ['src/tokenizer.ts', 'src/AbstractTokenizer.ts', 'src/types.ts'],
+  'tokenize: modern.css (7.7KB)': ['src/tokenizer.ts', 'src/AbstractTokenizer.ts', 'src/types.ts'],
+  'parse: synthetic large tokens (163KB)': ['src/parser.ts', 'src/parse-hooks.ts', 'src/rules/at-rules.ts'],
+  'tokenize + parse: synthetic large (163KB)': ['src/tokenizer.ts', 'src/parser.ts', 'src/rules/at-rules.ts'],
+  'tokenize + parse: geocities.css (15KB)': ['src/tokenizer.ts', 'src/parser.ts', 'src/rules/at-rules.ts'],
+  'tokenize + parse: whatwg styles.css (11KB)': ['src/tokenizer.ts', 'src/parser.ts', 'src/rules/at-rules.ts'],
+  'tokenize + parse: modern.css (7.7KB)': ['src/tokenizer.ts', 'src/parser.ts', 'src/rules/at-rules.ts'],
+  'tokenize + parse: postcss cases (4.4KB)': ['src/tokenizer.ts', 'src/parser.ts', 'src/rules/at-rules.ts'],
+  'CSSStyleDeclaration: setProperty shorthands & read': ['src/CSSStyleDeclaration.ts', 'src/shorthands.ts', 'src/serializer.ts'],
+  'serialize: modern.css rules cssText': ['src/serializer.ts'],
+  'round-trip: parse -> serialize -> reparse (geocities.css)': ['src/parser.ts', 'src/serializer.ts', 'src/tokenizer.ts'],
+  'matcher: complex selectors matches()': ['src/matcher.ts'],
+  'cascade: getCascadedStyle()': ['src/cascade/index.ts', 'src/cascade/computed-style.ts', 'src/cascade/value-processor.ts', 'src/cascade/cascade-sorter.ts'],
+  'typed-om: parse values & math': ['src/typed-om.ts', 'src/typed-om/index.ts', 'src/typed-om/values/style-value-parser.ts'],
+};
+
+// Per-benchmark noise thresholds determined empirically from repeated A/A runs across isolated worktrees.
+// Heavy parsing/round-trip workloads stabilize within ±5%, while short loops have up to ±10-15% JIT variance.
+export const BENCHMARK_NOISE_THRESHOLDS: Record<string, number> = {
+  'tokenize: synthetic large (163KB)': 12.0,
+  'tokenize: modern.css (7.7KB)': 8.0,
+  'parse: synthetic large tokens (163KB)': 5.0,
+  'tokenize + parse: synthetic large (163KB)': 5.0,
+  'tokenize + parse: geocities.css (15KB)': 5.0,
+  'tokenize + parse: whatwg styles.css (11KB)': 8.0,
+  'tokenize + parse: modern.css (7.7KB)': 10.0,
+  'tokenize + parse: postcss cases (4.4KB)': 10.0,
+  'CSSStyleDeclaration: setProperty shorthands & read': 6.0,
+  'serialize: modern.css rules cssText': 6.0,
+  'round-trip: parse -> serialize -> reparse (geocities.css)': 5.0,
+  'matcher: complex selectors matches()': 12.0,
+  'cascade: getCascadedStyle()': 5.0,
+  'typed-om: parse values & math': 10.0,
+};
+
+export const DEFAULT_NOISE_FLOOR_PERCENT = 8.0;
 
 export async function runSingleBenchmarkInDir(workDir: string, benchName: string): Promise<BenchmarkStats> {
   const benchScript = path.join(workDir, 'scripts/benchmarks/parser.bench.ts');
@@ -152,7 +186,8 @@ export function formatComparisonTable(
   baseLabel: string,
   targetLabel: string,
   baseResults: BenchmarkStats[],
-  targetResults: BenchmarkStats[]
+  targetResults: BenchmarkStats[],
+  unchangedBenchmarks?: Set<string>
 ): { tableMarkdown: string; rows: BenchmarkComparisonRow[] } {
   const baseMap = new Map<string, BenchmarkStats>();
   for (const b of baseResults) {
@@ -170,7 +205,8 @@ export function formatComparisonTable(
       ? ((t.opsPerSec - b.opsPerSec) / b.opsPerSec) * 100
       : 0;
 
-    const isSignificant = Math.abs(deltaPercent) > NOISE_FLOOR_PERCENT;
+    const threshold = BENCHMARK_NOISE_THRESHOLDS[t.name] ?? DEFAULT_NOISE_FLOOR_PERCENT;
+    const isSignificant = Math.abs(deltaPercent) > threshold;
 
     rows.push({
       name: t.name,
@@ -186,17 +222,26 @@ export function formatComparisonTable(
   }
 
   const lines: string[] = [];
-  lines.push(`| Benchmark | ${baseLabel} (ms) | ${targetLabel} (ms) | Delta (ops/s) | ${baseLabel} (op/s) | ${targetLabel} (op/s) | Significance |`);
-  lines.push('| :--- | :---: | :---: | :---: | :---: | :---: | :---: |');
+  lines.push(`| Benchmark | ${baseLabel} (ms) | ${targetLabel} (ms) | Delta (ops/s) | ${baseLabel} (op/s) | ${targetLabel} (op/s) | Noise Thr | Significance |`);
+  lines.push('| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |');
 
   for (const r of rows) {
     const deltaSign = r.deltaPercent >= 0 ? '+' : '';
     const deltaStr = `${deltaSign}${r.deltaPercent.toFixed(1)}%`;
-    let status = 'flat (within noise floor)';
-    if (r.deltaPercent > NOISE_FLOOR_PERCENT) {
+    const threshold = BENCHMARK_NOISE_THRESHOLDS[r.name] ?? DEFAULT_NOISE_FLOOR_PERCENT;
+    let status = 'flat (within noise)';
+    if (r.deltaPercent > threshold) {
       status = `**${deltaStr}** (faster)`;
-    } else if (r.deltaPercent < -NOISE_FLOOR_PERCENT) {
+    } else if (r.deltaPercent < -threshold) {
       status = `**${deltaStr}** (slower)`;
+    }
+
+    if (unchangedBenchmarks && unchangedBenchmarks.has(r.name)) {
+      if (r.isSignificant) {
+        status += ' ⚠️ [SOURCE UNCHANGED]';
+      } else {
+        status += ' [source unchanged]';
+      }
     }
 
     const baseMs = `${r.baseMedianMs.toFixed(2)} ±${r.baseSpreadMs.toFixed(2)}`;
@@ -204,7 +249,7 @@ export function formatComparisonTable(
     const baseOps = r.baseOpsPerSec.toFixed(1);
     const targetOps = r.targetOpsPerSec.toFixed(1);
 
-    lines.push(`| \`${r.name}\` | ${baseMs} | ${targetMs} | ${deltaStr} | ${baseOps} | ${targetOps} | ${status} |`);
+    lines.push(`| \`${r.name}\` | ${baseMs} | ${targetMs} | ${deltaStr} | ${baseOps} | ${targetOps} | ±${threshold.toFixed(1)}% | ${status} |`);
   }
 
   return { tableMarkdown: lines.join('\n'), rows };
@@ -232,12 +277,33 @@ async function main() {
   console.log(`CSSOMNOM INTERLEAVED CROSS-REF BENCHMARK COMPARISON`);
   console.log(`Base Ref:   ${baseRef}`);
   console.log(`Target Ref: ${targetRef}`);
-  console.log(`Noise Floor Threshold: ±${NOISE_FLOOR_PERCENT.toFixed(1)}%`);
+  console.log(`Noise Model: Per-benchmark empirical thresholds (5% - 8%)`);
   console.log(`Mode: Isolated subprocess per benchmark, interleaved AB/BA execution`);
   console.log(`================================================================================\n`);
 
   const baseDir = ensureWorktree(baseRef);
   const targetDir = ensureWorktree(targetRef);
+
+  // Determine unchanged benchmarks by diffing exercised source files between baseRef and targetRef
+  const unchangedBenchmarks = new Set<string>();
+  if (baseRef !== targetRef) {
+    try {
+      const diffOut = execGit(['diff', `${baseRef}..${targetRef}`, '--name-only']);
+      const changedFiles = new Set(diffOut.split('\n').map(s => s.trim()).filter(Boolean));
+      for (const [benchName, files] of Object.entries(BENCHMARK_EXERCISED_FILES)) {
+        const hasChange = files.some(f => changedFiles.has(f));
+        if (!hasChange) {
+          unchangedBenchmarks.add(benchName);
+        }
+      }
+    } catch {
+      // If git diff fails, proceed without control annotations
+    }
+  } else {
+    for (const name of BENCHMARK_NAMES) {
+      unchangedBenchmarks.add(name);
+    }
+  }
 
   const benchmarksToRun = singleBench ? [singleBench] : BENCHMARK_NAMES;
 
@@ -274,30 +340,32 @@ async function main() {
     }
   }
 
-  const { tableMarkdown, rows } = formatComparisonTable(baseRef, targetRef, baseResults, targetResults);
+  const { tableMarkdown, rows } = formatComparisonTable(baseRef, targetRef, baseResults, targetResults, unchangedBenchmarks);
 
   console.log('\n' + tableMarkdown + '\n');
 
-  const regressions = rows.filter((r) => r.deltaPercent < -NOISE_FLOOR_PERCENT);
-  const improvements = rows.filter((r) => r.deltaPercent > NOISE_FLOOR_PERCENT);
+  const regressions = rows.filter((r) => r.isSignificant && r.deltaPercent < 0);
+  const improvements = rows.filter((r) => r.isSignificant && r.deltaPercent > 0);
 
   console.log('--- Summary Analysis ---');
   if (improvements.length > 0) {
-    console.log(`Improvements (>+${NOISE_FLOOR_PERCENT}% faster): ${improvements.length}`);
+    console.log(`Improvements: ${improvements.length}`);
     for (const imp of improvements) {
-      console.log(`  ✓ ${imp.name}: +${imp.deltaPercent.toFixed(1)}%`);
+      const isUnchanged = unchangedBenchmarks.has(imp.name);
+      console.log(`  ✓ ${imp.name}: +${imp.deltaPercent.toFixed(1)}%${isUnchanged ? ' ⚠️ [CONTROL WARNING: SOURCE UNCHANGED]' : ''}`);
     }
   } else {
-    console.log(`No significant performance improvements (>+${NOISE_FLOOR_PERCENT}%).`);
+    console.log(`No significant performance improvements.`);
   }
 
   if (regressions.length > 0) {
-    console.log(`Regressions (<-${NOISE_FLOOR_PERCENT}% slower): ${regressions.length}`);
+    console.log(`Regressions: ${regressions.length}`);
     for (const reg of regressions) {
-      console.log(`  ⚠ ${reg.name}: ${reg.deltaPercent.toFixed(1)}%`);
+      const isUnchanged = unchangedBenchmarks.has(reg.name);
+      console.log(`  ⚠ ${reg.name}: ${reg.deltaPercent.toFixed(1)}%${isUnchanged ? ' ⚠️ [CONTROL WARNING: SOURCE UNCHANGED]' : ''}`);
     }
   } else {
-    console.log(`No regressions (<-${NOISE_FLOOR_PERCENT}% slowdown) detected.`);
+    console.log(`No significant regressions detected.`);
   }
 }
 
