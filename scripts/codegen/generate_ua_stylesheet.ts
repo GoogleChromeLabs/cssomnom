@@ -19,13 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 const WHATWG_RENDERING_URL = 'https://html.spec.whatwg.org/multipage/rendering.html';
-const CACHE_PATH = path.resolve(import.meta.dirname, 'cache/whatwg-ua-blocks.json');
 const OUTPUT_PATH = path.resolve(import.meta.dirname, '../../src/data/gen/ua-stylesheet.ts');
-
-interface CachedUaData {
-  sourceUrl: string;
-  blocks: string[];
-}
 
 function decodeHtmlEntities(html: string): string {
   return html
@@ -78,69 +72,69 @@ function extractPureTagRules(cssText: string): string[] {
   return rules;
 }
 
-async function fetchOrLoadBlocks(): Promise<string[]> {
-  if (fs.existsSync(CACHE_PATH) && process.env.REFRESH_UA_STYLESHEET !== '1') {
-    const cached = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf-8')) as CachedUaData;
-    return cached.blocks;
-  }
+function escapeTemplateLiteral(str: string): string {
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$\{/g, '\\${');
+}
 
+async function fetchBlocks(): Promise<string[]> {
+  let html: string;
   try {
-    const res = await fetch(WHATWG_RENDERING_URL, { signal: AbortSignal.timeout(8000) });
+    const res = await fetch(WHATWG_RENDERING_URL, { signal: AbortSignal.timeout(15000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const html = await res.text();
-
-    const preRegex = /([\s\S]{0,220})<pre><code class=['"]css['"]>([\s\S]*?)<\/code><\/pre>/gi;
-    const extractedBlocks: string[] = [];
-    let match: RegExpExecArray | null;
-
-    while ((match = preRegex.exec(html)) !== null) {
-      const context = decodeHtmlEntities(match[1]).replace(/\s+/g, ' ').toLowerCase();
-      // Skip quirks-mode, legacy encoding, and optional customizable-select appearance branches
-      if (
-        context.includes('quirks mode') ||
-        context.includes('iso-8859-8') ||
-        context.includes('base appearance') ||
-        context.includes('presentational hints')
-      ) {
-        continue;
-      }
-
-      const decoded = decodeHtmlEntities(match[2]).trim();
-      if (!decoded.startsWith('@namespace')) continue;
-
-      const normalized = normalizeWhatwgCssBlock(decoded);
-      const tagRules = extractPureTagRules(normalized);
-      if (tagRules.length > 0) {
-        extractedBlocks.push(tagRules.join('\n'));
-      }
-
-      // HTML § 15.3.2 (#the-page) normative prose specifies 8px default margin on <body>
-      if (decoded.includes('html, body { display: block; }')) {
-        extractedBlocks.push('body { margin: 8px; }');
-      }
-    }
-
-    if (extractedBlocks.length > 0) {
-      fs.mkdirSync(path.dirname(CACHE_PATH), { recursive: true });
-      fs.writeFileSync(
-        CACHE_PATH,
-        JSON.stringify({ sourceUrl: WHATWG_RENDERING_URL, blocks: extractedBlocks }, null, 2) + '\n',
-      );
-      return extractedBlocks;
-    }
+    html = await res.text();
   } catch (err) {
-    if (fs.existsSync(CACHE_PATH)) {
-      const cached = JSON.parse(fs.readFileSync(CACHE_PATH, 'utf-8')) as CachedUaData;
-      return cached.blocks;
+    if (fs.existsSync(OUTPUT_PATH)) {
+      console.warn(
+        `[WARN] Failed to fetch WHATWG rendering.html (${err instanceof Error ? err.message : String(err)}). Keeping existing ${OUTPUT_PATH}.`,
+      );
+      process.exit(0);
     }
     throw err;
   }
 
-  throw new Error('Failed to extract UA stylesheet blocks from WHATWG rendering.html');
+  const preRegex = /([\s\S]{0,220})<pre><code class=['"]css['"]>([\s\S]*?)<\/code><\/pre>/gi;
+  const extractedBlocks: string[] = [];
+  let match: RegExpExecArray | null;
+
+  while ((match = preRegex.exec(html)) !== null) {
+    const context = decodeHtmlEntities(match[1]).replace(/\s+/g, ' ').toLowerCase();
+    // Skip quirks-mode, legacy encoding, and optional customizable-select appearance branches
+    if (
+      context.includes('quirks mode') ||
+      context.includes('iso-8859-8') ||
+      context.includes('base appearance') ||
+      context.includes('presentational hints')
+    ) {
+      continue;
+    }
+
+    const decoded = decodeHtmlEntities(match[2]).trim();
+    if (!decoded.startsWith('@namespace')) continue;
+
+    const normalized = normalizeWhatwgCssBlock(decoded);
+    const tagRules = extractPureTagRules(normalized);
+    if (tagRules.length > 0) {
+      extractedBlocks.push(tagRules.join('\n'));
+    }
+
+    // HTML § 15.3.2 (#the-page) normative prose specifies 8px default margin on <body>
+    if (decoded.includes('html, body { display: block; }')) {
+      extractedBlocks.push('body { margin: 8px; }');
+    }
+  }
+
+  if (extractedBlocks.length === 0) {
+    throw new Error('Failed to extract UA stylesheet blocks from WHATWG rendering.html');
+  }
+
+  return extractedBlocks;
 }
 
 async function main() {
-  const blocks = await fetchOrLoadBlocks();
+  const blocks = await fetchBlocks();
   const stylesheetText = blocks.join('\n\n');
 
   const output = `/**
@@ -163,7 +157,9 @@ async function main() {
 // @generated by scripts/codegen/generate_ua_stylesheet.ts. Do not edit.
 // Extracted from WHATWG HTML Standard § 15.3 (https://html.spec.whatwg.org/multipage/rendering.html)
 
-export const HTML_UA_STYLESHEET_TEXT = ${JSON.stringify(stylesheetText, null, 2)};
+export const HTML_UA_STYLESHEET_TEXT = \`
+${escapeTemplateLiteral(stylesheetText)}
+\`;
 `;
 
   fs.mkdirSync(path.dirname(OUTPUT_PATH), { recursive: true });
