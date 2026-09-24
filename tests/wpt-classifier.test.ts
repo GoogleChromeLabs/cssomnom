@@ -331,25 +331,38 @@ test('classifySubtestFeasibility: Phase 139 Heuristics Tuning', () => {
   });
   assert.strictEqual(selectorTextWithMetric.isBrowserOnly, false);
   assert.strictEqual(selectorTextWithMetric.category, undefined);
-  // 6. perspective-origin used value box resolution
-  const perspectiveOriginTest = classifySubtestFeasibility({
+  // 6. Perspective-origin syntax or supports check is not classified as browser-only
+  const perspectiveOriginSupports = classifySubtestFeasibility({
     file: 'submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html',
-    name: 'same var() for both values of perspective-origin',
-    expected: '"50px 50px"',
-    actual: '"25% 25%"',
-    error: 'Error: expected "50px 50px" but got "25% 25%"'
+    name: 'CSS.supports("perspective-origin", "var(--pos) var(--pos)")',
+    expected: 'true',
+    actual: 'false',
+    error: 'assert_equals: expected true but got false'
   });
-  assert.strictEqual(perspectiveOriginTest.isBrowserOnly, true);
-  assert.strictEqual(perspectiveOriginTest.category, 'LAYOUT_GEOMETRY');
+  assert.strictEqual(perspectiveOriginSupports.isBrowserOnly, false);
+  assert.strictEqual(perspectiveOriginSupports.category, undefined);
 
-  // 7. Missing box metric stub (expected number but got undefined)
+  // 7. Missing box metric stub (expected number but got undefined or 0, test references metric)
   const offsetWidthUndefined = classifySubtestFeasibility({
-    file: 'submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-001.html',
-    name: 'A :lang value that matches an identical lang attribute value on the same element will produce styling.',
+    file: 'submodules/web-platform-tests/css/cssom/element-metrics-test.html',
+    name: 'element.offsetWidth layout dimension resolution',
     error: 'Error: expected 100 but got undefined'
   });
   assert.strictEqual(offsetWidthUndefined.isBrowserOnly, true);
   assert.strictEqual(offsetWidthUndefined.category, 'LAYOUT_GEOMETRY');
+
+  // Negative test: querySelector should not use Unicode case-folding in selectors-case-sensitive-001.html
+  // Even though the file contains offsetHeight assertions in other tests, this querySelector subtest
+  // has nothing to do with layout or box metrics and must NOT be classified.
+  const querySelectorCaseSensitive = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/selectors/selectors-case-sensitive-001.html',
+    name: '`querySelector` should not use Unicode case-folding',
+    expected: 'null',
+    actual: '<k></k>',
+    error: 'assert_equals: expected null but got Element'
+  });
+  assert.strictEqual(querySelectorCaseSensitive.isBrowserOnly, false);
+  assert.strictEqual(querySelectorCaseSensitive.category, undefined);
 
   // 8. Pure CSSOM getComputedStyle display/color assertion must NOT be classified
   const pureComputedColor = classifySubtestFeasibility({
@@ -361,5 +374,39 @@ test('classifySubtestFeasibility: Phase 139 Heuristics Tuning', () => {
   });
   assert.strictEqual(pureComputedColor.isBrowserOnly, false);
   assert.strictEqual(pureComputedColor.category, undefined);
+
+  // 9. Percentage vs px on layout properties
+  // Positive: expected "100px", actual "50%" on width -> LAYOUT_GEOMETRY
+  const widthPxVsPercent = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/cssom/computed-style-001.html',
+    name: 'relative_property_values width',
+    expected: '"100px"',
+    actual: '"50%"',
+    error: 'Error: expected "100px" but got "50%"'
+  });
+  assert.strictEqual(widthPxVsPercent.isBrowserOnly, true);
+  assert.strictEqual(widthPxVsPercent.category, 'LAYOUT_GEOMETRY');
+
+  // Negative: the same pair on a non-layout property (e.g. background-position) -> not classified
+  const bgPositionPxVsPercent = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/cssom/getComputedStyle-bg.html',
+    name: 'background-position resolution',
+    expected: '"100px"',
+    actual: '"50%"',
+    error: 'Error: expected "100px" but got "50%"'
+  });
+  assert.strictEqual(bgPositionPxVsPercent.isBrowserOnly, false);
+  assert.strictEqual(bgPositionPxVsPercent.category, undefined);
+
+  // Negative: expected "50%", actual "25%" on width -> not classified
+  const widthPercentVsPercent = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/cssom/getComputedStyle-width.html',
+    name: 'width percentage calculation',
+    expected: '"50%"',
+    actual: '"25%"',
+    error: 'Error: expected "50%" but got "25%"'
+  });
+  assert.strictEqual(widthPercentVsPercent.isBrowserOnly, false);
+  assert.strictEqual(widthPercentVsPercent.category, undefined);
 });
 

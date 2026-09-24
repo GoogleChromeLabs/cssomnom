@@ -91,5 +91,33 @@ describe('CSSOM: getComputedStyle Pseudo-Element Resolution & Min-Size Auto Reso
     assert.strictEqual(getCascadedStyle(flexItem).getPropertyValue('min-width'), 'auto');
     assert.strictEqual(getCascadedStyle(noneItem).getPropertyValue('min-width'), 'auto');
   });
+
+  // css-transforms-2 § 3.2 #perspective-origin-property: computed value is see background-position (css-backgrounds-3)
+  it('resolves perspective-origin to its computed value', () => {
+    const { document } = parseHTML(`
+      <div id="default"></div>
+      <div id="left" style="perspective-origin: left"></div>
+      <div id="center" style="perspective-origin: center"></div>
+      <div id="lengths" style="font-size: 16px; perspective-origin: 1em 2em"></div>
+      <div id="top-left" style="perspective-origin: top left"></div>
+    `);
+
+    const def = document.getElementById('default')!;
+    const left = document.getElementById('left')!;
+    const center = document.getElementById('center')!;
+    const lengths = document.getElementById('lengths')!;
+    const topLeft = document.getElementById('top-left')!;
+
+    // Initial value is 50% 50%
+    assert.strictEqual(getCascadedStyle(def).getPropertyValue('perspective-origin'), '50% 50%');
+    // 'left' -> 0% 50%
+    assert.strictEqual(getCascadedStyle(left).getPropertyValue('perspective-origin'), '0% 50%');
+    // 'center' -> 50% 50%
+    assert.strictEqual(getCascadedStyle(center).getPropertyValue('perspective-origin'), '50% 50%');
+    // '1em 2em' with 16px font-size -> 16px 32px
+    assert.strictEqual(getCascadedStyle(lengths).getPropertyValue('perspective-origin'), '16px 32px');
+    // 'top left' -> 0% 0%
+    assert.strictEqual(getCascadedStyle(topLeft).getPropertyValue('perspective-origin'), '0% 0%');
+  });
 });
 

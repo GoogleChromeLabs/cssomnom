@@ -633,6 +633,25 @@ Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `co
 - [ ] Narrow signatures and delete the dual-shape handling in `src/cascade/` (`index.ts`, `rule-filter.ts`, `layer-manager.ts`, `at-rule-manager.ts`) and `toParserRule` in `parser-api.ts`; remove the `(r as { type?: number }).type === N` fallbacks where `instanceof` suffices.
 - [ ] Net-negative `src/`; 0 WPT regressions.
 
+## Phase 154: Fix :lang() Matching [ ]
+**Objective**: Implement spec-compliant CSS Selectors 4 § 7.2 `:lang()` pseudo-class matching using RFC 4647 extended language range filtering.
+
+Currently, `src/matcher.ts` uses basic prefix matching (`elementLang === clean || elementLang.startsWith(clean + '-')`), which fails RFC 4647 extended filtering, wildcard ranges, and XML document handling.
+
+### Todo Cases Catalogued in `tests/selectors-lang.test.ts`
+- [ ] **RFC 4647 Extended Filtering (Script Subtags & Wildcards)**:
+  - Language range matching when tags contain intermediate script/region subtags (e.g., `:lang(cs-CZ)` matching `lang="cs-Latn-CZ"`, `:lang(fr-FR)` matching `lang="fr-Latn-FR"`).
+  - Wildcard ranges in selector lists (e.g., `:lang(*-Latn)`, `:lang(*-CH)`, `:lang(*-FR)`, `:lang(*-x-foobar)`).
+  - Escaped wildcard ranges (e.g., `:lang(\*-FR)`).
+- [ ] **Private-Use Subtag & Singleton Handling**:
+  - RFC 4647 step 3D singleton subtag handling (e.g., `:lang("fr-x-foobar")` matching `lang="fr-Latn-FR-x-foobar"` while singletons block skipping).
+- [ ] **Subtag Length Boundaries**:
+  - RFC 4647 8-character subtag limit enforcement (e.g., `:lang(fr)` must not match `lang="fr-ninechars"`).
+- [ ] **Argument Syntax Resilience & Whitespace**:
+  - Argument list parsing resilience for numbers/idents (e.g., `:lang(de, nl, 0, fr)`, `:lang(0)`).
+- [ ] **XML Document `xml:lang` Attribute Semantics**:
+  - Support `xml:lang` lookup in XML documents while ignoring it in HTML documents per CSS Selectors 4 / HTML specification.
+
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
 

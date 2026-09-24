@@ -324,6 +324,41 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return rawVal;
       }
+      if (dashed === 'perspective-origin' || dashed === '-webkit-perspective-origin') {
+        // css-transforms-2 § 3.2: computed value is two offsets (horizontal then vertical)
+        // keywords become percentages (left/top 0%, center 50%, right/bottom 100%), lengths absolutize
+        const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
+        const tokens = lowerRaw.split(/\s+/).filter(Boolean);
+        const normalizeComponent = (tok: string): string => {
+          if (tok === 'left' || tok === 'top') return '0%';
+          if (tok === 'right' || tok === 'bottom') return '100%';
+          if (tok === 'center') return '50%';
+          if (tok.endsWith('%') || tok.endsWith('px')) return tok;
+          if (tok === '0') return '0px';
+          if (tok.endsWith('em')) {
+            const n = parseFloat(tok);
+            return !isNaN(n) ? `${n * fs}px` : tok;
+          }
+          return tok;
+        };
+
+        if (tokens.length === 1) {
+          const t = tokens[0];
+          if (t === 'top' || t === 'bottom') {
+            return `50% ${normalizeComponent(t)}`;
+          }
+          return `${normalizeComponent(t)} 50%`;
+        }
+        if (tokens.length === 2) {
+          const [first, second] = tokens;
+          // check if first is vertical keyword and second is horizontal keyword
+          if ((first === 'top' || first === 'bottom') && (second === 'left' || second === 'right' || second === 'center')) {
+            return `${normalizeComponent(second)} ${normalizeComponent(first)}`;
+          }
+          return `${normalizeComponent(first)} ${normalizeComponent(second)}`;
+        }
+        return rawVal;
+      }
       return rawVal;
     }
 
@@ -353,6 +388,9 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     }
     if (dashed === 'min-width' || dashed === 'min-height') {
       return 'auto';
+    }
+    if (dashed === 'perspective-origin' || dashed === '-webkit-perspective-origin') {
+      return '50% 50%';
     }
 
     return '';

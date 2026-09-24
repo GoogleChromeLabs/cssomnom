@@ -1,5 +1,7 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 
+import * as fs from 'node:fs';
+
 export type BrowserCapabilityCategory =
   | 'LAYOUT_GEOMETRY'
   | 'VIEWPORT_GEOMETRY'
@@ -269,11 +271,45 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
       'offsetwidth',
       'offsetheight',
       'scrollwidth',
-      'scrollheight'
+      'scrollheight',
+      'getboundingclientrect',
+      'getclientrects'
     ];
 
+    let fileContent = '';
+    if (file && fs.existsSync(file)) {
+      try {
+        fileContent = fs.readFileSync(file, 'utf-8');
+      } catch {}
+    }
+
+    const testReferencesMetric = (metric: string): boolean => {
+      if (combined.includes(metric)) return true;
+      if (fileContent) {
+        let searchScope = fileContent;
+        if (name) {
+          const nameIdx = fileContent.indexOf(name);
+          if (nameIdx !== -1) {
+            // Find the nearest preceding test( or promise_test(
+            const before = fileContent.slice(0, nameIdx);
+            const testStart = Math.max(before.lastIndexOf('test('), before.lastIndexOf('promise_test('));
+            if (testStart !== -1) {
+              // Find the end of this test block
+              const after = fileContent.slice(nameIdx);
+              const testEndRel = after.indexOf(');');
+              const testEnd = testEndRel !== -1 ? nameIdx + testEndRel + 2 : fileContent.length;
+              searchScope = fileContent.slice(testStart, testEnd);
+            }
+          }
+        }
+        const re = new RegExp(`\\b${metric}\\b`, 'i');
+        return re.test(searchScope);
+      }
+      return false;
+    };
+
     for (const metric of BOX_METRIC_PROPERTIES) {
-      if (combined.includes(metric)) {
+      if (testReferencesMetric(metric)) {
         const isExpectedNumber = /^\s*["']?\d+(\.\d+)?["']?\s*$/.test(expected) || /expected \d+ but got undefined/i.test(error);
         const isActualBlankOrZero = /^\s*["']?(0|0px|auto|none|normal|undefined|)["']?\s*$/.test(actual) || /^\s*""\s*$/.test(actual) || /got undefined/i.test(error);
         if (isExpectedNumber && isActualBlankOrZero) {
@@ -285,26 +321,6 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
         }
       }
     }
-  }
-
-  if (fileLower.includes('perspective-origin') || combined.includes('perspective-origin')) {
-    return {
-      isBrowserOnly: true,
-      category: 'LAYOUT_GEOMETRY',
-      reason: 'perspective-origin used value percentage/keyword resolution requires layout box dimensions'
-    };
-  }
-
-  if (
-    fileLower.includes('css3-selectors-lang-') ||
-    fileLower.includes('selectors-case-sensitive-') ||
-    fileLower.includes('relative-units-005')
-  ) {
-    return {
-      isBrowserOnly: true,
-      category: 'LAYOUT_GEOMETRY',
-      reason: 'Test asserts layout geometry via offsetWidth/offsetHeight or font-relative query evaluation'
-    };
   }
 
   // Check expected vs actual px dimension mismatches on layout properties
@@ -323,6 +339,22 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
     (/^\s*["']?(auto|none|0px|normal|0|)["']?\s*$/i.test(actVal) || /^\s*""\s*$/.test(actVal))
   ) {
     // If the test name or property references a visual box model property
+    for (const prop of LAYOUT_PROPERTIES) {
+      if (name.toLowerCase().includes(prop) || combined.includes(prop)) {
+        return {
+          isBrowserOnly: true,
+          category: 'LAYOUT_GEOMETRY',
+          reason: `Resolved layout ${prop} value requires visual box formatting context`
+        };
+      }
+    }
+  }
+
+  // Used values of layout properties (e.g. width) require visual formatting context to resolve percentages against parent/box
+  if (
+    /^\s*["']?\d+(\.\d+)?px["']?\s*$/i.test(expVal) &&
+    /^\s*["']?\d+(\.\d+)?%["']?\s*$/i.test(actVal)
+  ) {
     for (const prop of LAYOUT_PROPERTIES) {
       if (name.toLowerCase().includes(prop) || combined.includes(prop)) {
         return {

@@ -2527,7 +2527,6 @@
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/computed.tentative.html": [
     "Computed StylePropertyMap contains CSS property declarations in inline styles",
     "Computed StylePropertyMap contains CSS property declarations in style rules",
-    "Computed StylePropertyMap contains computed values and not resolved values",
     "Computed StylePropertyMap contains custom property declarations in inline rules",
     "Computed StylePropertyMap contains custom property declarations in style rules",
     "Computed StylePropertyMap is live"
@@ -14683,17 +14682,7 @@
   "submodules/web-platform-tests/css/cssom/computed-style-001.html": [
     "inherited_property_values",
     "property_values",
-    "read_only",
-    "relative_property_values"
-  ],
-  "submodules/web-platform-tests/css/cssom/computed-style-002.html": [
-    "Check that a percent width in an iframe is resolved against iframe width for getComputedStyle."
-  ],
-  "submodules/web-platform-tests/css/cssom/computed-style-003.html": [
-    "Check that a percent width in an iframe is the resolved width when the iframe is displayed."
-  ],
-  "submodules/web-platform-tests/css/cssom/computed-style-004.html": [
-    "Check that the initial width is 100px."
+    "read_only"
   ],
   "submodules/web-platform-tests/css/cssom/computed-style-005.html": [
     "absolute_computed_left_and_right",
@@ -15330,12 +15319,6 @@
     "Fixed-length right property value should roundtrip",
     "Fixed-length top property value should roundtrip"
   ],
-  "submodules/web-platform-tests/css/cssom/getComputedStyle-layout-dependent-removed-ib-sibling.html": [
-    "getComputedStyle() should return the correct used value for nodes that have had an IB-split sibling removed"
-  ],
-  "submodules/web-platform-tests/css/cssom/getComputedStyle-layout-dependent-replaced-into-ib-split.html": [
-    "getComputedStyle() should return used value correctly for nodes just inserted into the document, even if they're in an IB-split"
-  ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-line-height.html": [
     "line-height: 1",
     "line-height: 10%",
@@ -15405,7 +15388,6 @@
     "Prefixed ::-webkit-file-upload-button does not resolve in getComputedStyle",
     "Resolution of nonexistent pseudo-element styles",
     "Resolution of pseudo-element styles in display: none elements",
-    "Resolution of width is correct for ::before and ::after pseudo-elements of display: contents elements",
     "Resolution of width is correct when pseudo-element argument is ignored (due to no colon)",
     "Resolution of width is correct when pseudo-element argument is invalid (due to a trailing token)",
     "Unknown pseudo-element with a known identifier: backdrop",
@@ -15437,6 +15419,9 @@
     "The resolved value for 'caret-color' is the used value",
     "The resolved value for 'color' is the used value",
     "The resolved value for 'outline-color' is the used value"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-min-max-clamping.html": [
+    "Resolved value of width / height when there's no used value isn't clamped by min/max properties"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-min-size-auto.html": [
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-degenerate-aspect-ratio\"",

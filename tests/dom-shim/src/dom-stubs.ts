@@ -2102,16 +2102,13 @@ function patchElementPrototype(window: WindowType): void {
       };
     }
     if (!('getClientRects' in elProto)) {
-      (elProto as unknown as Record<string, unknown>).getClientRects = () => [{
-        top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
-        toJSON: () => ({})
-      }];
-    }
-    if (!('getBoundingClientRect' in elProto)) {
-      (elProto as unknown as Record<string, unknown>).getBoundingClientRect = () => ({
-        top: 0, left: 0, right: 100, bottom: 100, width: 100, height: 100, x: 0, y: 0,
-        toJSON: () => ({})
-      });
+      (elProto as unknown as Record<string, unknown>).getClientRects = function (this: Element) {
+        const rect = this.getBoundingClientRect ? this.getBoundingClientRect() : {
+          top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0,
+          toJSON: () => ({})
+        };
+        return [rect];
+      };
     }
     if (!('scrollIntoView' in elProto)) {
       (elProto as unknown as Record<string, unknown>).scrollIntoView = () => {};
@@ -2659,31 +2656,6 @@ function patchWindowStyles(window: WindowType): void {
                   const elDisp = (element as { style?: { getPropertyValue?: (prop: string) => string } }).style?.getPropertyValue?.('display') || getCascadedStyle(element as Element).getPropertyValue('display');
                   if (elDisp === 'flex' || elDisp === 'inline-flex' || elDisp === 'grid' || elDisp === 'inline-grid') {
                     return 'block';
-                  }
-                }
-                if ((p === 'width' || p === 'height') && val.endsWith('%')) {
-                  const pct = parseFloat(val);
-                  if (!isNaN(pct)) {
-                    let ancestor: unknown = element;
-                    while (ancestor && typeof ancestor === 'object') {
-                      const el = ancestor as { parentElement?: unknown; parentNode?: unknown; ownerDocument?: { defaultView?: unknown } };
-                      const parent = el.parentElement || el.parentNode;
-                      if (parent && typeof parent === 'object') {
-                        try {
-                          const parentDecl = getCascadedStyle(parent as Element);
-                          const styleVal = parentDecl.getPropertyValue(p);
-                          if (styleVal && styleVal.endsWith('px')) {
-                            return `${(parseFloat(styleVal) * pct) / 100}px`;
-                          }
-                        } catch {}
-                      } else {
-                        const winCtx = el.ownerDocument?.defaultView || window;
-                        const env = getMediaEnvForWindow(winCtx);
-                        const dim = p === 'width' ? (env.width ?? 800) : (env.height ?? 600);
-                        return `${(dim * pct) / 100}px`;
-                      }
-                      ancestor = parent;
-                    }
                   }
                 }
                 return val;
