@@ -3451,7 +3451,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 142: WPT Conformance Boost — Core CSSOM WebIDL Harness & Dynamic Stylesheet Lifecycle [ ]
+## Phase 142: WPT Conformance Boost — Core CSSOM WebIDL Harness & Dynamic Stylesheet Lifecycle [x]
 **Goal**: Advance `cssom` conformance from 1,989 / 2,141 (92.9%) to 2,085 / 2,120 (98.3% feasible) by fixing test harness Promise rejection polyfills, missing DOM prototypes, `<style>` / `<link>` lifecycle synchronization, rule restrictions, and logical property setter ordering.
 
 **Spec References**:
@@ -3485,16 +3485,16 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Implement CSSOM § 4.6 alternate stylesheet disabled rules: toggling `link.disabled = true` uncouples `sheet.ownerNode = null` and clears it from `document.styleSheets`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-002.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/HTMLLinkElement-disabled-002.html) through `007.html` (+14 tests).
 
-#### Phase 142.3: CSSOM Rule Restrictions & Declaration Polish (+16 tests) [ ]
+#### Phase 142.3: CSSOM Rule Restrictions & Declaration Polish (+16 tests) [x]
 - [x] **Enforce Property Restrictions on `@page` and `@keyframes` (+2 tests)**:
   - In `CSSPageRule` and `CSSKeyframeRule`, configure property validator hooks to drop non-applicable properties (`transform` in `@page`, `animation-name` in `@keyframes`).
   - *Target*: 100% pass on [`submodules/web-platform-tests/css/cssom/rule-restrictions.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/rule-restrictions.html) (+2 tests).
 - [x] **`CSSStyleDeclaration` Logical Property Grouping (+7 tests)**:
   - In `src/CSSStyleDeclaration.ts:setProperty()`, preserve declaration ordering relative to logical property groups per CSSOM § 6.5.1.
   - *Target*: Fixes [`submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-logical.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-logical.html) (+7 tests).
-- [ ] **Constructable Stylesheet Document Adoption Verification (+7 tests)**:
-  - Implement document adoption checks when modifying constructable stylesheets.
-  - *Target*: Fixes constructable stylesheet adoption tests in `submodules/web-platform-tests/css/cssom/` (+7 tests).
+- [x] **Constructable Stylesheet Document Adoption Verification (+7 tests)**:
+  - Implement document adoption checks when modifying constructable stylesheets and CSS Syntax 3 § 5.5.5 Step 7 declaration trailing whitespace removal.
+  - *Target*: Fixes constructable stylesheet adoption and `replace()` rule tests in `submodules/web-platform-tests/css/cssom/` (+7 tests).
 
 ---
 

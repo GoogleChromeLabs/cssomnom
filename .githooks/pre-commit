@@ -38,6 +38,7 @@ hash_of() { [ -f "$1" ] && git hash-object "$1" || echo "absent"; }
 
 progress_before=$(hash_of wpt-progress.md)
 readme_before=$(hash_of README.md)
+baseline_before=$(hash_of tests/wpt-passing-baseline.json)
 
 if ! pnpm run wpt:progress; then
   echo "error: wpt:progress failed (regressions detected or runner error). Aborting commit." >&2
@@ -45,10 +46,11 @@ if ! pnpm run wpt:progress; then
 fi
 
 
-for f in wpt-progress.md README.md; do
+for f in wpt-progress.md README.md tests/wpt-passing-baseline.json; do
   case "$f" in
-    wpt-progress.md) before=$progress_before ;;
-    README.md)       before=$readme_before ;;
+    wpt-progress.md)                  before=$progress_before ;;
+    README.md)                        before=$readme_before ;;
+    tests/wpt-passing-baseline.json)  before=$baseline_before ;;
   esac
   if [ "$(hash_of "$f")" != "$before" ]; then
     git add "$f"

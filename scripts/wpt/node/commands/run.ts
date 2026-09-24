@@ -123,13 +123,28 @@ export async function runCommand(options: RunCommandOptions = {}): Promise<TestR
     console.log(`\n--- ZERO-REGRESSION AUDIT REPORT ---`);
     console.log(`Baseline: ${audit.baselineCount} | Current: ${audit.currentCount} | New: +${audit.newPasses.length} | Regressions: -${audit.regressions.length}`);
     if (audit.regressions.length > 0) {
+      const failureMsgMap = new Map<string, string>();
+      for (const r of dataset.fileResults) {
+        if (r.loadError) {
+          failureMsgMap.set(`${r.file}::*`, r.loadError);
+        }
+        for (const s of r.subtests) {
+          if (s.status === 'FAIL' && (s.error || s.rawError)) {
+            failureMsgMap.set(`${r.file}::${s.name}`, s.error || s.rawError || '');
+          }
+        }
+      }
+      const formatRegression = (r: { file: string; test: string }) => {
+        const msg = failureMsgMap.get(`${r.file}::${r.test}`) || failureMsgMap.get(`${r.file}::*`);
+        return msg ? `  - ${r.file} -> ${r.test}\n      Reason: ${msg}` : `  - ${r.file} -> ${r.test}`;
+      };
       if (options.noVerify) {
         console.warn('\n⚠️  WARNING: REGRESSIONS DETECTED (--no-verify / --allow-regressions active, continuing):');
-        for (const r of audit.regressions.slice(0, 20)) console.warn(`  - ${r.file} -> ${r.test}`);
+        for (const r of audit.regressions.slice(0, 20)) console.warn(formatRegression(r));
         if (audit.regressions.length > 20) console.warn(`  ... and ${audit.regressions.length - 20} more regressions`);
       } else {
         console.error('\n🔴 REGRESSIONS DETECTED:');
-        for (const r of audit.regressions.slice(0, 20)) console.error(`  - ${r.file} -> ${r.test}`);
+        for (const r of audit.regressions.slice(0, 20)) console.error(formatRegression(r));
         if (audit.regressions.length > 20) console.error(`  ... and ${audit.regressions.length - 20} more regressions`);
         process.exit(1);
       }
@@ -141,7 +156,7 @@ export async function runCommand(options: RunCommandOptions = {}): Promise<TestR
   }
 
 
-  if (options.writePassingSetBaseline) {
+  if (options.writePassingSetBaseline || options.writeProgressMarkdown) {
     const baselinePath = getBaselinePath();
     const currentPassingMap: Record<string, string[]> = {};
     for (const r of dataset.fileResults) if (r.passingSubtests.length > 0) currentPassingMap[r.file] = [...r.passingSubtests].sort();
