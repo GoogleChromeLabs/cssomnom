@@ -183,11 +183,11 @@ export class CSSLayerStatementRule extends CSSRule {
       throw new TypeError('Illegal constructor');
     }
     super();
-    this._nameList = nameList;
+    this._nameList = Object.freeze([...nameList]);
   }
 
   get nameList(): readonly string[] {
-    return Object.freeze([...this._nameList]);
+    return this._nameList;
   }
 
   get [Symbol.toStringTag]() {

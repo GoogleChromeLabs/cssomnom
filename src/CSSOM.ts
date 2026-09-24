@@ -470,6 +470,10 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._style.cssText = value;
   }
 
+  get [Symbol.toStringTag]() {
+    return 'CSSStyleRule';
+  }
+
   private _getNamespaceContext(): { hasDefaultNamespace: boolean; defaultNamespacePrefixes: Set<string> } {
     let hasDefaultNamespace = false;
     const defaultNamespacePrefixes = new Set<string>();

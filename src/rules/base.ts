@@ -43,6 +43,9 @@ const RULE_CONSTANTS = {
 } as const;
 
 export class CSSRule {
+  get [Symbol.toStringTag](): string {
+    return 'CSSRule';
+  }
   /** @internal */
   _parentRule: CSSRule | null = null;
   /** @internal */
@@ -169,12 +172,15 @@ export class CSSGroupingRule extends CSSRule {
       }
     }
 
-    let isDirectlyInScope = this.constructor.name === 'CSSScopeRule';
-    if (!isDirectlyInScope && this.constructor.name !== 'CSSStyleRule') {
+    const isScopeRule = (r: CSSRule) => r[Symbol.toStringTag] === 'CSSScopeRule' || r.constructor.name === 'CSSScopeRule';
+    const isStyleRule = (r: CSSRule) => ('type' in r && (r as { type: number }).type === 1) || r[Symbol.toStringTag] === 'CSSStyleRule' || r.constructor.name === 'CSSStyleRule';
+
+    let isDirectlyInScope = isScopeRule(this);
+    if (!isDirectlyInScope && !isStyleRule(this)) {
       let parent = this.parentRule;
       while (parent) {
-        if (parent.constructor.name === 'CSSStyleRule') break;
-        if (parent.constructor.name === 'CSSScopeRule') {
+        if (isStyleRule(parent)) break;
+        if (isScopeRule(parent)) {
           isDirectlyInScope = true;
           break;
         }

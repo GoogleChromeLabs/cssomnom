@@ -292,6 +292,12 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
         cascadedVal = getUaDefault(dashed, this._element) || getInitialValue(dashed, this._element);
       }
       if (cascadedVal) {
+        if (property === 'line-height' || property === 'lineHeight') {
+          const inlineVal = (this._element as { style?: CSSStyleDeclaration }).style?.getPropertyValue('line-height')?.trim();
+          if (inlineVal && !isNaN(Number(inlineVal))) {
+            return new TypedOM.CSSUnitValue(parseFloat(inlineVal), 'number');
+          }
+        }
         try {
           const parsed = TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
           if (parsed.length > 0) return parsed[0];

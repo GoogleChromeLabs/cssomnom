@@ -347,10 +347,21 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         if (lowerRaw === '0') return '0px';
       }
       if (dashed === 'line-height') {
+        const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
+        if (lowerRaw === 'normal') {
+          return 'normal';
+        }
         if (lowerRaw.endsWith('em')) {
-          const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
           const num = parseFloat(lowerRaw);
           if (!isNaN(num)) return `${num * fs}px`;
+        } else if (lowerRaw.endsWith('%')) {
+          const pct = parseFloat(lowerRaw);
+          if (!isNaN(pct)) return `${(pct * fs) / 100}px`;
+        } else if (lowerRaw.endsWith('px')) {
+          return rawVal;
+        } else if (!isNaN(Number(lowerRaw))) {
+          const num = parseFloat(lowerRaw);
+          return `${num * fs}px`;
         }
         return rawVal;
       }
