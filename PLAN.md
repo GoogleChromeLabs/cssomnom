@@ -231,7 +231,7 @@ Objective: Refactor and simplify `src/parser.ts` based on subagent feedback.
 
 #### Phase 3: Advanced Refactoring (Optional/Later)
 - [x] **Map-Based Dispatch for At-Rules**: Implement a registry or map for at-rule handlers.
-- [ ] **Avoid Re-tokenization**: Explore parsing directly from `ComponentValue[]` without converting back to tokens. (Deferred: Recommended to wait for performance bottleneck).
+- *Avoid Re-tokenization: moved to Phase 150 (Future).*
 - [x] **Follow-up: Added targeted unit tests** in `tests/parser-refactor.test.ts` to increase coverage for refactored components.
 
 ## Phase 14: Tokenizer Unification & Optimization
@@ -474,7 +474,7 @@ Objective: Address non-compliance issues and missing features validated by the S
 #### CSS Syntax
 - [x] **Fix `<unicode-range-token>` consumption**: Tokenizer should only eagerly consume it when allowed (e.g., in `@font-face`). (Spec: `css-syntax-3 #consume-token`)
 - [x] **Transition to "Consume a block's contents"**: Replace legacy "List of declarations" algorithm. (Spec: `css-syntax-3 #consume-block-contents`)
-- [ ] **Operate on Token Stream**: (Optional but recommended) Refactor parser to operate directly on token stream instead of component values.
+- *Operate on Token Stream: moved to Phase 150 (Future).*
 
 #### CSSOM Spec
 - [x] **Fix `CSSPageRule` inheritance**: Make it extend `CSSGroupingRule`. (Spec: `cssom-1 #the-csspagerule-interface`)
@@ -3582,3 +3582,29 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - [x] Lazily parse `UA_STYLESHEET_CSS` via `parseStyleSheet()` and integrate it into the cascade / UA fallback resolution so `em` units, logical properties (`margin-block-start`), and shorthands (`margin`) resolve dynamically through our engine.
 - [x] Delete the imperative `if (tag === 'H1') ...` ladder and `BLOCK_TAGS` duplication from `getUaDefault()` in `src/cascade/value-processor.ts`.
 - [x] Verify 100% pass rate on `revert-val-005.html`, `css-cascade`, and full WPT baseline with `pnpm run preflight`.
+
+## Phase 148: Benchmark Suite Expansion & Post-Janitor Performance Check [ ]
+**Objective**: Phases 143–146 removed ~1,900 lines from `src/parser.ts`, `src/shorthands.ts`, `src/serializer.ts`, `src/MediaParser.ts`, and `src/rules/at-rules.ts`, verified for behavior but not speed. [`scripts/benchmarks/parser.bench.ts`](./scripts/benchmarks/parser.bench.ts) only measures tokenize/parse of one small synthetic sheet repeated 1000×.
+
+### Tasks
+- [ ] Expand the benchmark to cover more realistic inputs (real-world stylesheets, nesting, selectors, custom properties, at-rules, large values) and more API paths (`parseStyleSheet`, `CSSStyleDeclaration.setProperty` / `cssText` with shorthands, serialization, selector matching, cascade / `getComputedStyle`, Typed OM parsing).
+- [ ] Make results statistically trustworthy (multiple samples, median/variance, warmup, GC isolation) and comparable across git refs (e.g. `v0.1.8` vs `HEAD`).
+- [ ] Record the `v0.1.8` → `HEAD` comparison and flag any regressions from Phases 143–147.
+
+## Phase 149: HTML UA Stylesheet as a Real Cascade Origin [ ]
+**Objective**: `src/data/gen/ua-stylesheet.ts` is parsed, but only consumed by `getUaDefault()` as a per-tag property lookup. Feed the parsed sheet into the cascade as the actual user-agent origin (css-cascade-5 § 6.2 #cascading-origins) so selectors, specificity, ordering, and `revert` behave per spec, and delete the special-casing that exists to fake it (margin normalization in `getUaTagStyles()`, and `getUaDefault()` itself if possible).
+
+### Tasks
+- [ ] Insert the UA stylesheet's rules as the user-agent origin in the cascade (normal and `!important`), matched via the real selector matcher.
+- [ ] Make `revert` roll back to UA-origin declarations.
+- [ ] Delete `getUaTagStyles()` margin/em normalization and as much of `getUaDefault()` as the cascade now covers. Net-negative line count expected.
+- [ ] Zero WPT regressions (`pnpm run wpt:verify`) and `pnpm run preflight` clean.
+
+## Phase 150 (Future): Parser Performance — Eliminate Re-tokenization & Operate on Token Stream [ ]
+**Gate**: Only start once Phase 148 benchmarks show where parser time goes; compare every change against that baseline.
+
+Moved from earlier deferred items (Phase 13 "Avoid Re-tokenization", and CSS Syntax findings "Operate on Token Stream").
+
+### Tasks
+- [ ] **Avoid re-tokenization**: remove serialize→`tokenize()` round trips on already-parsed values. Known sites: shorthand expansion in [`CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts) (`tokenize(val)` for longhands), `parseStyleAttribute(tokenize(serialize(blockVal)))` in [`rule-filter.ts`](./src/cascade/rule-filter.ts), re-parsers in [`parser.ts`](./src/parser.ts) (`new Parser(tokenize(text, …))`, `` tokenize(`{ ${text} }`) ``), and name re-tokenization in [`variable-resolver.ts`](./src/cascade/variable-resolver.ts). Audit the 73 `tokenize(` call sites in `src/` and keep only true string entry points.
+- [ ] **Operate on token stream**: evaluate refactoring the parser to consume the token stream directly (css-syntax-3 § 5 parser algorithms) instead of pre-grouped component values. Large change; only pursue if benchmarks justify it.
