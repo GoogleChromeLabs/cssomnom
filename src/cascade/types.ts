@@ -38,7 +38,7 @@ export interface MatchedDeclaration {
   raw?: string;
   ruleId?: number;
   treeScope?: 'document' | 'part' | 'slotted' | 'shadow';
-  origin?: 'user-agent' | 'user' | 'author' | 'animation';
+  origin?: 'user-agent' | 'author' | 'animation';
 }
 
 /**

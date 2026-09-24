@@ -77,6 +77,21 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     assert.equal(style.getPropertyValue('display'), 'inline');
   });
 
+  it('revert-layer in a single author layer rolls back to the UA stylesheet value', () => {
+    const css = `
+      @layer single {
+        p { display: revert-layer; }
+      }
+    `;
+    const rules = parseStyleSheet(css);
+    const { document } = parseHTML('<html><body><p id="p">Hello</p></body></html>');
+    const p = document.getElementById('p');
+
+    const style = Parser.getCascadedStyle(p, rules);
+    // With no earlier author layers, revert-layer falls back to the UA origin (block)
+    assert.equal(style.getPropertyValue('display'), 'block');
+  });
+
   it('important UA declarations override author declarations', () => {
     // In WHATWG HTML UA stylesheet, marquee has `overflow: hidden !important;`
     // which expands to overflow-x: hidden !important; overflow-y: hidden !important;
@@ -89,5 +104,26 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
 
     const style = Parser.getCascadedStyle(m, rules);
     assert.equal(style.getPropertyValue('overflow-x'), 'hidden');
+  });
+
+  it('keyframe animation with revert rolls back past author rules to the UA value', () => {
+    // css-cascade-5 § 6.2: revert in animation origin rolls back as if in author origin,
+    // ignoring author declarations and falling back to UA.
+    const css = `
+      @keyframes anim {
+        from { margin-top: revert; }
+        to { margin-top: 50px; }
+      }
+      h1.test {
+        margin-top: 0px;
+        animation: anim 1s paused;
+      }
+    `;
+    const rules = parseStyleSheet(css);
+    const { document } = parseHTML('<html><body><h1 id="h" class="test">Title</h1></body></html>');
+    const h = document.getElementById('h');
+
+    const style = Parser.getCascadedStyle(h, rules);
+    assert.equal(style.getPropertyValue('margin-top'), '0.67em');
   });
 });

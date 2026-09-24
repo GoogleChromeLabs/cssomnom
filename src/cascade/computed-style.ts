@@ -103,22 +103,19 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
   private _parentStyle: CSSStyleDeclaration | null;
   private _element: unknown;
   private _pseudoElement: string | null;
-  private _priorOriginDeclarations?: Map<string, string>;
 
   constructor(
     declarations: Declaration[] = [],
     readonlyFlag: boolean = false,
     parentStyle: CSSStyleDeclaration | null = null,
     element: unknown = null,
-    pseudoElement: string | null = null,
-    priorOriginDeclarations?: Map<string, string>
+    pseudoElement: string | null = null
   ) {
     super(declarations, readonlyFlag);
     this._parentStyle = parentStyle;
     this._element = element;
     this._pseudoElement = pseudoElement;
     this._parentRule = null;
-    this._priorOriginDeclarations = priorOriginDeclarations;
   }
 
   override get cssText(): string {
@@ -408,9 +405,6 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
       // css-cascade-5 § 6.2 #default
       if (lowerRaw === 'revert' || lowerRaw === 'revert-layer' || lowerRaw === 'revert-rule') {
-        if (this._priorOriginDeclarations && this._priorOriginDeclarations.has(dashed)) {
-          return this._priorOriginDeclarations.get(dashed)!;
-        }
         if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
           if (parentVal) return parentVal;

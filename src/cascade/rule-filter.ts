@@ -494,7 +494,7 @@ export function collectMatchedDeclarations(
   ruleList: (Rule | CSSRule)[],
   layerDeclarationOrder: Map<string, number>,
   pseudoElement?: string | null,
-  origin: 'user-agent' | 'user' | 'author' = 'author'
+  origin: 'user-agent' | 'author' = 'author'
 ): { matchedDeclarations: MatchedDeclaration[]; sourceOrderCounter: number } {
   const matchedDeclarations: MatchedDeclaration[] = [];
   let sourceOrderCounter = 0;

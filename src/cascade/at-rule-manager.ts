@@ -60,7 +60,8 @@ export function collectActiveAtRules(
     return candidate.sourceOrder > existing.sourceOrder;
   }
 
-  function walk(rules: ArrayLike<Rule | CSSRule | Declaration>, currentLayer?: string) {
+  function walk(rules: ArrayLike<Rule | CSSRule | Declaration> | undefined | null, currentLayer?: string) {
+    if (!rules || typeof rules.length !== 'number') return;
     for (let i = 0; i < rules.length; i++) {
       const r = rules[i];
       if (!r) continue;
@@ -69,7 +70,6 @@ export function collectActiveAtRules(
       if (
         r instanceof CSSPropertyRule ||
         (r as { type?: number }).type === 18 ||
-        (r as { constructor?: { name?: string } }).constructor?.name === 'CSSPropertyRule' ||
         ((r as { type?: number; name?: string; syntax?: string }).name?.startsWith('--') && (r as { syntax?: string }).syntax !== undefined)
       ) {
         const name = (r as CSSPropertyRule).name;
@@ -95,7 +95,7 @@ export function collectActiveAtRules(
         if (!existing || winsOver(candidate, existing)) {
           propertyCandidates.set(name, candidate);
         }
-      } else if (r instanceof CSSKeyframesRule || (r as { type?: number }).type === 7 || (r as { constructor?: { name?: string } }).constructor?.name === 'CSSKeyframesRule') {
+      } else if (r instanceof CSSKeyframesRule || (r as { type?: number }).type === 7) {
         const name = (r as CSSKeyframesRule).name;
         if (!name) continue;
 
@@ -106,22 +106,22 @@ export function collectActiveAtRules(
         if (!existing || winsOver(candidate, existing)) {
           keyframesCandidates.set(name, candidate);
         }
-      } else if (r instanceof CSSLayerBlockRule || (r as { constructor?: { name?: string } }).constructor?.name === 'CSSLayerBlockRule') {
+      } else if (r instanceof CSSLayerBlockRule) {
         const assigned = (r as { _assignedLayerName?: string })._assignedLayerName;
-        const rawName = (r as CSSLayerBlockRule).name;
+        const rawName = r.name;
         const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
-        walk((r as CSSLayerBlockRule).cssRules, layerName);
-      } else if (r instanceof CSSMediaRule || (r as { type?: number }).type === 4 || (r as { constructor?: { name?: string } }).constructor?.name === 'CSSMediaRule') {
+        walk(r.cssRules, layerName);
+      } else if (r instanceof CSSMediaRule || (r as { type?: number }).type === 4) {
         const mediaText = (r as CSSMediaRule).media?.mediaText;
         if (!mediaText || MediaParser.evaluate(mediaText, env)) {
           walk((r as CSSMediaRule).cssRules, currentLayer);
         }
-      } else if (r instanceof CSSSupportsRule || (r as { type?: number }).type === 12 || (r as { constructor?: { name?: string } }).constructor?.name === 'CSSSupportsRule') {
+      } else if (r instanceof CSSSupportsRule || (r as { type?: number }).type === 12) {
         const cond = (r as CSSSupportsRule).conditionText;
         if (!cond || supports(cond)) {
           walk((r as CSSSupportsRule).cssRules, currentLayer);
         }
-      } else if (r instanceof CSSImportRule || (r as { type?: number }).type === 3 || (r as { constructor?: { name?: string } }).constructor?.name === 'CSSImportRule') {
+      } else if (r instanceof CSSImportRule || (r as { type?: number }).type === 3) {
         const importedSheet = (r as CSSImportRule).styleSheet;
         if (importedSheet && importedSheet.cssRules) {
           const rawLayer = (r as CSSImportRule).layerName;
