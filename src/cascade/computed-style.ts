@@ -335,7 +335,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
           if (tok === 'center') return '50%';
           if (tok.endsWith('%') || tok.endsWith('px')) return tok;
           if (tok === '0') return '0px';
-          if (tok.endsWith('em')) {
+          if (tok.endsWith('em') && !tok.endsWith('rem')) {
             const n = parseFloat(tok);
             return !isNaN(n) ? `${n * fs}px` : tok;
           }

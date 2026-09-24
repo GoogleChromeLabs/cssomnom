@@ -118,6 +118,11 @@ describe('CSSOM: getComputedStyle Pseudo-Element Resolution & Min-Size Auto Reso
     assert.strictEqual(getCascadedStyle(lengths).getPropertyValue('perspective-origin'), '16px 32px');
     // 'top left' -> 0% 0%
     assert.strictEqual(getCascadedStyle(topLeft).getPropertyValue('perspective-origin'), '0% 0%');
+
+    // '3rem 10px' -> keeps 3rem unresolved (like ch/ex) rather than guessing with element font-size
+    const { document: docRem } = parseHTML('<div id="rem-test" style="font-size: 20px; perspective-origin: 3rem 10px"></div>');
+    const remTest = docRem.getElementById('rem-test')!;
+    assert.strictEqual(getCascadedStyle(remTest).getPropertyValue('perspective-origin'), '3rem 10px');
   });
 });
 

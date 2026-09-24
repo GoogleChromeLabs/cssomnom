@@ -408,5 +408,16 @@ test('classifySubtestFeasibility: Phase 139 Heuristics Tuning', () => {
   });
   assert.strictEqual(widthPercentVsPercent.isBrowserOnly, false);
   assert.strictEqual(widthPercentVsPercent.category, undefined);
+
+  // 10. Fail-closed scoping: subtest name not in source even if sibling test uses offsetHeight -> NOT classified
+  const unlocatedSubtestWithMetricSibling = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/selectors/selectors-case-sensitive-001.html',
+    name: 'Nonexistent subtest name generated dynamically',
+    expected: '100',
+    actual: '0',
+    error: 'assert_equals: expected 100 but got 0'
+  });
+  assert.strictEqual(unlocatedSubtestWithMetricSibling.isBrowserOnly, false);
+  assert.strictEqual(unlocatedSubtestWithMetricSibling.category, undefined);
 });
 

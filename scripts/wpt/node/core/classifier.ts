@@ -286,22 +286,19 @@ export function classifySubtestFeasibility(input: SubtestClassificationInput): F
     const testReferencesMetric = (metric: string): boolean => {
       if (combined.includes(metric)) return true;
       if (fileContent) {
-        let searchScope = fileContent;
-        if (name) {
-          const nameIdx = fileContent.indexOf(name);
-          if (nameIdx !== -1) {
-            // Find the nearest preceding test( or promise_test(
-            const before = fileContent.slice(0, nameIdx);
-            const testStart = Math.max(before.lastIndexOf('test('), before.lastIndexOf('promise_test('));
-            if (testStart !== -1) {
-              // Find the end of this test block
-              const after = fileContent.slice(nameIdx);
-              const testEndRel = after.indexOf(');');
-              const testEnd = testEndRel !== -1 ? nameIdx + testEndRel + 2 : fileContent.length;
-              searchScope = fileContent.slice(testStart, testEnd);
-            }
-          }
-        }
+        if (!name) return false;
+        const nameIdx = fileContent.indexOf(name);
+        if (nameIdx === -1) return false;
+        // Find the nearest preceding test( or promise_test(
+        const before = fileContent.slice(0, nameIdx);
+        const testStart = Math.max(before.lastIndexOf('test('), before.lastIndexOf('promise_test('));
+        if (testStart === -1) return false;
+        // Find the end of this test block
+        const after = fileContent.slice(nameIdx);
+        const testEndRel = after.indexOf(');');
+        const testEnd = testEndRel !== -1 ? nameIdx + testEndRel + 2 : fileContent.length;
+        const searchScope = fileContent.slice(testStart, testEnd);
+
         const re = new RegExp(`\\b${metric}\\b`, 'i');
         return re.test(searchScope);
       }
