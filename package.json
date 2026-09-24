@@ -57,6 +57,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "oxlint",
     "check:safe-exec": "node scripts/ci/check-safe-exec.ts",
+    "bench": "node scripts/benchmarks/parser.bench.ts",
+    "bench:compare": "node scripts/benchmarks/compare.ts",
     "preflight": "pnpm typecheck && pnpm lint && pnpm check:safe-exec && pnpm test:node",
     "fixtures:generate": "node scripts/external_suites/extract_all.ts",
     "external:extract": "node scripts/external_suites/extract_all.ts",
