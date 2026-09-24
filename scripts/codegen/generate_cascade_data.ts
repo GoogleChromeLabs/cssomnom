@@ -71,14 +71,6 @@ const SVG2_CROSS_SPEC_PRESENTATION_PROPERTIES = new Set([
   'writing-mode',
 ]);
 
-// Standard HTML flow content block elements defaulting to display: block per CSS Display 3 & HTML Rendering § 15
-const HTML_BLOCK_ELEMENTS = [
-  'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'BODY', 'DD', 'DIV', 'DL', 'DT',
-  'FIELDSET', 'FIGCAPTION', 'FIGURE', 'FOOTER', 'FORM', 'H1', 'H2', 'H3',
-  'H4', 'H5', 'H6', 'HEADER', 'HGROUP', 'HR', 'HTML', 'LI', 'MAIN',
-  'NAV', 'OL', 'P', 'PRE', 'SECTION', 'TABLE', 'UL',
-];
-
 function main() {
   const webref = JSON.parse(fs.readFileSync(WEBREF_CSS_PATH, 'utf-8')) as { properties: WebrefProperty[] };
   const mdn = JSON.parse(fs.readFileSync(MDN_PROPERTIES_PATH, 'utf-8')) as Record<string, MdnProperty>;
@@ -247,19 +239,7 @@ export const DEFAULT_PROPERTY_VALUES: Readonly<Record<string, string>> = {\n`;
   for (const key of sortedDefaultKeys) {
     code += `  '${key}': ${JSON.stringify(defaultPropertyValues[key])},\n`;
   }
-  code += `};\n\n`;
-
-  code += `/**
- * Standard HTML block elements defaulting to display: block.
- * css-display-3 § 2
- * html § 15 #rendering
- */
-export const BLOCK_TAGS: ReadonlySet<string> = new Set([\n`;
-
-  for (const tag of HTML_BLOCK_ELEMENTS.sort()) {
-    code += `  '${tag}',\n`;
-  }
-  code += `]);\n`;
+  code += `};\n`;
 
   const outDir = path.dirname(OUTPUT_CASCADE_PATH);
   if (!fs.existsSync(outDir)) {

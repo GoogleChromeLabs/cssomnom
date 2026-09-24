@@ -15,7 +15,8 @@
  * limitations under the License.
  */
 
-import { DEFAULT_PROPERTY_VALUES, BLOCK_TAGS } from '../data/gen/cascade-data.ts';
+import { DEFAULT_PROPERTY_VALUES } from '../data/gen/cascade-data.ts';
+import { HTML_UA_STYLESHEET_TEXT } from '../data/gen/ua-stylesheet.ts';
 import { SHORTHANDS } from '../shorthands.ts';
 import { tokenize } from '../tokenizer.ts';
 import { serialize } from '../serializer.ts';
@@ -25,6 +26,7 @@ import type { MatchedDeclaration } from './types.ts';
 import { substituteVariables } from './variable-resolver.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
+import type { CSSStyleRule } from '../CSSOM.ts';
 import type { PropertyDefinition } from '../PropertyRegistry.ts';
 
 const EXTRA_INITIAL_VALUES: Record<string, string> = {
@@ -41,126 +43,118 @@ const EXTRA_INITIAL_VALUES: Record<string, string> = {
   'stop-opacity': '1',
 };
 
-export function getUaDefault(prop: string, element: unknown): string {
-  const el = element as { tagName?: string; nodeName?: string };
-  const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
+interface UaTagComputedDefaults {
+  display?: string;
+  fontSizeEm?: number;
+  marginBlockRaw?: string;
+  marginInlineRaw?: string;
+  marginAllRaw?: string;
+  margins?: Record<string, string>;
+}
 
-  // html § 15.3.4 #flow-content-3, html § 15.3.3 #phrasing-content-3, css-cascade-5 § 6.2 #default
-  // Standard HTML UA default margins for headings, paragraphs, blockquotes, and body
-  if (tag === 'H1') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '21.44px'; // 0.67em of 32px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '0px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '21.44px 0px';
-    }
-    if (prop === 'margin-inline') {
-      return '0px';
-    }
-  } else if (tag === 'H2') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '19.92px'; // 0.83em of 24px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '0px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '19.92px 0px';
-    }
-    if (prop === 'margin-inline') {
-      return '0px';
-    }
-  } else if (tag === 'H3') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '18.72px'; // 1em of 18.72px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '0px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '18.72px 0px';
-    }
-    if (prop === 'margin-inline') {
-      return '0px';
-    }
-  } else if (tag === 'H4') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '21.28px'; // 1.33em of 16px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '0px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '21.28px 0px';
-    }
-    if (prop === 'margin-inline') {
-      return '0px';
-    }
-  } else if (tag === 'H5') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '22.176px'; // 1.67em of 13.28px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '0px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '22.176px 0px';
-    }
-    if (prop === 'margin-inline') {
-      return '0px';
-    }
-  } else if (tag === 'H6') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '24.971px'; // 2.33em of 10.72px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '0px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '24.971px 0px';
-    }
-    if (prop === 'margin-inline') {
-      return '0px';
-    }
-  } else if (tag === 'P') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '16px'; // 1em of 16px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '0px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '16px 0px';
-    }
-    if (prop === 'margin-inline') {
-      return '0px';
-    }
-  } else if (tag === 'BLOCKQUOTE') {
-    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
-      return '16px'; // 1em of 16px font-size
-    }
-    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
-      return '40px';
-    }
-    if (prop === 'margin' || prop === 'margin-block') {
-      return '16px 40px';
-    }
-    if (prop === 'margin-inline') {
-      return '40px';
-    }
-  } else if (tag === 'BODY') {
-    if (
-      prop === 'margin' || prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-left' || prop === 'margin-right' ||
-      prop === 'margin-block-start' || prop === 'margin-block-end' || prop === 'margin-inline-start' || prop === 'margin-inline-end' ||
-      prop === 'margin-block' || prop === 'margin-inline'
-    ) {
-      return '8px';
+let cachedUaTagStyles: Map<string, UaTagComputedDefaults> | null = null;
+
+function resolveUaLengthPx(raw: string, fontSizePx: number): string {
+  const trimmed = raw.trim();
+  if (trimmed.endsWith('em')) {
+    const px = Number((parseFloat(trimmed) * fontSizePx).toFixed(3));
+    return `${px}px`;
+  }
+  if (trimmed === '0') return '0px';
+  return trimmed;
+}
+
+function getUaTagStyles(): Map<string, UaTagComputedDefaults> {
+  if (cachedUaTagStyles) return cachedUaTagStyles;
+  const map = new Map<string, UaTagComputedDefaults>();
+  const rules = ParseHooks.consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true);
+
+  for (const rule of rules) {
+    const styleRule = rule as CSSStyleRule;
+    if (!styleRule.selectorText || !styleRule.style) continue;
+    const style = styleRule.style;
+    const display = style.getPropertyValue('display');
+    const fontSize = style.getPropertyValue('font-size');
+    const marginTop = style.getPropertyValue('margin-top');
+    const marginLeft = style.getPropertyValue('margin-left');
+    const marginBlockStart = style.getPropertyValue('margin-block-start');
+    const marginInlineStart = style.getPropertyValue('margin-inline-start');
+
+    for (const rawSel of styleRule.selectorText.split(',')) {
+      const tag = rawSel.trim().toUpperCase();
+      if (!tag) continue;
+      let entry = map.get(tag);
+      if (!entry) {
+        entry = {};
+        map.set(tag, entry);
+      }
+      if (display && display !== 'none' && display !== 'contents') {
+        entry.display = display === 'inline-block' || display === 'inline' ? display : 'block';
+      }
+      if (fontSize && fontSize.endsWith('em')) {
+        entry.fontSizeEm = parseFloat(fontSize);
+      }
+      if (marginTop && marginLeft && marginTop === marginLeft && marginTop !== 'auto') {
+        entry.marginAllRaw = marginTop;
+      }
+      if (marginBlockStart && marginBlockStart !== '0' && marginBlockStart !== 'auto') {
+        entry.marginBlockRaw = marginBlockStart;
+      }
+      if (marginInlineStart && marginInlineStart !== 'auto') {
+        entry.marginInlineRaw = marginInlineStart;
+      }
     }
   }
 
+  for (const entry of map.values()) {
+    const fontSizePx = (entry.fontSizeEm ?? 1) * 16;
+    if (entry.marginAllRaw) {
+      const px = resolveUaLengthPx(entry.marginAllRaw, fontSizePx);
+      entry.margins = {
+        margin: px,
+        'margin-top': px,
+        'margin-bottom': px,
+        'margin-left': px,
+        'margin-right': px,
+        'margin-block': px,
+        'margin-block-start': px,
+        'margin-block-end': px,
+        'margin-inline': px,
+        'margin-inline-start': px,
+        'margin-inline-end': px,
+      };
+    } else if (entry.marginBlockRaw) {
+      const blockPx = resolveUaLengthPx(entry.marginBlockRaw, fontSizePx);
+      const inlinePx = entry.marginInlineRaw ? resolveUaLengthPx(entry.marginInlineRaw, fontSizePx) : '0px';
+      const shorthand = `${blockPx} ${inlinePx}`;
+      entry.margins = {
+        margin: shorthand,
+        'margin-block': shorthand,
+        'margin-top': blockPx,
+        'margin-bottom': blockPx,
+        'margin-block-start': blockPx,
+        'margin-block-end': blockPx,
+        'margin-inline': inlinePx,
+        'margin-left': inlinePx,
+        'margin-right': inlinePx,
+        'margin-inline-start': inlinePx,
+        'margin-inline-end': inlinePx,
+      };
+    }
+  }
+
+  cachedUaTagStyles = map;
+  return map;
+}
+
+export function getUaDefault(prop: string, element: unknown): string {
+  const el = element as { tagName?: string; nodeName?: string };
+  const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
+  const uaEntry = tag ? getUaTagStyles().get(tag) : undefined;
+
+  if (uaEntry?.margins && prop in uaEntry.margins) {
+    return uaEntry.margins[prop];
+  }
   if (prop === 'margin') {
     return '0px';
   }
@@ -171,21 +165,9 @@ export function getUaDefault(prop: string, element: unknown): string {
     return '';
   }
   if (prop === 'display') {
-    return BLOCK_TAGS.has(tag) ? 'block' : 'inline';
+    return uaEntry?.display ?? 'inline';
   }
-  // svg2 § 13.2 #presentation-attributes
-  if (isSvgElement(element)) {
-    if (prop === 'baseline-shift') return 'baseline';
-    if (prop === 'flood-color' || prop === 'lighting-color' || prop === 'stop-color' || prop === 'stroke') return '';
-  }
-  const val = DEFAULT_PROPERTY_VALUES[prop] || EXTRA_INITIAL_VALUES[prop];
-  if (val !== undefined && val !== '') return val;
-  if (prop.startsWith('-webkit-')) {
-    const unPrefixed = prop.slice(8);
-    const unPrefixedVal = DEFAULT_PROPERTY_VALUES[unPrefixed] || EXTRA_INITIAL_VALUES[unPrefixed];
-    if (unPrefixedVal !== undefined && unPrefixedVal !== '') return unPrefixedVal;
-  }
-  return '';
+  return getInitialValue(prop, element);
 }
 
 export function isSvgElement(element: unknown): boolean {

@@ -3563,7 +3563,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 147: Architectural Cleanup — Codegen Normative HTML UA Stylesheet & Replace `getUaDefault()` [ ]
+## Phase 147: Architectural Cleanup — Codegen Normative HTML UA Stylesheet & Replace `getUaDefault()` [x]
 **Objective**: Eliminate the accreted 130+ line imperative `getUaDefault()` `if/else` ladder in `src/cascade/value-processor.ts` and replace it with an auto-generated User-Agent stylesheet (`src/data/gen/ua-stylesheet.ts`) extracted directly from the WHATWG HTML Standard (`rendering.html`) via `scripts/codegen/generate_ua_stylesheet.ts`, wired into `scripts/codegen/generate_all.ts` and `MAINTENANCE.md`.
 
 **Context & Rationale**:
@@ -3577,8 +3577,8 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - SVG 2 § 13.2 (Presentation attributes & initial defaults)
 
 ### Tasks
-- [ ] Create `scripts/codegen/generate_ua_stylesheet.ts` that fetches/extracts the `<pre><code class="css">` blocks from WHATWG HTML Standard `rendering.html` (with offline cache fallback), strips `@namespace` / pseudo-rules that don't apply, and generates `src/data/gen/ua-stylesheet.ts`.
-- [ ] Wire `generate_ua_stylesheet.ts` into `scripts/codegen/generate_all.ts` and document in `MAINTENANCE.md` so `pnpm run codegen` and `pnpm run maintain` automatically regenerate `src/data/gen/ua-stylesheet.ts`.
-- [ ] Lazily parse `UA_STYLESHEET_CSS` via `parseStyleSheet()` and integrate it into the cascade / UA fallback resolution so `em` units, logical properties (`margin-block-start`), and shorthands (`margin`) resolve dynamically through our engine.
-- [ ] Delete the imperative `if (tag === 'H1') ...` ladder and `BLOCK_TAGS` duplication from `getUaDefault()` in `src/cascade/value-processor.ts`.
-- [ ] Verify 100% pass rate on `revert-val-005.html`, `css-cascade`, and full WPT baseline with `pnpm run preflight`.
+- [x] Create `scripts/codegen/generate_ua_stylesheet.ts` that fetches/extracts the `<pre><code class="css">` blocks from WHATWG HTML Standard `rendering.html` (with offline cache fallback), strips `@namespace` / pseudo-rules that don't apply, and generates `src/data/gen/ua-stylesheet.ts`.
+- [x] Wire `generate_ua_stylesheet.ts` into `scripts/codegen/generate_all.ts` and document in `MAINTENANCE.md` so `pnpm run codegen` and `pnpm run maintain` automatically regenerate `src/data/gen/ua-stylesheet.ts`.
+- [x] Lazily parse `UA_STYLESHEET_CSS` via `parseStyleSheet()` and integrate it into the cascade / UA fallback resolution so `em` units, logical properties (`margin-block-start`), and shorthands (`margin`) resolve dynamically through our engine.
+- [x] Delete the imperative `if (tag === 'H1') ...` ladder and `BLOCK_TAGS` duplication from `getUaDefault()` in `src/cascade/value-processor.ts`.
+- [x] Verify 100% pass rate on `revert-val-005.html`, `css-cascade`, and full WPT baseline with `pnpm run preflight`.

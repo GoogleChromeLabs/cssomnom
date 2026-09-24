@@ -38,7 +38,7 @@ This runs `git submodule update --init --remote && pnpm run submodules:update` t
 ```bash
 pnpm run codegen
 ```
-Generates CSS properties, syntax dictionaries, SVG presentation attributes, colors, and unit definitions from the updated specs.
+Generates CSS properties, syntax dictionaries, SVG presentation attributes, normative HTML User-Agent stylesheet (`src/data/gen/ua-stylesheet.ts`), colors, and unit definitions from the updated specs.
 
 **3. Generate Fixtures:**
 ```bash

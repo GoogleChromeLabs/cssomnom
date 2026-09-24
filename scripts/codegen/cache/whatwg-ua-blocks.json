@@ -1,0 +1,26 @@
+{
+  "sourceUrl": "https://html.spec.whatwg.org/multipage/rendering.html",
+  "blocks": [
+    "area, base, basefont, datalist, head, link, meta, noembed, noframes, param, rp, script, style, template, title { display: none; }",
+    "html, body { display: block; }",
+    "body { margin: 8px; }",
+    "address, blockquote, center, dialog, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, search, xmp { display: block; }\nblockquote, figure, listing, p, plaintext, pre, xmp { margin-block: 1em; }\nblockquote, figure { margin-inline: 40px; }\naddress { font-style: italic; }\nlisting, plaintext, pre, xmp { font-family: monospace; white-space: pre; }\ndialog { position: absolute; inset-inline-start: 0; inset-inline-end: 0; width: fit-content; height: fit-content; margin: auto; border: solid; padding: 1em; background-color: Canvas; color: CanvasText; }\nslot { display: contents; }",
+    "cite, dfn, em, i, var { font-style: italic; }\nb, strong { font-weight: bolder; }\ncode, kbd, samp, tt { font-family: monospace; }\nbig { font-size: larger; }\nsmall { font-size: smaller; }\nsub { vertical-align: sub; }\nsup { vertical-align: super; }\nsub, sup { line-height: normal; font-size: smaller; }\nruby { display: ruby; }\nrt { display: ruby-text; }\nmark { background: yellow; color: black; }\nins, u { text-decoration: underline; }\ndel, s, strike { text-decoration: line-through; }\nbr { display-outside: newline; }\nnobr { white-space: nowrap; }\nwbr { display-outside: break-opportunity; }",
+    "address, blockquote, center, div, figure, figcaption, footer, form, header, hr, legend, listing, main, p, plaintext, pre, summary, xmp, article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, search, section, table, caption, colgroup, col, thead, tbody, tfoot, tr, td, th, dir, dd, dl, dt, menu, ol, ul, li, bdi, output { unicode-bidi: isolate; }\nbdo { unicode-bidi: isolate-override; }",
+    "article, aside, h1, h2, h3, h4, h5, h6, hgroup, nav, section { display: block; }\nh1, h2, h3, h4, h5, h6 { font-weight: bold; }\nh1 { margin-block: 0.67em; font-size: 2.00em; }\nh2 { margin-block: 0.83em; font-size: 1.50em; }\nh3 { margin-block: 1.00em; font-size: 1.17em; }\nh4 { margin-block: 1.33em; font-size: 1.00em; }\nh5 { margin-block: 1.67em; font-size: 0.83em; }\nh6 { font-size: 0.67em; margin-block: 2.33em; }",
+    "dir, dd, dl, dt, menu, ol, ul { display: block; }\nli { display: list-item; text-align: match-parent; }\ndir, dl, menu, ol, ul { margin-block: 1em; }\ndd { margin-inline-start: 40px; }\ndir, menu, ol, ul { padding-inline-start: 40px; }\nol, ul, menu { counter-reset: list-item; }\nol { list-style-type: decimal; }\ndir, menu, ul { list-style-type: disc; }",
+    "table { display: table; }\ncaption { display: table-caption; }\ncolgroup { display: table-column-group; }\ncol { display: table-column; }\nthead { display: table-header-group; }\ntbody { display: table-row-group; }\ntfoot { display: table-footer-group; }\ntr { display: table-row; }\ntd, th { display: table-cell; }\ntable { box-sizing: border-box; border-spacing: 2px; border-collapse: separate; text-indent: initial; }\ntd, th { padding: 1px; }\nth { font-weight: bold; }\ncaption { text-align: center; }\nthead, tbody, tfoot { vertical-align: middle; }\ntr, td, th { vertical-align: inherit; }\nthead, tbody, tfoot, tr { border-color: inherit; }",
+    "input, button, textarea { letter-spacing: initial; word-spacing: initial; line-height: initial; }\ninput, select, button, textarea { text-transform: initial; text-indent: initial; text-shadow: initial; appearance: auto; }\ninput, select, textarea { text-align: initial; }\ninput, button { display: inline-block; }\ntextarea { white-space: pre-wrap; }",
+    "hr { color: gray; border-style: inset; border-width: 1px; margin-block: 0.5em; margin-inline: auto; overflow: hidden; }",
+    "fieldset { display: block; margin-inline: 2px; border: groove 2px ThreeDFace; padding-block: 0.35em 0.625em; padding-inline: 0.75em; min-inline-size: min-content; }\nlegend { padding-inline: 2px; }",
+    "iframe { border: 2px inset; }\nvideo { object-fit: contain; }",
+    "details, summary { display: block; }",
+    "marquee { display: inline-block; text-align: initial; overflow: hidden !important; }",
+    "meter { appearance: auto; }",
+    "progress { appearance: auto; }",
+    "option { display: block; }\noptgroup { display: block; font-weight: bolder; }",
+    "select { align-content: center; }",
+    "select { letter-spacing: initial; word-spacing: initial; line-height: initial; }",
+    "select { display: inline-block; }"
+  ]
+}
