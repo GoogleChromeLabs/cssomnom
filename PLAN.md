@@ -3515,7 +3515,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 144: Janitor Sweep — `src/shorthands.ts` Simplification [ ]
+## Phase 144: Janitor Sweep — `src/shorthands.ts` Simplification [x]
 **Objective**: Refactor and streamline `src/shorthands.ts` (currently 2,249 lines), eliminating duplicate expansion and serialization logic while maintaining complete CSS property shorthand fidelity.
 
 **Context**: High repetition exists across 4-sided properties (margins, paddings, borders, insets) and directional property expansions.
@@ -3525,9 +3525,9 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - **Strict Parity**: Verify zero regressions against shorthand and lightning CSS suites.
 
 ### Tasks
-- [ ] Establish characterization baseline with `pnpm run preflight` and existing shorthand tests.
-- [ ] Conduct Janitor refactoring pass on `src/shorthands.ts` to de-duplicate logic and clean up boilerplate.
-- [ ] Verify zero regressions across unit tests and WPT conformance suites.
+- [x] Establish characterization baseline with `pnpm run preflight` and existing shorthand tests.
+- [x] Conduct Janitor refactoring pass on `src/shorthands.ts` to de-duplicate logic and clean up boilerplate.
+- [x] Verify zero regressions across unit tests and WPT conformance suites.
 
 ---
 
