@@ -66,19 +66,15 @@ export function collectActiveAtRules(
       if (!r) continue;
       sourceOrder++;
 
-      if (
-        r instanceof CSSPropertyRule ||
-        (r as { type?: number }).type === 18 ||
-        ((r as { type?: number; name?: string; syntax?: string }).name?.startsWith('--') && (r as { syntax?: string }).syntax !== undefined)
-      ) {
-        const name = (r as CSSPropertyRule).name;
+      if (r instanceof CSSPropertyRule) {
+        const name = r.name;
         if (!name.startsWith('--')) continue;
 
         const definition: PropertyDefinition = {
           name,
-          syntax: (r as CSSPropertyRule).syntax || '*',
-          inherits: Boolean((r as CSSPropertyRule).inherits),
-          initialValue: (r as CSSPropertyRule).initialValue ?? undefined,
+          syntax: r.syntax || '*',
+          inherits: Boolean(r.inherits),
+          initialValue: r.initialValue ?? undefined,
         };
 
         try {
@@ -94,12 +90,12 @@ export function collectActiveAtRules(
         if (!existing || winsOver(candidate, existing)) {
           propertyCandidates.set(name, candidate);
         }
-      } else if (r instanceof CSSKeyframesRule || (r as { type?: number }).type === 7) {
-        const name = (r as CSSKeyframesRule).name;
+      } else if (r instanceof CSSKeyframesRule) {
+        const name = r.name;
         if (!name) continue;
 
         const layerOrder = currentLayer !== undefined && currentLayer !== null ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
-        const candidate: Candidate<CSSKeyframesRule> = { item: r as CSSKeyframesRule, layerOrder, sourceOrder };
+        const candidate: Candidate<CSSKeyframesRule> = { item: r, layerOrder, sourceOrder };
 
         const existing = keyframesCandidates.get(name);
         if (!existing || winsOver(candidate, existing)) {
@@ -110,27 +106,27 @@ export function collectActiveAtRules(
         const rawName = r.name;
         const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
         if (r.cssRules) walk(r.cssRules, layerName);
-      } else if (r instanceof CSSMediaRule || (r as { type?: number }).type === 4) {
-        const mediaText = (r as CSSMediaRule).media?.mediaText;
-        if ((!mediaText || MediaParser.evaluate(mediaText, env)) && (r as CSSMediaRule).cssRules) {
-          walk((r as CSSMediaRule).cssRules, currentLayer);
+      } else if (r instanceof CSSMediaRule) {
+        const mediaText = r.media?.mediaText;
+        if ((!mediaText || MediaParser.evaluate(mediaText, env)) && r.cssRules) {
+          walk(r.cssRules, currentLayer);
         }
-      } else if (r instanceof CSSSupportsRule || (r as { type?: number }).type === 12) {
-        const cond = (r as CSSSupportsRule).conditionText;
-        if ((!cond || supports(cond)) && (r as CSSSupportsRule).cssRules) {
-          walk((r as CSSSupportsRule).cssRules, currentLayer);
+      } else if (r instanceof CSSSupportsRule) {
+        const cond = r.conditionText;
+        if ((!cond || supports(cond)) && r.cssRules) {
+          walk(r.cssRules, currentLayer);
         }
-      } else if (r instanceof CSSImportRule || (r as { type?: number }).type === 3) {
-        const importedSheet = (r as CSSImportRule).styleSheet;
+      } else if (r instanceof CSSImportRule) {
+        const importedSheet = r.styleSheet;
         if (importedSheet && importedSheet.cssRules) {
-          const rawLayer = (r as CSSImportRule).layerName;
+          const rawLayer = r.layerName;
           const layerName = rawLayer !== null && rawLayer !== undefined
             ? (currentLayer ? (rawLayer ? `${currentLayer}.${rawLayer}` : currentLayer) : rawLayer)
             : currentLayer;
           walk(importedSheet.cssRules, layerName);
         }
-      } else if ((r instanceof CSSGroupingRule || (r as { cssRules?: unknown }).cssRules) && (r as CSSGroupingRule).cssRules) {
-        walk((r as CSSGroupingRule).cssRules, currentLayer);
+      } else if (r instanceof CSSGroupingRule && r.cssRules) {
+        walk(r.cssRules, currentLayer);
       }
     }
   }

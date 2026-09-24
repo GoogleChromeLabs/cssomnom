@@ -205,7 +205,7 @@ export interface ASTAtRule {
   block?: SimpleBlock;
 }
 
-export type Rule = ASTAtRule | CSSRule;
+export type Rule = CSSRule;
 
 /**
  * CSSOM Interfaces according to CSSOM spec.

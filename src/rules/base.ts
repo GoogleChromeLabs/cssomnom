@@ -16,7 +16,7 @@
  */
 
 import { ParseHooks } from '../parse-hooks.ts';
-import type { Declaration, Rule, ASTAtRule, RuleSourceLocation } from '../types.ts';
+import type { Declaration, Rule, RuleSourceLocation } from '../types.ts';
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { deleteRuleFromArray } from '../utils.ts';
 import { CSSRuleList } from './collections.ts';
@@ -164,7 +164,9 @@ export class CSSGroupingRule extends CSSRule {
         throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
       }
       if (isNested && !isImportRule(topRule) && !isNamespaceRule(topRule)) {
-        const atRuleName = (topRule as ASTAtRule).name || (topRule.constructor.name.replace(/^CSS/, '').replace(/Rule$/, '').toLowerCase());
+        const atRuleName = ('name' in topRule && typeof (topRule as { name?: string }).name === 'string'
+          ? (topRule as { name: string }).name
+          : topRule.constructor.name.replace(/^CSS/, '').replace(/Rule$/, '').toLowerCase());
         const isGroupingRule = topRule instanceof CSSGroupingRule || ['media', 'supports', 'container', 'layer', 'scope', 'starting-style', 'style'].includes(atRuleName);
         if (!isGroupingRule && topRule.constructor.name !== 'CSSStyleRule') {
           throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');

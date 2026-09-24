@@ -332,12 +332,16 @@ export class Parser {
     if (block && isTopLevelTokenStream && this.options?.atRules?.[rule.name]) {
       const type = this.options.atRules[rule.name];
       if (type === 'declaration') {
-        rule.childRules = this.consumeDeclarationsFromBlockContents(block.value);
-        return rule;
+        const decls = this.consumeDeclarationsFromBlockContents(block.value);
+        const atRule = new CSSAtRule(rule.name, rule.prelude, block, undefined, decls);
+        atRule._location = location;
+        return atRule;
       }
       if (type === 'rule') {
-        rule.childRules = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
-        return rule;
+        const childRules = this.consumeNestedRules(block, false);
+        const atRule = new CSSAtRule(rule.name, rule.prelude, block, childRules);
+        atRule._location = location;
+        return atRule;
       }
     }
 

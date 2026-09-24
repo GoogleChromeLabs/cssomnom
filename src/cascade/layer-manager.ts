@@ -23,9 +23,8 @@ import {
   CSSGroupingRule,
   CSSRule,
 } from '../CSSOM.ts';
-import { serialize } from '../serializer.ts';
 import { MediaParser } from '../MediaParser.ts';
-import type { Rule, ASTAtRule, InternalRuleMetadata, MediaEnvironment, ElementLike } from '../types.ts';
+import type { Rule, InternalRuleMetadata, MediaEnvironment, ElementLike } from '../types.ts';
 
 export interface LayerState {
   nextLayerIndex: number;
@@ -104,7 +103,7 @@ export function assignLayerOrders(
  * css-cascade-5 § 6.4.3 #layer-ordering
  */
 export function scanLayers(
-  list: (Rule | CSSRule)[],
+  list: Rule[],
   root: LayerTree,
   state: LayerState = { nextLayerIndex: 1 },
   prefix: string = '',
@@ -112,29 +111,17 @@ export function scanLayers(
   isInsideStyleRule: boolean = false
 ): void {
   for (const r of list) {
-    if (
-      !isInsideStyleRule && (
-        r instanceof CSSLayerStatementRule ||
-        ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'layer' && !(r as ASTAtRule).block)
-      )
-    ) {
+    if (!isInsideStyleRule && r instanceof CSSLayerStatementRule) {
       // css-cascade-5 § 6.4.1 #layer-declaration, § 6.4.4.2 #layer-empty (Layer Statement Rules)
       // css-cascade-5 § 6.4.2 #layer-names (nested layers concatenated with period)
-      let names: readonly string[] = (r as CSSLayerStatementRule).nameList;
-      if (!names && (r as ASTAtRule).prelude) {
-        const preludeText = serialize((r as ASTAtRule).prelude || []).trim();
-        names = preludeText.split(',').map(s => s.trim()).filter(Boolean);
-      }
-      for (const n of names || []) {
+      const names = r.nameList || [];
+      for (const n of names) {
         const fullName = prefix ? `${prefix}.${n}` : n;
         root.registerPath(fullName);
       }
-    } else if (
-      r instanceof CSSLayerBlockRule ||
-      ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'layer' && (r as ASTAtRule).block)
-    ) {
+    } else if (r instanceof CSSLayerBlockRule) {
       // css-cascade-5 § 6.4.1 #layer-declaration, § 6.4.4.1 #layer-block (Layer Block Rules)
-      const rawName = (r as CSSLayerBlockRule).name || serialize((r as ASTAtRule).prelude || []).trim();
+      const rawName = r.name;
       let fullName: string;
       if (!rawName) {
         // css-cascade-5 § 6.4.2.1 #unnamed-layers (Anonymous Layers: unique anonymous segment)
@@ -145,22 +132,19 @@ export function scanLayers(
       }
       root.registerPath(fullName);
       (r as CSSRule & InternalRuleMetadata)._assignedLayerName = fullName;
-      const childRules = (r instanceof CSSGroupingRule ? r.cssRules : (r as ASTAtRule).childRules) || [];
-      if (childRules.length > 0) {
-        scanLayers(Array.from(childRules as ArrayLike<Rule | CSSRule>), root, state, fullName, env, isInsideStyleRule);
+      const childRules = r.cssRules;
+      if (childRules && childRules.length > 0) {
+        scanLayers(Array.from(childRules), root, state, fullName, env, isInsideStyleRule);
       }
-    } else if (
-      r instanceof CSSImportRule ||
-      ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'import')
-    ) {
+    } else if (r instanceof CSSImportRule) {
       // css-cascade-5 § 6.4.1 #layer-declaration, § 6.4.3 #layer-ordering
-      const mediaText = r instanceof CSSImportRule ? r.media?.mediaText : '';
+      const mediaText = r.media?.mediaText;
       if (mediaText && !MediaParser.evaluate(mediaText, env)) {
         // css-cascade-5 § 6.4.3: Condition is false; does not contribute to layer ordering
         continue;
       }
 
-      const rawLayer = r instanceof CSSImportRule ? (r as CSSImportRule).layerName : null;
+      const rawLayer = r.layerName;
       if (rawLayer !== null && rawLayer !== undefined) {
         let fullName: string;
         if (rawLayer === '') {
@@ -168,40 +152,35 @@ export function scanLayers(
         } else {
           fullName = prefix ? `${prefix}.${rawLayer}` : rawLayer;
         }
-        (r as CSSRule & InternalRuleMetadata)._assignedLayerName = fullName;
+        (r as unknown as InternalRuleMetadata)._assignedLayerName = fullName;
         root.registerPath(fullName);
-        const importedSheet = (r as CSSImportRule).styleSheet;
+        const importedSheet = r.styleSheet;
         if (importedSheet && importedSheet.cssRules) {
-          scanLayers(Array.from(importedSheet.cssRules as ArrayLike<Rule | CSSRule>), root, state, fullName, env, isInsideStyleRule);
+          scanLayers(Array.from(importedSheet.cssRules), root, state, fullName, env, isInsideStyleRule);
         }
       } else {
-        const importedSheet = (r as CSSImportRule).styleSheet;
+        const importedSheet = r.styleSheet;
         if (importedSheet && importedSheet.cssRules) {
-          scanLayers(Array.from(importedSheet.cssRules as ArrayLike<Rule | CSSRule>), root, state, prefix, env, isInsideStyleRule);
+          scanLayers(Array.from(importedSheet.cssRules), root, state, prefix, env, isInsideStyleRule);
         }
       }
-    } else if (
-      r instanceof CSSMediaRule ||
-      ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'media')
-    ) {
+    } else if (r instanceof CSSMediaRule) {
       // css-cascade-5 § 6.4.3 #layer-ordering: Layers defined inside conditional group rule
       // do not contribute to layer order unless condition is true
-      const mediaText = r instanceof CSSMediaRule ? r.media.mediaText : serialize((r as ASTAtRule).prelude || []).trim();
+      const mediaText = r.media.mediaText;
       if (mediaText && !MediaParser.evaluate(mediaText, env)) {
         continue;
       }
-      const childRules = (r instanceof CSSGroupingRule ? r.cssRules : (r as ASTAtRule).childRules) || [];
-      if (childRules.length > 0) {
-        scanLayers(Array.from(childRules as ArrayLike<Rule | CSSRule>), root, state, prefix, env, isInsideStyleRule);
+      const childRules = r.cssRules;
+      if (childRules && childRules.length > 0) {
+        scanLayers(Array.from(childRules), root, state, prefix, env, isInsideStyleRule);
       }
     } else if ('style' in r && 'selectorText' in r) {
       if ('cssRules' in r && (r as { cssRules?: unknown }).cssRules) {
-        scanLayers(Array.from((r as { cssRules: ArrayLike<Rule | CSSRule> }).cssRules), root, state, prefix, env, true);
+        scanLayers(Array.from((r as { cssRules: ArrayLike<Rule> }).cssRules), root, state, prefix, env, true);
       }
     } else if (r instanceof CSSGroupingRule && r.cssRules) {
-      scanLayers(Array.from(r.cssRules as ArrayLike<Rule | CSSRule>), root, state, prefix, env, isInsideStyleRule);
-    } else if ((r as ASTAtRule).childRules) {
-      scanLayers(Array.from((r as ASTAtRule).childRules as ArrayLike<Rule | CSSRule>), root, state, prefix, env, isInsideStyleRule);
+      scanLayers(Array.from(r.cssRules), root, state, prefix, env, isInsideStyleRule);
     }
   }
 }
@@ -211,7 +190,7 @@ export function scanLayers(
  * css-cascade-5 § 6.4.3 #layer-ordering
  */
 export function getLayerDeclarationOrder(
-  ruleList: (Rule | CSSRule)[],
+  ruleList: Rule[],
   env?: Partial<MediaEnvironment>
 ): Map<string, number> {
   const root = new LayerTree();

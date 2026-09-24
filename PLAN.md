@@ -624,16 +624,16 @@ Result (`cdb0479`, `426a5a0`, `9e1f301`): raw passing 21,227 → 21,184 (46 fake
 
 Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `computed-style.ts` (`clip`) and `variable-resolver.ts` should resolve against the root element's font-size; relative-position `auto` insets should negate the opposite inset.
 
-## Phase 153: Single Rule Model — Retire `ASTAtRule` from the Public `Rule` Type [ ]
+## Phase 153: Single Rule Model — Retire `ASTAtRule` from the Public `Rule` Type [x]
 **Objective**: `Rule = ASTAtRule | CSSRule` ([types.ts](./src/types.ts)) forces every consumer to handle a plain-object at-rule shape that only one feature still produces, which is where the cascade's `Rule | CSSRule | Declaration` signatures and `instanceof X || type === N` duck typing come from.
 
 **History** (`history` branch): the union was a snapshot of a half-migrated parser written during an `any`-removal pass (`e788178`, Apr 13). Known at-rules became `CSSRule` classes on Apr 14 (`0fd930e`), unknown at-rules became `CSSAtRule` on Apr 25 (`8ae172d`). Since then `ASTAtRule` escapes the parser only via the `atRules` option ([parser.ts `finalizeAtRule`](./src/parser.ts), added in `0909f19`), used by the CSS Parser API ([parser-api.ts](./src/parser-api.ts)). Phase 126 removed double casts but kept the union.
 
 ### Tasks
-- [ ] Return `atRules`-option custom at-rules as `CSSAtRule` (with child rules/declarations) instead of raw `ASTAtRule`; update `tests/parser-api.test.ts`.
-- [ ] Make public `Rule` mean `CSSRule`; keep `ASTAtRule` private to the parser (scratch object for at-rule handlers). Stop exporting it from [index.ts](./src/index.ts); update the API surface snapshot and README.
-- [ ] Narrow signatures and delete the dual-shape handling in `src/cascade/` (`index.ts`, `rule-filter.ts`, `layer-manager.ts`, `at-rule-manager.ts`) and `toParserRule` in `parser-api.ts`; remove the `(r as { type?: number }).type === N` fallbacks where `instanceof` suffices.
-- [ ] Net-negative `src/`; 0 WPT regressions.
+- [x] Return `atRules`-option custom at-rules as `CSSAtRule` (with child rules/declarations) instead of raw `ASTAtRule`; update `tests/parser-api.test.ts`.
+- [x] Make public `Rule` mean `CSSRule`; keep `ASTAtRule` private to the parser (scratch object for at-rule handlers). Stop exporting it from [index.ts](./src/index.ts); update the API surface snapshot and README.
+- [x] Narrow signatures and delete the dual-shape handling in `src/cascade/` (`index.ts`, `rule-filter.ts`, `layer-manager.ts`, `at-rule-manager.ts`) and `toParserRule` in `parser-api.ts`; remove the `(r as { type?: number }).type === N` fallbacks where `instanceof` suffices.
+- [x] Net-negative `src/`; 0 WPT regressions.
 
 ## Phase 154: Fix :lang() Matching [ ]
 **Objective**: Implement spec-compliant CSS Selectors 4 § 7.2 `:lang()` pseudo-class matching using RFC 4647 extended language range filtering.

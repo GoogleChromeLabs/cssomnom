@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSS } from '../src/index.ts';
+import { CSS, parse, CSSAtRule } from '../src/index.ts';
 import { CSSParserAtRule, CSSParserDeclaration, CSSParserQualifiedRule, CSSParserFunction, CSSParserToken } from '../src/parser-api.ts';
 
 describe('CSS Parser API', () => {
@@ -213,5 +213,24 @@ describe('CSS Parser API', () => {
         assert.ok(rules[0] instanceof CSSParserAtRule);
         const atRule = rules[0] as CSSParserAtRule;
         assert.ok(atRule.body?.[0] instanceof CSSParserQualifiedRule);
+    });
+
+    test('parse with atRules option returns CSSAtRule instance', () => {
+        const cssDecl = '@foo { color: red; }';
+        const sheetDecl = parse(cssDecl, { atRules: { foo: 'declaration' } });
+        assert.strictEqual(sheetDecl.cssRules.length, 1);
+        assert.ok(sheetDecl.cssRules[0] instanceof CSSAtRule);
+        const atRuleDecl = sheetDecl.cssRules[0] as CSSAtRule;
+        assert.strictEqual(atRuleDecl.name, 'foo');
+        assert.ok(atRuleDecl.declarations && atRuleDecl.declarations.length === 1);
+        assert.strictEqual(atRuleDecl.declarations[0].name, 'color');
+
+        const cssRule = '@bar { div { color: red; } }';
+        const sheetRule = parse(cssRule, { atRules: { bar: 'rule' } });
+        assert.strictEqual(sheetRule.cssRules.length, 1);
+        assert.ok(sheetRule.cssRules[0] instanceof CSSAtRule);
+        const atRuleRule = sheetRule.cssRules[0] as CSSAtRule;
+        assert.strictEqual(atRuleRule.name, 'bar');
+        assert.ok(atRuleRule.childRules && atRuleRule.childRules.length === 1);
     });
 });

@@ -28,7 +28,7 @@
 
 import { Parser } from './parser.ts';
 import { tokenize } from './tokenizer.ts';
-import type { ComponentValue, SimpleBlock, CSSFunction, ASTAtRule, Declaration, Token } from './types.ts';
+import type { ComponentValue, SimpleBlock, CSSFunction, Declaration, Token } from './types.ts';
 import { serialize } from './serializer.ts';
 import { PropertyRegistry, type PropertyDefinition, matchesSyntax } from './PropertyRegistry.ts';
 import { CSSFactories } from './data/gen/css-factories.ts';
@@ -38,9 +38,7 @@ import { SHORTHANDS } from './shorthands.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
 import { SelectorParser } from './SelectorParser.ts';
-
-
-
+import { CSSAtRule } from './CSSOM.ts';
 
 export abstract class CSSParserValue {
   abstract toString(): string;
@@ -50,10 +48,8 @@ export class CSSParserToken extends CSSParserValue {
   public value: string;
   constructor(value: string) { 
     super(); 
-    this.val = value; // Wait, let's use 'value' consistently
     this.value = value;
   }
-  private val: string; // Keep for internal use if needed, but 'value' is better
   toString(): string { return this.value; }
 }
 
@@ -192,24 +188,24 @@ interface QualifiedRuleLike {
   style?: Iterable<string> & { getPropertyValue(n: string): string };
 }
 
-function isASTAtRule(r: unknown): r is ASTAtRule {
-  return typeof r === 'object' && r !== null && (r as { type?: unknown }).type === 'at-rule';
-}
-
 function isASTDeclaration(r: unknown): r is Declaration {
   return typeof r === 'object' && r !== null && (r as { type?: unknown }).type === 'declaration';
 }
 
 function toParserRule(rule: unknown): CSSParserRule {
-  // Handle internal AST at-rule
-  if (isASTAtRule(rule)) {
-    const body = rule.childRules ? rule.childRules.map(toParserRule) : 
-                 (rule.block ? (rule.block.value as unknown[]).map(v => {
-                    if (isASTDeclaration(v)) return toParserRule(v);
-                    if (isASTAtRule(v)) return toParserRule(v);
-                    return null;
-                 }).filter((r): r is CSSParserRule => r !== null) : null);
-    
+  // Handle CSSAtRule
+  if (rule instanceof CSSAtRule) {
+    const body = rule.declarations
+      ? rule.declarations.map(toParserRule)
+      : (rule.childRules
+        ? rule.childRules.map(toParserRule)
+        : (rule.block
+          ? (rule.block.value as unknown[]).map(v => {
+              if (isASTDeclaration(v)) return toParserRule(v);
+              return null;
+            }).filter((r): r is CSSParserRule => r !== null)
+          : null));
+
     return new CSSParserAtRule(
       rule.name,
       rule.prelude.map(toParserToken),

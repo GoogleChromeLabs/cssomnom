@@ -47,7 +47,6 @@ import type {
   PseudoClassSelector,
   ComponentValue,
   Declaration,
-  ASTAtRule,
   InternalRuleMetadata,
   ElementLike,
   DocumentLike,
@@ -61,7 +60,7 @@ import type { MatchedDeclaration, Specificity } from './types.ts';
 export function collectStyleSheetsAndRules(
   element: ElementLike | DocumentLike | null | undefined,
   rules?: Rule[] | CSSRuleList
-): (Rule | CSSRule)[] | null {
+): Rule[] | null {
   if (!element || typeof element !== 'object') {
     return null;
   }
@@ -91,10 +90,10 @@ export function collectStyleSheetsAndRules(
   }
 
   if (rules) {
-    return Array.from(rules as ArrayLike<Rule | CSSRule>);
+    return Array.from(rules as ArrayLike<Rule>);
   }
 
-  const ruleList: (Rule | CSSRule)[] = [];
+  const ruleList: Rule[] = [];
   const root = typeof elObj.getRootNode === 'function'
     ? elObj.getRootNode()
     : (elObj.ownerDocument ?? (elObj.nodeType === 9 ? (elObj as DocumentLike) : null));
@@ -491,7 +490,7 @@ function getElementRootNode(el: ElementLike): { host?: ElementLike } | null {
  */
 export function collectMatchedDeclarations(
   element: ElementLike,
-  ruleList: (Rule | CSSRule)[],
+  ruleList: Rule[],
   layerDeclarationOrder: Map<string, number>,
   pseudoElement?: string | null,
   origin: 'user-agent' | 'author' = 'author'
@@ -718,52 +717,42 @@ export function collectMatchedDeclarations(
         }
 
         // Nested rules inside CSSStyleRule
-        const nestedRules: (Rule | CSSRule | Declaration)[] | CSSRuleList | undefined = (rule as CSSStyleRule).cssRules || ((rule as { block?: { value?: unknown[] } }).block?.value ? (rule as { block?: { value?: unknown[] } }).block!.value!.filter((v: unknown): v is Rule => Boolean(v && typeof v === 'object' && ('type' in v) && ((v as { type: string }).type === 'qualified-rule' || (v as { type: string }).type === 'at-rule'))) : undefined);
+        const nestedRules = (rule as CSSStyleRule).cssRules;
         if (nestedRules && nestedRules.length > 0) {
           walkRules(nestedRules, resolvedSelector, currentLayer, scopeNode, scopeProximity);
         }
-      } else if (
-        rule instanceof CSSLayerBlockRule ||
-        ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'layer' && (rule as ASTAtRule).block)
-      ) {
+      } else if (rule instanceof CSSLayerBlockRule) {
         const assigned = (rule as CSSRule & InternalRuleMetadata)._assignedLayerName;
-        const rawName = (rule as CSSLayerBlockRule).name || serialize((rule as ASTAtRule).prelude || []).trim();
+        const rawName = rule.name;
         const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
-        const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
-        walkRules(childRules, parentSelector, layerName, scopeNode, scopeProximity);
-      } else if (
+        if (rule.cssRules) {
+          walkRules(rule.cssRules, parentSelector, layerName, scopeNode, scopeProximity);
+        }
+      } else if (rule instanceof CSSMediaRule) {
         // css-cascade-5 § 2 #filtering
         // mediaqueries-4 § 3.2 #evaluating-mq-list
-        rule instanceof CSSMediaRule ||
-        ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'media')
-      ) {
-        const mediaText = rule instanceof CSSMediaRule ? rule.media.mediaText : serialize((rule as ASTAtRule).prelude || []).trim();
+        const mediaText = rule.media.mediaText;
         const env = resolveMediaEnvironment(element);
-        if (MediaParser.evaluate(mediaText, env)) {
-          const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
-          walkRules(childRules, parentSelector, currentLayer, scopeNode, scopeProximity);
+        if (MediaParser.evaluate(mediaText, env) && rule.cssRules) {
+          walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode, scopeProximity);
         }
-      } else if (
-        rule instanceof CSSImportRule ||
-        ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'import')
-      ) {
+      } else if (rule instanceof CSSImportRule) {
         // css-cascade-6 § 5 #at-import
-        const mediaText = rule instanceof CSSImportRule ? rule.media?.mediaText : '';
+        const mediaText = rule.media?.mediaText;
         const env = resolveMediaEnvironment(element);
         if (mediaText && !MediaParser.evaluate(mediaText, env)) {
           continue;
         }
 
-        const importedSheet = (rule as CSSImportRule).styleSheet;
+        const importedSheet = rule.styleSheet;
         if (importedSheet && importedSheet.cssRules && importedSheet.cssRules.length > 0) {
-          const rawLayer = (rule as CSSImportRule).layerName;
-          const assignedLayer = (rule as CSSRule & InternalRuleMetadata)._assignedLayerName;
+          const rawLayer = rule.layerName;
+          const assignedLayer = (rule as unknown as InternalRuleMetadata)._assignedLayerName;
           const layerName = assignedLayer || (rawLayer !== null && rawLayer !== undefined ? (currentLayer ? (rawLayer ? `${currentLayer}.${rawLayer}` : currentLayer) : rawLayer) : currentLayer);
           
-          const meta = rule as CSSRule & InternalRuleMetadata;
-          const isScoped = meta.isScoped || meta._isScoped;
-          const scopeStart = meta.scopeStart ?? meta._scopeStart;
-          const scopeEnd = meta.scopeEnd ?? meta._scopeEnd;
+          const isScoped = rule.isScoped;
+          const scopeStart = rule.scopeStart;
+          const scopeEnd = rule.scopeEnd;
 
           if (isScoped) {
             const startStr = scopeStart ? `(${scopeStart})` : null;
@@ -896,14 +885,10 @@ export function collectMatchedDeclarations(
             walkRules(childRules, '', currentLayer, candRoot, hops);
           }
         }
-      } else if (
-        rule instanceof CSSSupportsRule ||
-        ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'supports')
-      ) {
-        const condText = rule instanceof CSSSupportsRule ? rule.conditionText : serialize((rule as ASTAtRule).prelude || []).trim();
-        if (supports(condText)) {
-          const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
-          walkRules(childRules, parentSelector, currentLayer, scopeNode, scopeProximity);
+      } else if (rule instanceof CSSSupportsRule) {
+        const condText = rule.conditionText;
+        if (supports(condText) && rule.cssRules) {
+          walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode, scopeProximity);
         }
       } else if (rule instanceof CSSGroupingRule) {
         walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode, scopeProximity);

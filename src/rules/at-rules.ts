@@ -942,14 +942,22 @@ export class CSSAtRule extends CSSRule {
   public name: string;
   public prelude: ComponentValue[];
   public block?: SimpleBlock | null;
-  public childRules?: CSSRule[];
+  public childRules?: Rule[];
+  public declarations?: Declaration[];
 
-  constructor(name: string, prelude: ComponentValue[], block?: SimpleBlock | null, childRules?: CSSRule[]) {
+  constructor(
+    name: string,
+    prelude: ComponentValue[],
+    block?: SimpleBlock | null,
+    childRules?: Rule[],
+    declarations?: Declaration[]
+  ) {
     super();
     this.name = name;
     this.prelude = prelude;
     this.block = block;
     this.childRules = childRules;
+    this.declarations = declarations;
   }
 
   override get type(): number {

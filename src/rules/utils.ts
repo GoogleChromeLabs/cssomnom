@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import type { Rule, ASTAtRule } from '../types.ts';
+import type { Rule } from '../types.ts';
 import type { CSSRule, CSSStyleSheet } from '../CSSOM.ts';
 
 export const FONT_FACE_DESCRIPTORS = new Set<string>([
@@ -27,17 +27,11 @@ export const PAGE_DESCRIPTORS = new Set<string>([
 ]);
 
 export function isImportRule(r: Rule): boolean {
-  if (typeof r.type === 'number') {
-    return r.type === 3; // CSSRule.IMPORT_RULE
-  }
-  return r.type === 'at-rule' && (r as ASTAtRule).name === 'import';
+  return r.type === 3; // CSSRule.IMPORT_RULE
 }
 
 export function isNamespaceRule(r: Rule): boolean {
-  if (typeof r.type === 'number') {
-    return r.type === 10; // CSSRule.NAMESPACE_RULE
-  }
-  return r.type === 'at-rule' && (r as ASTAtRule).name === 'namespace';
+  return r.type === 10; // CSSRule.NAMESPACE_RULE
 }
 
 export function isRegularRule(r: Rule): boolean {
