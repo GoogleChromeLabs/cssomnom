@@ -53,6 +53,11 @@ export class StyleSheet {
   private _media: MediaList;
   private _disabledFlag = false;
 
+  // cssom-1 § 6.1 #the-stylesheet-interface
+  get [Symbol.toStringTag](): string {
+    return 'StyleSheet';
+  }
+
   get type(): string {
     return this._type;
   }
@@ -129,6 +134,11 @@ export class CSSStyleSheet extends StyleSheet {
       return this._ownerRule.parentStyleSheet;
     }
     return this._parentStyleSheet;
+  }
+
+  // cssom-1 § 6.5 #the-cssstylesheet-interface
+  get [Symbol.toStringTag](): string {
+    return 'CSSStyleSheet';
   }
 
   get cssRules(): CSSRuleList {
@@ -640,5 +650,20 @@ for (const ctor of cssomClasses) {
     applyWebIDLInterface(ctor as Function);
   }
 }
+
+// cssom-1 § 6.7 #the-cssstyleproperties-interface
+// WebIDL § 3.6.3 #interface-prototype-object
+Object.defineProperty(CSSStyleDeclaration.prototype, Symbol.toStringTag, {
+  value: 'CSSStyleProperties',
+  configurable: true,
+  writable: false,
+  enumerable: false
+});
+Object.defineProperty(CSSStyleProperties.prototype, Symbol.toStringTag, {
+  value: 'CSSStyleProperties',
+  configurable: true,
+  writable: false,
+  enumerable: false
+});
 
 export * from './rules/at-rules.ts';

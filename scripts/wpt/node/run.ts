@@ -195,6 +195,12 @@ export function runWptFile(filePath: string): WptFileResult {
   // Expose Window and format_value on sandbox
   sandbox.Window = win.Window || (win as unknown as { constructor: unknown }).constructor || (globalThis as unknown as Record<string, unknown>).Window;
   sandbox.format_value = (sandbox as { format_value?: unknown }).format_value || format_value;
+  if (win.Document) sandbox.Document = win.Document;
+  if (win.SVGStyleElement) sandbox.SVGStyleElement = win.SVGStyleElement;
+  if (win.MathMLElement) sandbox.MathMLElement = win.MathMLElement;
+  if (win.HTMLLinkElement) sandbox.HTMLLinkElement = win.HTMLLinkElement;
+  if (win.ShadowRoot) sandbox.ShadowRoot = win.ShadowRoot;
+  if (win.ProcessingInstruction) sandbox.ProcessingInstruction = win.ProcessingInstruction;
 
   let contextRealm: Record<string, unknown> | undefined;
 
@@ -278,6 +284,12 @@ export function runWptFile(filePath: string): WptFileResult {
         if (JS_INTRINSICS.has(prop) && contextRealm && prop in contextRealm) {
           return { value: contextRealm[prop], writable: true, enumerable: false, configurable: true };
         }
+        // WebIDL § 3.7.1: Operations on [Global] interfaces must be [[Enumerable]]: true
+        if (prop === 'getComputedStyle') {
+          const val = sandbox.getComputedStyle ?? (target as Record<string, unknown>)[prop];
+          return { value: val, writable: true, enumerable: true, configurable: true };
+        }
+        // WebIDL § 3.6 #interface-object & § 3.8 #es-namespaces: Interface objects and namespaces must be [[Enumerable]]: false
         if (prop in sandbox) {
           return { value: sandbox[prop], writable: true, enumerable: false, configurable: true };
         }
@@ -285,7 +297,10 @@ export function runWptFile(filePath: string): WptFileResult {
           return { value: (globalThis as unknown as Record<string, unknown>)[prop], writable: true, enumerable: false, configurable: true };
         }
         if (targetDesc) {
-          return targetDesc;
+          return { ...targetDesc, enumerable: false };
+        }
+        if (SAFE_HOST_APIS.has(prop) && prop in globalThis) {
+          return { value: (globalThis as unknown as Record<string, unknown>)[prop], writable: true, enumerable: false, configurable: true };
         }
         if (prop in target) {
           return { value: target[prop], writable: true, enumerable: false, configurable: true };
@@ -331,7 +346,11 @@ export function runWptFile(filePath: string): WptFileResult {
     'Element',
     'HTMLElement',
     'HTMLStyleElement',
+    'HTMLLinkElement',
     'SVGElement',
+    'SVGStyleElement',
+    'MathMLElement',
+    'ShadowRoot',
     'CharacterData',
     'Comment',
     'Text',
@@ -396,6 +415,40 @@ export function runWptFile(filePath: string): WptFileResult {
 
   const context = vm.createContext(sandbox);
   contextRealm = vm.runInContext('this', context) as Record<string, unknown>;
+
+  // cssom-1 § 9 #namespacedef-css
+  if (sandbox.CSS && typeof sandbox.CSS === 'object' && contextRealm.Object && (contextRealm.Object as { prototype?: object }).prototype) {
+    Object.setPrototypeOf(sandbox.CSS, (contextRealm.Object as { prototype: object }).prototype);
+  }
+
+  // WebIDL § 3.6 #interface-object
+  const vmObjectProto = (contextRealm.Object as { prototype?: object })?.prototype;
+  const vmFunctionProto = (contextRealm.Function as { prototype?: object })?.prototype;
+  if (vmObjectProto && vmFunctionProto) {
+    const rootClasses = [
+      sandbox.MediaList,
+      sandbox.StyleSheet,
+      sandbox.StyleSheetList,
+      sandbox.CSSRuleList,
+      sandbox.CSSRule,
+      winObj.MediaList,
+      winObj.StyleSheet,
+      winObj.StyleSheetList,
+      winObj.CSSRuleList,
+      winObj.CSSRule
+    ];
+    for (const cls of rootClasses) {
+      if (cls && typeof cls === 'function') {
+        const c = cls as Function & { prototype?: object };
+        if (c.prototype && Object.getPrototypeOf(c.prototype) === Object.prototype) {
+          Object.setPrototypeOf(c.prototype, vmObjectProto);
+        }
+        if (Object.getPrototypeOf(c) === Function.prototype) {
+          Object.setPrototypeOf(c, vmFunctionProto);
+        }
+      }
+    }
+  }
 
   const cleanup = () => {
     (winObj as unknown as { __sandbox?: unknown }).__sandbox = undefined;

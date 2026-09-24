@@ -716,5 +716,100 @@ export const WPT_ASSERTIONS = {
         assert.ok(ctorMatches, `${description || ''}: threw an exception from the wrong global`);
       }
     }
+  },
+
+  // testharness.js § promise_rejects_dom
+  async promise_rejects_dom(
+    test: unknown,
+    type: string | number,
+    promiseOrConstructor: unknown,
+    descriptionOrPromise?: unknown,
+    maybeDescription?: string
+  ): Promise<unknown> {
+    let constructor: unknown;
+    let promise: Promise<unknown>;
+    let description: string | undefined;
+
+    if (typeof promiseOrConstructor === 'function' && (promiseOrConstructor as Function).name === 'DOMException') {
+      constructor = promiseOrConstructor;
+      promise = descriptionOrPromise as Promise<unknown>;
+      description = maybeDescription;
+    } else {
+      constructor =
+        (typeof globalThis !== 'undefined' && (globalThis as unknown as { DOMException?: unknown }).DOMException) ||
+        (typeof DOMException !== 'undefined' ? DOMException : undefined);
+      promise = promiseOrConstructor as Promise<unknown>;
+      description = descriptionOrPromise as string | undefined;
+    }
+
+    try {
+      await promise;
+    } catch (err: unknown) {
+      if (err instanceof assert.AssertionError) {
+        throw err;
+      }
+      WPT_ASSERTIONS.assert_throws_dom(type, constructor, () => { throw err; }, description);
+      return err;
+    }
+
+    const t = test as { unreached_func?: (msg: string) => () => void } | undefined;
+    if (t && typeof t.unreached_func === 'function') {
+      t.unreached_func(`${description || ''}: promise unexpectedly resolved`)();
+    }
+    throw new AssertionErrorProxy(`${description ? description + ': ' : ''}promise unexpectedly resolved`);
+  },
+
+  // testharness.js § promise_rejects_js
+  async promise_rejects_js(
+    test: unknown,
+    constructor: Function,
+    promise: Promise<unknown>,
+    description?: string
+  ): Promise<unknown> {
+    try {
+      await promise;
+    } catch (err: unknown) {
+      if (err instanceof assert.AssertionError) {
+        throw err;
+      }
+      WPT_ASSERTIONS.assert_throws_js(constructor, () => { throw err; }, description);
+      return err;
+    }
+
+    const t = test as { unreached_func?: (msg: string) => () => void } | undefined;
+    if (t && typeof t.unreached_func === 'function') {
+      t.unreached_func(`${description || ''}: promise unexpectedly resolved`)();
+    }
+    throw new AssertionErrorProxy(`${description ? description + ': ' : ''}promise unexpectedly resolved`);
+  },
+
+  // testharness.js § promise_rejects_exactly
+  async promise_rejects_exactly(
+    test: unknown,
+    expected: unknown,
+    promise: Promise<unknown>,
+    description?: string
+  ): Promise<unknown> {
+    try {
+      await promise;
+    } catch (err: unknown) {
+      if (err instanceof assert.AssertionError) {
+        throw err;
+      }
+      WPT_ASSERTIONS.assert_throws_exactly(expected, () => { throw err; }, description);
+      return err;
+    }
+
+    const t = test as { unreached_func?: (msg: string) => () => void } | undefined;
+    if (t && typeof t.unreached_func === 'function') {
+      t.unreached_func(`${description || ''}: promise unexpectedly resolved`)();
+    }
+    throw new AssertionErrorProxy(`${description ? description + ': ' : ''}promise unexpectedly resolved`);
   }
 };
+
+export const {
+  promise_rejects_dom,
+  promise_rejects_js,
+  promise_rejects_exactly
+} = WPT_ASSERTIONS;

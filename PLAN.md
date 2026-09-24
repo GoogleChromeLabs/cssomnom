@@ -3465,15 +3465,15 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ### Sub-Phases & Atomic Tasks
 
-#### Phase 142.1: Test Harness WebIDL Bridge & Global Prototypes (+53 tests) [ ]
-- [ ] **Polyfill `promise_rejects_dom` and `promise_rejects_js` on Test Harness (+25 tests)**:
+#### Phase 142.1: Test Harness WebIDL Bridge & Global Prototypes (+53 tests) [x]
+- [x] **Polyfill `promise_rejects_dom` and `promise_rejects_js` on Test Harness (+25 tests)**:
   - In `tests/dom-shim/src/wpt-assertions.ts`, implement `promise_rejects_dom` and `promise_rejects_js` matching WPT `testharness.js` specifications.
   - Prevents async constructable stylesheet rejection tests (e.g. `sheet.replace('invalid')`) from crashing the harness.
   - *Target*: Unblocks constructable stylesheet rejection tests across `submodules/web-platform-tests/css/cssom/` (+25 tests).
-- [ ] **Expose Missing Interface Prototypes on Mock Window (+20 tests)**:
+- [x] **Expose Missing Interface Prototypes on Mock Window (+20 tests)**:
   - In `tests/dom-shim/src/dom-stubs.ts`: expose `SVGStyleElement`, `MathMLElement`, and ensure `Document.prototype` inherits `Node.prototype` with proper accessor descriptors.
   - *Target*: Fixes missing interface prototype tests in [`submodules/web-platform-tests/css/cssom/idlharness.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/cssom/idlharness.html) (+20 tests).
-- [ ] **Prototype Property Descriptors & Stringification (+8 tests)**:
+- [x] **Prototype Property Descriptors & Stringification (+8 tests)**:
   - In `src/rules/at-rules.ts`: ensure `CSSMediaRule.prototype.media` is a prototype getter and `CSSFontFaceRule.prototype.style` is correctly descriptor-bound with `Symbol.toStringTag`.
   - *Target*: Completes `idlharness.html` interface checks (+8 tests).
 

@@ -133,11 +133,17 @@ export class StyleSheetListImpl extends Array<CSSStyleSheet> {
 }
 
 // State WeakMaps to eliminate instance monkey-patching
-const styleSheetMap = new WeakMap<object, CSSStyleSheet | null>();
+export const styleSheetMap = new WeakMap<object, CSSStyleSheet | null>();
 const styleSheetSourceMap = new WeakMap<object, string | null>();
 const attributeStyleMapCache = new WeakMap<object, TypedOM.StylePropertyMap>();
 const computedStyleMapCache = new WeakMap<object, ComputedStylePropertyMap>();
 const documentFontsMap = new WeakMap<object, FontFaceSet>();
+
+export let globalSVGStyleElement: (Function & { prototype: object }) | undefined;
+export let globalMathMLElement: (Function & { prototype: object }) | undefined;
+export let globalProcessingInstruction: (Function & { prototype: object }) | undefined;
+export let globalDocumentConstructor: (Function & { prototype: object }) | undefined;
+export let globalWindowClass: (Function & { prototype: object }) | undefined;
 
 // ---------------------------------------------------------------------------
 // Pure Value Transformation Helpers (for ComputedStylePropertyMap & Layout)
@@ -1314,6 +1320,128 @@ function patchStyleElementPrototype(window: WindowType): void {
   }
 }
 
+// svg2 § 5.8 #interface-svgstyleelement
+// cssom-1 § 4.6 #the-linkstyle-interface
+function patchSVGStyleElementPrototype(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const BaseSvg = (win.SVGElement || win.Element || class {}) as { new(): Element };
+
+  class SVGStyleElement extends BaseSvg {}
+  Object.defineProperty(SVGStyleElement.prototype, Symbol.toStringTag, {
+    value: 'SVGStyleElement',
+    configurable: true
+  });
+
+  const svgSheetGet = function (this: Element) {
+    if (!this || (this as unknown) === SVGStyleElement.prototype || !(this instanceof SVGStyleElement)) {
+      throw new TypeError("Failed to read the 'sheet' property from 'SVGStyleElement': The provided value is not of type 'SVGStyleElement'.");
+    }
+    const currentText = this.textContent || '';
+    let sheet = styleSheetMap.get(this);
+    const source = styleSheetSourceMap.get(this);
+    if (!sheet || source !== currentText) {
+      styleSheetSourceMap.set(this, currentText);
+      const rules = parseStyleSheet(currentText);
+      sheet = CSSStyleSheet.createInternal(rules, parseRule);
+      (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
+      const mediaText = this.getAttribute ? this.getAttribute('media') || '' : '';
+      if (mediaText) {
+        sheet.media.mediaText = mediaText;
+      }
+      resolveImportRules(sheet, this.ownerDocument);
+      styleSheetMap.set(this, sheet);
+    }
+    return sheet;
+  };
+  Object.defineProperty(svgSheetGet, 'name', { value: 'get sheet', configurable: true });
+  Object.defineProperty(SVGStyleElement.prototype, 'sheet', {
+    get: svgSheetGet,
+    enumerable: true,
+    configurable: true
+  });
+
+  for (const attr of ['type', 'media', 'title'] as const) {
+    Object.defineProperty(SVGStyleElement.prototype, attr, {
+      get(this: Element) {
+        return this.getAttribute ? this.getAttribute(attr) || '' : '';
+      },
+      set(this: Element, val: string) {
+        if (this.setAttribute) this.setAttribute(attr, String(val));
+      },
+      enumerable: true,
+      configurable: true
+    });
+  }
+  Object.defineProperty(SVGStyleElement.prototype, 'disabled', {
+    get(this: Element) {
+      return this.hasAttribute ? this.hasAttribute('disabled') : false;
+    },
+    set(this: Element, val: boolean) {
+      if (val) {
+        if (this.setAttribute) this.setAttribute('disabled', '');
+      } else {
+        if (this.removeAttribute) this.removeAttribute('disabled');
+      }
+    },
+    enumerable: true,
+    configurable: true
+  });
+
+  Object.defineProperty(SVGStyleElement, 'length', { value: 0, writable: false, enumerable: false, configurable: true });
+  win.SVGStyleElement = SVGStyleElement;
+  globalSVGStyleElement = SVGStyleElement;
+}
+
+// mathml-core § 2.1 #the-mathmlelement-interface
+// cssom-1 § 6.8 #the-elementcssinlinestyle-mixin
+function patchMathMLElementPrototype(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const BaseElem = (win.Element || class {}) as { new(): Element };
+
+  class MathMLElement extends BaseElem {}
+  Object.defineProperty(MathMLElement.prototype, Symbol.toStringTag, {
+    value: 'MathMLElement',
+    configurable: true
+  });
+  patchElementStyle(MathMLElement.prototype as unknown as Record<string, unknown>, window);
+  Object.defineProperty(MathMLElement, 'length', { value: 0, writable: false, enumerable: false, configurable: true });
+  win.MathMLElement = MathMLElement;
+  globalMathMLElement = MathMLElement;
+}
+
+// dom § 4.10 #interface-processinginstruction
+// cssom-1 § 4.6 #the-linkstyle-interface
+function patchProcessingInstructionPrototype(window: WindowType): void {
+  const win = window as unknown as Record<string, unknown>;
+  const BaseCharData = (win.CharacterData || win.Node || class {}) as { new(): Node };
+
+  class ProcessingInstruction extends BaseCharData {
+    private _target: string = '';
+    get target(): string {
+      return this._target;
+    }
+  }
+  Object.defineProperty(ProcessingInstruction.prototype, Symbol.toStringTag, {
+    value: 'ProcessingInstruction',
+    configurable: true
+  });
+  const piSheetGet = function (this: unknown) {
+    if (!this || (this as unknown) === ProcessingInstruction.prototype || !(this instanceof ProcessingInstruction)) {
+      throw new TypeError("Failed to read the 'sheet' property from 'ProcessingInstruction': The provided value is not of type 'ProcessingInstruction'.");
+    }
+    return styleSheetMap.get(this as object) ?? null;
+  };
+  Object.defineProperty(piSheetGet, 'name', { value: 'get sheet', configurable: true });
+  Object.defineProperty(ProcessingInstruction.prototype, 'sheet', {
+    get: piSheetGet,
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(ProcessingInstruction, 'length', { value: 0, writable: false, enumerable: false, configurable: true });
+  win.ProcessingInstruction = ProcessingInstruction;
+  globalProcessingInstruction = ProcessingInstruction;
+}
+
 function detectFileEncoding(
   fileBuf: Buffer,
   linkEl: { getAttribute?: (attr: string) => string | null; ownerDocument?: Document }
@@ -1474,17 +1602,46 @@ function patchLinkElementPrototype(window: WindowType): void {
   });
 }
 
+// dom § 4.3 #interface-document
+// dom § 4.4 #dom-document-document
+// WebIDL § 3.6.3 #interface-prototype-object
 function patchDocumentPrototype(window: WindowType): void {
   const win = window as unknown as Record<string, unknown>;
-  const documentConstructor = win.Document as { prototype: Record<string, unknown> } | undefined;
-  if (!documentConstructor) return;
+  const doc = window.document as unknown as object;
+  const htmlDocProto = doc ? Object.getPrototypeOf(doc) : null;
+  const docProto = (htmlDocProto ? Object.getPrototypeOf(htmlDocProto) : null) as Record<string, unknown> | null;
+  const OrigDoc = (docProto ? docProto.constructor : null) as (Function & { prototype: Record<string, unknown> }) | undefined;
+  if (!docProto || !OrigDoc) return;
 
-  const docProto = documentConstructor.prototype as unknown as Record<string, unknown>;
+  function Document(this: unknown) {
+    if (!(this instanceof Document)) {
+      throw new TypeError("Failed to construct 'Document': Please use the 'new' operator, this DOM object cannot be called as a function.");
+    }
+    const instance = Reflect.construct(OrigDoc as Function, [], Document);
+    return instance;
+  }
+  Document.prototype = docProto;
+  docProto.constructor = Document;
+  Object.defineProperty(Document, 'length', { value: 0, writable: false, enumerable: false, configurable: true });
+  Object.defineProperty(Document, 'name', { value: 'Document', configurable: true });
+  win.Document = Document;
+  globalDocumentConstructor = Document;
+
+  if (window.document) {
+    const symGlobals = Object.getOwnPropertySymbols(window.document).find(s => s.description === 'globals');
+    if (symGlobals) {
+      const docObj = window.document as unknown as Record<symbol, Record<string, unknown>>;
+      docObj[symGlobals] = {
+        ...docObj[symGlobals],
+        Document
+      };
+    }
+  }
 
   Object.defineProperty(docProto, 'adoptedStyleSheets', createAdoptedStyleSheetsAccessor(window));
 
   const docSheetsGet = function (this: Document) {
-    if (!this || (this as unknown) === docProto || !(this instanceof (documentConstructor as Function))) {
+    if (!this || (this as unknown) === docProto || !(this instanceof Document)) {
       throw new TypeError("Failed to read the 'styleSheets' property from 'Document': The provided value is not of type 'Document'.");
     }
     return collectStyleSheets(this);
@@ -1955,6 +2112,9 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
   patchIFramePrototype(window, patchWindow);
   patchDocumentElementNormalization(window);
   patchStyleElementPrototype(window);
+  patchSVGStyleElementPrototype(window);
+  patchMathMLElementPrototype(window);
+  patchProcessingInstructionPrototype(window);
   patchLinkElementPrototype(window);
   patchDocumentPrototype(window);
   patchShadowRootPrototype(window);
@@ -1967,6 +2127,34 @@ export function patchDomPrototypes(window: WindowType, patchWindow: (win: Window
 
 function patchWindowGlobals(window: WindowType): void {
   const win = window as unknown as Record<string, unknown>;
+
+  if (!win.Window) {
+    const EventTargetBase = (win.EventTarget || (globalThis as { EventTarget?: unknown }).EventTarget || class {}) as { new(): object };
+    class Window extends EventTargetBase {
+      constructor() {
+        super();
+        throw new TypeError('Illegal constructor');
+      }
+    }
+    Object.defineProperty(Window.prototype, Symbol.toStringTag, {
+      value: 'Window',
+      configurable: true
+    });
+    win.Window = Window;
+    globalWindowClass = Window;
+    try {
+      Object.setPrototypeOf(win, Window.prototype);
+    } catch {}
+  } else if (!globalWindowClass) {
+    globalWindowClass = win.Window as (Function & { prototype: object });
+  }
+
+  if (win.HTMLLinkElement && typeof win.HTMLLinkElement === 'function' && (win.HTMLLinkElement as Function).prototype) {
+    ((win.HTMLLinkElement as Function).prototype as { constructor: unknown }).constructor = win.HTMLLinkElement;
+  }
+  if (win.ShadowRoot && typeof win.ShadowRoot === 'function' && (win.ShadowRoot as Function).prototype) {
+    ((win.ShadowRoot as Function).prototype as { constructor: unknown }).constructor = win.ShadowRoot;
+  }
 
   Object.assign(win, {
     CSSStyleDeclaration,
@@ -1995,7 +2183,14 @@ function patchWindowGlobals(window: WindowType): void {
     StyleSheetList,
     CSSRuleList,
     CSSStyleProperties,
-    CSSPageDescriptors
+    CSSPageDescriptors,
+    SVGStyleElement: globalSVGStyleElement || win.SVGStyleElement,
+    MathMLElement: globalMathMLElement || win.MathMLElement,
+    ProcessingInstruction: globalProcessingInstruction || win.ProcessingInstruction,
+    Document: globalDocumentConstructor || win.Document,
+    HTMLLinkElement: window.HTMLLinkElement,
+    ShadowRoot: (window as unknown as Record<string, unknown>).ShadowRoot,
+    Window: globalWindowClass || win.Window
   });
 
   if (!('FocusEvent' in win)) {
@@ -2221,8 +2416,13 @@ function createEmptyComputedStyle() {
 function patchWindowStyles(window: WindowType): void {
   const win = window as unknown as Record<string, unknown>;
 
-  win.getComputedStyle = function (element: Element, pseudoElt?: string | null) {
+  win.getComputedStyle = function getComputedStyle(this: unknown, element: Element, pseudoElt?: string | null) {
     // WebIDL § 3.7 #es-operations
+    // cssom-1 § 6.9 #dom-window-getcomputedstyle
+    const effectiveThis = this == null ? win : this;
+    if (effectiveThis !== win && effectiveThis !== window && (typeof win.Window === 'function' ? !(effectiveThis instanceof (win.Window as Function)) : true)) {
+      throw new TypeError("Failed to execute 'getComputedStyle' on 'Window': Illegal invocation.");
+    }
     if (arguments.length < 1) {
       throw new TypeError("Failed to execute 'getComputedStyle' on 'Window': 1 argument required, but only 0 present.");
     }
@@ -2412,6 +2612,8 @@ function patchWindowStyles(window: WindowType): void {
   };
 
   // WebIDL § 3.7 #es-operations
+  // WebIDL § 3.7.1 #es-operations
+  Object.defineProperty(win.getComputedStyle, 'length', { value: 1, configurable: true });
   Object.defineProperty(win, 'getComputedStyle', {
     value: win.getComputedStyle,
     writable: true,

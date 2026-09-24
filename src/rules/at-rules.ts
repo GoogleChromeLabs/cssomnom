@@ -33,23 +33,43 @@ export class CSSConditionRule extends CSSGroupingRule {
 }
 
 // css-conditional-3 § 4 #the-cssmediarule-interface
+// cssom-1 § 6.4.3 #the-cssmediarule-interface
 export class CSSMediaRule extends CSSConditionRule {
-  readonly media: MediaList;
+  private _media: MediaList;
 
   constructor(mediaText: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
-    this.media = new MediaList(mediaText);
+    this._media = new MediaList(mediaText);
+  }
+
+  // cssom-1 § 6.4.3 #dom-cssmediarule-media
+  get media(): MediaList {
+    return this._media;
+  }
+
+  set media(value: string | MediaList | null) {
+    if (value === null) {
+      this._media.mediaText = '';
+    } else if (typeof value === 'string') {
+      this._media.mediaText = value;
+    } else if (value && 'mediaText' in value) {
+      this._media.mediaText = value.mediaText;
+    }
+  }
+
+  get [Symbol.toStringTag](): string {
+    return 'CSSMediaRule';
   }
 
   override get conditionText(): string {
-    return this.media.mediaText;
+    return this._media.mediaText;
   }
 
   get type() { return 4; }
 
   // 6.17 The CSSMediaRule Interface
   get cssText() {
-    return serializeGroupingRule('media', this.media.mediaText, this._rules);
+    return serializeGroupingRule('media', this._media.mediaText, this._rules);
   }
 
   set cssText(_value: string) {
@@ -89,6 +109,11 @@ export class CSSSupportsRule extends CSSConditionRule {
 
   override get conditionText(): string {
     return this._conditionText;
+  }
+
+  // css-conditional-3 § 5 #the-csssupportsrule-interface
+  get [Symbol.toStringTag](): string {
+    return 'CSSSupportsRule';
   }
 
   get type() { return 12; }
@@ -331,6 +356,11 @@ export class CSSKeyframesRule extends CSSRule {
 
   get type() { return 7; }
 
+  // css-animations-1 § 5.2 #the-csskeyframesrule-interface
+  get [Symbol.toStringTag](): string {
+    return 'CSSKeyframesRule';
+  }
+
   get length(): number {
     return this._rules.length;
   }
@@ -426,6 +456,11 @@ export class CSSKeyframeRule extends CSSRule {
 
   get type() { return 8; }
 
+  // css-animations-1 § 5.3 #the-csskeyframerule-interface
+  get [Symbol.toStringTag](): string {
+    return 'CSSKeyframeRule';
+  }
+
   // The CSSKeyframeRule Interface
   get cssText() {
     const body = this._style.cssText.trim();
@@ -474,6 +509,8 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   }
 }
 
+// css-fonts-4 § 6 #om-fontface
+// cssom-1 § 6.4.3 #the-cssfontfacerule-interface
 export class CSSFontFaceRule extends CSSRule {
   private _style: CSSFontFaceDescriptors;
 
@@ -483,12 +520,17 @@ export class CSSFontFaceRule extends CSSRule {
     this._style._parentRule = this;
   }
 
-  get style(): CSSFontFaceDescriptors {
+  // css-fonts-4 § 6 #dom-cssfontfacerule-style
+  get style(): CSSStyleDeclaration {
     return this._style;
   }
 
   set style(value: string) {
     this._style.cssText = value;
+  }
+
+  get [Symbol.toStringTag](): string {
+    return 'CSSFontFaceRule';
   }
 
   get type() { return 5; }
@@ -531,6 +573,11 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
 
   override _isPropertySupported(property: string): boolean {
     return super._isPropertySupported(property) || PAGE_DESCRIPTORS.has(property);
+  }
+
+  // cssom-1 § 6.4.4 #the-csspagedescriptors-interface
+  get [Symbol.toStringTag](): string {
+    return 'CSSPageDescriptors';
   }
 }
 
@@ -575,6 +622,10 @@ export class CSSMarginRule extends CSSRule {
   private _style: CSSMarginDescriptors;
 
   constructor(name: string, declarations: Declaration[]) {
+    // css-page-3 § 7.3 #the-cssmarginrule-interface
+    if (arguments.length === 0) {
+      throw new TypeError('Illegal constructor');
+    }
     super();
     this._name = name;
     this._style = new CSSMarginDescriptors(declarations);
@@ -592,6 +643,11 @@ export class CSSMarginRule extends CSSRule {
 
   set style(value: string) {
     this._style.cssText = value;
+  }
+
+  // css-page-3 § 7.3 #the-cssmarginrule-interface
+  get [Symbol.toStringTag](): string {
+    return 'CSSMarginRule';
   }
 
   get type() { return 9; } // CSSRule.MARGIN_RULE
@@ -623,6 +679,10 @@ export class CSSImportRule extends CSSRule {
     scopeEnd: string | null = null,
     isScoped: boolean = false
   ) {
+    // cssom-1 § 6.4.3 #the-cssimportrule-interface
+    if (arguments.length === 0) {
+      throw new TypeError('Illegal constructor');
+    }
     super();
     this._href = href;
     this._media = new MediaList(mediaText);
@@ -726,6 +786,10 @@ export class CSSNamespaceRule extends CSSRule {
   private _prefix: string;
 
   constructor(prefix: string, namespaceURI: string) {
+    // cssom-1 § 6.4.5 #the-cssnamespacerule-interface
+    if (arguments.length === 0) {
+      throw new TypeError('Illegal constructor');
+    }
     super();
     this._prefix = prefix;
     this._namespaceURI = namespaceURI;
@@ -861,6 +925,11 @@ export class CSSPageRule extends CSSGroupingRule {
 
   set style(value: string) {
     this._style.cssText = value;
+  }
+
+  // cssom-1 § 6.4.4 #the-csspagerule-interface
+  get [Symbol.toStringTag](): string {
+    return 'CSSPageRule';
   }
 
   get type() { return 6; }

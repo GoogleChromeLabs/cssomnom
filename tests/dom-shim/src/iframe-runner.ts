@@ -6,6 +6,8 @@ import * as vm from 'node:vm';
 import { parseHTML, DOMParser } from 'linkedom';
 import { HarnessError, messageOf } from './wpt-assertions.ts';
 import { createWptContext, type WindowType, type DocumentType, type WptSandboxTest } from './testharness-bridge.ts';
+import { styleSheetMap } from './dom-stubs.ts';
+import { CSSStyleSheet, parseRule } from '../../../src/index.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 export const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
@@ -471,6 +473,41 @@ function loadIframeResource(
         },
         configurable: true
       });
+    }
+
+    // cssom-1 § 4.6 #the-linkstyle-interface
+    // dom § 4.10 #interface-processinginstruction
+    if (fileContent.includes('<?xml-stylesheet')) {
+      const PIClass = (xmlWindow as unknown as Record<string, unknown>).ProcessingInstruction as {
+        prototype: object;
+      } | undefined;
+      if (PIClass) {
+        const piMatch = /<\?xml-stylesheet\s+([^?]+)\?>/.exec(fileContent);
+        const data = piMatch ? piMatch[1].trim() : "href='data:text/css,'";
+        const piNode = Object.create(PIClass.prototype);
+        Object.defineProperty(piNode, '_target', { value: 'xml-stylesheet', writable: true, configurable: true });
+        Object.defineProperty(piNode, 'target', { value: 'xml-stylesheet', configurable: true });
+        Object.defineProperty(piNode, 'nodeType', { value: 7, configurable: true });
+        Object.defineProperty(piNode, 'nodeName', { value: 'xml-stylesheet', configurable: true });
+        Object.defineProperty(piNode, 'data', { value: data, writable: true, configurable: true });
+        Object.defineProperty(piNode, 'ownerDocument', { value: xmlDoc, configurable: true });
+        Object.defineProperty(piNode, 'parentNode', { value: xmlDoc, configurable: true });
+        const sheet = CSSStyleSheet.createInternal([], parseRule as never);
+        styleSheetMap.set(piNode, sheet);
+        const origFirstChild = (xmlDoc as unknown as { firstChild: unknown }).firstChild;
+        Object.defineProperty(xmlDoc, 'firstChild', {
+          get() {
+            return piNode;
+          },
+          configurable: true
+        });
+        Object.defineProperty(piNode, 'nextSibling', {
+          get() {
+            return origFirstChild;
+          },
+          configurable: true
+        });
+      }
     }
 
     // Route postMessage to parent window
