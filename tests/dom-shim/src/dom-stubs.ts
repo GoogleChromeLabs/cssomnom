@@ -2655,7 +2655,12 @@ function patchWindowStyles(window: WindowType): void {
       const parent = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement;
       const parentNode = (curr as { parentNode?: unknown }).parentNode;
       if (parent && typeof parent === 'object' && (parent as { shadowRoot?: unknown }).shadowRoot && parentNode === parent) {
-        if (!(curr as { assignedSlot?: unknown }).assignedSlot) {
+        const sr = (parent as { shadowRoot: unknown }).shadowRoot as { querySelector?(s: string): unknown } | null;
+        const hasSlot = Boolean(
+          (curr as { assignedSlot?: unknown }).assignedSlot ||
+          (sr && typeof sr.querySelector === 'function' && sr.querySelector('slot'))
+        );
+        if (!hasSlot) {
           return createEmptyComputedStyle();
         }
       }

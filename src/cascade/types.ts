@@ -36,6 +36,8 @@ export interface MatchedDeclaration {
   scopeProximity?: number;
   sourceOrder: number;
   raw?: string;
+  ruleId?: number;
+  treeScope?: 'document' | 'part' | 'slotted' | 'shadow';
 }
 
 /**

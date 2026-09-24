@@ -26,6 +26,7 @@ export interface PropertyDefinition {
   syntax?: string;
   inherits: boolean;
   initialValue?: string;
+  origin?: 'js' | 'css';
 }
 
 const VALID_COMPONENTS = new Set([

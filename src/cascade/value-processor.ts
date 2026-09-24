@@ -25,6 +25,7 @@ import type { MatchedDeclaration } from './types.ts';
 import { substituteVariables } from './variable-resolver.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
+import type { PropertyDefinition } from '../PropertyRegistry.ts';
 
 const EXTRA_INITIAL_VALUES: Record<string, string> = {
   '-webkit-mask-box-image-outset': '0',
@@ -37,6 +38,7 @@ const EXTRA_INITIAL_VALUES: Record<string, string> = {
   '-webkit-text-stroke-width': '0px',
   'background-tbd': 'none',
   'font-presentation': 'auto',
+  'stop-opacity': '1',
 };
 
 export function getUaDefault(prop: string, element: unknown): string {
@@ -171,6 +173,11 @@ export function getUaDefault(prop: string, element: unknown): string {
   if (prop === 'display') {
     return BLOCK_TAGS.has(tag) ? 'block' : 'inline';
   }
+  // svg2 § 13.2 #presentation-attributes
+  if (isSvgElement(element)) {
+    if (prop === 'baseline-shift') return 'baseline';
+    if (prop === 'flood-color' || prop === 'lighting-color' || prop === 'stop-color' || prop === 'stroke') return '';
+  }
   const val = DEFAULT_PROPERTY_VALUES[prop] || EXTRA_INITIAL_VALUES[prop];
   if (val !== undefined && val !== '') return val;
   if (prop.startsWith('-webkit-')) {
@@ -181,7 +188,38 @@ export function getUaDefault(prop: string, element: unknown): string {
   return '';
 }
 
-export function getInitialValue(prop: string, _element: unknown): string {
+export function isSvgElement(element: unknown): boolean {
+  if (!element || typeof element !== 'object') return false;
+  const el = element as {
+    namespaceURI?: string | null;
+    ownerSVGElement?: unknown;
+    tagName?: string;
+    nodeName?: string;
+    parentElement?: { tagName?: string; nodeName?: string; namespaceURI?: string | null };
+  };
+  if (el.namespaceURI === 'http://www.w3.org/2000/svg') return true;
+  if (el.ownerSVGElement !== undefined && el.ownerSVGElement !== null) return true;
+  const tag = (el.tagName || el.nodeName || '').toLowerCase();
+  const SVG_TAGS = new Set([
+    'svg', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon',
+    'path', 'text', 'tspan', 'g', 'symbol', 'defs', 'marker',
+    'lineargradient', 'radialgradient', 'pattern', 'clippath', 'mask',
+    'filter', 'image', 'use', 'stop', 'foreignobject',
+  ]);
+  if (SVG_TAGS.has(tag)) return true;
+  if (el.parentElement) {
+    const parentTag = (el.parentElement.tagName || el.parentElement.nodeName || '').toLowerCase();
+    if (SVG_TAGS.has(parentTag) || el.parentElement.namespaceURI === 'http://www.w3.org/2000/svg') return true;
+  }
+  return false;
+}
+
+export function getInitialValue(prop: string, element: unknown): string {
+  // svg2 § 13.2 #presentation-attributes
+  if (isSvgElement(element)) {
+    if (prop === 'baseline-shift') return 'baseline';
+    if (prop === 'flood-color' || prop === 'lighting-color' || prop === 'stop-color' || prop === 'stroke') return '';
+  }
   const val = DEFAULT_PROPERTY_VALUES[prop] || EXTRA_INITIAL_VALUES[prop];
   if (val !== undefined && val !== '') return val;
   if (prop.startsWith('-webkit-')) {
@@ -198,7 +236,10 @@ export function getInitialValue(prop: string, _element: unknown): string {
 export function expandShorthandWithVariables(
   decl: MatchedDeclaration,
   resolvedCustomProps: Map<string, string>,
-  cyclicProps: Set<string>
+  cyclicProps: Set<string>,
+  element?: unknown,
+  taintedProps: Set<string> = new Set(),
+  activeProperties?: Map<string, PropertyDefinition>
 ): MatchedDeclaration[] {
   const shorthand = SHORTHANDS[decl.name.toLowerCase()];
   if (!shorthand) {
@@ -206,9 +247,18 @@ export function expandShorthandWithVariables(
   }
 
   let subVal = decl.value;
-  if (subVal.includes('var(') || subVal.includes('env(')) {
-    const res = substituteVariables(subVal, resolvedCustomProps, new Set(), cyclicProps);
-    if (res === null) {
+  if (
+    subVal.includes('var(') ||
+    subVal.includes('env(') ||
+    subVal.includes('attr(') ||
+    subVal.includes('ident(') ||
+    subVal.includes('if(') ||
+    subVal.includes('random-item(')
+  ) {
+    const taintOut = { tainted: false };
+    const res = substituteVariables(subVal, resolvedCustomProps, new Set(), cyclicProps, element, taintedProps, taintOut, activeProperties);
+    // css-values-5 § 3.3 #attr-security: attr()-tainted values used in a <url> make declaration invalid at computed-value time
+    if (res === null || (taintOut.tainted && (res.includes('url(') || res.includes('image-set(')))) {
       // css-variables-1 § 3.1: Invalid at computed-value time
       // When a shorthand contains an invalid var(), each longhand is invalid at computed-value time
       // and reverts to its initial value (e.g. 0px for margin).
@@ -237,7 +287,7 @@ export function expandShorthandWithVariables(
           ...decl,
           name: lh,
           value: subVal,
-        }, resolvedCustomProps, cyclicProps));
+        }, resolvedCustomProps, cyclicProps, element, taintedProps, activeProperties));
       } else {
         results.push({
           ...decl,
@@ -262,7 +312,7 @@ export function expandShorthandWithVariables(
           ...decl,
           name: lh,
           value: valStr,
-        }, resolvedCustomProps, cyclicProps));
+        }, resolvedCustomProps, cyclicProps, element, taintedProps, activeProperties));
       } else {
         results.push({
           ...decl,
@@ -290,12 +340,14 @@ export function processStandardDeclarations(
   resolvedCustomProps: Map<string, string>,
   cyclicProps: Set<string>,
   parentCascaded: CSSStyleDeclaration | null,
-  element: unknown
+  element: unknown,
+  taintedProps: Set<string> = new Set(),
+  activeProperties?: Map<string, PropertyDefinition>
 ): Map<string, MatchedDeclaration> {
   const standardDeclarationsByProperty = new Map<string, MatchedDeclaration[]>();
   for (const decl of matchedDeclarations) {
     if (decl.name.startsWith('--')) continue;
-    const expandedList = expandShorthandWithVariables(decl, resolvedCustomProps, cyclicProps);
+    const expandedList = expandShorthandWithVariables(decl, resolvedCustomProps, cyclicProps, element, taintedProps, activeProperties);
     for (const expDecl of expandedList) {
       const key = expDecl.name.toLowerCase();
       if (!standardDeclarationsByProperty.has(key)) {
@@ -311,11 +363,23 @@ export function processStandardDeclarations(
     if (prop.startsWith('--')) continue;
     decls.sort(compareCascadeDeclarations);
 
+    const revertingRuleIds = new Set<number>();
+    let hasImportantRevertRule = false;
+
     for (let i = decls.length - 1; i >= 0; i--) {
       const decl = decls[i];
-      const subVal = substituteVariables(decl.value, resolvedCustomProps, new Set(), cyclicProps);
+      if (decl.ruleId !== undefined && revertingRuleIds.has(decl.ruleId)) {
+        continue;
+      }
+      const taintOut = { tainted: false };
+      const subVal = substituteVariables(decl.value, resolvedCustomProps, new Set(), cyclicProps, element, taintedProps, taintOut, activeProperties);
       if (subVal === null) {
         // css-variables-1 § 3.1: Invalid at computed-value time
+        continue;
+      }
+
+      // css-values-5 § 3.3 #attr-security: attr()-tainted values used in a <url> make declaration invalid at computed-value time
+      if (taintOut.tainted && (subVal.includes('url(') || subVal.includes('image-set('))) {
         continue;
       }
 
@@ -325,9 +389,25 @@ export function processStandardDeclarations(
 
       const trimmedVal = subVal.trim();
       if (trimmedVal === 'revert-rule') {
+        // css-cascade-5 § 6.3.3 #revert-rule-keyword
+        if (decl.important) {
+          hasImportantRevertRule = true;
+        }
+        if (decl.ruleId !== undefined) {
+          revertingRuleIds.add(decl.ruleId);
+        }
         continue;
       }
       if (trimmedVal === 'revert-layer') {
+        if (hasImportantRevertRule) {
+          // css-cascade-5 § 6.3.3 #revert-rule-keyword
+          // W3C csswg-drafts #13916: Cycle between revert-rule !important and revert-layer resolves to unset
+          const val = (INHERITED_PROPERTIES.has(prop) && parentCascaded)
+            ? parentCascaded.getPropertyValue(prop)
+            : getInitialValue(prop, element);
+          winningDeclarations.set(prop, { ...decl, value: val });
+          break;
+        }
         let prevIdx = i - 1;
         while (prevIdx >= 0 && decls[prevIdx].layerOrder >= decl.layerOrder) {
           prevIdx--;

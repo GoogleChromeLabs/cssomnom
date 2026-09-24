@@ -205,6 +205,86 @@ export function collectStyleSheetsAndRules(
     }
   };
 
+  const collectFilteredRules = (targetRoot: unknown, keyword: '::part(' | '::slotted('): (Rule | CSSRule)[] => {
+    const result: (Rule | CSSRule)[] = [];
+    const tObj = targetRoot as {
+      styleSheets?: ArrayLike<CSSStyleSheet>;
+      adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
+      querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
+    };
+    const seenNodes = new Set<unknown>();
+
+    const checkAndAddRule = (r: Rule | CSSRule) => {
+      if ('selectorText' in r && typeof (r as CSSStyleRule).selectorText === 'string') {
+        if ((r as CSSStyleRule).selectorText.includes(keyword)) {
+          result.push(r);
+        }
+      } else if ('cssRules' in r && (r as unknown as CSSGroupingRule).cssRules) {
+        const children = (r as unknown as CSSGroupingRule).cssRules;
+        for (let i = 0; i < children.length; i++) {
+          checkAndAddRule(children[i]);
+        }
+      } else if ('prelude' in r && Array.isArray((r as { prelude?: ComponentValue[] }).prelude)) {
+        if (serialize((r as { prelude: ComponentValue[] }).prelude).includes(keyword)) {
+          result.push(r);
+        }
+      }
+    };
+
+    const processSheet = (sheet: unknown) => {
+      if (!sheet) return;
+      const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
+      if (s.disabled) return;
+      try {
+        if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
+          processSheet(s.sheet);
+          return;
+        }
+      } catch {
+        // linkedom fallback
+      }
+      if (s.cssRules && s.cssRules.length !== undefined) {
+        for (let j = 0; j < s.cssRules.length; j++) {
+          const r = s.cssRules[j];
+          if (r) checkAndAddRule(r as CSSRule);
+        }
+        return;
+      }
+      if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
+        const parsed = parseStyleSheet(s.textContent);
+        for (const r of parsed) {
+          checkAndAddRule(r);
+        }
+        return;
+      }
+    };
+
+    if ('styleSheets' in tObj && tObj.styleSheets && tObj.styleSheets.length > 0) {
+      for (let i = 0; i < tObj.styleSheets.length; i++) {
+        const sheet = tObj.styleSheets[i];
+        processSheet(sheet);
+        if (sheet && (sheet as { ownerNode?: unknown }).ownerNode) {
+          seenNodes.add((sheet as { ownerNode: unknown }).ownerNode);
+        }
+      }
+    }
+    if (typeof tObj.querySelectorAll === 'function') {
+      const styleTags = Array.from(tObj.querySelectorAll('style')).filter(s => !isInsideTemplate(s));
+      for (let i = 0; i < styleTags.length; i++) {
+        const tag = styleTags[i];
+        if (!seenNodes.has(tag)) {
+          processSheet(tag);
+        }
+      }
+    }
+    if (tObj.adoptedStyleSheets && tObj.adoptedStyleSheets.length > 0) {
+      for (let i = 0; i < tObj.adoptedStyleSheets.length; i++) {
+        processSheet(tObj.adoptedStyleSheets[i]);
+      }
+    }
+    return result;
+  };
+
   if (root && typeof root === 'object') {
     const rootObj = root as {
       host?: { isConnected?: boolean };
@@ -213,40 +293,60 @@ export function collectStyleSheetsAndRules(
       querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
     };
 
+    const addRootSheets = (targetRoot: unknown) => {
+      if (!targetRoot || typeof targetRoot !== 'object') return;
+      const tObj = targetRoot as {
+        styleSheets?: ArrayLike<CSSStyleSheet>;
+        adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
+        querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
+      };
+      const seenNodes = new Set<unknown>();
+      if ('styleSheets' in tObj && tObj.styleSheets && tObj.styleSheets.length > 0) {
+        determinePreferredTitle(tObj.styleSheets);
+        for (let i = 0; i < tObj.styleSheets.length; i++) {
+          const sheet = tObj.styleSheets[i];
+          addSheetRules(sheet);
+          if (sheet && (sheet as { ownerNode?: unknown }).ownerNode) {
+            seenNodes.add((sheet as { ownerNode: unknown }).ownerNode);
+          }
+        }
+      }
+      if (typeof tObj.querySelectorAll === 'function') {
+        const styleTags = Array.from(tObj.querySelectorAll('style')).filter(s => !isInsideTemplate(s));
+        determinePreferredTitle(styleTags);
+        for (let i = 0; i < styleTags.length; i++) {
+          const tag = styleTags[i];
+          if (!seenNodes.has(tag)) {
+            addSheetRules(tag);
+          }
+        }
+      }
+      if (tObj.adoptedStyleSheets && tObj.adoptedStyleSheets.length > 0) {
+        for (let i = 0; i < tObj.adoptedStyleSheets.length; i++) {
+          addSheetRules(tObj.adoptedStyleSheets[i]);
+        }
+      }
+    };
+
     // If root is a ShadowRoot whose host is disconnected
     if (rootObj.host && rootObj.host.isConnected === false) {
       return null;
     }
 
-    // 1. Regular non-adopted stylesheets
-    const seenStyleNodes = new Set<unknown>();
-    if ('styleSheets' in rootObj && rootObj.styleSheets && rootObj.styleSheets.length > 0) {
-      determinePreferredTitle(rootObj.styleSheets);
-      for (let i = 0; i < rootObj.styleSheets.length; i++) {
-        const sheet = rootObj.styleSheets[i];
-        addSheetRules(sheet);
-        if (sheet && (sheet as { ownerNode?: unknown }).ownerNode) {
-          seenStyleNodes.add((sheet as { ownerNode: unknown }).ownerNode);
-        }
-      }
-    }
-    if (typeof rootObj.querySelectorAll === 'function') {
-      const styleTags = Array.from(rootObj.querySelectorAll('style')).filter(s => !isInsideTemplate(s));
-      determinePreferredTitle(styleTags);
-      for (let i = 0; i < styleTags.length; i++) {
-        const tag = styleTags[i];
-        if (!seenStyleNodes.has(tag)) {
-          addSheetRules(tag);
-        }
-      }
-    }
+    addRootSheets(root);
 
-    // 2. Adopted stylesheets (ordered after non-adopted stylesheets)
-    if (rootObj.adoptedStyleSheets && rootObj.adoptedStyleSheets.length > 0) {
-      for (let i = 0; i < rootObj.adoptedStyleSheets.length; i++) {
-        addSheetRules(rootObj.adoptedStyleSheets[i]);
-      }
+    // If element is inside a ShadowRoot, also collect ::part() rules from document
+    if (rootObj.host && elObj.ownerDocument) {
+      const partRules = collectFilteredRules(elObj.ownerDocument, '::part(');
+      ruleList.push(...partRules);
     }
+  }
+
+  // 2. If element is slotted into a shadow host, also collect ::slotted() rules from that host's shadowRoot
+  const parent = (element as { parentElement?: unknown }).parentElement as { shadowRoot?: unknown } | null;
+  if (parent && parent.shadowRoot) {
+    const slottedRules = collectFilteredRules(parent.shadowRoot, '::slotted(');
+    ruleList.push(...slottedRules);
   }
 
   // 3. If element is a shadow host (has shadowRoot), also include :host rules from shadowRoot
@@ -384,6 +484,7 @@ export function collectMatchedDeclarations(
 ): { matchedDeclarations: MatchedDeclaration[]; sourceOrderCounter: number } {
   const matchedDeclarations: MatchedDeclaration[] = [];
   let sourceOrderCounter = 0;
+  let ruleCounter = 0;
 
   const walkRules = (
     list: (Rule | CSSRule | Declaration)[] | CSSRuleList,
@@ -401,16 +502,21 @@ export function collectMatchedDeclarations(
         (rule as { type: string }).type === 'style-rule' ||
         (rule as { type: string }).type === 'qualified-rule'
       ) {
+        const currentRuleId = ++ruleCounter;
         const selectorText = (rule as CSSStyleRule).selectorText || serialize((rule as { prelude?: ComponentValue[] }).prelude || []).trim();
         const resolvedSelector = resolveNestedSelector(selectorText, parentSelector);
         const selectors = splitSelectorList(resolvedSelector);
 
         let maxSpecificity: Specificity | null = null;
         let isMatchingSelector = false;
+        let matchingTreeScope: 'document' | 'part' | 'slotted' | 'shadow' | undefined;
 
         for (const sel of selectors) {
           let matchesThisSel = false;
           let selectorForMatching = sel;
+          let currentSelTreeScope: 'document' | 'part' | 'slotted' | 'shadow' | undefined;
+          let partOrSlottedSpec: Specificity | null = null;
+
           if (pseudoElement) {
             const normTarget = pseudoElement.toLowerCase().replace(/\s+/g, '');
             const isLegacy = ['::before', '::after', '::first-line', '::first-letter'].includes(normTarget);
@@ -441,26 +547,78 @@ export function collectMatchedDeclarations(
               }
             }
           } else {
-            const hasPseudo = /::[a-zA-Z-]+(?:\([^)]*\))?$/.test(sel) || /:(before|after|first-line|first-letter)\b/.test(sel);
-            if (!hasPseudo) {
-              if (scopeNode) {
-                const trimmed = sel.trim();
-                const startsWithComb = /^([>+~]|\s)/.test(trimmed);
-                const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
-                if (startsWithComb || containsScopeOrNesting) {
-                  matchesThisSel = matches(element, sel, scopeNode);
-                } else {
-                  matchesThisSel = matches(element, `:where(:scope) ${sel}`, scopeNode);
+            // css-shadow-parts § 4 #part, css-scoping-1 § 3.2 #slotted-pseudo
+            const partMatch = sel.match(/^(.*?)::part\(\s*([a-zA-Z0-9_-]+)\s*\)$/);
+            const slottedMatch = sel.match(/^(.*?)::slotted\(\s*([^)]+)\s*\)$/);
+            if (partMatch) {
+              const hostSelector = partMatch[1].trim() || '*';
+              const partName = partMatch[2];
+              const elPartAttr = (element as { getAttribute?(a: string): string | null }).getAttribute?.('part') || '';
+              const partTokens = elPartAttr.trim().split(/\s+/);
+              if (partTokens.includes(partName)) {
+                const rootNode = typeof (element as unknown as { getRootNode?: () => unknown }).getRootNode === 'function'
+                  ? (element as unknown as { getRootNode: () => unknown }).getRootNode()
+                  : null;
+                const shadowHost = (rootNode as { host?: unknown })?.host;
+                if (shadowHost && isElement(shadowHost) && matches(shadowHost, hostSelector)) {
+                  matchesThisSel = true;
+                  currentSelTreeScope = 'part';
+                  const hostSpecArr = calculateSpecificity(hostSelector);
+                  const baseSpec = hostSpecArr[0] || [0, 0, 0];
+                  partOrSlottedSpec = [baseSpec[0], baseSpec[1], baseSpec[2] + 1];
                 }
-              } else {
-                matchesThisSel = matches(element, sel, scopeNode);
+              }
+            } else if (slottedMatch) {
+              const slotArg = slottedMatch[2].trim();
+              const parent = (element as { parentElement?: unknown }).parentElement as { shadowRoot?: unknown } | null;
+              const isSlotted = Boolean((element as { assignedSlot?: unknown }).assignedSlot || parent?.shadowRoot);
+              if (isSlotted && matches(element, slotArg)) {
+                matchesThisSel = true;
+                currentSelTreeScope = 'slotted';
+                const argSpecArr = calculateSpecificity(slotArg);
+                const baseSpec = argSpecArr[0] || [0, 0, 0];
+                partOrSlottedSpec = [baseSpec[0], baseSpec[1], baseSpec[2] + 1];
+              }
+            } else if (sel.includes(':host')) {
+              matchesThisSel = matches(element, sel);
+              if (matchesThisSel) {
+                currentSelTreeScope = 'shadow';
+              }
+            } else {
+              const hasPseudo = /::[a-zA-Z-]+(?:\([^)]*\))?$/.test(sel) || /:(before|after|first-line|first-letter)\b/.test(sel);
+              if (!hasPseudo) {
+                if (scopeNode) {
+                  const trimmed = sel.trim();
+                  const startsWithComb = /^([>+~]|\s)/.test(trimmed);
+                  const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
+                  if (startsWithComb || containsScopeOrNesting) {
+                    matchesThisSel = matches(element, sel, scopeNode);
+                  } else {
+                    matchesThisSel = matches(element, `:where(:scope) ${sel}`, scopeNode);
+                  }
+                } else {
+                  matchesThisSel = matches(element, sel, scopeNode);
+                }
+                if (matchesThisSel) {
+                  const rootNode = typeof (element as unknown as { getRootNode?: () => unknown }).getRootNode === 'function'
+                    ? (element as unknown as { getRootNode: () => unknown }).getRootNode()
+                    : null;
+                  if (rootNode && (rootNode as { host?: unknown }).host) {
+                    currentSelTreeScope = 'shadow';
+                  } else {
+                    currentSelTreeScope = 'document';
+                  }
+                }
               }
             }
           }
 
           if (matchesThisSel) {
             isMatchingSelector = true;
-            const spec = getMatchingSpecificity(element, selectorForMatching, scopeNode);
+            if (currentSelTreeScope) {
+              matchingTreeScope = currentSelTreeScope;
+            }
+            const spec = partOrSlottedSpec || getMatchingSpecificity(element, selectorForMatching, scopeNode);
             if (!maxSpecificity || compareSpecificity(spec, maxSpecificity) > 0) {
               maxSpecificity = spec;
             }
@@ -504,6 +662,8 @@ export function collectMatchedDeclarations(
                   specificity: spec,
                   scopeProximity,
                   sourceOrder: sourceOrderCounter++,
+                  ruleId: currentRuleId,
+                  treeScope: matchingTreeScope,
                 });
               }
             } else if (Array.isArray((style as { _declarations?: unknown[] })._declarations)) {
@@ -518,6 +678,8 @@ export function collectMatchedDeclarations(
                   specificity: spec,
                   scopeProximity,
                   sourceOrder: sourceOrderCounter++,
+                  ruleId: currentRuleId,
+                  treeScope: matchingTreeScope,
                 });
               }
             }
@@ -535,6 +697,8 @@ export function collectMatchedDeclarations(
                 specificity: spec,
                 scopeProximity,
                 sourceOrder: sourceOrderCounter++,
+                ruleId: currentRuleId,
+                treeScope: matchingTreeScope,
               });
             }
           }

@@ -176,6 +176,12 @@
     "E1 Different specificity, all !important",
     "E2 Different specificity, all !important"
   ],
+  "submodules/web-platform-tests/css/css-cascade/layer-keyframes-override.html": [
+    "@keyframes override between layers",
+    "@keyframes override update with appended sheet 1",
+    "@keyframes override update with appended sheet 2",
+    "@keyframes unlayered overrides layered"
+  ],
   "submodules/web-platform-tests/css/css-cascade/layer-media-query.html": [
     "A1 Basic",
     "A2 Basic",
@@ -187,7 +193,10 @@
     "C4 Reordering"
   ],
   "submodules/web-platform-tests/css/css-cascade/layer-property-override.html": [
-    "@property override update with appended sheet 2"
+    "@property override between layers",
+    "@property override update with appended sheet 1",
+    "@property override update with appended sheet 2",
+    "@property unlayered overrides layered"
   ],
   "submodules/web-platform-tests/css/css-cascade/layer-replaceSync-clears-stale.html": [
     "replaceSync clears stale layer statements"
@@ -291,6 +300,10 @@
   "submodules/web-platform-tests/css/css-cascade/revert-rule-custom-property.html": [
     "revert-rule in a custom property"
   ],
+  "submodules/web-platform-tests/css/css-cascade/revert-rule-cycle.tentative.html": [
+    "Cycle between revert-rule !important and revert-layer resolves to unset instead of lower layers",
+    "Multi-layer chain cycle with revert-rule !important resolves to unset instead of lower layers"
+  ],
   "submodules/web-platform-tests/css/css-cascade/revert-rule-important.html": [
     "revert-rule in !important declaration reverts across layers",
     "revert-rule in !important declaration reverts to earlier normal rule if the !important rule comes later",
@@ -309,10 +322,16 @@
   ],
   "submodules/web-platform-tests/css/css-cascade/revert-rule-shadow.html": [
     "revert-rule chain across document rule and :host rule",
+    "revert-rule in ::part() rule falls back to earlier ::part() rule",
     "revert-rule in ::part() rule falls back to shadow-internal rule",
     "revert-rule in :host rule has no effect when a document rule already wins",
+    "revert-rule in document rule falls back to ::slotted rule",
     "revert-rule in document rule falls back to :host rule",
     "revert-rule in document rule falls back to the winning :host rule",
+    "revert-rule in higher-specificity ::part() rule falls back to lower-specificity ::part() rule",
+    "revert-rule in shadow-internal rule has no effect when ::part() rule wins",
+    "revert-rule in third ::part() rule falls back to second ::part() rule",
+    "revert-rule on host and ::part() rule on part are independent",
     "revert-rule with no shadow fallback falls through to unset (inherited)"
   ],
   "submodules/web-platform-tests/css/css-cascade/revert-val-004.html": [
@@ -321,6 +340,9 @@
   "submodules/web-platform-tests/css/css-cascade/revert-val-005.html": [
     "The revert keyword works with logical properties",
     "The revert keyword works with physical properties"
+  ],
+  "submodules/web-platform-tests/css/css-cascade/revert-val-007.html": [
+    "A @keyframe animation with revert works when applied to multiple identical elements"
   ],
   "submodules/web-platform-tests/css/css-cascade/revert-val-011.html": [
     "anonymous-test-0",
@@ -14115,6 +14137,7 @@
     "Tilde, plus, and exclamation mark in url() token must not be escaped"
   ],
   "submodules/web-platform-tests/css/css-variables/var-ident-function.html": [
+    "Referencing a custom property with ident()",
     "ident() causing lookup of invalid custom property",
     "ident() causing lookup of invalid custom property, fallback",
     "ident() causing lookup of invalid custom property, fallback, CSS-wide keyword",
@@ -14344,6 +14367,8 @@
   ],
   "submodules/web-platform-tests/css/css-variables/variable-presentation-attribute.html": [
     "Testing 'alignment-baseline'.",
+    "Testing 'baseline-shift'.",
+    "Testing 'clip' on '#test4'.",
     "Testing 'clip-rule'.",
     "Testing 'color'.",
     "Testing 'cursor'.",
@@ -14353,6 +14378,7 @@
     "Testing 'fill-opacity'.",
     "Testing 'fill-rule'.",
     "Testing 'filter'.",
+    "Testing 'flood-color'.",
     "Testing 'flood-opacity'.",
     "Testing 'font-family'.",
     "Testing 'font-size'.",
@@ -14360,8 +14386,10 @@
     "Testing 'font-style'.",
     "Testing 'font-weight'.",
     "Testing 'letter-spacing'.",
+    "Testing 'lighting-color'.",
     "Testing 'opacity'.",
     "Testing 'overflow'.",
+    "Testing 'stop-color'.",
     "Testing 'stroke-dasharray'.",
     "Testing 'stroke-linecap'.",
     "Testing 'stroke-linejoin'.",
@@ -14389,10 +14417,14 @@
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-name-substitution-attr-taint.html": [
     "attr()-taint reaches the name argument through another custom property",
+    "attr()-tainted name argument does not invalidate values that are not URLs",
     "attr()-tainted name argument makes an image-set() declaration invalid at computed-value time",
+    "attr()-tainted name argument substitutes normally into a custom property",
     "attr()-tainted name argument taints a registered <url> property",
     "attr()-tainted name argument taints a url() value",
-    "attr()-tainted name argument taints the value even when an earlier value was already tainted"
+    "attr()-tainted name argument taints the fallback",
+    "attr()-tainted name argument taints the value even when an earlier value was already tainted",
+    "untainted substituted name argument does not taint the value"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-name-substitution.html": [
     "-- as substituted name falls back",
@@ -14406,11 +14438,27 @@
     "name argument substituting to nothing falls back",
     "string substituted name falls back",
     "substituted name of a guaranteed-invalid registered property uses the fallback",
+    "substituted name resolves a registered property",
     "unset name-providing var() falls back",
+    "var() name comes from a chain of var()s",
+    "var() name comes from another var()",
+    "var() name comes from attr()",
+    "var() name comes from if()",
+    "var() name comes from random-item()",
     "var() name from attr() that is not a name falls back",
+    "whitespace around substituted name",
     "{}-wrapped literal name argument",
     "{}-wrapped name argument with fallback",
-    "{}-wrapped name argument with whitespace"
+    "{}-wrapped name argument with whitespace",
+    "{}-wrapped substituted name argument"
+  ],
+  "submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html": [
+    "same var() for both values of perspective-origin",
+    "var() as both values of perspective-origin",
+    "var() as first value of perspective-origin",
+    "var() as first value with keyword",
+    "var() as second value of perspective-origin",
+    "var() as second value with keyword"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-shorthands-cssom.html": [
     "anonymous-test-0"
@@ -14494,6 +14542,14 @@
     "invert",
     "saturate",
     "sepia"
+  ],
+  "submodules/web-platform-tests/css/css-variables/variable-substitution-replaced-size.html": [
+    "height on CANVAS",
+    "height on IFRAME",
+    "height on INPUT",
+    "width on CANVAS",
+    "width on IFRAME",
+    "width on INPUT"
   ],
   "submodules/web-platform-tests/css/css-variables/variable-substitution-shadow-properties.html": [
     "box-shadow",
@@ -15238,6 +15294,9 @@
     "font-variant: none serialization",
     "font-variant: normal serialization",
     "font-variant: normal with non-default longhands"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-animations-replaced-into-ib-split.html": [
+    "getComputedStyle() should return animation styles for nodes just inserted into the document, even if they're in an IB-split"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-detached-subtree.html": [
     "getComputedStyle returns no style for descendant outside the flat tree",

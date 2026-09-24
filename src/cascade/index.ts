@@ -33,8 +33,10 @@ export * from './variable-resolver.ts';
 export * from './color-resolver.ts';
 export * from './value-processor.ts';
 export * from './computed-style.ts';
+export * from './at-rule-manager.ts';
 
 import { getLayerDeclarationOrder, resolveMediaEnvironment } from './layer-manager.ts';
+import { collectActiveAtRules } from './at-rule-manager.ts';
 import {
   collectStyleSheetsAndRules,
   collectMatchedDeclarations,
@@ -44,7 +46,7 @@ import {
 import { groupDeclarationsByProperty } from './cascade-sorter.ts';
 import { resolveCustomProperties } from './variable-resolver.ts';
 import { normalizeComputedColor } from './color-resolver.ts';
-import { processStandardDeclarations } from './value-processor.ts';
+import { processStandardDeclarations, isSvgElement } from './value-processor.ts';
 import { CSSComputedStyleDeclaration } from './computed-style.ts';
 
 export const KNOWN_PSEUDO_ELEMENTS = new Set([
@@ -184,6 +186,7 @@ export function getCascadedStyle(
   // 2. Discover @layer ordering (CSS Cascade 5 § 6.4 #layer-ordering)
   const env = resolveMediaEnvironment(element);
   const layerDeclarationOrder = getLayerDeclarationOrder(ruleList, env);
+  const { activeProperties, activeKeyframes } = collectActiveAtRules(ruleList, layerDeclarationOrder, env);
 
   // 3. Collect matched declarations from stylesheet rules
   const { matchedDeclarations, sourceOrderCounter } = collectMatchedDeclarations(
@@ -267,11 +270,13 @@ export function getCascadedStyle(
     }
   }
 
-  // 9. Resolve custom properties (CSS Variables 1 § 3, § 4)
-  const { resolvedCustomProps, cyclicProps } = resolveCustomProperties(
+  // 9. Resolve custom properties (CSS Variables 1 § 3, § 4, CSS Variables 2 § 3, CSS Values 5 § 3.3, CSS Cascade 5 § 6.4.3)
+  const { resolvedCustomProps, cyclicProps, taintedProps } = resolveCustomProperties(
     declarationsByProperty,
     rawCustomProps,
-    parentCascaded
+    parentCascaded,
+    element,
+    activeProperties
   );
 
   // 10. Resolve standard properties and shorthands
@@ -280,15 +285,64 @@ export function getCascadedStyle(
     resolvedCustomProps,
     cyclicProps,
     parentCascaded,
-    element
+    element,
+    taintedProps,
+    activeProperties
   );
+
+  // 10.1. Apply animation declarations (css-cascade-5 § 6.1 #cascade-sort, css-animations-1 § 4 #keyframes)
+  const animDecl = winningDeclarations.get('animation') || winningDeclarations.get('animation-name');
+  if (animDecl && !animDecl.value.startsWith('none')) {
+    const tokens = animDecl.value.trim().split(/\s+/);
+    const nonNameKeywords = new Set([
+      'paused', 'running', 'infinite', 'linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out',
+      'step-start', 'step-end', 'normal', 'reverse', 'alternate', 'alternate-reverse',
+      'forwards', 'backwards', 'both', 'none'
+    ]);
+    let animName = '';
+    for (const tok of tokens) {
+      if (!tok) continue;
+      if (/^\d+(?:\.\d+)?(?:s|ms)$/i.test(tok)) continue;
+      if (nonNameKeywords.has(tok.toLowerCase())) continue;
+      if (/^steps\(|^cubic-bezier\(/i.test(tok)) continue;
+      animName = tok;
+      break;
+    }
+
+    if (animName && activeKeyframes.has(animName)) {
+      const kfRule = activeKeyframes.get(animName)!;
+      const startKf = kfRule.findRule('0%') || kfRule.findRule('from');
+      if (startKf && startKf.style) {
+        const kfStyle = startKf.style as { length: number; item(i: number): string; getPropertyValue(p: string): string };
+        for (let k = 0; k < kfStyle.length; k++) {
+          const propName = kfStyle.item(k);
+          const propVal = kfStyle.getPropertyValue(propName);
+          const existing = winningDeclarations.get(propName);
+          if (!existing || !existing.important) {
+            winningDeclarations.set(propName, {
+              name: propName,
+              value: propVal,
+              important: false,
+              isInline: false,
+              layerOrder: Infinity,
+              specificity: [0, 0, 0],
+              sourceOrder: Infinity,
+            });
+          }
+        }
+      }
+    }
+  }
 
   // 11. Map declarations into final CSSComputedStyleDeclaration
   const finalDeclarations: Declaration[] = [];
 
   for (const [name, decl] of winningDeclarations) {
     const mappedName = resolveLogicalProperty(name, writingMode, direction);
-    const finalValue = COLOR_PROPERTIES.has(mappedName) ? normalizeComputedColor(decl.value) : decl.value;
+    // svg2 § 13.2 #presentation-attributes
+    const isSvg = isSvgElement(element);
+    const isSvgColorProp = isSvg && (mappedName === 'flood-color' || mappedName === 'lighting-color' || mappedName === 'stop-color' || mappedName === 'stroke');
+    const finalValue = COLOR_PROPERTIES.has(mappedName) && !isSvgColorProp ? normalizeComputedColor(decl.value) : decl.value;
 
     finalDeclarations.push({
       type: 'declaration',

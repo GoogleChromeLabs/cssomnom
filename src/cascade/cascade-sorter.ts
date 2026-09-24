@@ -28,20 +28,33 @@ import type { MatchedDeclaration } from './types.ts';
  */
 export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDeclaration): number {
   const getPrecedence = (decl: MatchedDeclaration): number => {
+    // css-scoping-1 § 3.3, css-cascade-5 § 6.1 #cascade-origin
+    // Tree context precedence:
+    // Normal declarations: document / part (2) > shadow (1) > slotted (0)
+    // Important declarations: shadow (2) > document / part (1) > slotted (0)
+    let scopeScore = 0;
+    if (decl.treeScope === 'slotted') {
+      scopeScore = 0;
+    } else if (decl.treeScope === 'shadow') {
+      scopeScore = decl.important ? 2 : 1;
+    } else {
+      scopeScore = decl.important ? 1 : 2;
+    }
+
     if (decl.important) {
       // css-cascade-5 § 6.1 #style-attr, § 6.3 #importance
-      if (decl.isInline) return 60;
+      if (decl.isInline) return 600;
       // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance, § 6.4.3 #layer-ordering
-      if (decl.layerOrder !== Infinity) return 50;
+      if (decl.layerOrder !== Infinity) return 500 + scopeScore;
       // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance (unlayered is implicit final layer; loses to explicit layers)
-      return 40;
+      return 400 + scopeScore;
     } else {
       // css-cascade-5 § 6.1 #style-attr
-      if (decl.isInline) return 30;
+      if (decl.isInline) return 300;
       // css-cascade-5 § 6.1 #cascade-layering (unlayered is implicit final layer; wins over explicit layers)
-      if (decl.layerOrder === Infinity) return 20;
+      if (decl.layerOrder === Infinity) return 200 + scopeScore;
       // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering
-      return 10;
+      return 100 + scopeScore;
     }
   };
 

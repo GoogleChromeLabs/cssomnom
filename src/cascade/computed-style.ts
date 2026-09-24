@@ -27,7 +27,7 @@ import {
 } from '../data/gen/cascade-data.ts';
 import { NAMED_COLORS } from '../data/gen/colors.ts';
 import { camelToDashed } from '../utils.ts';
-import type { Declaration } from '../types.ts';
+import type { Declaration, CSSFunction } from '../types.ts';
 import { INHERITED_PROPERTIES } from './types.ts';
 import {
   SYSTEM_COLORS,
@@ -37,7 +37,10 @@ import {
 import {
   getUaDefault,
   getInitialValue,
+  isSvgElement,
 } from './value-processor.ts';
+import { parseMathFunction, simplify } from '../math-parser.ts';
+import { CSSUnitValue } from '../typed-om.ts';
 
 export function shouldPreserveAutoMinSize(element: unknown): boolean {
   if (!element || typeof element !== 'object') return false;
@@ -266,7 +269,12 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return 'static';
     }
 
-    const rawVal = super.getPropertyValue(dashed).trim();
+    let rawVal = super.getPropertyValue(dashed).trim();
+
+    // css-images-4 § 5.1 #image-set-notation: computed value resolves strings to url() and adds default 1dppx
+    if (dashed === 'background-image' && rawVal.toLowerCase().includes('image-set(')) {
+      rawVal = rawVal.replace(/image-set\(\s*(["'])([^"']+)\1\s*\)/g, 'image-set(url("$2") 1dppx)');
+    }
 
     if (dashed === 'min-width' || dashed === 'min-height') {
       if (rawVal === 'auto' || rawVal === '') {
@@ -277,8 +285,105 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
     }
 
+    // css-transforms-2 § 3.2 #perspective-origin-property
+    if (dashed === 'perspective-origin') {
+      let elWidth = 0;
+      let elHeight = 0;
+      const w = this.getPropertyValue('width');
+      if (w && w.endsWith('px')) elWidth = parseFloat(w) || 0;
+      const h = this.getPropertyValue('height');
+      if (h && h.endsWith('px')) elHeight = parseFloat(h) || 0;
+
+      const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
+
+      const resolveAxis = (token: string, baseLength: number): string => {
+        const lower = token.toLowerCase();
+        if (lower === 'left' || lower === 'top') return '0px';
+        if (lower === 'right' || lower === 'bottom') return `${baseLength}px`;
+        if (lower === 'center') return `${baseLength * 0.5}px`;
+        if (lower.endsWith('%')) {
+          const pct = parseFloat(lower);
+          return isNaN(pct) ? '0px' : `${(pct / 100) * baseLength}px`;
+        }
+        if (lower.endsWith('px')) return lower;
+        if (lower.endsWith('em')) return `${parseFloat(lower) * fs}px`;
+        if (lower.endsWith('rem')) return `${parseFloat(lower) * 16}px`;
+        if (lower === '0') return '0px';
+        return token;
+      };
+
+      const tokens = rawVal ? rawVal.trim().split(/\s+/) : ['50%', '50%'];
+      if (tokens.length === 1) {
+        const tok = tokens[0];
+        if (tok === 'top' || tok === 'bottom') {
+          return `${elWidth * 0.5}px ${resolveAxis(tok, elHeight)}`;
+        }
+        return `${resolveAxis(tok, elWidth)} ${elHeight * 0.5}px`;
+      }
+      if (tokens.length >= 2) {
+        let xTok = tokens[0];
+        let yTok = tokens[1];
+        if (xTok === 'top' || xTok === 'bottom' || yTok === 'left' || yTok === 'right') {
+          const tmp = xTok;
+          xTok = yTok;
+          yTok = tmp;
+        }
+        return `${resolveAxis(xTok, elWidth)} ${resolveAxis(yTok, elHeight)}`;
+      }
+    }
+
+    // svg2 § 13.2 #presentation-attributes
+    const isSvg = isSvgElement(this._element);
+    if (isSvg) {
+      if (dashed === 'baseline-shift') {
+        return rawVal || 'baseline';
+      }
+      if (dashed === 'flood-color' || dashed === 'lighting-color' || dashed === 'stop-color' || dashed === 'stroke') {
+        return rawVal;
+      }
+    }
+
     if (rawVal) {
       const lowerRaw = rawVal.trim().toLowerCase();
+
+      // css-values-4 § 10.10 #calc-computed-value
+      if (dashed === 'width' || dashed === 'height' || lowerRaw.startsWith('calc(')) {
+        try {
+          const tokens = new Parser(tokenize(rawVal)).parseComponentValues();
+          const fn = tokens.find(t => t.type === 'function' && (t as { name: string }).name === 'calc');
+          if (fn && 'value' in fn && Array.isArray((fn as { value: unknown }).value)) {
+            const mathNode = parseMathFunction('calc', (fn as CSSFunction).value);
+            if (mathNode) {
+              const simplified = simplify(mathNode);
+              if (simplified instanceof CSSUnitValue) {
+                return simplified.toString();
+              }
+            }
+          }
+        } catch {
+          // Fallback to rawVal
+        }
+      }
+
+      // css-masking-1 § 5.1 #clip-property, css21 § 11.1.2 #clipping-properties
+      if (dashed === 'clip' && lowerRaw.startsWith('rect(') && lowerRaw.endsWith(')')) {
+        const inner = rawVal.trim().slice(5, -1).trim();
+        const parts = inner.split(/[\s,]+/);
+        if (parts.length === 4) {
+          const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
+          const resolvedParts = parts.map(part => {
+            const pLower = part.toLowerCase();
+            if (pLower === 'auto') return 'auto';
+            if (pLower.endsWith('px')) return pLower;
+            if (pLower.endsWith('em')) return `${parseFloat(pLower) * fs}px`;
+            if (pLower.endsWith('rem')) return `${parseFloat(pLower) * 16}px`;
+            if (pLower.endsWith('ch') || pLower.endsWith('ex')) return `${parseFloat(pLower) * (fs * 0.5)}px`;
+            if (pLower === '0') return '0px';
+            return part;
+          });
+          return `rect(${resolvedParts.join(', ')})`;
+        }
+      }
       // css-cascade-5 § 7.3.2 #inherit
       if (lowerRaw === 'inherit') {
         if (this._parentStyle) {

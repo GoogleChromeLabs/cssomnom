@@ -3323,7 +3323,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 140: WPT Conformance Boost — CSS Variables Spec Compliance & Cycle Invalidation [ ]
+## Phase 140: WPT Conformance Boost — CSS Variables Spec Compliance & Cycle Invalidation [x]
 **Goal**: Advance `css-variables` conformance from 411 / 499 (82.4%) to 471+ / 494 (95.3%+ feasible) by fixing declaration-value pre-validation, registered property CSS-wide keywords, guaranteed-invalid cascade invalidation, replaced element math simplification, and `css-variables-2` dynamic name substitution.
 
 **Spec References**:
@@ -3369,19 +3369,19 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - Enforce that `position` cannot be altered by `::first-letter` / `::first-line` per CSS Pseudo-Elements 4 § 2 and always computes to `static`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-first-letter.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-first-letter.html) and [`variable-first-line.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-first-line.html) (+4 tests).
 
-#### Phase 140.3: Value Processing & Geometry Simplification (+17 tests) [ ]
-- [ ] **`calc()` Simplification on Replaced Element Sizing (+6 tests)**:
+#### Phase 140.3: Value Processing & Geometry Simplification (+17 tests) [x]
+- [x] **`calc()` Simplification on Replaced Element Sizing (+6 tests)**:
   - In `CSSComputedStyleDeclaration.getPropertyValue('width')` and `'height'`, simplify constant `calc(...)` expressions like `calc(10px + 20px)` into `30px` using `CSSMathOperations`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-substitution-replaced-size.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-substitution-replaced-size.html) (+6 tests).
-- [ ] **`perspective-origin` Dimension Resolution (+6 tests)**:
+- [x] **`perspective-origin` Dimension Resolution (+6 tests)**:
   - In `src/cascade/computed-style.ts`, implement resolved value computation for `perspective-origin`: resolve percentage tokens against the element's box dimensions per CSS Transforms 2 § 3.2.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html) (+6 tests).
-- [ ] **SVG Presentation Attribute Default Value Alignment (+5 tests)**:
+- [x] **SVG Presentation Attribute Default Value Alignment (+5 tests)**:
   - In `src/cascade/computed-style.ts`, update SVG-specific property default mappings for `clip`, `baseline-shift`, `flood-color`, `lighting-color`, `stop-color`, `stroke` when queried on SVG element instances.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-variables/variable-presentation-attribute.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-variables/variable-presentation-attribute.html) (+5 tests).
 
-#### Phase 140.4: `css-variables-2` Dynamic Name Substitution (+12 tests) [ ]
-- [ ] **Arbitrary Substitution Value for `var()` Name**:
+#### Phase 140.4: `css-variables-2` Dynamic Name Substitution (+12 tests) [x]
+- [x] **Arbitrary Substitution Value for `var()` Name**:
   - In `src/cascade/variable-resolver.ts:100-125`, evaluate nested substitution functions in the first argument of `var()` (e.g. `var(var(--myvar))` or `var({var(--myvar)})`) recursively before validating as a custom property ident.
   - Strip outer whitespace and `{}` blocks from the substituted string.
   - If the resulting string matches `^--[a-zA-Z0-9_-]+$`, resolve that property; otherwise treat as invalid and trigger fallback.
@@ -3389,7 +3389,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 141: WPT Conformance Boost — CSS Cascade Layer Ordering & Grammar Alignment [ ]
+## Phase 141: WPT Conformance Boost — CSS Cascade Layer Ordering & Grammar Alignment [x]
 **Goal**: Advance `css-cascade` conformance from 412 / 494 (83.4%) to 462 / 462 (100% feasible, 93.5% raw) by fixing WebIDL prototypes, `@layer` grammar strictness, computed `line-height` resolution, `@scope` relative syntax serialization, implicit sub-layer sorting, and layered at-rule resolution.
 
 **Spec References**:
@@ -3440,11 +3440,11 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - In `getUaDefault()`, add default block margins for heading tags (`h1`-`h6`, `p`, `blockquote`) matching HTML rendering specifications.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/revert-val-005.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/revert-val-005.html) (+2 tests).
 
-#### Phase 141.3: Name-Defining Rules & Shadow DOM Cascade (+9 tests) [ ]
-- [ ] **Layered At-Rule Resolution (`@property`, `@keyframes`, `@font-face`) (+5 tests)**:
+#### Phase 141.3: Name-Defining Rules & Shadow DOM Cascade (+9 tests) [x]
+- [x] **Layered At-Rule Resolution (`@property`, `@keyframes`, `@font-face`) (+5 tests)**:
   - Associate layer metadata with `@property` and `@keyframes` registrations; resolve winning definitions according to layer precedence rather than naive first-come order.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/layer-property-override.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-property-override.html), [`layer-keyframes-override.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-keyframes-override.html), and [`layer-font-face-override.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-font-face-override.html) (+5 tests).
-- [ ] **Shadow DOM `revert-rule` & `::part()` Rollback (+4 tests)**:
+- [x] **Shadow DOM `revert-rule` & `::part()` Rollback (+4 tests)**:
   - Track shadow tree origin and rule identity in `MatchedDeclaration` so `revert-rule` rolls back cleanly across `::part()` boundaries.
   - Implement cycle detection between `revert-rule !important` and `revert-layer` resolving to `unset`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/revert-rule-shadow.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/revert-rule-shadow.html) and [`revert-rule-cycle.tentative.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/revert-rule-cycle.tentative.html) (+4 tests).
@@ -3561,4 +3561,24 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - [ ] Conduct Janitor refactoring pass on `src/rules/at-rules.ts`.
 - [ ] Verify zero regressions across all test suites and confirm export backward-compatibility.
 
+---
 
+## Phase 147: Architectural Cleanup — Codegen Normative HTML UA Stylesheet & Replace `getUaDefault()` [ ]
+**Objective**: Eliminate the accreted 130+ line imperative `getUaDefault()` `if/else` ladder in `src/cascade/value-processor.ts` and replace it with an auto-generated User-Agent stylesheet (`src/data/gen/ua-stylesheet.ts`) extracted directly from the WHATWG HTML Standard (`rendering.html`) via `scripts/codegen/generate_ua_stylesheet.ts`, wired into `scripts/codegen/generate_all.ts` and `MAINTENANCE.md`.
+
+**Context & Rationale**:
+- Currently, `getUaDefault()` manually re-implements tag matching (`if (tag === 'H1') ... else if (tag === 'H2')`), shorthand expansion (`margin`, `margin-block`, `margin-top`), and pre-multiplied `em`-to-`px` math (`21.44px`, `19.92px`, `22.176px`).
+- Furthermore, per our **Automation Over Hardcoding** rule (`AGENTS.md`), spec-derived data must live in `src/data/gen/` and be updated by `pnpm run codegen` (`scripts/codegen/generate_all.ts`).
+- The WHATWG HTML Standard (`https://html.spec.whatwg.org/multipage/rendering.html`) publishes the exact normative UA stylesheet across `<pre><code class="css">` blocks. Extracting and normalizing those CSS blocks into `src/data/gen/ua-stylesheet.ts` via `scripts/codegen/generate_ua_stylesheet.ts` ensures `pnpm run maintain` / `pnpm run codegen` keeps our UA stylesheet automatically synchronized with the spec, while our own `parseStyleSheet()` engine resolves selectors, shorthands, logical properties, and `em` units natively.
+
+**Spec References**:
+- WHATWG HTML Standard § 15.3 (`https://html.spec.whatwg.org/multipage/rendering.html`)
+- CSS Cascading and Inheritance Level 5 § 6.1 (`#cascading-origins`) & § 6.2 (`#default`)
+- SVG 2 § 13.2 (Presentation attributes & initial defaults)
+
+### Tasks
+- [ ] Create `scripts/codegen/generate_ua_stylesheet.ts` that fetches/extracts the `<pre><code class="css">` blocks from WHATWG HTML Standard `rendering.html` (with offline cache fallback), strips `@namespace` / pseudo-rules that don't apply, and generates `src/data/gen/ua-stylesheet.ts`.
+- [ ] Wire `generate_ua_stylesheet.ts` into `scripts/codegen/generate_all.ts` and document in `MAINTENANCE.md` so `pnpm run codegen` and `pnpm run maintain` automatically regenerate `src/data/gen/ua-stylesheet.ts`.
+- [ ] Lazily parse `UA_STYLESHEET_CSS` via `parseStyleSheet()` and integrate it into the cascade / UA fallback resolution so `em` units, logical properties (`margin-block-start`), and shorthands (`margin`) resolve dynamically through our engine.
+- [ ] Delete the imperative `if (tag === 'H1') ...` ladder and `BLOCK_TAGS` duplication from `getUaDefault()` in `src/cascade/value-processor.ts`.
+- [ ] Verify 100% pass rate on `revert-val-005.html`, `css-cascade`, and full WPT baseline with `pnpm run preflight`.
