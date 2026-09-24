@@ -21,6 +21,7 @@ import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
 
 import { tokenize } from './tokenizer.ts';
 import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSRule, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule, MediaList } from './CSSOM.ts';
+import { INTERNAL_RULE_TOKEN } from './internal-token.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
 
@@ -742,7 +743,7 @@ export class Parser {
 
   private handleMarginRule(rule: ASTAtRule, block: SimpleBlock): Rule {
     const declarations = this.consumeDeclarationsFromBlockContents(block.value);
-    return new CSSMarginRule(rule.name, declarations);
+    return new CSSMarginRule(rule.name, declarations, INTERNAL_RULE_TOKEN);
   }
 
   // css-counter-styles-3 § 8.1 #csscounterstylerule
@@ -1009,7 +1010,7 @@ export class Parser {
     }
     mediaText = remaining.trim();
     
-    return new CSSImportRule(href, mediaText, layerName, supportsText, scopeStart, scopeEnd, isScoped);
+    return new CSSImportRule(href, mediaText, layerName, supportsText, scopeStart, scopeEnd, isScoped, INTERNAL_RULE_TOKEN);
   }
 
   private handleNamespaceRule(rule: ASTAtRule): Rule {
@@ -1042,7 +1043,7 @@ export class Parser {
       }
     }
 
-    const nsRule = new CSSNamespaceRule(prefix, namespaceURI);
+    const nsRule = new CSSNamespaceRule(prefix, namespaceURI, INTERNAL_RULE_TOKEN);
     this.declaredNamespaces.add(nsRule.prefix);
     return nsRule;
   }

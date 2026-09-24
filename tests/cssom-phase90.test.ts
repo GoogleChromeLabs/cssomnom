@@ -28,6 +28,7 @@ import {
   getCascadedStyle,
   parse
 } from '../src/index.ts';
+import { INTERNAL_RULE_TOKEN } from '../src/internal-token.ts';
 
 describe('Phase 90: CSSOM Core Rules, Constructable Sheets & SelectorText Invalidation', () => {
   describe('Rule Hierarchy & Inheritance', () => {
@@ -49,13 +50,14 @@ describe('Phase 90: CSSOM Core Rules, Constructable Sheets & SelectorText Invali
     });
 
     test('CSSNamespaceRule exposes namespaceURI and prefix per cssom-1 § 6.4.5', () => {
-      const nsRule = new CSSNamespaceRule('svg', 'http://www.w3.org/2000/svg');
+      assert.throws(() => new CSSNamespaceRule('svg', 'http://www.w3.org/2000/svg'), TypeError);
+      const nsRule = new CSSNamespaceRule('svg', 'http://www.w3.org/2000/svg', INTERNAL_RULE_TOKEN);
       assert.equal(nsRule.type, 10);
       assert.equal(nsRule.namespaceURI, 'http://www.w3.org/2000/svg');
       assert.equal(nsRule.prefix, 'svg');
       assert.equal(nsRule.cssText, '@namespace svg url("http://www.w3.org/2000/svg");');
 
-      const defaultNsRule = new CSSNamespaceRule('', 'http://www.w3.org/1999/xhtml');
+      const defaultNsRule = new CSSNamespaceRule('', 'http://www.w3.org/1999/xhtml', INTERNAL_RULE_TOKEN);
       assert.equal(defaultNsRule.prefix, '');
       assert.equal(defaultNsRule.cssText, '@namespace url("http://www.w3.org/1999/xhtml");');
     });

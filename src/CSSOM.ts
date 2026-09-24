@@ -651,14 +651,16 @@ for (const ctor of cssomClasses) {
   }
 }
 
-// cssom-1 § 6.7 #the-cssstyleproperties-interface
+// cssom-1 § 6.6 #the-cssstyledeclaration-interface
 // WebIDL § 3.6.3 #interface-prototype-object
 Object.defineProperty(CSSStyleDeclaration.prototype, Symbol.toStringTag, {
-  value: 'CSSStyleProperties',
+  value: 'CSSStyleDeclaration',
   configurable: true,
   writable: false,
   enumerable: false
 });
+// cssom-1 § 6.7 #the-cssstyleproperties-interface
+// WebIDL § 3.6.3 #interface-prototype-object
 Object.defineProperty(CSSStyleProperties.prototype, Symbol.toStringTag, {
   value: 'CSSStyleProperties',
   configurable: true,

@@ -15,13 +15,15 @@
  * limitations under the License.
  */
 import { CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSKeyframesRule, CSSLayerStatementRule, CSSGroupingRule, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSViewTransitionRule } from '../src/index.ts';
+import { INTERNAL_RULE_TOKEN } from '../src/internal-token.ts';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import type { Rule } from '../src/types.ts';
 
 describe('Readonly properties', () => {
   it('should make CSSImportRule properties readonly', () => {
-    const rule = new CSSImportRule('http://example.com');
+    assert.throws(() => new CSSImportRule('http://example.com'), TypeError);
+    const rule = new CSSImportRule('http://example.com', '', null, null, null, null, false, INTERNAL_RULE_TOKEN);
     
     assert.throws(() => {
       // @ts-expect-error - href should be readonly
@@ -47,7 +49,8 @@ describe('Readonly properties', () => {
   });
 
   it('should make CSSNamespaceRule properties readonly', () => {
-    const rule = new CSSNamespaceRule('prefix', 'http://namespace.com');
+    assert.throws(() => new CSSNamespaceRule('prefix', 'http://namespace.com'), TypeError);
+    const rule = new CSSNamespaceRule('prefix', 'http://namespace.com', INTERNAL_RULE_TOKEN);
     
     assert.throws(() => {
       // @ts-expect-error - namespaceURI should be readonly
@@ -63,7 +66,8 @@ describe('Readonly properties', () => {
   });
 
   it('should make CSSMarginRule properties readonly', () => {
-    const rule = new CSSMarginRule('top-left', []);
+    assert.throws(() => new CSSMarginRule('top-left', []), TypeError);
+    const rule = new CSSMarginRule('top-left', [], INTERNAL_RULE_TOKEN);
     
     assert.throws(() => {
       // @ts-expect-error - name should be readonly
@@ -113,11 +117,10 @@ describe('Readonly properties', () => {
     assert.ok(true);
   });
 
-  it('should make CSSMediaRule media readonly', () => {
+  it('should delegate CSSMediaRule media setter to mediaText per WebIDL [PutForwards]', () => {
     const rule = new CSSMediaRule('', [], () => ({} as unknown as Rule));
-    // @ts-expect-error - media should be readonly
-    rule.media = null as unknown as MediaList;
-    assert.ok(true);
+    rule.media = 'screen and (min-width: 500px)';
+    assert.equal(rule.media.mediaText, 'screen and (min-width: 500px)');
   });
 
   it('should make CSSSupportsRule conditionText readonly', () => {

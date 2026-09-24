@@ -323,20 +323,20 @@ To preserve clean architectural separation and prevent circular import cycles be
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **94.0%** (21,147 / 22,499 passed assertions across 1,769 test files).
+* **W3C Standards Conformance**: **94.0%** (21,143 / 22,499 passed assertions across 1,769 test files).
 * **Chrome 154 Parity**: **94.0%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
 | **`Typed OM`** | 12,758 | 12,178 | **95.5%** | 🟢 **+1.9%** (ahead of Chrome) |
-| **`CSSOM`** | 2,150 | 2,049 | **95.3%** | -1.8% |
+| **`CSSOM`** | 2,150 | 2,045 | **95.1%** | -2.0% |
 | **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
 | **`Cascade`** | 497 | 437 | **87.9%** | -12.0% |
 | **`Variables`** | 499 | 440 | **88.2%** | -2.4% |
 | **`Selectors`** | 5,654 | 5,108 | **90.3%** | 🟢 **+4.4%** (ahead of Chrome) |
 | **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **22,499** | **21,147** | **94.0%** | 🟢 **+0.9%** |
+| **OVERALL** | **22,499** | **21,143** | **94.0%** | 🟢 **+0.9%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

@@ -24,6 +24,7 @@ import { CSSRule, CSSGroupingRule } from './base.ts';
 import { CSSStyleSheet } from '../CSSOM.ts';
 import { MediaList, CSSRuleList } from './collections.ts';
 import { serializeGroupingRule, FONT_FACE_DESCRIPTORS, PAGE_DESCRIPTORS } from './utils.ts';
+import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
 
 // css-conditional-3 § 3 #the-cssconditionrule-interface
 export class CSSConditionRule extends CSSGroupingRule {
@@ -47,14 +48,10 @@ export class CSSMediaRule extends CSSConditionRule {
     return this._media;
   }
 
-  set media(value: string | MediaList | null) {
-    if (value === null) {
-      this._media.mediaText = '';
-    } else if (typeof value === 'string') {
-      this._media.mediaText = value;
-    } else if (value && 'mediaText' in value) {
-      this._media.mediaText = value.mediaText;
-    }
+  // cssom-1 § 6.4.3 #dom-cssmediarule-media
+  // WebIDL § 3.3.6 #putforwards
+  set media(val: unknown) {
+    this._media.mediaText = val === null ? '' : String(val);
   }
 
   get [Symbol.toStringTag](): string {
@@ -504,6 +501,12 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   declare fontDisplay?: string;
   declare unicodeRange?: string;
 
+  // css-fonts-4 § 6 #om-fontface
+  // WebIDL § 3.6.3 #interface-prototype-object
+  get [Symbol.toStringTag](): string {
+    return 'CSSFontFaceDescriptors';
+  }
+
   override _isPropertySupported(property: string): boolean {
     return super._isPropertySupported(property) || FONT_FACE_DESCRIPTORS.has(property);
   }
@@ -621,9 +624,10 @@ export class CSSMarginRule extends CSSRule {
   private _name: string;
   private _style: CSSMarginDescriptors;
 
-  constructor(name: string, declarations: Declaration[]) {
+  constructor(name: string, declarations: Declaration[], internalToken?: symbol) {
     // css-page-3 § 7.3 #the-cssmarginrule-interface
-    if (arguments.length === 0) {
+    // WebIDL § 3.6.3 #interface-prototype-object
+    if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
     super();
@@ -677,10 +681,12 @@ export class CSSImportRule extends CSSRule {
     supportsText: string | null = null,
     scopeStart: string | null = null,
     scopeEnd: string | null = null,
-    isScoped: boolean = false
+    isScoped: boolean = false,
+    internalToken?: symbol
   ) {
     // cssom-1 § 6.4.3 #the-cssimportrule-interface
-    if (arguments.length === 0) {
+    // WebIDL § 3.6.3 #interface-prototype-object
+    if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
     super();
@@ -703,14 +709,10 @@ export class CSSImportRule extends CSSRule {
     return this._media;
   }
 
-  set media(value: string | import('../types.ts').MediaList | null) {
-    if (value === null) {
-      this._media.mediaText = '';
-    } else if (typeof value === 'string') {
-      this._media.mediaText = value;
-    } else {
-      this._media.mediaText = value.mediaText;
-    }
+  // cssom-1 § 6.4.3 #dom-cssimportrule-media
+  // WebIDL § 3.3.6 #putforwards
+  set media(val: unknown) {
+    this._media.mediaText = val === null ? '' : String(val);
   }
 
   // cssom-1 § 6.4.3 #dom-cssimportrule-stylesheet
@@ -785,9 +787,10 @@ export class CSSNamespaceRule extends CSSRule {
   private _namespaceURI: string;
   private _prefix: string;
 
-  constructor(prefix: string, namespaceURI: string) {
+  constructor(prefix: string, namespaceURI: string, internalToken?: symbol) {
     // cssom-1 § 6.4.5 #the-cssnamespacerule-interface
-    if (arguments.length === 0) {
+    // WebIDL § 3.6.3 #interface-prototype-object
+    if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
     super();

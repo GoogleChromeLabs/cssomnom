@@ -18,6 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { CSSPageRule, CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSFontFaceRule, CSSCounterStyleRule, CSSFontFeatureValuesRule } from '../src/index.ts';
+import { INTERNAL_RULE_TOKEN } from '../src/internal-token.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import {
   CSSRuleList,
@@ -354,7 +355,8 @@ test('CSSImportRule cssText serialization', () => {
   // Spec requires url() wrapper for serialized URL in @import
   assert.equal(rule.cssText, '@import url("foo.css") print;');
   
-  const rule2 = new CSSImportRule('foo"bar.css');
+  assert.throws(() => new CSSImportRule('foo"bar.css'), TypeError);
+  const rule2 = new CSSImportRule('foo"bar.css', '', null, null, null, null, false, INTERNAL_RULE_TOKEN);
   assert.equal(rule2.cssText, '@import url("foo\\"bar.css");');
 });
 

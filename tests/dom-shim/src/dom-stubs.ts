@@ -1372,17 +1372,32 @@ function patchSVGStyleElementPrototype(window: WindowType): void {
       configurable: true
     });
   }
+  // cssom-1 § 4.6 #dom-linkstyle-sheet
+  const svgDisabledGet = function (this: Element) {
+    const isSvgStyle = (this instanceof (win.SVGStyleElement as Function)) || (this as { localName?: string }).localName === 'style';
+    if (!this || (this as unknown) === SVGStyleElement.prototype || !isSvgStyle) {
+      throw new TypeError("Failed to read the 'disabled' property from 'SVGStyleElement': The provided value is not of type 'SVGStyleElement'.");
+    }
+    const sheet = styleSheetMap.get(this);
+    return sheet ? sheet.disabled : false;
+  };
+  Object.defineProperty(svgDisabledGet, 'name', { value: 'get disabled', configurable: true });
+
+  const svgDisabledSet = function (this: Element, val: boolean) {
+    const isSvgStyle = (this instanceof (win.SVGStyleElement as Function)) || (this as { localName?: string }).localName === 'style';
+    if (!this || (this as unknown) === SVGStyleElement.prototype || !isSvgStyle) {
+      throw new TypeError("Failed to set the 'disabled' property on 'SVGStyleElement': The provided value is not of type 'SVGStyleElement'.");
+    }
+    const sheet = styleSheetMap.get(this);
+    if (sheet) {
+      sheet.disabled = Boolean(val);
+    }
+  };
+  Object.defineProperty(svgDisabledSet, 'name', { value: 'set disabled', configurable: true });
+
   Object.defineProperty(SVGStyleElement.prototype, 'disabled', {
-    get(this: Element) {
-      return this.hasAttribute ? this.hasAttribute('disabled') : false;
-    },
-    set(this: Element, val: boolean) {
-      if (val) {
-        if (this.setAttribute) this.setAttribute('disabled', '');
-      } else {
-        if (this.removeAttribute) this.removeAttribute('disabled');
-      }
-    },
+    get: svgDisabledGet,
+    set: svgDisabledSet,
     enumerable: true,
     configurable: true
   });

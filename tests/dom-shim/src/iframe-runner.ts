@@ -7,7 +7,8 @@ import { parseHTML, DOMParser } from 'linkedom';
 import { HarnessError, messageOf } from './wpt-assertions.ts';
 import { createWptContext, type WindowType, type DocumentType, type WptSandboxTest } from './testharness-bridge.ts';
 import { styleSheetMap } from './dom-stubs.ts';
-import { CSSStyleSheet, parseRule } from '../../../src/index.ts';
+import { CSSStyleSheet } from '../../../src/index.ts';
+import { parseRule } from '../../../src/parser.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 export const WPT_ROOT = path.join(REPO_ROOT, 'submodules/web-platform-tests');
@@ -492,7 +493,7 @@ function loadIframeResource(
         Object.defineProperty(piNode, 'data', { value: data, writable: true, configurable: true });
         Object.defineProperty(piNode, 'ownerDocument', { value: xmlDoc, configurable: true });
         Object.defineProperty(piNode, 'parentNode', { value: xmlDoc, configurable: true });
-        const sheet = CSSStyleSheet.createInternal([], parseRule as never);
+        const sheet = CSSStyleSheet.createInternal([], parseRule);
         styleSheetMap.set(piNode, sheet);
         const origFirstChild = (xmlDoc as unknown as { firstChild: unknown }).firstChild;
         Object.defineProperty(xmlDoc, 'firstChild', {
