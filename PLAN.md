@@ -3547,7 +3547,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 146: Janitor Sweep — `src/rules/at-rules.ts` Modularization [ ]
+## Phase 146: Janitor Sweep — `src/rules/at-rules.ts` Modularization [x]
 **Objective**: Clean up and modularize `src/rules/at-rules.ts` (1,133 lines) to improve code organization, decouple distinct spec domain rules, and standardize WebIDL interfaces.
 
 **Context**: Houses 15 distinct at-rule implementations in a single file with varying property descriptor patterns.
@@ -3557,9 +3557,9 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - **Strict Parity**: Verify zero regressions across `tests/cssom-interfaces.test.ts` and WPT `cssom` / `css-cascade` suites.
 
 ### Tasks
-- [ ] Establish baseline verification with `pnpm run preflight`.
-- [ ] Conduct Janitor refactoring pass on `src/rules/at-rules.ts`.
-- [ ] Verify zero regressions across all test suites and confirm export backward-compatibility.
+- [x] Establish baseline verification with `pnpm run preflight`.
+- [x] Conduct Janitor refactoring pass on `src/rules/at-rules.ts`.
+- [x] Verify zero regressions across all test suites and confirm export backward-compatibility.
 
 ---
 

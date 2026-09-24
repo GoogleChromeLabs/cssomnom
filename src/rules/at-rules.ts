@@ -122,6 +122,25 @@ export class CSSSupportsRule extends CSSConditionRule {
   set cssText(_value: string) {}
 }
 
+const CONTAINER_KEYWORDS = new Set(['not', 'and', 'or', 'none']);
+
+function parseContainerPrelude(containerQuery: string, containerName: string): { name: string; query: string } {
+  if (containerName || !containerQuery) {
+    return { name: containerName, query: containerQuery };
+  }
+  const trimmed = containerQuery.trim();
+  const firstSpace = trimmed.indexOf(' ');
+  if (firstSpace > 0) {
+    const potentialName = trimmed.slice(0, firstSpace);
+    if (!CONTAINER_KEYWORDS.has(potentialName.toLowerCase()) && !potentialName.startsWith('(')) {
+      return { name: potentialName, query: trimmed.slice(firstSpace + 1).trim() };
+    }
+  } else if (!CONTAINER_KEYWORDS.has(trimmed.toLowerCase()) && !trimmed.startsWith('(')) {
+    return { name: trimmed, query: '' };
+  }
+  return { name: '', query: trimmed };
+}
+
 // css-conditional-5 § 4 #the-csscontainerrule-interface
 export class CSSContainerRule extends CSSConditionRule {
   readonly containerName: string;
@@ -129,30 +148,9 @@ export class CSSContainerRule extends CSSConditionRule {
 
   constructor(containerQuery: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule, containerName: string = '') {
     super(rules, parseRuleInBlock);
-    if (!containerName && containerQuery) {
-      const trimmed = containerQuery.trim();
-      const firstSpace = trimmed.indexOf(' ');
-      if (firstSpace > 0) {
-        const potentialName = trimmed.slice(0, firstSpace);
-        const lower = potentialName.toLowerCase();
-        if (!['not', 'and', 'or', 'none'].includes(lower) && !potentialName.startsWith('(')) {
-          this.containerName = potentialName;
-          this.containerQuery = trimmed.slice(firstSpace + 1).trim();
-        } else {
-          this.containerName = '';
-          this.containerQuery = trimmed;
-        }
-      } else if (!['not', 'and', 'or', 'none'].includes(trimmed.toLowerCase()) && !trimmed.startsWith('(')) {
-        this.containerName = trimmed;
-        this.containerQuery = '';
-      } else {
-        this.containerName = '';
-        this.containerQuery = trimmed;
-      }
-    } else {
-      this.containerName = containerName;
-      this.containerQuery = containerQuery;
-    }
+    const parsed = parseContainerPrelude(containerQuery, containerName);
+    this.containerName = parsed.name;
+    this.containerQuery = parsed.query;
   }
 
   override get conditionText(): string {
@@ -167,6 +165,15 @@ export class CSSContainerRule extends CSSConditionRule {
   }
 
   set cssText(_value: string) {}
+}
+
+function serializeLayerName(name: string): string {
+  return name ? name.split('.').map(p => serializeIdentifier(p)).join('.') : '';
+}
+
+function formatInlineStyleBlock(prefix: string, style: CSSStyleDeclaration): string {
+  const body = style.cssText.trim();
+  return `${prefix} {${body ? ' ' + body + ' ' : ''}}`;
 }
 
 // css-cascade-5 § 6.4.4 #the-csslayerblockrule-interface
@@ -187,10 +194,7 @@ export class CSSLayerBlockRule extends CSSGroupingRule {
   }
 
   get cssText() {
-    const serializedName = this._name
-      ? this._name.split('.').map(p => serializeIdentifier(p)).join('.')
-      : '';
-    return serializeGroupingRule('layer', serializedName, this._rules);
+    return serializeGroupingRule('layer', serializeLayerName(this._name), this._rules);
   }
 
   set cssText(_value: string) {}
@@ -217,10 +221,7 @@ export class CSSLayerStatementRule extends CSSRule {
   }
 
   get cssText() {
-    const serializedNames = this._nameList
-      .map(name => name.split('.').map(p => serializeIdentifier(p)).join('.'))
-      .join(', ');
-    return `@layer ${serializedNames};`;
+    return `@layer ${this._nameList.map(serializeLayerName).join(', ')};`;
   }
 
   set cssText(_value: string) {}
@@ -254,23 +255,17 @@ export class CSSScopeRule extends CSSGroupingRule {
   }
 
   get start(): string | null {
-    if (!this.startSelector) return null;
-    return this.startSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null;
+    return this.startSelector ? (this.startSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
   }
 
   get end(): string | null {
-    if (!this.endSelector) return null;
-    return this.endSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null;
+    return this.endSelector ? (this.endSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
   }
 
   get cssText() {
-    let prelude = '';
-    if (this.startSelector) {
-      prelude += this.startSelector;
-    }
+    let prelude = this.startSelector || '';
     if (this.endSelector) {
-      if (prelude) prelude += ' ';
-      prelude += `to ${this.endSelector}`;
+      prelude += `${prelude ? ' ' : ''}to ${this.endSelector}`;
     }
     return serializeGroupingRule('scope', prelude, this._rules);
   }
@@ -283,13 +278,8 @@ export class CSSViewTransitionRule extends CSSRule {
 
   constructor(declarations: Declaration[]) {
     super();
-    let navigation = 'none';
-    for (const decl of declarations) {
-      if (decl.name === 'navigation') {
-        navigation = serialize(decl.value).trim();
-      }
-    }
-    this.navigation = navigation;
+    const navDecl = declarations.findLast(d => d.name === 'navigation');
+    this.navigation = navDecl ? serialize(navDecl.value).trim() : 'none';
   }
 
   get cssText() {
@@ -300,9 +290,8 @@ export class CSSViewTransitionRule extends CSSRule {
 }
 
 function normalizeKeyframeSelector(selector: string): string {
-  const parts = selector.split(',');
   const normalized: string[] = [];
-  for (const part of parts) {
+  for (const part of selector.split(',')) {
     const trimmed = part.trim().toLowerCase();
     if (trimmed === 'from') {
       normalized.push('0%');
@@ -310,21 +299,23 @@ function normalizeKeyframeSelector(selector: string): string {
       normalized.push('100%');
     } else {
       if (!trimmed.endsWith('%')) {
-        throw new DOMException(`Invalid keyframe selector`, 'SyntaxError');
+        throw new DOMException('Invalid keyframe selector', 'SyntaxError');
       }
       const valStr = trimmed.slice(0, -1).trim();
       const val = Number(valStr);
       if (Number.isNaN(val) || valStr === '' || val < 0 || val > 100) {
-        throw new DOMException(`Invalid keyframe selector`, 'SyntaxError');
+        throw new DOMException('Invalid keyframe selector', 'SyntaxError');
       }
       normalized.push(`${val}%`);
     }
   }
   if (normalized.length === 0) {
-    throw new DOMException(`Invalid keyframe selector`, 'SyntaxError');
+    throw new DOMException('Invalid keyframe selector', 'SyntaxError');
   }
   return normalized.join(', ');
 }
+
+const DISALLOWED_KEYFRAME_NAMES = new Set(['none', 'initial', 'inherit', 'unset', 'revert', 'default']);
 
 export class CSSKeyframesRule extends CSSRule {
   [index: number]: CSSKeyframeRule;
@@ -347,7 +338,7 @@ export class CSSKeyframesRule extends CSSRule {
           }
         }
         return Reflect.get(target, prop, receiver);
-      }
+      },
     });
   }
 
@@ -362,42 +353,40 @@ export class CSSKeyframesRule extends CSSRule {
     return this._rules.length;
   }
 
-  // The CSSKeyframesRule Interface
   get cssText() {
-    const isDisallowed = ['none', 'initial', 'inherit', 'unset', 'revert', 'default'].includes(this.name.toLowerCase());
-    const serializedName = isDisallowed ? JSON.stringify(this.name) : serializeIdentifier(this.name);
+    const serializedName = DISALLOWED_KEYFRAME_NAMES.has(this.name.toLowerCase())
+      ? JSON.stringify(this.name)
+      : serializeIdentifier(this.name);
     return serializeGroupingRule('keyframes', serializedName, this._rules);
   }
 
-  set cssText(_value: string) {
-    // Do nothing as per spec
-  }
+  set cssText(_value: string) {}
 
-  findRule(select: string): CSSKeyframeRule | null {
+  private _findRuleIndex(select: string): number {
     let normalized: string;
     try {
       normalized = normalizeKeyframeSelector(select);
     } catch {
-      return null;
+      return -1;
     }
     for (let i = this._rules.length - 1; i >= 0; i--) {
-      if (this._rules[i].keyText === normalized) {
-        return this._rules[i];
-      }
+      if (this._rules[i].keyText === normalized) return i;
     }
-    return null;
+    return -1;
+  }
+
+  findRule(select: string): CSSKeyframeRule | null {
+    const idx = this._findRuleIndex(select);
+    return idx !== -1 ? this._rules[idx] : null;
   }
 
   appendRule(ruleText: string): void {
     const openBrace = ruleText.indexOf('{');
     const closeBrace = ruleText.lastIndexOf('}');
-    if (openBrace === -1 || closeBrace === -1 || closeBrace < openBrace) {
-      return;
-    }
-    const selectorText = ruleText.slice(0, openBrace).trim();
+    if (openBrace === -1 || closeBrace < openBrace) return;
     let keyText: string;
     try {
-      keyText = normalizeKeyframeSelector(selectorText);
+      keyText = normalizeKeyframeSelector(ruleText.slice(0, openBrace).trim());
     } catch {
       return;
     }
@@ -409,18 +398,8 @@ export class CSSKeyframesRule extends CSSRule {
   }
 
   deleteRule(select: string): void {
-    let normalized: string;
-    try {
-      normalized = normalizeKeyframeSelector(select);
-    } catch {
-      return;
-    }
-    for (let i = this._rules.length - 1; i >= 0; i--) {
-      if (this._rules[i].keyText === normalized) {
-        this._rules.splice(i, 1);
-        break;
-      }
-    }
+    const idx = this._findRuleIndex(select);
+    if (idx !== -1) this._rules.splice(idx, 1);
   }
 }
 
@@ -431,10 +410,7 @@ class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
   }
 
   override _isPropertySupported(property: string): boolean {
-    if (property === 'animation-name') {
-      return false;
-    }
-    return super._isPropertySupported(property);
+    return property !== 'animation-name' && super._isPropertySupported(property);
   }
 }
 
@@ -472,15 +448,11 @@ export class CSSKeyframeRule extends CSSRule {
     return 'CSSKeyframeRule';
   }
 
-  // The CSSKeyframeRule Interface
   get cssText() {
-    const body = this._style.cssText.trim();
-    return `${this.keyText} {${body ? ' ' + body + ' ' : ''}}`;
+    return formatInlineStyleBlock(this.keyText, this._style);
   }
 
-  set cssText(_value: string) {
-    // Do nothing as per spec
-  }
+  set cssText(_value: string) {}
 }
 
 export class CSSNestedDeclarations extends CSSRule {
@@ -500,14 +472,11 @@ export class CSSNestedDeclarations extends CSSRule {
     this._style.cssText = value;
   }
 
-  // The CSSNestedDeclarations Interface
   get cssText() {
     return this._style.cssText;
   }
 
-  set cssText(_value: string) {
-    // Do nothing as per spec
-  }
+  set cssText(_value: string) {}
 }
 
 export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
@@ -553,13 +522,10 @@ export class CSSFontFaceRule extends CSSRule {
   get type() { return 5; }
 
   get cssText() {
-    const body = this._style.cssText.trim();
-    return `@font-face {${body ? ' ' + body + ' ' : ''}}`;
+    return formatInlineStyleBlock('@font-face', this._style);
   }
 
-  set cssText(_value: string) {
-    // Do nothing as per spec
-  }
+  set cssText(_value: string) {}
 }
 
 // css-page-3 § 3 #conform-partial
@@ -714,22 +680,37 @@ export class CSSMarginRule extends CSSRule {
   get type() { return 9; } // CSSRule.MARGIN_RULE
 
   get cssText() {
-    const body = this.style.cssText.trim();
-    return `@${this.name} {${body ? ' ' + body + ' ' : ''}}`;
+    return formatInlineStyleBlock(`@${this.name}`, this.style);
   }
 
   set cssText(_value: string) {}
+}
+
+function parseDataUrlRules(href: string): Rule[] {
+  if (!href || !href.startsWith('data:')) return [];
+  const commaIdx = href.indexOf(',');
+  if (commaIdx === -1) return [];
+  const meta = href.slice(5, commaIdx).toLowerCase();
+  const content = href.slice(commaIdx + 1);
+  try {
+    const rawData = meta.includes(';base64')
+      ? (typeof atob === 'function' ? atob(content) : Buffer.from(content, 'base64').toString('utf-8'))
+      : decodeURIComponent(content);
+    return ParseHooks.consumeListOfRules(tokenize(rawData), true);
+  } catch {
+    return [];
+  }
 }
 
 export class CSSImportRule extends CSSRule {
   private _href: string;
   private _media: MediaList;
   private _styleSheet: CSSStyleSheet | null = null;
-  private _layerName: string | null = null;
-  private _supportsText: string | null = null;
-  private _scopeStart: string | null = null;
-  private _scopeEnd: string | null = null;
-  private _isScoped: boolean = false;
+  private _layerName: string | null;
+  private _supportsText: string | null;
+  private _scopeStart: string | null;
+  private _scopeEnd: string | null;
+  private _isScoped: boolean;
 
   constructor(
     href: string,
@@ -742,7 +723,6 @@ export class CSSImportRule extends CSSRule {
     internalToken?: symbol
   ) {
     // cssom-1 § 6.4.3 #the-cssimportrule-interface
-    // WebIDL § 3.6.3 #interface-prototype-object
     if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
@@ -757,79 +737,31 @@ export class CSSImportRule extends CSSRule {
   }
 
   // cssom-1 § 6.4.3 #dom-cssimportrule-href
-  get href(): string {
-    return this._href;
-  }
+  get href(): string { return this._href; }
 
   // cssom-1 § 6.4.3 #dom-cssimportrule-media
-  get media(): MediaList {
-    return this._media;
-  }
-
-  // cssom-1 § 6.4.3 #dom-cssimportrule-media
-  // WebIDL § 3.3.6 #putforwards
-  set media(val: unknown) {
-    this._media.mediaText = val === null ? '' : String(val);
-  }
+  get media(): MediaList { return this._media; }
+  set media(val: unknown) { this._media.mediaText = val === null ? '' : String(val); }
 
   // cssom-1 § 6.4.3 #dom-cssimportrule-stylesheet
   get styleSheet(): CSSStyleSheet | null {
     if (!this._styleSheet) {
-      let initialRules: Rule[] = [];
-      if (this._href && this._href.startsWith('data:')) {
-        const commaIdx = this._href.indexOf(',');
-        if (commaIdx !== -1) {
-          const meta = this._href.slice(5, commaIdx).toLowerCase();
-          const content = this._href.slice(commaIdx + 1);
-          try {
-            let rawData: string;
-            if (meta.includes(';base64')) {
-              rawData = typeof atob === 'function' ? atob(content) : Buffer.from(content, 'base64').toString('utf-8');
-            } else {
-              rawData = decodeURIComponent(content);
-            }
-            const tokens = tokenize(rawData);
-            initialRules = ParseHooks.consumeListOfRules(tokens, true);
-          } catch {
-            initialRules = [];
-          }
-        }
-      }
-      this._styleSheet = CSSStyleSheet.createInternal(initialRules, (text: string) => {
-        const tokens = tokenize(text);
-        return ParseHooks.consumeRule(tokens);
-      });
+      this._styleSheet = CSSStyleSheet.createInternal(
+        parseDataUrlRules(this._href),
+        (text: string) => ParseHooks.consumeRule(tokenize(text)),
+      );
       this._styleSheet._initImportedSheet(this, this.parentStyleSheet, this._href);
     }
     return this._styleSheet;
   }
 
-  // cssom-1 § 6.4.3 #dom-cssimportrule-layername
-  get layerName(): string | null {
-    return this._layerName;
-  }
+  get layerName(): string | null { return this._layerName; }
+  get supportsText(): string | null { return this._supportsText; }
+  get scopeStart(): string | null { return this._scopeStart; }
+  get scopeEnd(): string | null { return this._scopeEnd; }
+  get isScoped(): boolean { return this._isScoped; }
 
-  // cssom-1 § 6.4.3 #dom-cssimportrule-supportstext
-  get supportsText(): string | null {
-    return this._supportsText;
-  }
-
-  get scopeStart(): string | null {
-    return this._scopeStart;
-  }
-
-  get scopeEnd(): string | null {
-    return this._scopeEnd;
-  }
-
-  get isScoped(): boolean {
-    return this._isScoped;
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'CSSImportRule';
-  }
-
+  get [Symbol.toStringTag]() { return 'CSSImportRule'; }
   get type() { return 3; } // CSSRule.IMPORT_RULE
 
   get cssText() {
@@ -842,18 +774,15 @@ export class CSSImportRule extends CSSRule {
     }
     if (this._isScoped) {
       if (this._scopeStart || this._scopeEnd) {
-        let scopeInner = '';
-        if (this._scopeStart) scopeInner += `(${this._scopeStart})`;
-        if (this._scopeEnd) scopeInner += ` to (${this._scopeEnd})`;
-        text += ` scope(${scopeInner.trim()})`;
+        const startPart = this._scopeStart ? `(${this._scopeStart})` : '';
+        const endPart = this._scopeEnd ? ` to (${this._scopeEnd})` : '';
+        text += ` scope(${(startPart + endPart).trim()})`;
       } else {
         text += ` scope`;
       }
     }
     const mediaStr = this.media.mediaText;
-    if (mediaStr) {
-      text += ` ${mediaStr}`;
-    }
+    if (mediaStr) text += ` ${mediaStr}`;
     return text + `;`;
   }
 
@@ -866,7 +795,6 @@ export class CSSNamespaceRule extends CSSRule {
 
   constructor(prefix: string, namespaceURI: string, internalToken?: symbol) {
     // cssom-1 § 6.4.5 #the-cssnamespacerule-interface
-    // WebIDL § 3.6.3 #interface-prototype-object
     if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
@@ -875,100 +803,57 @@ export class CSSNamespaceRule extends CSSRule {
     this._namespaceURI = namespaceURI;
   }
 
-  // cssom-1 § 6.4.5 #dom-cssnamespacerule-namespaceuri
-  get namespaceURI(): string {
-    return this._namespaceURI;
-  }
-
-  // cssom-1 § 6.4.5 #dom-cssnamespacerule-prefix
-  get prefix(): string {
-    return this._prefix;
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'CSSNamespaceRule';
-  }
-
+  get namespaceURI(): string { return this._namespaceURI; }
+  get prefix(): string { return this._prefix; }
+  get [Symbol.toStringTag]() { return 'CSSNamespaceRule'; }
   get type() { return 10; } // CSSRule.NAMESPACE_RULE
 
   get cssText() {
-    if (this._prefix) {
-      return `@namespace ${serializeIdentifier(this._prefix)} url("${this._namespaceURI}");`;
-    }
-    return `@namespace url("${this._namespaceURI}");`;
+    const prefixPart = this._prefix ? `${serializeIdentifier(this._prefix)} ` : '';
+    return `@namespace ${prefixPart}url("${this._namespaceURI}");`;
   }
 
   set cssText(_value: string) {}
 }
 
-function parsePageSelectorList(text: string): string[] | null {
-  const trimmed = text.trim();
-  if (trimmed === '') return [''];
+const VALID_PAGE_PSEUDOS = new Set(['left', 'right', 'first', 'blank']);
 
-  const tokens = tokenize(text);
-  const values = ParseHooks.parseComponentValues(tokens);
-  
-  const selectorTokensList: ComponentValue[][] = [];
-  let current: ComponentValue[] = [];
+function parsePageSelectorList(text: string): string[] | null {
+  if (text.trim() === '') return [''];
+
+  const values = ParseHooks.parseComponentValues(tokenize(text));
+  const selectorTokensList: ComponentValue[][] = [[]];
   for (const v of values) {
-    if (v.type === 'comma') {
-      selectorTokensList.push(current);
-      current = [];
-    } else {
-      current.push(v);
-    }
+    if (v.type === 'comma') selectorTokensList.push([]);
+    else selectorTokensList[selectorTokensList.length - 1].push(v);
   }
-  selectorTokensList.push(current);
 
   const results: string[] = [];
-
   for (const selTokens of selectorTokensList) {
     let start = 0;
-    while (start < selTokens.length && (selTokens[start].type === 'whitespace' || selTokens[start].type === 'comment')) {
-      start++;
-    }
     let end = selTokens.length;
-    while (end > start && (selTokens[end - 1].type === 'whitespace' || selTokens[end - 1].type === 'comment')) {
-      end--;
-    }
-    const trimmedTokens = selTokens.slice(start, end);
-    if (trimmedTokens.length === 0) {
+    while (start < end && (selTokens[start].type === 'whitespace' || selTokens[start].type === 'comment')) start++;
+    while (end > start && (selTokens[end - 1].type === 'whitespace' || selTokens[end - 1].type === 'comment')) end--;
+    const trimmed = selTokens.slice(start, end);
+    if (trimmed.length === 0 || trimmed.some(t => t.type === 'whitespace' || t.type === 'comment')) {
       return null;
     }
 
-    if (trimmedTokens.some(t => t.type === 'whitespace' || t.type === 'comment')) {
-      return null;
-    }
-
-    let hasIdent = false;
     let pos = 0;
-    
-    if (trimmedTokens[0].type === 'ident') {
-      hasIdent = true;
+    let serialized = '';
+    if (trimmed[0].type === 'ident') {
+      serialized += serializeIdentifier(trimmed[0].value as string);
       pos = 1;
     }
-    
-    while (pos < trimmedTokens.length) {
-      const colon = trimmedTokens[pos];
-      const ident = trimmedTokens[pos + 1];
-      if (colon && colon.type === 'colon' && ident && ident.type === 'ident') {
-        const pseudoName = (ident.value as string).toLowerCase();
-        if (['left', 'right', 'first', 'blank'].includes(pseudoName)) {
-          pos += 2;
-          continue;
-        }
-      }
-      return null;
-    }
-    
-    let serialized = '';
-    if (hasIdent) {
-      serialized += serializeIdentifier(trimmedTokens[0].value as string);
-    }
-    let p = hasIdent ? 1 : 0;
-    while (p < trimmedTokens.length) {
-      serialized += ':' + serializeIdentifier((trimmedTokens[p + 1].value as string).toLowerCase());
-      p += 2;
+
+    while (pos < trimmed.length) {
+      const colon = trimmed[pos];
+      const ident = trimmed[pos + 1];
+      if (colon?.type !== 'colon' || ident?.type !== 'ident') return null;
+      const pseudoName = (ident.value as string).toLowerCase();
+      if (!VALID_PAGE_PSEUDOS.has(pseudoName)) return null;
+      serialized += ':' + serializeIdentifier(pseudoName);
+      pos += 2;
     }
     results.push(serialized);
   }
@@ -976,65 +861,47 @@ function parsePageSelectorList(text: string): string[] | null {
   return results;
 }
 
+function formatPageSelectorText(text: string): string | null {
+  const parsed = parsePageSelectorList(text);
+  if (parsed === null) return null;
+  return parsed.length === 1 && parsed[0] === '' ? '' : parsed.join(', ');
+}
+
 export class CSSPageRule extends CSSGroupingRule {
   private _selectorText: string;
   private _style: CSSPageDescriptors;
- 
+
   constructor(selectorText: string, declarations: Declaration[], rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
-    const parsed = parsePageSelectorList(selectorText);
-    this._selectorText = parsed ? (parsed.length === 1 && parsed[0] === '' ? '' : parsed.join(', ')) : selectorText;
+    this._selectorText = formatPageSelectorText(selectorText) ?? selectorText;
     this._style = new CSSPageDescriptors(declarations, PAGE_DESCRIPTORS_INTERNAL);
     this._style._parentRule = this;
   }
 
-  get selectorText(): string {
-    return this._selectorText;
-  }
-
+  get selectorText(): string { return this._selectorText; }
   set selectorText(value: string) {
-    const parsed = parsePageSelectorList(value);
-    if (parsed !== null) {
-      this._selectorText = (parsed.length === 1 && parsed[0] === '') ? '' : parsed.join(', ');
-    }
+    const formatted = formatPageSelectorText(value);
+    if (formatted !== null) this._selectorText = formatted;
   }
 
-  get style(): CSSPageDescriptors {
-    return this._style;
-  }
+  get style(): CSSPageDescriptors { return this._style; }
+  set style(value: string) { this._style.cssText = value; }
 
-  set style(value: string) {
-    this._style.cssText = value;
-  }
-
-  // cssom-1 § 6.4.4 #the-csspagerule-interface
-  get [Symbol.toStringTag](): string {
-    return 'CSSPageRule';
-  }
-
+  get [Symbol.toStringTag](): string { return 'CSSPageRule'; }
   get type() { return 6; }
 
   get cssText() {
     const sel = this.selectorText ? this.selectorText + ' ' : '';
     const declsStr = this.style.cssText.trim();
     const rulesStr = this._rules.map((r: Rule) => (r as CSSRule).cssText).join('\n').trim();
-    
-    let bodyText = '';
-    if (declsStr && rulesStr) {
-      bodyText = declsStr + '\n' + rulesStr;
-    } else {
-      bodyText = declsStr || rulesStr;
-    }
+    const bodyText = declsStr && rulesStr ? `${declsStr}\n${rulesStr}` : (declsStr || rulesStr);
 
     if (!bodyText) return `@page ${sel}{ }`;
-    
     const indentedBody = bodyText.split('\n').map(line => '  ' + line).join('\n');
     return `@page ${sel}{\n${indentedBody}\n}`;
   }
 
-  set cssText(_value: string) {
-    // Do nothing as per spec
-  }
+  set cssText(_value: string) {}
 }
 
 export class CSSPropertyRule extends CSSRule {
@@ -1055,16 +922,21 @@ export class CSSPropertyRule extends CSSRule {
 
   get cssText() {
     let body = `syntax: ${serializeString(this.syntax)}; inherits: ${this.inherits};`;
-    if (this.initialValue !== null) {
-      body += `initial-value: ${this.initialValue};`;
-    }
+    if (this.initialValue !== null) body += `initial-value: ${this.initialValue};`;
     return `@property ${serializeIdentifier(this.name)} {${body}}`;
   }
 
-  set cssText(_value: string) {
-    // Do nothing as per spec
-  }
+  set cssText(_value: string) {}
 }
+
+const AT_RULE_TYPE_MAP: Record<string, number> = {
+  import: CSSRule.IMPORT_RULE,
+  charset: CSSRule.CHARSET_RULE,
+  namespace: CSSRule.NAMESPACE_RULE,
+  page: CSSRule.PAGE_RULE,
+  'font-face': CSSRule.FONT_FACE_RULE,
+  supports: 12,
+};
 
 export class CSSAtRule extends CSSRule {
   public name: string;
@@ -1081,66 +953,80 @@ export class CSSAtRule extends CSSRule {
   }
 
   override get type(): number {
-    switch (this.name) {
-      case 'import': return CSSRule.IMPORT_RULE;
-      case 'charset': return CSSRule.CHARSET_RULE;
-      case 'namespace': return CSSRule.NAMESPACE_RULE;
-      case 'page': return CSSRule.PAGE_RULE;
-      case 'font-face': return CSSRule.FONT_FACE_RULE;
-      case 'supports': return 12;
-      case 'layer': return 0;
-      default: return 0;
-    }
+    return AT_RULE_TYPE_MAP[this.name] ?? 0;
   }
 
   get cssText(): string {
     const cond = this.prelude.length > 0 ? ' ' + serialize(this.prelude).trim() : '';
     if (!this.block) return `@${this.name}${cond};`;
-    
+
     const childRules = this.childRules || [];
     if (childRules.length > 0) {
       return serializeGroupingRule(this.name, cond.trim(), childRules);
     }
-    
+
     const blockContentText = serialize(this.block.value).trim();
     if (!blockContentText) return `@${this.name}${cond} { }`;
-    
+
     const indentedBody = blockContentText.split('\n').map(line => '  ' + line).join('\n');
     return `@${this.name}${cond} {\n${indentedBody}\n}`;
   }
 }
 
+const COUNTER_STYLE_DESCRIPTORS: ReadonlyArray<readonly [string, string]> = [
+  ['system', 'system'],
+  ['symbols', 'symbols'],
+  ['additive-symbols', 'additiveSymbols'],
+  ['negative', 'negative'],
+  ['prefix', 'prefix'],
+  ['suffix', 'suffix'],
+  ['range', 'range'],
+  ['pad', 'pad'],
+  ['speak-as', 'speakAs'],
+  ['fallback', 'fallback'],
+];
+
+const COUNTER_STYLE_PROP_BY_DESCRIPTOR = new Map<string, string>(COUNTER_STYLE_DESCRIPTORS);
+
 // css-counter-styles-3 § 8.1 #csscounterstylerule
 export class CSSCounterStyleRule extends CSSRule {
   private _name: string;
-  private _system: string = '';
-  private _symbols: string = '';
-  private _additiveSymbols: string = '';
-  private _negative: string = '';
-  private _prefix: string = '';
-  private _suffix: string = '';
-  private _range: string = '';
-  private _pad: string = '';
-  private _speakAs: string = '';
-  private _fallback: string = '';
   private _declarations: Declaration[] = [];
+  readonly _descriptors: Record<string, string> = {
+    system: '',
+    symbols: '',
+    additiveSymbols: '',
+    negative: '',
+    prefix: '',
+    suffix: '',
+    range: '',
+    pad: '',
+    speakAs: '',
+    fallback: '',
+  };
+
+  declare system: string;
+  declare symbols: string;
+  declare additiveSymbols: string;
+  declare negative: string;
+  declare prefix: string;
+  declare suffix: string;
+  declare range: string;
+  declare pad: string;
+  declare speakAs: string;
+  declare fallback: string;
 
   constructor(name: string, declarations: Declaration[] = []) {
     super();
     this._name = name;
     this._declarations = declarations;
     for (const d of declarations) {
-      const valStr = Array.isArray(d.value) ? serialize(d.value).trim() : (typeof d.value === 'string' ? d.value : '');
-      if (d.name === 'system') this._system = valStr;
-      else if (d.name === 'symbols') this._symbols = valStr;
-      else if (d.name === 'additive-symbols') this._additiveSymbols = valStr;
-      else if (d.name === 'negative') this._negative = valStr;
-      else if (d.name === 'prefix') this._prefix = valStr;
-      else if (d.name === 'suffix') this._suffix = valStr;
-      else if (d.name === 'range') this._range = valStr;
-      else if (d.name === 'pad') this._pad = valStr;
-      else if (d.name === 'speak-as') this._speakAs = valStr;
-      else if (d.name === 'fallback') this._fallback = valStr;
+      const prop = COUNTER_STYLE_PROP_BY_DESCRIPTOR.get(d.name);
+      if (prop) {
+        this._descriptors[prop] = Array.isArray(d.value)
+          ? serialize(d.value).trim()
+          : (typeof d.value === 'string' ? d.value : '');
+      }
     }
   }
 
@@ -1148,50 +1034,7 @@ export class CSSCounterStyleRule extends CSSRule {
   get name(): string { return this._name; }
   set name(value: string) { this._name = value; }
 
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-system
-  get system(): string { return this._system; }
-  set system(value: string) { this._system = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-symbols
-  get symbols(): string { return this._symbols; }
-  set symbols(value: string) { this._symbols = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-additivesymbols
-  get additiveSymbols(): string { return this._additiveSymbols; }
-  set additiveSymbols(value: string) { this._additiveSymbols = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-negative
-  get negative(): string { return this._negative; }
-  set negative(value: string) { this._negative = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-prefix
-  get prefix(): string { return this._prefix; }
-  set prefix(value: string) { this._prefix = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-suffix
-  get suffix(): string { return this._suffix; }
-  set suffix(value: string) { this._suffix = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-range
-  get range(): string { return this._range; }
-  set range(value: string) { this._range = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-pad
-  get pad(): string { return this._pad; }
-  set pad(value: string) { this._pad = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-speakas
-  get speakAs(): string { return this._speakAs; }
-  set speakAs(value: string) { this._speakAs = value; }
-
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-fallback
-  get fallback(): string { return this._fallback; }
-  set fallback(value: string) { this._fallback = value; }
-
-  get [Symbol.toStringTag]() {
-    return 'CSSCounterStyleRule';
-  }
-
+  get [Symbol.toStringTag]() { return 'CSSCounterStyleRule'; }
   get type() { return 11; }
 
   // css-counter-styles-3 § 8.1 #csscounterstylerule
@@ -1200,63 +1043,48 @@ export class CSSCounterStyleRule extends CSSRule {
       const valStr = Array.isArray(d.value) ? serialize(d.value).trim() : (typeof d.value === 'string' ? d.value : '');
       return `${d.name}: ${valStr};`;
     }).join(' ');
-    if (decls.length > 0) {
-      return `@counter-style ${this._name} { ${decls} }`;
-    }
-    return `@counter-style ${this._name} {}`;
+    return decls.length > 0 ? `@counter-style ${this._name} { ${decls} }` : `@counter-style ${this._name} {}`;
   }
   set cssText(_value: string) {}
+}
+
+for (const [, prop] of COUNTER_STYLE_DESCRIPTORS) {
+  Object.defineProperty(CSSCounterStyleRule.prototype, prop, {
+    get(this: CSSCounterStyleRule): string { return this._descriptors[prop]; },
+    set(this: CSSCounterStyleRule, value: string) { this._descriptors[prop] = value; },
+    enumerable: true,
+    configurable: true,
+  });
 }
 
 // css-fonts-4 § 8 #om-fontfeaturevalues
 export class CSSFontFeatureValuesMap {
   private _map = new Map<string, number[]>();
 
-  get size(): number {
-    return this._map.size;
-  }
-
-  get(featureValueName: string): number[] | undefined {
-    return this._map.get(featureValueName);
-  }
-
+  get size(): number { return this._map.size; }
+  get(featureValueName: string): number[] | undefined { return this._map.get(featureValueName); }
   set(featureValueName: string, values: number | number[]): void {
-    const arr = Array.isArray(values) ? values.map(Number) : [Number(values)];
-    this._map.set(featureValueName, arr);
+    this._map.set(featureValueName, Array.isArray(values) ? values.map(Number) : [Number(values)]);
   }
-
-  has(featureValueName: string): boolean {
-    return this._map.has(featureValueName);
-  }
-
-  delete(featureValueName: string): boolean {
-    return this._map.delete(featureValueName);
-  }
-
-  clear(): void {
-    this._map.clear();
-  }
-
-  entries(): IterableIterator<[string, number[]]> {
-    return this._map.entries();
-  }
-
-  keys(): IterableIterator<string> {
-    return this._map.keys();
-  }
-
-  values(): IterableIterator<number[]> {
-    return this._map.values();
-  }
-
-  [Symbol.iterator](): IterableIterator<[string, number[]]> {
-    return this._map[Symbol.iterator]();
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'CSSFontFeatureValuesMap';
-  }
+  has(featureValueName: string): boolean { return this._map.has(featureValueName); }
+  delete(featureValueName: string): boolean { return this._map.delete(featureValueName); }
+  clear(): void { this._map.clear(); }
+  entries(): IterableIterator<[string, number[]]> { return this._map.entries(); }
+  keys(): IterableIterator<string> { return this._map.keys(); }
+  values(): IterableIterator<number[]> { return this._map.values(); }
+  [Symbol.iterator](): IterableIterator<[string, number[]]> { return this._map[Symbol.iterator](); }
+  get [Symbol.toStringTag]() { return 'CSSFontFeatureValuesMap'; }
 }
+
+const FONT_FEATURE_VALUE_MAP_DEFS = [
+  ['annotation', 'annotation'],
+  ['ornaments', 'ornaments'],
+  ['stylistic', 'stylistic'],
+  ['swash', 'swash'],
+  ['character-variant', 'characterVariant'],
+  ['styleset', 'styleset'],
+  ['historical-forms', 'historicalForms'],
+] as const;
 
 // css-fonts-4 § 8 #cssfontfeaturevaluesrule-interface
 export class CSSFontFeatureValuesRule extends CSSRule {
@@ -1274,36 +1102,18 @@ export class CSSFontFeatureValuesRule extends CSSRule {
     this._fontFamily = fontFamily;
   }
 
-  // css-fonts-4 § 8 #om-fontfeaturevalues
-  get fontFamily(): string {
-    return this._fontFamily;
-  }
-
-  set fontFamily(value: string) {
-    this._fontFamily = value;
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'CSSFontFeatureValuesRule';
-  }
-
+  get fontFamily(): string { return this._fontFamily; }
+  set fontFamily(value: string) { this._fontFamily = value; }
+  get [Symbol.toStringTag]() { return 'CSSFontFeatureValuesRule'; }
   get type() { return 14; }
 
   get cssText(): string {
     const blocks: string[] = [];
-    const maps: [string, CSSFontFeatureValuesMap][] = [
-      ['annotation', this.annotation],
-      ['ornaments', this.ornaments],
-      ['stylistic', this.stylistic],
-      ['swash', this.swash],
-      ['character-variant', this.characterVariant],
-      ['styleset', this.styleset],
-      ['historical-forms', this.historicalForms],
-    ];
-    for (const [name, map] of maps) {
+    for (const [atName, prop] of FONT_FEATURE_VALUE_MAP_DEFS) {
+      const map = this[prop];
       if (map.size > 0) {
         const entries = Array.from(map.entries(), ([k, v]) => `${k}: ${v.join(' ')};`).join(' ');
-        blocks.push(`@${name} { ${entries} }`);
+        blocks.push(`@${atName} { ${entries} }`);
       }
     }
     const body = blocks.length > 0 ? ` { ${blocks.join(' ')} }` : ' {}';
@@ -1311,3 +1121,4 @@ export class CSSFontFeatureValuesRule extends CSSRule {
   }
   set cssText(_value: string) {}
 }
+
