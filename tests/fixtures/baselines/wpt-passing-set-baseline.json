@@ -483,6 +483,8 @@
     "Style rules within @media are scoped"
   ],
   "submodules/web-platform-tests/css/css-cascade/scope-name-defining-rules.html": [
+    "@keyframes is unaffected by @scope",
+    "@keyframes is unaffected by non-matching @scope",
     "@property is unaffected by @scope",
     "@property is unaffected by non-matching @scope"
   ],

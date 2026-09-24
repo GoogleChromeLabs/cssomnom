@@ -340,7 +340,7 @@ export function substituteVariables(
               const nextStack = new Set(resolvingStack);
               nextStack.add(varName);
               const subTaint = { tainted: false };
-              const resolvedCustom = substituteVariables(rawCustomVal, customProps, nextStack, cyclicProps, element, taintedProps, subTaint);
+              const resolvedCustom = substituteVariables(rawCustomVal, customProps, nextStack, cyclicProps, element, taintedProps, subTaint, activeProperties);
               if (subTaint.tainted) hasAttrTaint = true;
               if (resolvedCustom === null || cyclicProps.has(varName)) {
                 cyclicProps.add(varName);

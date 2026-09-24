@@ -285,7 +285,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
     }
 
-    // css-transforms-2 § 3.2 #perspective-origin-property
+    // CSSOM § 6.5 & CSS Transforms 2 § 3.2: getComputedStyle() returns the resolved value, which for perspective-origin is the used value (percentages resolved against reference box width/height).
     if (dashed === 'perspective-origin') {
       let elWidth = 0;
       let elHeight = 0;

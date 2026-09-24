@@ -219,8 +219,8 @@ export function collectStyleSheetsAndRules(
         if ((r as CSSStyleRule).selectorText.includes(keyword)) {
           result.push(r);
         }
-      } else if ('cssRules' in r && (r as unknown as CSSGroupingRule).cssRules) {
-        const children = (r as unknown as CSSGroupingRule).cssRules;
+      } else if (r instanceof CSSGroupingRule) {
+        const children = r.cssRules;
         for (let i = 0; i < children.length; i++) {
           checkAndAddRule(children[i]);
         }
@@ -472,6 +472,19 @@ function resolveUrlsInValue(val: string, baseURL: string | null): string {
   });
 }
 
+interface ShadowElementLike extends ElementLike {
+  getRootNode?(options?: { composed?: boolean }): { host?: ElementLike } | null;
+  part?: { value?: string; contains?: (p: string) => boolean } | string;
+}
+
+function getElementRootNode(el: ElementLike): { host?: ElementLike } | null {
+  const shadowEl = el as ShadowElementLike;
+  if (typeof shadowEl.getRootNode === 'function') {
+    return shadowEl.getRootNode();
+  }
+  return null;
+}
+
 /**
  * Traverses rule list, evaluates conditional at-rules and selectors, and collects matched declarations.
  * css-cascade-5 § 2 #filtering
@@ -556,9 +569,7 @@ export function collectMatchedDeclarations(
               const elPartAttr = (element as { getAttribute?(a: string): string | null }).getAttribute?.('part') || '';
               const partTokens = elPartAttr.trim().split(/\s+/);
               if (partTokens.includes(partName)) {
-                const rootNode = typeof (element as unknown as { getRootNode?: () => unknown }).getRootNode === 'function'
-                  ? (element as unknown as { getRootNode: () => unknown }).getRootNode()
-                  : null;
+                const rootNode = getElementRootNode(element);
                 const shadowHost = (rootNode as { host?: unknown })?.host;
                 if (shadowHost && isElement(shadowHost) && matches(shadowHost, hostSelector)) {
                   matchesThisSel = true;
@@ -600,9 +611,7 @@ export function collectMatchedDeclarations(
                   matchesThisSel = matches(element, sel, scopeNode);
                 }
                 if (matchesThisSel) {
-                  const rootNode = typeof (element as unknown as { getRootNode?: () => unknown }).getRootNode === 'function'
-                    ? (element as unknown as { getRootNode: () => unknown }).getRootNode()
-                    : null;
+                  const rootNode = getElementRootNode(element);
                   if (rootNode && (rootNode as { host?: unknown }).host) {
                     currentSelTreeScope = 'shadow';
                   } else {

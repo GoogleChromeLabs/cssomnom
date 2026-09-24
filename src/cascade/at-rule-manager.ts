@@ -16,11 +16,10 @@
  */
 
 import { CSSPropertyRule, CSSKeyframesRule, CSSLayerBlockRule, CSSGroupingRule, CSSMediaRule, CSSSupportsRule, CSSImportRule, CSSRule } from '../CSSOM.ts';
-import type { Rule, ASTAtRule, Declaration, MediaEnvironment } from '../types.ts';
+import type { Rule, Declaration, MediaEnvironment } from '../types.ts';
 import { PropertyRegistry, type PropertyDefinition } from '../PropertyRegistry.ts';
 import { MediaParser } from '../MediaParser.ts';
 import { supports } from '../parser-api.ts';
-import { serialize } from '../serializer.ts';
 
 /**
  * Discovers and resolves active @property and @keyframes definitions across stylesheets and layers.
@@ -67,26 +66,15 @@ export function collectActiveAtRules(
       if (!r) continue;
       sourceOrder++;
 
-      if (r instanceof CSSPropertyRule || ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'property')) {
-        let name = '';
-        let syntax: string | undefined;
-        let inherits = false;
-        let initialValue: string | undefined;
-
-        if (r instanceof CSSPropertyRule) {
-          name = r.name;
-          syntax = r.syntax;
-          inherits = r.inherits;
-          initialValue = r.initialValue ?? undefined;
-        }
-
+      if (r instanceof CSSPropertyRule) {
+        const name = r.name;
         if (!name.startsWith('--')) continue;
 
         const definition: PropertyDefinition = {
           name,
-          syntax: syntax || '*',
-          inherits: Boolean(inherits),
-          initialValue,
+          syntax: r.syntax || '*',
+          inherits: Boolean(r.inherits),
+          initialValue: r.initialValue ?? undefined,
         };
 
         try {
@@ -102,62 +90,43 @@ export function collectActiveAtRules(
         if (!existing || winsOver(candidate, existing)) {
           propertyCandidates.set(name, candidate);
         }
-      } else if (r instanceof CSSKeyframesRule || ((r as ASTAtRule).type === 'at-rule' && ((r as ASTAtRule).name === 'keyframes' || (r as ASTAtRule).name === '-webkit-keyframes'))) {
-        let name = '';
-        let keyframesRule: CSSKeyframesRule | null = null;
-        if (r instanceof CSSKeyframesRule) {
-          name = r.name;
-          keyframesRule = r;
-        }
-
-        if (!name || !keyframesRule) continue;
+      } else if (r instanceof CSSKeyframesRule) {
+        const name = r.name;
+        if (!name) continue;
 
         const layerOrder = currentLayer !== undefined && currentLayer !== null ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
-        const candidate: Candidate<CSSKeyframesRule> = { item: keyframesRule, layerOrder, sourceOrder };
+        const candidate: Candidate<CSSKeyframesRule> = { item: r, layerOrder, sourceOrder };
 
         const existing = keyframesCandidates.get(name);
         if (!existing || winsOver(candidate, existing)) {
           keyframesCandidates.set(name, candidate);
         }
-      } else if (
-        r instanceof CSSLayerBlockRule ||
-        ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'layer' && (r as ASTAtRule).block)
-      ) {
+      } else if (r instanceof CSSLayerBlockRule) {
         const assigned = (r as { _assignedLayerName?: string })._assignedLayerName;
-        const rawName = (r as CSSLayerBlockRule).name || serialize((r as ASTAtRule).prelude || []).trim();
+        const rawName = r.name;
         const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
-        const childRules = (r instanceof CSSGroupingRule ? r.cssRules : (r as ASTAtRule).childRules) || [];
-        walk(childRules, layerName);
-      } else if (
-        r instanceof CSSMediaRule ||
-        ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'media')
-      ) {
-        const mediaText = r instanceof CSSMediaRule ? r.media.mediaText : serialize((r as ASTAtRule).prelude || []).trim();
+        walk(r.cssRules, layerName);
+      } else if (r instanceof CSSMediaRule) {
+        const mediaText = r.media.mediaText;
         if (!mediaText || MediaParser.evaluate(mediaText, env)) {
-          const childRules = (r instanceof CSSGroupingRule ? r.cssRules : (r as ASTAtRule).childRules) || [];
-          walk(childRules, currentLayer);
+          walk(r.cssRules, currentLayer);
         }
-      } else if (
-        r instanceof CSSSupportsRule ||
-        ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'supports')
-      ) {
-        const cond = r instanceof CSSSupportsRule ? r.conditionText : serialize((r as ASTAtRule).prelude || []).trim();
+      } else if (r instanceof CSSSupportsRule) {
+        const cond = r.conditionText;
         if (!cond || supports(cond)) {
-          const childRules = (r instanceof CSSGroupingRule ? r.cssRules : (r as ASTAtRule).childRules) || [];
-          walk(childRules, currentLayer);
+          walk(r.cssRules, currentLayer);
         }
-      } else if (
-        r instanceof CSSImportRule ||
-        ((r as ASTAtRule).type === 'at-rule' && (r as ASTAtRule).name === 'import')
-      ) {
-        const importedSheet = (r as CSSImportRule).styleSheet;
+      } else if (r instanceof CSSImportRule) {
+        const importedSheet = r.styleSheet;
         if (importedSheet && importedSheet.cssRules) {
-          const rawLayer = (r as CSSImportRule).layerName;
+          const rawLayer = r.layerName;
           const layerName = rawLayer !== null && rawLayer !== undefined
             ? (currentLayer ? (rawLayer ? `${currentLayer}.${rawLayer}` : currentLayer) : rawLayer)
             : currentLayer;
           walk(importedSheet.cssRules, layerName);
         }
+      } else if (r instanceof CSSGroupingRule) {
+        walk(r.cssRules, currentLayer);
       }
     }
   }

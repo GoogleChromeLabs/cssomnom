@@ -28,10 +28,13 @@ import type { MatchedDeclaration } from './types.ts';
  */
 export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDeclaration): number {
   const getPrecedence = (decl: MatchedDeclaration): number => {
-    // css-scoping-1 § 3.3, css-cascade-5 § 6.1 #cascade-origin
-    // Tree context precedence:
-    // Normal declarations: document / part (2) > shadow (1) > slotted (0)
-    // Important declarations: shadow (2) > document / part (1) > slotted (0)
+    // css-scoping-1 § 3.3, css-cascade-5 § 6.1 #cascade-origin, § 6.1 #cascade-sort
+    // Criterion 1: Origin & Importance (Important Author > Normal Author)
+    // Criterion 2: Context (Shadow Encapsulation)
+    //   - Normal: document / part (2) > shadow (1) > slotted (0)
+    //   - Important: shadow (2) > document / part (1) > slotted (0)
+    // Criterion 3: Element-Attached Styles (inline style)
+    // Criterion 4: Cascade Layers (Normal: unlayered > layered; Important: layered > unlayered)
     let scopeScore = 0;
     if (decl.treeScope === 'slotted') {
       scopeScore = 0;
@@ -43,18 +46,16 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
 
     if (decl.important) {
       // css-cascade-5 § 6.1 #style-attr, § 6.3 #importance
-      if (decl.isInline) return 600;
-      // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance, § 6.4.3 #layer-ordering
-      if (decl.layerOrder !== Infinity) return 500 + scopeScore;
-      // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance (unlayered is implicit final layer; loses to explicit layers)
-      return 400 + scopeScore;
+      const inlineBonus = decl.isInline ? 50 : 0;
+      // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance (layered beats unlayered)
+      const layerTier = decl.layerOrder !== Infinity ? 20 : 10;
+      return 1000 + scopeScore * 100 + inlineBonus + layerTier;
     } else {
       // css-cascade-5 § 6.1 #style-attr
-      if (decl.isInline) return 300;
-      // css-cascade-5 § 6.1 #cascade-layering (unlayered is implicit final layer; wins over explicit layers)
-      if (decl.layerOrder === Infinity) return 200 + scopeScore;
-      // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering
-      return 100 + scopeScore;
+      const inlineBonus = decl.isInline ? 50 : 0;
+      // css-cascade-5 § 6.1 #cascade-layering (unlayered beats layered)
+      const layerTier = decl.layerOrder === Infinity ? 20 : 10;
+      return scopeScore * 100 + inlineBonus + layerTier;
     }
   };
 
