@@ -162,92 +162,62 @@ export function serialize(nodes: ComponentValue[], preserveCase: boolean = false
   return result;
 }
 
+function trimWhitespaceTokens(tokens: ComponentValue[]): ComponentValue[] {
+  let start = 0;
+  while (start < tokens.length && tokens[start].type === 'whitespace') start++;
+  let end = tokens.length - 1;
+  while (end >= start && tokens[end].type === 'whitespace') end--;
+  return start <= end ? tokens.slice(start, end + 1) : [];
+}
+
 function serializeNode(node: ComponentValue, preserveCase: boolean): string {
-  if (typeof node !== 'object' || node === null) {
+  if (typeof node !== 'object' || node === null || !('type' in node)) {
     return '';
   }
 
-  if ('type' in node) {
-    if (node.type === 'simple-block') {
-      const start = node.associatedToken.value as string;
-      const end = getMirrorToken(start);
-
-      return start + serialize(node.value, preserveCase) + end;
-    }
-
-    if (node.type === 'function' && 'name' in node) {
-      let args = node.value;
-      const funcName = preserveCase ? node.name : node.name.toLowerCase();
-      
-      if (funcName === 'counter') {
-        let i = args.length - 1;
-        while (i >= 0 && args[i].type === 'whitespace') i--;
-        if (i >= 0 && args[i].type === 'ident' && (args[i] as Token).value === 'decimal') {
-          let j = i - 1;
-          while (j >= 0 && args[j].type === 'whitespace') j--;
-          if (j >= 0 && args[j].type === 'comma') {
-            args = args.slice(0, j);
-          }
-        }
-      }
-      
-      if (funcName === 'url') {
-        let start = 0;
-        while (start < args.length && args[start].type === 'whitespace') start++;
-        let end = args.length - 1;
-        while (end >= start && args[end].type === 'whitespace') end--;
-        if (start <= end) {
-          args = args.slice(start, end + 1);
-        } else {
-          args = [];
-        }
-      }
-
-      if (funcName === 'attr') {
-        let hasPipe = false;
-        // Remove leading '|'
-        let i = 0;
-        while (i < args.length && args[i].type === 'whitespace') i++;
-        if (i < args.length && args[i].type === 'delim' && (args[i] as Token).value === '|') {
-          hasPipe = true;
-          args = args.slice(i + 1);
-        }
-        
-        // Remove trailing ', ""' ONLY if hasPipe was true
-        if (hasPipe) {
-          let k = args.length - 1;
-          while (k >= 0 && args[k].type === 'whitespace') k--;
-          if (k >= 0 && args[k].type === 'string' && (args[k] as Token).value === '') {
-            let l = k - 1;
-            while (l >= 0 && args[l].type === 'whitespace') l--;
-            if (l >= 0 && args[l].type === 'comma') {
-              args = args.slice(0, l);
-            }
-          }
-        }
-        
-        // Trim whitespace from args (moved to end)
-        let start = 0;
-        while (start < args.length && args[start].type === 'whitespace') start++;
-        let end = args.length - 1;
-        while (end >= start && args[end].type === 'whitespace') end--;
-        
-        if (start <= end) {
-          args = args.slice(start, end + 1);
-        } else {
-          args = [];
-        }
-      }
-      
-      let serializedArgs = serialize(args, preserveCase);
-      return funcName + '(' + serializedArgs + ')';
-    }
-
-    // It's a token
-    return serializeToken(node as Token, preserveCase);
+  if (node.type === 'simple-block') {
+    const start = node.associatedToken.value as string;
+    return start + serialize(node.value, preserveCase) + getMirrorToken(start);
   }
 
-  return '';
+  if (node.type === 'function' && 'name' in node) {
+    let args = node.value;
+    const funcName = preserveCase ? node.name : node.name.toLowerCase();
+
+    if (funcName === 'counter') {
+      let i = args.length - 1;
+      while (i >= 0 && args[i].type === 'whitespace') i--;
+      if (i >= 0 && args[i].type === 'ident' && (args[i] as Token).value === 'decimal') {
+        let j = i - 1;
+        while (j >= 0 && args[j].type === 'whitespace') j--;
+        if (j >= 0 && args[j].type === 'comma') {
+          args = args.slice(0, j);
+        }
+      }
+    } else if (funcName === 'url') {
+      args = trimWhitespaceTokens(args);
+    } else if (funcName === 'attr') {
+      let i = 0;
+      while (i < args.length && args[i].type === 'whitespace') i++;
+      if (i < args.length && args[i].type === 'delim' && (args[i] as Token).value === '|') {
+        args = args.slice(i + 1);
+        let k = args.length - 1;
+        while (k >= 0 && args[k].type === 'whitespace') k--;
+        if (k >= 0 && args[k].type === 'string' && (args[k] as Token).value === '') {
+          let l = k - 1;
+          while (l >= 0 && args[l].type === 'whitespace') l--;
+          if (l >= 0 && args[l].type === 'comma') {
+            args = args.slice(0, l);
+          }
+        }
+      }
+      args = trimWhitespaceTokens(args);
+    }
+
+    return `${funcName}(${serialize(args, preserveCase)})`;
+  }
+
+  return serializeToken(node as Token, preserveCase);
 }
 
 function serializeToken(token: Token, preserveCase: boolean): string {
@@ -270,7 +240,6 @@ function serializeToken(token: Token, preserveCase: boolean): string {
       return formatNumber(token.value) + '%';
     case 'dimension':
       return formatNumber(token.value) + (token.unit ? serializeIdentifier(token.unit) : '');
-
     case 'whitespace':
       return (preserveCase && token.originalText) ? token.originalText : token.value;
     case 'comment':
@@ -292,10 +261,10 @@ function serializeToken(token: Token, preserveCase: boolean): string {
     case '(':
     case ')':
       return token.value;
-    case 'function':
-      // If it's a raw token, it hasn't been parsed into a function node
+    case 'function': {
       const funcName = preserveCase ? token.value : token.value.toLowerCase();
       return serializeIdentifier(funcName) + '(';
+    }
     case 'unicode-range':
       return token.value;
     case 'EOF':
@@ -316,19 +285,12 @@ export function getOriginalText(values: ComponentValue[]): string {
   let text = '';
   for (const val of values) {
     if (val.type === 'simple-block') {
-       text += val.associatedToken.originalText || '';
-       text += getOriginalText(val.value);
-       const start = val.associatedToken.value;
-       if (start === '{') text += '}';
-       else if (start === '[') text += ']';
-       else if (start === '(') text += ')';
+      text += (val.associatedToken.originalText || '') + getOriginalText(val.value) + getMirrorToken(val.associatedToken.value as string);
     } else if (val.type === 'function') {
-       const func = val as CSSFunction;
-       text += func.name + '(';
-       text += getOriginalText(func.value);
-       text += ')';
+      const func = val as CSSFunction;
+      text += `${func.name}(${getOriginalText(func.value)})`;
     } else {
-       text += (val as Token).originalText || (val as Token).value;
+      text += (val as Token).originalText || (val as Token).value;
     }
   }
   return text;
@@ -569,6 +531,15 @@ function checkIntervening(decls: Declaration[], allDecls: Declaration[], declInd
   return false;
 }
 
+const BOX_SHORTHAND_NAMES = new Set([
+  'margin', 'padding', 'border-width', 'border-style', 'border-color',
+  'scroll-margin', 'scroll-padding', 'inset', 'overflow-clip-margin', 'border-radius',
+]);
+
+const BOX_SHORTHAND_ENTRIES = Object.entries(SHORTHANDS).filter(
+  ([shorthand, def]) => BOX_SHORTHAND_NAMES.has(shorthand) && def.logicalLonghands?.length === 4,
+);
+
 function tryCombineBoxShorthand(
   d: Declaration,
   declMap: Map<string, Declaration>,
@@ -576,33 +547,25 @@ function tryCombineBoxShorthand(
   declarations: Declaration[],
   declIndices: Map<Declaration, number>
 ): string | null {
-  for (const [shorthand, def] of Object.entries(SHORTHANDS)) {
-    if (!["margin", "padding", "border-width", "border-style", "border-color", "scroll-margin", "scroll-padding", "inset", "overflow-clip-margin", "border-radius"].includes(shorthand)) continue;
-    
-    if (!def.logicalLonghands || def.logicalLonghands.length !== 4) continue;
+  for (const [shorthand, def] of BOX_SHORTHAND_ENTRIES) {
     const physical = def.longhands;
-    const logical = def.logicalLonghands;
-    
+    const logical = def.logicalLonghands!;
     const isPhysical = physical.includes(d.name);
     const isLogical = logical.includes(d.name);
     if (!isPhysical && !isLogical) continue;
 
     const longhands = isPhysical ? physical : logical;
     const allDecls = longhands.map(name => declMap.get(name));
-    
-    if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-      if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
+    if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) continue;
+    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
 
-      const valuesForContract: Record<string, ComponentValue[]> = {};
-      allDecls.forEach(other => {
-        valuesForContract[other!.name] = other!.value;
-      });
+    const valuesForContract: Record<string, ComponentValue[]> = {};
+    for (const other of allDecls) valuesForContract[other!.name] = other!.value;
 
-      const value = def.contract(valuesForContract);
-      if (value !== null) {
-        allDecls.forEach(other => processed.add(other!));
-        return `${shorthand}: ${value}${d.important ? ' !important' : ''}`;
-      }
+    const value = def.contract(valuesForContract);
+    if (value !== null) {
+      for (const other of allDecls) processed.add(other!);
+      return `${shorthand}: ${value}${d.important ? ' !important' : ''}`;
     }
   }
   return null;
@@ -616,29 +579,26 @@ function tryCombineLogicalShorthand(
   declIndices: Map<Declaration, number>
 ): string | null {
   for (const [shorthand, longhands] of logicalShorthandsEntries) {
-    if (d.name === longhands.start || d.name === longhands.end) {
-      const otherName = d.name === longhands.start ? longhands.end : longhands.start;
-      const otherDecl = declMap.get(otherName);
-      
-      if (otherDecl && !processed.has(otherDecl) && d.important === otherDecl.important) {
-        if (checkIntervening([d, otherDecl], declarations, declIndices)) continue;
+    if (d.name !== longhands.start && d.name !== longhands.end) continue;
+    const otherName = d.name === longhands.start ? longhands.end : longhands.start;
+    const otherDecl = declMap.get(otherName);
+    if (!otherDecl || processed.has(otherDecl) || d.important !== otherDecl.important) continue;
+    if (checkIntervening([d, otherDecl], declarations, declIndices)) continue;
 
-        const startDecl = d.name === longhands.start ? d : otherDecl;
-        const endDecl = d.name === longhands.end ? d : otherDecl;
-        
-        const valS = serialize(startDecl.value).trim();
-        const valE = serialize(endDecl.value).trim();
-        
-        if (valS === valE) {
-          processed.add(startDecl);
-          processed.add(endDecl);
-          return `${shorthand}: ${valS}${d.important ? ' !important' : ''}`;
-        } else if (longhands.allowDifferent && !valS.includes('var(') && !valE.includes('var(')) {
-          processed.add(startDecl);
-          processed.add(endDecl);
-          return `${shorthand}: ${valS} ${valE}${d.important ? ' !important' : ''}`;
-        }
-      }
+    const startDecl = d.name === longhands.start ? d : otherDecl;
+    const endDecl = d.name === longhands.end ? d : otherDecl;
+    const valS = serialize(startDecl.value).trim();
+    const valE = serialize(endDecl.value).trim();
+
+    if (valS === valE) {
+      processed.add(startDecl);
+      processed.add(endDecl);
+      return `${shorthand}: ${valS}${d.important ? ' !important' : ''}`;
+    }
+    if (longhands.allowDifferent && !valS.includes('var(') && !valE.includes('var(')) {
+      processed.add(startDecl);
+      processed.add(endDecl);
+      return `${shorthand}: ${valS} ${valE}${d.important ? ' !important' : ''}`;
     }
   }
   return null;
@@ -653,28 +613,32 @@ function tryCombineGenericShorthand(
 ): { name: string, value: string, important: boolean } | null {
   for (const [shorthand, longhands] of genericShorthandsEntries) {
     if (!longhands.includes(d.name)) continue;
-
     const allDecls = longhands.map(name => declMap.get(name));
-    if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-      if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
+    if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) continue;
+    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
 
-      const record: Record<string, ComponentValue[]> = {};
-      allDecls.forEach(other => {
-        record[other!.name] = other!.value;
-      });
+    const record: Record<string, ComponentValue[]> = {};
+    for (const other of allDecls) record[other!.name] = other!.value;
 
-      const def = SHORTHANDS[shorthand];
-      if (def) {
-        const contracted = def.contract(record);
-        if (contracted !== null) {
-          allDecls.forEach(other => processed.add(other!));
-          return { name: shorthand, value: contracted, important: d.important };
-        }
-      }
+    const contracted = SHORTHANDS[shorthand]?.contract(record);
+    if (contracted !== null && contracted !== undefined) {
+      for (const other of allDecls) processed.add(other!);
+      return { name: shorthand, value: contracted, important: d.important };
     }
   }
   return null;
 }
+
+const BORDER_PHYSICAL_SIDE_LONGHANDS = [
+  'border-top-width', 'border-top-style', 'border-top-color',
+  'border-right-width', 'border-right-style', 'border-right-color',
+  'border-bottom-width', 'border-bottom-style', 'border-bottom-color',
+  'border-left-width', 'border-left-style', 'border-left-color',
+] as const;
+
+const BORDER_IMAGE_LONGHAND_NAMES = [
+  'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat',
+] as const;
 
 function tryCombineBorderFull(
   d: Declaration,
@@ -683,201 +647,87 @@ function tryCombineBorderFull(
   declarations: Declaration[],
   declIndices: Map<Declaration, number>
 ): string | null {
-  const longhands = [
-    'border-top-width', 'border-top-style', 'border-top-color',
-    'border-right-width', 'border-right-style', 'border-right-color',
-    'border-bottom-width', 'border-bottom-style', 'border-bottom-color',
-    'border-left-width', 'border-left-style', 'border-left-color'
-  ];
+  if (!BORDER_PHYSICAL_SIDE_LONGHANDS.includes(d.name as typeof BORDER_PHYSICAL_SIDE_LONGHANDS[number])) return null;
+
+  const allDecls = BORDER_PHYSICAL_SIDE_LONGHANDS.map(name => declMap.get(name));
+  if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) return null;
+  if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
+
+  const imageDecls = BORDER_IMAGE_LONGHAND_NAMES
+    .map(name => declMap.get(name))
+    .filter((img): img is Declaration => Boolean(img && !processed.has(img)));
+  if (imageDecls.length === 0) return null;
+
+  const imageRecord: Record<string, ComponentValue[]> = {
+    'border-image-source': [{ type: 'ident', value: 'none' }],
+    'border-image-slice': [{ type: 'percentage', value: 100, sign: null }],
+    'border-image-width': [{ type: 'number', value: 1, sign: null, numberType: 'integer' }],
+    'border-image-outset': [{ type: 'number', value: 0, sign: null, numberType: 'integer' }],
+    'border-image-repeat': [{ type: 'ident', value: 'stretch' }],
+  };
+  for (const img of imageDecls) imageRecord[img.name] = img.value;
+  if (!isInitialBorderImage(imageRecord)) return null;
+
+  const record: Record<string, ComponentValue[]> = { ...imageRecord };
+  for (const other of allDecls) record[other!.name] = other!.value;
+
+  const contracted = SHORTHANDS['border']?.contract(record);
+  if (contracted !== null && contracted !== undefined) {
+    for (const other of allDecls) processed.add(other!);
+    for (const img of imageDecls) processed.add(img);
+    return `border: ${contracted}${d.important ? ' !important' : ''}`;
+  }
+  return null;
+}
+
+const ORDERED_SHORTHAND_COMBINERS: readonly { name: string; longhands: readonly string[] }[] = [
+  { name: 'font', longhands: SHORTHANDS['font'].longhands },
+  { name: 'font-variant', longhands: SHORTHANDS['font-variant'].longhands },
+  {
+    name: 'background',
+    longhands: [
+      'background-image', 'background-position', 'background-size', 'background-repeat',
+      'background-attachment', 'background-origin', 'background-clip', 'background-color',
+    ],
+  },
+  {
+    name: 'border-block',
+    longhands: [
+      'border-block-start-width', 'border-block-start-style', 'border-block-start-color',
+      'border-block-end-width', 'border-block-end-style', 'border-block-end-color',
+    ],
+  },
+  {
+    name: 'border-inline',
+    longhands: [
+      'border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color',
+      'border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color',
+    ],
+  },
+];
+
+function tryCombineNamedShorthand(
+  shorthandName: string,
+  longhands: readonly string[],
+  d: Declaration,
+  declMap: Map<string, Declaration>,
+  processed: Set<Declaration>,
+  declarations: Declaration[],
+  declIndices: Map<Declaration, number>
+): string | null {
   if (!longhands.includes(d.name)) return null;
 
   const allDecls = longhands.map(name => declMap.get(name));
-  if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
+  if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) return null;
+  if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
 
-    const borderImageLonghands = [
-      'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'
-    ];
-    const imageDecls = borderImageLonghands.map(name => declMap.get(name)).filter((img): img is Declaration => Boolean(img && !processed.has(img)));
-    if (imageDecls.length === 0) {
-      return null;
-    }
-    const imageRecord: Record<string, ComponentValue[]> = {
-      'border-image-source': [{ type: 'ident', value: 'none' }],
-      'border-image-slice': [{ type: 'percentage', value: 100, sign: null }],
-      'border-image-width': [{ type: 'number', value: 1, sign: null, numberType: 'integer' }],
-      'border-image-outset': [{ type: 'number', value: 0, sign: null, numberType: 'integer' }],
-      'border-image-repeat': [{ type: 'ident', value: 'stretch' }],
-    };
-    for (const img of imageDecls) {
-      imageRecord[img.name] = img.value;
-    }
-    if (!isInitialBorderImage(imageRecord)) {
-      return null;
-    }
+  const record: Record<string, ComponentValue[]> = {};
+  for (const other of allDecls) record[other!.name] = other!.value;
 
-    const record: Record<string, ComponentValue[]> = {
-      ...imageRecord,
-    };
-    for (const other of allDecls) {
-      record[other!.name] = other!.value;
-    }
-
-    const contracted = SHORTHANDS['border']?.contract(record);
-    if (contracted !== null && contracted !== undefined) {
-      allDecls.forEach(other => processed.add(other!));
-      imageDecls.forEach(img => processed.add(img));
-      return `border: ${contracted}${d.important ? ' !important' : ''}`;
-    }
-  }
-  return null;
-}
-
-function tryCombineBackground(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): string | null {
-  const longhands = [
-    'background-image', 'background-position', 'background-size', 'background-repeat',
-    'background-attachment', 'background-origin', 'background-clip', 'background-color'
-  ];
-  if (!longhands.includes(d.name)) return null;
-
-  const allDecls = longhands.map(name => declMap.get(name));
-  if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
-
-    const record: Record<string, ComponentValue[]> = {};
-    for (const name of longhands) {
-      record[name] = declMap.get(name)!.value;
-    }
-
-    const contracted = SHORTHANDS['background'].contract(record);
-    if (contracted !== null) {
-      allDecls.forEach(other => processed.add(other!));
-      return `background: ${contracted}${d.important ? ' !important' : ''}`;
-    }
-  }
-  return null;
-}
-
-function tryCombineBorderBlock(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): string | null {
-  const longhands = [
-    'border-block-start-width', 'border-block-start-style', 'border-block-start-color',
-    'border-block-end-width', 'border-block-end-style', 'border-block-end-color'
-  ];
-  if (!longhands.includes(d.name)) return null;
-
-  const allDecls = longhands.map(name => declMap.get(name));
-  if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
-
-    const record: Record<string, ComponentValue[]> = {};
-    for (const other of allDecls) {
-      record[other!.name] = other!.value;
-    }
-
-    const contracted = SHORTHANDS['border-block']?.contract(record);
-    if (contracted !== null && contracted !== undefined) {
-      allDecls.forEach(other => processed.add(other!));
-      return `border-block: ${contracted}${d.important ? ' !important' : ''}`;
-    }
-  }
-  return null;
-}
-
-function tryCombineBorderInline(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): string | null {
-  const longhands = [
-    'border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color',
-    'border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color'
-  ];
-  if (!longhands.includes(d.name)) return null;
-
-  const allDecls = longhands.map(name => declMap.get(name));
-  if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
-
-    const record: Record<string, ComponentValue[]> = {};
-    for (const other of allDecls) {
-      record[other!.name] = other!.value;
-    }
-
-    const contracted = SHORTHANDS['border-inline']?.contract(record);
-    if (contracted !== null && contracted !== undefined) {
-      allDecls.forEach(other => processed.add(other!));
-      return `border-inline: ${contracted}${d.important ? ' !important' : ''}`;
-    }
-  }
-  return null;
-}
-
-function tryCombineFont(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): string | null {
-  const def = SHORTHANDS['font'];
-  if (!def || !def.longhands.includes(d.name)) return null;
-
-  const allDecls = def.longhands.map(name => declMap.get(name));
-  if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
-
-    const record: Record<string, ComponentValue[]> = {};
-    for (const other of allDecls) {
-      record[other!.name] = other!.value;
-    }
-
-    const contracted = def.contract(record);
-    if (contracted !== null) {
-      allDecls.forEach(other => processed.add(other!));
-      return `font: ${contracted}${d.important ? ' !important' : ''}`;
-    }
-  }
-  return null;
-}
-
-function tryCombineFontVariant(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): string | null {
-  const def = SHORTHANDS['font-variant'];
-  if (!def || !def.longhands.includes(d.name)) return null;
-
-  const allDecls = def.longhands.map(name => declMap.get(name));
-  if (allDecls.every(other => other && !processed.has(other) && other.important === d.important)) {
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
-
-    const record: Record<string, ComponentValue[]> = {};
-    for (const other of allDecls) {
-      record[other!.name] = other!.value;
-    }
-
-    const contracted = def.contract(record);
-    if (contracted !== null) {
-      allDecls.forEach(other => processed.add(other!));
-      return `font-variant: ${contracted}${d.important ? ' !important' : ''}`;
-    }
+  const contracted = SHORTHANDS[shorthandName]?.contract(record);
+  if (contracted !== null && contracted !== undefined) {
+    for (const other of allDecls) processed.add(other!);
+    return `${shorthandName}: ${contracted}${d.important ? ' !important' : ''}`;
   }
   return null;
 }
@@ -906,16 +756,10 @@ function serializeFontFamilyItem(tokens: ComponentValue[]): string {
       return `"${strVal}"`;
     }
     const words = strVal.split(' ');
-    const isValidIdentSequence = words.length > 0 && words.every(word => {
-      if (word.length === 0) return false;
-      if (/^[0-9]|^--|^-[0-9]/.test(word)) return false;
-      return /^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(word);
-    });
-    if (isValidIdentSequence) {
-      return strVal;
-    } else {
-      return `"${strVal}"`;
-    }
+    const isValidIdentSequence = words.length > 0 && words.every(word => (
+      word.length > 0 && !/^[0-9]|^--|^-[0-9]/.test(word) && /^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(word)
+    ));
+    return isValidIdentSequence ? strVal : `"${strVal}"`;
   }
   if (nonWs.every(t => t.type === 'ident')) {
     return nonWs.map(t => serializeNode(t, false)).join(' ');
@@ -935,16 +779,14 @@ export function serializeFontFamily(values: ComponentValue[]): string {
       current.push(token);
     }
   }
-  if (current.length > 0) {
-    groups.push(current);
-  }
+  if (current.length > 0) groups.push(current);
 
   return groups.map(g => serializeFontFamilyItem(g).trim()).filter(s => s.length > 0).join(', ');
 }
 
 export function serializeDeclarations(declarations: Declaration[]): string {
   if (declarations.length === 0) return '';
-  
+
   const declMap = new Map<string, Declaration>();
   const declIndices = new Map<Declaration, number>();
   for (let i = 0; i < declarations.length; i++) {
@@ -952,23 +794,18 @@ export function serializeDeclarations(declarations: Declaration[]): string {
     declMap.set(d.name, d);
     declIndices.set(d, i);
   }
-  
-  // Check if all longhands are present and set to the same CSS-wide keyword or var() with the same priority
+
   if (declarations.length >= ALL_SHORTHAND_LONGHANDS.length) {
     const firstDecl = declMap.get(ALL_SHORTHAND_LONGHANDS[0]);
     if (firstDecl) {
       const firstVal = serialize(firstDecl.value).trim();
       const firstValLower = firstVal.toLowerCase();
       const firstImportant = firstDecl.important;
-      if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(firstValLower) || firstValLower.startsWith('var(')) {
-        let allMatch = true;
-        for (const lh of ALL_SHORTHAND_LONGHANDS) {
+      if (CSS_WIDE_AND_DEFAULT.has(firstValLower) || firstValLower.startsWith('var(')) {
+        const allMatch = ALL_SHORTHAND_LONGHANDS.every(lh => {
           const d = declMap.get(lh);
-          if (!d || serialize(d.value).trim().toLowerCase() !== firstValLower || d.important !== firstImportant) {
-            allMatch = false;
-            break;
-          }
-        }
+          return d && serialize(d.value).trim().toLowerCase() === firstValLower && d.important === firstImportant;
+        });
         if (allMatch) {
           const allLonghandsSet = new Set(ALL_SHORTHAND_LONGHANDS as readonly string[]);
           const allDecl: Declaration = {
@@ -979,8 +816,7 @@ export function serializeDeclarations(declarations: Declaration[]): string {
           };
           const newDecls: Declaration[] = [];
           let inserted = false;
-          for (let idx = 0; idx < declarations.length; idx++) {
-            const d = declarations[idx];
+          for (const d of declarations) {
             if (allLonghandsSet.has(d.name)) {
               if (!inserted) {
                 newDecls.push(allDecl);
@@ -998,30 +834,21 @@ export function serializeDeclarations(declarations: Declaration[]): string {
 
   const processed = new Set<Declaration>();
   const result: string[] = [];
-  
+
   for (const d of declarations) {
     if (processed.has(d)) continue;
-    
+
     let combined = tryCombineBorderFull(d, declMap, processed, declarations, declIndices);
     if (!combined) {
-      combined = tryCombineFont(d, declMap, processed, declarations, declIndices);
-    }
-    if (!combined) {
-      combined = tryCombineFontVariant(d, declMap, processed, declarations, declIndices);
-    }
-    if (!combined) {
-      combined = tryCombineBackground(d, declMap, processed, declarations, declIndices);
-    }
-    if (!combined) {
-      combined = tryCombineBorderBlock(d, declMap, processed, declarations, declIndices);
-    }
-    if (!combined) {
-      combined = tryCombineBorderInline(d, declMap, processed, declarations, declIndices);
+      for (const spec of ORDERED_SHORTHAND_COMBINERS) {
+        combined = tryCombineNamedShorthand(spec.name, spec.longhands, d, declMap, processed, declarations, declIndices);
+        if (combined) break;
+      }
     }
     if (!combined) {
       combined = tryCombineBoxShorthand(d, declMap, processed, declarations, declIndices);
     }
-    
+
     if (!combined) {
       const generic = tryCombineGenericShorthand(d, declMap, processed, declarations, declIndices);
       if (generic) {
@@ -1030,8 +857,9 @@ export function serializeDeclarations(declarations: Declaration[]): string {
           const sideResults = sides.map(side => {
             if (side === generic.name) return generic;
             const existing = declMap.get(side);
-            if (existing && !processed.has(existing)) return { name: side, value: serialize(existing.value).trim(), important: existing.important, decl: existing };
-
+            if (existing && !processed.has(existing)) {
+              return { name: side, value: serialize(existing.value).trim(), important: existing.important, decl: existing };
+            }
             const longhands = genericShorthands[side];
             if (!longhands) return null;
             const sideLonghands = longhands.map(lh => declMap.get(lh));
@@ -1044,10 +872,10 @@ export function serializeDeclarations(declarations: Declaration[]): string {
           });
 
           if (sideResults.every(r => r !== null && r.value === generic.value && r.important === generic.important)) {
-            sideResults.forEach(r => {
+            for (const r of sideResults) {
               if (r && 'longhands' in r) (r.longhands as Declaration[]).forEach(lh => processed.add(lh));
               else if (r && 'decl' in r) processed.add(r.decl as Declaration);
-            });
+            }
             combined = `border: ${generic.value}${generic.important ? ' !important' : ''}`;
           } else {
             combined = `${generic.name}: ${generic.value}${generic.important ? ' !important' : ''}`;
@@ -1061,7 +889,7 @@ export function serializeDeclarations(declarations: Declaration[]): string {
     if (!combined) {
       combined = tryCombineLogicalShorthand(d, declMap, processed, declarations, declIndices);
     }
-    
+
     if (combined) {
       result.push(combined);
     } else {
@@ -1078,7 +906,7 @@ export function serializeDeclarations(declarations: Declaration[]): string {
       processed.add(d);
     }
   }
-  
+
   return result.join('; ') + ';';
 }
 
@@ -1091,12 +919,9 @@ export function serializeSelectorList(list: SelectorList, nsContext?: boolean | 
   const hasDefaultNamespace = typeof nsContext === 'boolean' ? nsContext : Boolean(nsContext?.hasDefaultNamespace);
   const defaultNamespacePrefixes = typeof nsContext === 'object' && nsContext !== null ? nsContext.defaultNamespacePrefixes : undefined;
   const context = { hasDefaultNamespace, defaultNamespacePrefixes };
-  return list.selectors.map(s => {
-    if (s.type === 'invalid-selector') {
-      return serialize(s.tokens);
-    }
-    return serializeComplexSelector(s, context);
-  }).join(', ');
+  return list.selectors.map(s => (
+    s.type === 'invalid-selector' ? serialize(s.tokens) : serializeComplexSelector(s, context)
+  )).join(', ');
 }
 
 function serializeComplexSelector(complex: ComplexSelector, nsContext: { hasDefaultNamespace: boolean; defaultNamespacePrefixes?: Set<string> }): string {
@@ -1104,8 +929,7 @@ function serializeComplexSelector(complex: ComplexSelector, nsContext: { hasDefa
   return complex.items.map((item, idx) => {
     if (item.type === 'combinator') {
       if (item.value === ' ') return ' ';
-      if (idx === 0) return `${item.value} `;
-      return ` ${item.value} `;
+      return idx === 0 ? `${item.value} ` : ` ${item.value} `;
     }
     const selectors = item.selectors.filter((s, sIdx) => {
       if (s.type === 'universal-selector' && item.selectors.length > 1 && sIdx === 0) {
@@ -1122,111 +946,60 @@ function serializeComplexSelector(complex: ComplexSelector, nsContext: { hasDefa
 
 function formatAnPlusB(tokens: ComponentValue[]): string {
   const parsed = parseAnPlusB(tokens);
-  if (parsed !== null) {
-    const { a, b } = parsed;
-    if (a === 0) {
-      return b.toString();
-    }
-    let partA = '';
-    if (a === 1) {
-      partA = 'n';
-    } else if (a === -1) {
-      partA = '-n';
-    } else {
-      partA = a + 'n';
-    }
-
-    if (b === 0) {
-      return partA;
-    } else if (b > 0) {
-      return partA + '+' + b;
-    } else {
-      return partA + b;
-    }
-  }
-  return serialize(tokens).trim();
+  if (parsed === null) return serialize(tokens).trim();
+  const { a, b } = parsed;
+  if (a === 0) return b.toString();
+  const partA = a === 1 ? 'n' : a === -1 ? '-n' : `${a}n`;
+  if (b === 0) return partA;
+  return b > 0 ? `${partA}+${b}` : `${partA}${b}`;
 }
 
+function formatSelectorNamespacePrefix(
+  namespace: string | undefined,
+  nsContext: { hasDefaultNamespace: boolean; defaultNamespacePrefixes?: Set<string> },
+  isElementSelector: boolean,
+): string {
+  if (namespace === undefined) return '';
+  if (isElementSelector && namespace !== '' && nsContext.defaultNamespacePrefixes?.has(namespace)) {
+    return '';
+  }
+  if (namespace === '*') {
+    return (!isElementSelector || nsContext.hasDefaultNamespace) ? '*|' : '';
+  }
+  if (namespace === '') {
+    return isElementSelector ? '|' : '';
+  }
+  return `${serializeIdentifier(namespace)}|`;
+}
+
+const NTH_PSEUDO_CLASSES = new Set(['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type']);
+
 function serializeSimpleSelector(simple: SimpleSelector, nsContext: { hasDefaultNamespace: boolean; defaultNamespacePrefixes?: Set<string> }): string {
-  const { hasDefaultNamespace, defaultNamespacePrefixes } = nsContext;
   switch (simple.type) {
-    case 'type-selector': {
-      let name = serializeIdentifier(simple.name);
-      if (simple.namespace !== undefined) {
-        const isDefaultNs = simple.namespace !== '' && defaultNamespacePrefixes?.has(simple.namespace);
-        if (isDefaultNs) {
-          return name;
-        }
-        if (simple.namespace === '*') {
-          if (hasDefaultNamespace) {
-            name = '*|' + name;
-          }
-        } else if (simple.namespace === '') {
-          name = '|' + name;
-        } else {
-          name = serializeIdentifier(simple.namespace) + '|' + name;
-        }
-      }
-      return name;
-    }
-    case 'universal-selector': {
-      if (simple.namespace !== undefined) {
-        const isDefaultNs = simple.namespace !== '' && defaultNamespacePrefixes?.has(simple.namespace);
-        if (isDefaultNs) {
-          return '*';
-        }
-        if (simple.namespace === '*') {
-          if (hasDefaultNamespace) {
-            return '*|*';
-          }
-          return '*';
-        } else if (simple.namespace === '') {
-          return '|*';
-        } else {
-          return serializeIdentifier(simple.namespace) + '|*';
-        }
-      }
-      return '*';
-    }
-    case 'id-selector': return '#' + serializeIdentifier(simple.name);
-    case 'class-selector': return '.' + serializeIdentifier(simple.name);
+    case 'type-selector':
+      return formatSelectorNamespacePrefix(simple.namespace, nsContext, true) + serializeIdentifier(simple.name);
+    case 'universal-selector':
+      return formatSelectorNamespacePrefix(simple.namespace, nsContext, true) + '*';
+    case 'id-selector':
+      return '#' + serializeIdentifier(simple.name);
+    case 'class-selector':
+      return '.' + serializeIdentifier(simple.name);
     case 'attribute-selector': {
-      let attr = '[';
-      if (simple.namespace !== undefined) {
-        if (simple.namespace === '*') {
-          attr += '*|';
-        } else if (simple.namespace === '') {
-          // Null namespace omits pipe in attribute selectors
-        } else {
-          attr += serializeIdentifier(simple.namespace) + '|';
-        }
-      }
-      attr += serializeIdentifier(simple.name);
-      if (simple.operator) {
-        attr += simple.operator + serializeString(simple.value || '');
-      }
-      if (simple.flags) {
-        attr += ' ' + simple.flags;
-      }
+      let attr = '[' + formatSelectorNamespacePrefix(simple.namespace, nsContext, false) + serializeIdentifier(simple.name);
+      if (simple.operator) attr += simple.operator + serializeString(simple.value || '');
+      if (simple.flags) attr += ' ' + simple.flags;
       return attr + ']';
     }
     case 'pseudo-class-selector': {
       let pc = `:${simple.name}`;
-      const lowerName = simple.name.toLowerCase();
-      const isNth = ['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type'].includes(lowerName);
+      const isNth = NTH_PSEUDO_CLASSES.has(simple.name.toLowerCase());
       if (simple.argument) {
         if ('type' in simple.argument && simple.argument.type === 'selector-list') {
-          if (isNth && simple.nth) {
-            pc += `(${formatAnPlusB(simple.nth)} of ${serializeSelectorList(simple.argument, nsContext)})`;
-          } else {
-            pc += `(${serializeSelectorList(simple.argument, nsContext)})`;
-          }
+          const selStr = serializeSelectorList(simple.argument, nsContext);
+          pc += isNth && simple.nth ? `(${formatAnPlusB(simple.nth)} of ${selStr})` : `(${selStr})`;
         } else {
-          if (isNth) {
-            pc += `(${formatAnPlusB(simple.argument as ComponentValue[])})`;
-          } else {
-            pc += `(${serialize(simple.argument as ComponentValue[]).trim()})`;
-          }
+          const tokens = simple.argument as ComponentValue[];
+          pc += `(${isNth ? formatAnPlusB(tokens) : serialize(tokens).trim()})`;
         }
       }
       return pc;
@@ -1234,16 +1007,16 @@ function serializeSimpleSelector(simple: SimpleSelector, nsContext: { hasDefault
     case 'pseudo-element-selector': {
       let pe = `::${simple.name}`;
       if (simple.argument) {
-        if ('type' in simple.argument && simple.argument.type === 'selector-list') {
-          pe += `(${serializeSelectorList(simple.argument, nsContext)})`;
-        } else {
-          pe += `(${serialize(simple.argument as ComponentValue[]).trim()})`;
-        }
+        pe += ('type' in simple.argument && simple.argument.type === 'selector-list')
+          ? `(${serializeSelectorList(simple.argument, nsContext)})`
+          : `(${serialize(simple.argument as ComponentValue[]).trim()})`;
       }
       return pe;
     }
-    case 'nesting-selector': return '&';
-    default: return '';
+    case 'nesting-selector':
+      return '&';
+    default:
+      return '';
   }
 }
 

@@ -3531,7 +3531,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 
 ---
 
-## Phase 145: Janitor Sweep — `src/serializer.ts` & `src/MediaParser.ts` Streamlining [ ]
+## Phase 145: Janitor Sweep — `src/serializer.ts` & `src/MediaParser.ts` Streamlining [x]
 **Objective**: Clean and simplify `src/serializer.ts` (1,249 lines) and `src/MediaParser.ts` (1,397 lines), reducing sprawling branches and modernizing token stringification.
 
 **Context**: Both files have accumulated complex backtracking loops, duplicate string formatting routines, and legacy helpers.
@@ -3541,9 +3541,9 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - **Strict Parity**: Verify zero regressions on serialization tests and WPT `mediaqueries` suite.
 
 ### Tasks
-- [ ] Establish characterization baseline with `pnpm run preflight` and `pnpm run wpt --spec=mediaqueries`.
-- [ ] Conduct Janitor refactoring pass across `src/serializer.ts` and `src/MediaParser.ts`.
-- [ ] Verify zero regressions across all test suites.
+- [x] Establish characterization baseline with `pnpm run preflight` and `pnpm run wpt --spec=mediaqueries`.
+- [x] Conduct Janitor refactoring pass across `src/serializer.ts` and `src/MediaParser.ts`.
+- [x] Verify zero regressions across all test suites.
 
 ---
 

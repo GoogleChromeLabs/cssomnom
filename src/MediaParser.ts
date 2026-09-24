@@ -240,6 +240,28 @@ export class MediaParser {
 
 
 
+function filterSignificant(tokens: ComponentValue[]): ComponentValue[] {
+  return tokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+}
+
+function normalizeAspectRatioTokens(featureName: string, valueTokens: ComponentValue[]): ComponentValue[] {
+  if (!featureName.includes('aspect-ratio')) return valueTokens;
+  const filtered = filterSignificant(valueTokens);
+  if (filtered.length !== 1) return valueTokens;
+  return [
+    filtered[0],
+    { type: 'delim', value: '/' } as Token,
+    { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token,
+  ];
+}
+
+const INVERT_COMPARISON_OP: Record<string, string> = {
+  '<': '>',
+  '<=': '>=',
+  '>': '<',
+  '>=': '<=',
+};
+
 export class MediaQueryValidator {
   private stream: ComponentValue[];
   private pos: number;
@@ -250,7 +272,7 @@ export class MediaQueryValidator {
   private static readonly FEATURE_ALLOWED_IDENTS = FEATURE_ALLOWED_IDENTS;
 
   constructor(stream: ComponentValue[]) {
-    this.stream = stream.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+    this.stream = filterSignificant(stream);
     this.pos = 0;
   }
 
@@ -271,54 +293,48 @@ export class MediaQueryValidator {
     if (!t || t.type !== 'ident') return false;
     return val ? t.value.toLowerCase() === val.toLowerCase() : true;
   }
-  
-  private isSimpleBlock(blockType: string): boolean {
-    const t = this.peek();
-    return !!t && t.type === 'simple-block' && t.associatedToken.value === blockType;
-  }
-
 
   public validate(): MediaQuery | null {
     if (this.stream.length === 0) return null;
     const startPos = this.pos;
-    
-    const cond = this.parseMediaCondition();
+
+    const cond = this.parseMediaCondition(true);
     if (cond !== null && this.eof()) {
       return {
         type: 'media-query',
         condition: cond,
-        tokens: this.stream
+        tokens: this.stream,
       };
     }
 
     this.pos = startPos;
-    
+
     let modifier: 'not' | 'only' | undefined = undefined;
     if (this.isIdent('not') || this.isIdent('only')) {
       modifier = String((this.consume() as Token).value).toLowerCase() as 'not' | 'only';
     }
-    
+
     const mediaType = this.parseMediaType();
     if (mediaType !== null) {
       let condition: MediaCondition | MediaFeature | GeneralEnclosed | undefined = undefined;
       if (this.isIdent('and')) {
         this.consume();
-        const condResult = this.parseMediaConditionWithoutOr();
+        const condResult = this.parseMediaCondition(false);
         if (condResult === null) return null;
         condition = condResult;
       }
-      
+
       if (this.eof()) {
         return {
           type: 'media-query',
           modifier,
           mediaType,
           condition,
-          tokens: this.stream
+          tokens: this.stream,
         };
       }
     }
-    
+
     return null;
   }
 
@@ -333,7 +349,7 @@ export class MediaQueryValidator {
     return v;
   }
 
-  private parseMediaCondition(): MediaCondition | MediaFeature | GeneralEnclosed | null {
+  private parseMediaCondition(allowOr: boolean = true): MediaCondition | MediaFeature | GeneralEnclosed | null {
     const startPos = this.pos;
     if (this.isIdent('not')) {
       this.consume();
@@ -342,7 +358,7 @@ export class MediaQueryValidator {
         return {
           type: 'media-condition',
           operator: 'not',
-          children: [res]
+          children: [res],
         };
       }
       this.pos = startPos;
@@ -352,9 +368,10 @@ export class MediaQueryValidator {
     const res = this.parseMediaInParens();
     if (res === null) return null;
 
-    if (this.isIdent('and')) {
+    const op = this.isIdent('and') ? 'and' : (allowOr && this.isIdent('or')) ? 'or' : null;
+    if (op) {
       const children = [res];
-      while (this.isIdent('and')) {
+      while (this.isIdent(op)) {
         this.consume();
         const next = this.parseMediaInParens();
         if (next === null) return null;
@@ -362,57 +379,8 @@ export class MediaQueryValidator {
       }
       return {
         type: 'media-condition',
-        operator: 'and',
-        children
-      };
-    } else if (this.isIdent('or')) {
-      const children = [res];
-      while (this.isIdent('or')) {
-        this.consume();
-        const next = this.parseMediaInParens();
-        if (next === null) return null;
-        children.push(next);
-      }
-      return {
-        type: 'media-condition',
-        operator: 'or',
-        children
-      };
-    }
-    return res;
-  }
-
-  private parseMediaConditionWithoutOr(): MediaCondition | MediaFeature | GeneralEnclosed | null {
-    const startPos = this.pos;
-    if (this.isIdent('not')) {
-      this.consume();
-      const res = this.parseMediaInParens();
-      if (res !== null) {
-        return {
-          type: 'media-condition',
-          operator: 'not',
-          children: [res]
-        };
-      }
-      this.pos = startPos;
-      return null;
-    }
-
-    const res = this.parseMediaInParens();
-    if (res === null) return null;
-
-    if (this.isIdent('and')) {
-      const children = [res];
-      while (this.isIdent('and')) {
-        this.consume();
-        const next = this.parseMediaInParens();
-        if (next === null) return null;
-        children.push(next);
-      }
-      return {
-        type: 'media-condition',
-        operator: 'and',
-        children
+        operator: op,
+        children,
       };
     }
     return res;
@@ -421,33 +389,29 @@ export class MediaQueryValidator {
   private parseMediaInParens(): MediaCondition | MediaFeature | GeneralEnclosed | null {
     const t = this.peek();
     if (!t) return null;
-    
+
     if (t.type === 'simple-block' && t.associatedToken.value === '(') {
       this.consume();
-      const tokens = t.value.filter((v: ComponentValue) => v.type !== 'whitespace' && v.type !== 'comment');
-      return this.validateMediaInParens(tokens);
+      return this.validateMediaInParens(filterSignificant(t.value));
     }
-    
+
     if (t.type === 'function' && Array.isArray(t.value)) {
       const fn = t as CSSFunction;
       this.consume();
       return {
         type: 'general-enclosed',
         name: fn.name,
-        value: fn.value
+        value: fn.value,
       };
     }
-    
+
     return null;
   }
 
   private isValidMfValue(tokens: ComponentValue[]): boolean {
     if (tokens.length === 0) return false;
     for (const t of tokens) {
-      if (t.type === 'delim' && (t.value === '<' || t.value === '>' || t.value === '=')) {
-        return false;
-      }
-      if (t.type === 'comma') {
+      if (t.type === 'comma' || (t.type === 'delim' && (t.value === '<' || t.value === '>' || t.value === '='))) {
         return false;
       }
     }
@@ -458,67 +422,49 @@ export class MediaQueryValidator {
     if (tokens.length === 0) return null;
 
     const validator = new MediaQueryValidator(tokens);
-    const condResult = validator.parseMediaCondition();
+    const condResult = validator.parseMediaCondition(true);
     if (condResult !== null && validator.eof()) {
       return condResult;
     }
 
     if (tokens.length >= 3 && tokens[0].type === 'ident' && tokens[1].type === 'colon') {
       const featureName = tokens[0].value.toLowerCase();
-      let valueTokens = tokens.slice(2);
-      if (featureName.includes('aspect-ratio')) {
-        const filtered = valueTokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-        if (filtered.length === 1) {
-          valueTokens = [
-            filtered[0],
-            { type: 'delim', value: '/' } as Token,
-            { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
-          ];
-        }
-      }
+      const valueTokens = normalizeAspectRatioTokens(featureName, tokens.slice(2));
       if (this.isValidMfValue(valueTokens)) {
-        const rebuiltTokens = [tokens[0], tokens[1], ...valueTokens];
         return {
           type: 'media-feature',
           name: featureName,
           value: valueTokens,
-          tokens: rebuiltTokens
+          tokens: [tokens[0], tokens[1], ...valueTokens],
         };
       }
     }
 
     if (tokens.length === 1 && tokens[0].type === 'ident') {
       const featureName = tokens[0].value.toLowerCase();
-      let isInvalidMinMax = false;
-      if (featureName.startsWith('min-') || featureName.startsWith('max-')) {
-        const baseFeature = featureName.slice(4);
-        if ((MediaQueryValidator.KNOWN_FEATURES as Set<string>).has(baseFeature)) {
-          isInvalidMinMax = true;
-        }
-      }
-
+      const isInvalidMinMax =
+        (featureName.startsWith('min-') || featureName.startsWith('max-')) &&
+        (MediaQueryValidator.KNOWN_FEATURES as Set<string>).has(featureName.slice(4));
       if (!isInvalidMinMax) {
         return {
           type: 'media-feature',
           name: featureName,
-          tokens
+          tokens,
         };
       }
     }
 
     const rangeResult = this.parseRangeContext(tokens);
-    if (rangeResult !== null) {
-      return rangeResult;
-    }
+    if (rangeResult !== null) return rangeResult;
 
     return {
       type: 'general-enclosed',
-      value: tokens
+      value: tokens,
     };
   }
 
   private parseRangeContext(tokens: ComponentValue[]): MediaFeature | null {
-    const ops = [];
+    const ops: { op: string; start: number; end: number }[] = [];
     let pos = 0;
     while (pos < tokens.length) {
       const opInfo = this.parseOperator(tokens, pos);
@@ -535,111 +481,59 @@ export class MediaQueryValidator {
       const right = tokens.slice(ops[0].end);
       if (left.length === 0 || right.length === 0) return null;
       if (!this.isValidMfValue(left) || !this.isValidMfValue(right)) return null;
-      
+
       const leftIsIdent = left.length === 1 && left[0].type === 'ident';
       const rightIsIdent = right.length === 1 && right[0].type === 'ident';
-      
-      let featureName: string | null = null;
-      let valueTokens: ComponentValue[] = [];
-      if (leftIsIdent) {
-        featureName = (left[0] as Token).value.toString().toLowerCase();
-        valueTokens = right;
-      } else if (rightIsIdent) {
-        featureName = (right[0] as Token).value.toString().toLowerCase();
-        valueTokens = left;
-      }
-      
-      if (featureName) {
-        if (featureName.includes('aspect-ratio')) {
-          const filtered = valueTokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-          if (filtered.length === 1) {
-            valueTokens = [
-              filtered[0],
-              { type: 'delim', value: '/' } as Token,
-              { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
-            ];
-          }
-        }
-        let op = ops[0].op;
-        if (rightIsIdent) {
-          if (op === '<') op = '>';
-          else if (op === '<=') op = '>=';
-          else if (op === '>') op = '<';
-          else if (op === '>=') op = '<=';
-        }
-        const rebuiltTokens = leftIsIdent
-          ? [left[0], ...tokens.slice(ops[0].start, ops[0].end), ...valueTokens]
-          : [...valueTokens, ...tokens.slice(ops[0].start, ops[0].end), right[0]];
-        return {
-          type: 'media-feature',
-          name: featureName,
-          value: valueTokens,
-          operator: op,
-          tokens: rebuiltTokens
-        };
-      }
-      
-      return null;
-    } else if (ops.length === 2) {
+      if (!leftIsIdent && !rightIsIdent) return null;
+
+      const featureName = String((leftIsIdent ? left[0] : right[0] as Token).value).toLowerCase();
+      const valueTokens = normalizeAspectRatioTokens(featureName, leftIsIdent ? right : left);
+      const op = rightIsIdent ? (INVERT_COMPARISON_OP[ops[0].op] ?? ops[0].op) : ops[0].op;
+      const opSlice = tokens.slice(ops[0].start, ops[0].end);
+      const rebuiltTokens = leftIsIdent
+        ? [left[0], ...opSlice, ...valueTokens]
+        : [...valueTokens, ...opSlice, right[0]];
+      return {
+        type: 'media-feature',
+        name: featureName,
+        value: valueTokens,
+        operator: op,
+        tokens: rebuiltTokens,
+      };
+    }
+
+    if (ops.length === 2) {
       const left = tokens.slice(0, ops[0].start);
       const middle = tokens.slice(ops[0].end, ops[1].start);
       const right = tokens.slice(ops[1].end);
-      
-      if (left.length === 0 || middle.length === 0 || right.length === 0) return null;
-      
+      if (left.length === 0 || middle.length !== 1 || middle[0].type !== 'ident' || right.length === 0) return null;
+
       const op1 = ops[0].op;
       const op2 = ops[1].op;
-      
-      const isLessThanOp = (op: string) => op === '<' || op === '<=';
-      const isGreaterThanOp = (op: string) => op === '>' || op === '>=';
-      
       if (op1 === '=' || op2 === '=') return null;
-      if (isLessThanOp(op1) && !isLessThanOp(op2)) return null;
-      if (isGreaterThanOp(op1) && !isGreaterThanOp(op2)) return null;
-      
+      if ((op1 === '<' || op1 === '<=') !== (op2 === '<' || op2 === '<=')) return null;
       if (!this.isValidMfValue(left) || !this.isValidMfValue(middle) || !this.isValidMfValue(right)) return null;
-      if (middle.length === 1 && middle[0].type === 'ident') {
-        const featureName = (middle[0] as Token).value.toString().toLowerCase();
-        let leftVal = left;
-        let rightVal = right;
-        if (featureName.includes('aspect-ratio')) {
-          const filtL = left.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-          if (filtL.length === 1) {
-            leftVal = [
-              filtL[0],
-              { type: 'delim', value: '/' } as Token,
-              { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
-            ];
-          }
-          const filtR = right.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-          if (filtR.length === 1) {
-            rightVal = [
-              filtR[0],
-              { type: 'delim', value: '/' } as Token,
-              { type: 'number', value: 1, valueText: '1', numberType: 'integer', sign: null } as Token
-            ];
-          }
-        }
-        const rebuiltTokens = [
+
+      const featureName = String((middle[0] as Token).value).toLowerCase();
+      const leftVal = normalizeAspectRatioTokens(featureName, left);
+      const rightVal = normalizeAspectRatioTokens(featureName, right);
+      return {
+        type: 'media-feature',
+        name: featureName,
+        range: {
+          leftValue: leftVal,
+          leftOp: op1,
+          rightOp: op2,
+          rightValue: rightVal,
+        },
+        tokens: [
           ...leftVal,
           ...tokens.slice(ops[0].start, ops[0].end),
           middle[0],
           ...tokens.slice(ops[1].start, ops[1].end),
-          ...rightVal
-        ];
-        return {
-          type: 'media-feature',
-          name: featureName,
-          range: {
-            leftValue: leftVal,
-            leftOp: op1,
-            rightOp: op2,
-            rightValue: rightVal
-          },
-          tokens: rebuiltTokens
-        };
-      }
-      return null;
+          ...rightVal,
+        ],
+      };
     }
 
     return null;
@@ -668,9 +562,7 @@ export class MediaQueryValidator {
 // Standalone Helper Functions for Type Validation and MQ4 AST Serialization
 
 function isValidRatioOperand(t: ComponentValue): boolean {
-  if (t.type === 'number') {
-    return t.value >= 0;
-  }
+  if (t.type === 'number') return t.value >= 0;
   if (t.type === 'function') {
     const fn = t as CSSFunction;
     const mathVal = parseMathFunction(fn.name, fn.value);
@@ -685,7 +577,7 @@ function isValidRatioOperand(t: ComponentValue): boolean {
 function matchesType(tokens: ComponentValue[], types: readonly string[], featureName: string): boolean {
   if (tokens.length === 0) return false;
   const t = tokens[0];
-  
+
   if (t.type === 'function') {
     const fn = t as CSSFunction;
     const mathVal = parseMathFunction(fn.name, fn.value);
@@ -693,54 +585,40 @@ function matchesType(tokens: ComponentValue[], types: readonly string[], feature
       const type = mathVal.type();
       if (types.includes('length') && type.length === 1) return true;
       if (types.includes('resolution') && type.resolution === 1) return true;
-      
       const isNumber = !type.length && !type.angle && !type.time && !type.frequency && !type.resolution && !type.flex && !type.percent;
       if (types.includes('integer') && isNumber) return true;
     }
   }
 
   if (types.includes('length')) {
-    if (t.type === 'dimension') {
-      const unit = t.unit.toLowerCase();
-      if (unit && unitToBase[unit] === 'length') return true;
-    }
+    if (t.type === 'dimension' && t.unit && unitToBase[t.unit.toLowerCase()] === 'length') return true;
     if (t.type === 'number' && t.value === 0) return true;
   }
-  
+
   if (types.includes('resolution')) {
     if (t.type === 'dimension') {
       const unit = t.unit.toLowerCase();
       if (unit && (unitToBase[unit] === 'resolution' || unit === 'x')) return true;
     }
-    if (t.type === 'ident' && t.value.toLowerCase() === 'infinite') {
-      return true;
-    }
+    if (t.type === 'ident' && t.value.toLowerCase() === 'infinite') return true;
   }
-  
-  if (types.includes('ident')) {
-    if (t.type === 'ident') {
-      const allowed = FEATURE_ALLOWED_IDENTS[featureName];
-      if (allowed) {
-        return allowed.includes(t.value.toLowerCase());
-      }
-      return true;
-    }
+
+  if (types.includes('ident') && t.type === 'ident') {
+    const allowed = FEATURE_ALLOWED_IDENTS[featureName];
+    return allowed ? allowed.includes(t.value.toLowerCase()) : true;
   }
-  
-  if (types.includes('integer')) {
-    if (t.type === 'number' && t.numberType === 'integer') return true;
+
+  if (types.includes('integer') && t.type === 'number' && t.numberType === 'integer') {
+    return true;
   }
-  
+
   if (types.includes('ratio')) {
-    if (tokens.length === 1) {
-      return isValidRatioOperand(tokens[0]);
-    }
+    if (tokens.length === 1) return isValidRatioOperand(tokens[0]);
     if (tokens.length === 3) {
       return isValidRatioOperand(tokens[0]) &&
              tokens[1].type === 'delim' && (tokens[1] as Token).value === '/' &&
              isValidRatioOperand(tokens[2]);
     }
-    return false;
   }
   return false;
 }
@@ -793,16 +671,12 @@ export function serializeMediaQuery(query: MediaQuery): string {
   if (query.invalid) return 'not all';
 
   let result = '';
-  if (query.modifier) {
-    result += query.modifier + ' ';
-  }
+  if (query.modifier) result += query.modifier + ' ';
   if (query.mediaType) {
     result += query.mediaType.startsWith('--') ? serializeIdentifier(query.mediaType) : serializeIdentifier(query.mediaType.toLowerCase());
   }
   if (query.condition) {
-    if (query.mediaType) {
-      result += ' and ';
-    }
+    if (query.mediaType) result += ' and ';
     result += serializeMediaCondition(query.condition);
   }
   return result;
@@ -815,50 +689,33 @@ function serializeMediaCondition(cond: MediaCondition | MediaFeature | GeneralEn
     }
     return cond.children.map(child => serializeMediaCondition(child)).join(` ${cond.operator} `);
   }
-  
   if (cond.type === 'media-feature') {
     return '(' + MediaParser.canonicalSerialize(cond.tokens) + ')';
   }
-  
   if (cond.type === 'general-enclosed') {
-    if (cond.name) {
-      return cond.name.toLowerCase() + '(' + MediaParser.canonicalSerialize(cond.value) + ')';
-    }
-    return '(' + MediaParser.canonicalSerialize(cond.value) + ')';
+    const inner = MediaParser.canonicalSerialize(cond.value);
+    return cond.name ? `${cond.name.toLowerCase()}(${inner})` : `(${inner})`;
   }
-  
   return '';
 }
 
 export function hasUnknownFeature(query: MediaQuery): boolean {
-  if (!query.condition) return false;
-  return checkConditionForUnknown(query.condition);
+  return query.condition ? checkConditionForUnknown(query.condition) : false;
 }
 
 function checkConditionForUnknown(node: MediaCondition | MediaFeature | GeneralEnclosed): boolean {
-  if (node.type === 'media-condition') {
-    return node.children.some(child => checkConditionForUnknown(child));
-  }
-  if (node.type === 'media-feature') {
-    return isFeatureUnknown(node);
-  }
-  if (node.type === 'general-enclosed') {
-    return true;
-  }
-  return false;
+  if (node.type === 'media-condition') return node.children.some(child => checkConditionForUnknown(child));
+  if (node.type === 'media-feature') return isFeatureUnknown(node);
+  return node.type === 'general-enclosed';
 }
 
 function isFeatureUnknown(feature: MediaFeature): boolean {
   const name = feature.name.toLowerCase();
   if (name.startsWith('--')) return false;
-  if (!(KNOWN_FEATURES as Set<string>).has(name)) {
-    return true;
-  }
+  if (!(KNOWN_FEATURES as Set<string>).has(name)) return true;
 
   if (feature.operator || feature.range) {
-    if (!(RANGE_FEATURES as Set<string>).has(name)) {
-      return true;
-    }
+    if (!(RANGE_FEATURES as Set<string>).has(name)) return true;
     const expectedTypes = FEATURE_VALUE_TYPES[name];
     if (expectedTypes) {
       if (feature.range) {
@@ -866,37 +723,25 @@ function isFeatureUnknown(feature: MediaFeature): boolean {
             !matchesType(feature.range.rightValue, expectedTypes, name)) {
           return true;
         }
-      } else if (feature.value) {
-        if (!matchesType(feature.value, expectedTypes, name)) {
-          return true;
-        }
+      } else if (feature.value && !matchesType(feature.value, expectedTypes, name)) {
+        return true;
       }
     }
   } else if (feature.value) {
     const expectedTypes = FEATURE_VALUE_TYPES[name];
     if (expectedTypes) {
-      if (!matchesType(feature.value, expectedTypes, name)) {
-        return true;
-      }
-      if (!expectedTypes.includes('ratio') && feature.value.length !== 1) {
-        return true;
-      }
+      if (!matchesType(feature.value, expectedTypes, name)) return true;
+      if (!expectedTypes.includes('ratio') && feature.value.length !== 1) return true;
     }
-  } else {
-    if (name.startsWith('min-') || name.startsWith('max-')) {
-      const baseFeature = name.slice(4);
-      if ((KNOWN_FEATURES as Set<string>).has(baseFeature)) {
-        return true;
-      }
-    }
+  } else if (name.startsWith('min-') || name.startsWith('max-')) {
+    if ((KNOWN_FEATURES as Set<string>).has(name.slice(4))) return true;
   }
 
   return false;
 }
 
 function evalNot3(val: EvalResult): EvalResult {
-  if (val === 'unknown') return 'unknown';
-  return !val;
+  return val === 'unknown' ? 'unknown' : !val;
 }
 
 function evalAnd3(vals: EvalResult[]): EvalResult {
@@ -912,60 +757,50 @@ function evalOr3(vals: EvalResult[]): EvalResult {
 }
 
 const NEGATIVE_RANGE_FEATURES = new Set([
-  'width',
-  'height',
-  'device-width',
-  'device-height',
-  'resolution',
-  'color',
-  'color-index',
-  'monochrome',
-  'horizontal-viewport-segments',
-  'vertical-viewport-segments'
+  'width', 'height', 'device-width', 'device-height', 'resolution',
+  'color', 'color-index', 'monochrome',
+  'horizontal-viewport-segments', 'vertical-viewport-segments',
 ]);
 
+const LENGTH_UNIT_TO_PX: Record<string, number> = {
+  px: 1,
+  em: 16,
+  rem: 16,
+  ex: 8,
+  ch: 8,
+  ic: 16,
+  in: 96,
+  cm: 96 / 2.54,
+  mm: 96 / 25.4,
+  pt: 96 / 72,
+  pc: 96 / 6,
+  vw: 800 / 100,
+  vh: 600 / 100,
+  vi: 800 / 100,
+  vb: 600 / 100,
+  vmin: 600 / 100,
+  vmax: 800 / 100,
+};
+
 function parseLengthToPx(tokens: ComponentValue[]): number | null {
-  const filtered = tokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (filtered.length === 1) {
-    const t = filtered[0];
-    if (t.type === 'dimension') {
-      const unit = t.unit.toLowerCase();
-      const val = t.value;
-      switch (unit) {
-        case 'px': return val;
-        case 'em':
-        case 'rem': return val * 16;
-        case 'ex': return val * 8;
-        case 'ch': return val * 8;
-        case 'ic': return val * 16;
-        case 'in': return val * 96;
-        case 'cm': return (val * 96) / 2.54;
-        case 'mm': return (val * 96) / 25.4;
-        case 'pt': return (val * 96) / 72;
-        case 'pc': return (val * 96) / 6;
-        case 'vw': return (val * 800) / 100;
-        case 'vh': return (val * 600) / 100;
-        case 'vi': return (val * 800) / 100;
-        case 'vb': return (val * 600) / 100;
-        case 'vmin': return (val * 600) / 100;
-        case 'vmax': return (val * 800) / 100;
-        default: return null;
-      }
-    }
-    if (t.type === 'number' && t.value === 0) {
-      return 0;
-    }
-    if (t.type === 'function') {
-      const fn = t as CSSFunction;
-      const mathVal = parseMathFunction(fn.name, fn.value);
-      if (mathVal && mathVal.type().length) {
-        const simplified = simplify(mathVal);
-        if (simplified instanceof CSSUnitValue) {
-          try {
-            return simplified.to('px').value;
-          } catch {
-            return null;
-          }
+  const filtered = filterSignificant(tokens);
+  if (filtered.length !== 1) return null;
+  const t = filtered[0];
+  if (t.type === 'dimension') {
+    const factor = LENGTH_UNIT_TO_PX[t.unit.toLowerCase()];
+    return factor !== undefined ? t.value * factor : null;
+  }
+  if (t.type === 'number' && t.value === 0) return 0;
+  if (t.type === 'function') {
+    const fn = t as CSSFunction;
+    const mathVal = parseMathFunction(fn.name, fn.value);
+    if (mathVal && mathVal.type().length) {
+      const simplified = simplify(mathVal);
+      if (simplified instanceof CSSUnitValue) {
+        try {
+          return simplified.to('px').value;
+        } catch {
+          return null;
         }
       }
     }
@@ -973,54 +808,48 @@ function parseLengthToPx(tokens: ComponentValue[]): number | null {
   return null;
 }
 
+const RESOLUTION_UNIT_TO_DPI: Record<string, number> = {
+  dpi: 1,
+  dpcm: 2.54,
+  dppx: 96,
+  x: 96,
+};
+
 function parseResolutionToDpi(tokens: ComponentValue[]): number | null {
-  const filtered = tokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (filtered.length === 1) {
-    const t = filtered[0];
-    if (t.type === 'dimension') {
-      const unit = t.unit.toLowerCase();
-      const val = t.value;
-      switch (unit) {
-        case 'dpi': return val;
-        case 'dpcm': return val * 2.54;
-        case 'dppx':
-        case 'x': return val * 96;
-        default: return null;
-      }
-    }
-    if (t.type === 'function') {
-      const fn = t as CSSFunction;
-      const mathVal = parseMathFunction(fn.name, fn.value);
-      if (mathVal && mathVal.type().resolution) {
-        const simplified = simplify(mathVal);
-        if (simplified instanceof CSSUnitValue) {
-          try {
-            return simplified.to('dpi').value;
-          } catch {
-            return null;
-          }
+  const filtered = filterSignificant(tokens);
+  if (filtered.length !== 1) return null;
+  const t = filtered[0];
+  if (t.type === 'dimension') {
+    const factor = RESOLUTION_UNIT_TO_DPI[t.unit.toLowerCase()];
+    return factor !== undefined ? t.value * factor : null;
+  }
+  if (t.type === 'function') {
+    const fn = t as CSSFunction;
+    const mathVal = parseMathFunction(fn.name, fn.value);
+    if (mathVal && mathVal.type().resolution) {
+      const simplified = simplify(mathVal);
+      if (simplified instanceof CSSUnitValue) {
+        try {
+          return simplified.to('dpi').value;
+        } catch {
+          return null;
         }
       }
     }
-    if (t.type === 'ident' && t.value.toLowerCase() === 'infinite') {
-      return Infinity;
-    }
   }
+  if (t.type === 'ident' && t.value.toLowerCase() === 'infinite') return Infinity;
   return null;
 }
 
 function parseRatio(tokens: ComponentValue[]): number | null {
-  const filtered = tokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (filtered.length === 1) {
-    if (filtered[0].type === 'number') {
-      return filtered[0].value;
-    }
+  const filtered = filterSignificant(tokens);
+  if (filtered.length === 1 && filtered[0].type === 'number') {
+    return filtered[0].value;
   }
   if (filtered.length === 3 && filtered[1].type === 'delim' && (filtered[1] as Token).value === '/') {
     const left = filtered[0];
     const right = filtered[2];
-    if (left.type === 'number' && right.type === 'number') {
-      if (right.value === 0) return null;
+    if (left.type === 'number' && right.type === 'number' && right.value !== 0) {
       return left.value / right.value;
     }
   }
@@ -1028,28 +857,21 @@ function parseRatio(tokens: ComponentValue[]): number | null {
 }
 
 function parseInteger(tokens: ComponentValue[]): number | null {
-  const filtered = tokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (filtered.length === 1 && filtered[0].type === 'number' && filtered[0].numberType === 'integer') {
-    return filtered[0].value;
-  }
-  return null;
+  const filtered = filterSignificant(tokens);
+  return (filtered.length === 1 && filtered[0].type === 'number' && filtered[0].numberType === 'integer')
+    ? filtered[0].value
+    : null;
 }
 
 function parseIdent(tokens: ComponentValue[]): string | null {
-  const filtered = tokens.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (filtered.length === 1 && filtered[0].type === 'ident') {
-    return filtered[0].value.toLowerCase();
-  }
-  return null;
+  const filtered = filterSignificant(tokens);
+  return (filtered.length === 1 && filtered[0].type === 'ident') ? filtered[0].value.toLowerCase() : null;
 }
 
 function compareOp(actual: number, op: string, queried: number, isNegativeRangeFeature: boolean): boolean {
   if (isNegativeRangeFeature && queried < 0) {
-    if (op === '=') return false;
-    if (op === '<' || op === '<=') return false;
-    if (op === '>' || op === '>=') return true;
+    return op === '>' || op === '>=';
   }
-
   const eps = 1e-6;
   switch (op) {
     case '=': return Math.abs(actual - queried) < eps;
@@ -1061,40 +883,129 @@ function compareOp(actual: number, op: string, queried: number, isNegativeRangeF
   }
 }
 
+function getActualNumeric(prop: string, env: MediaEnvironment): number | null {
+  switch (prop) {
+    case 'width': return env.width;
+    case 'height': return env.height;
+    case 'device-width': return env.deviceWidth;
+    case 'device-height': return env.deviceHeight;
+    case 'resolution': return env.resolution;
+    case 'color': return env.color;
+    case 'color-index': return env.colorIndex;
+    case 'monochrome': return env.monochrome;
+    case 'grid': return env.grid;
+    case 'aspect-ratio': return env.aspectRatio[0] / env.aspectRatio[1];
+    case 'device-aspect-ratio': return env.deviceAspectRatio[0] / env.deviceAspectRatio[1];
+    default: return null;
+  }
+}
+
+function parseValueForFeature(prop: string, tokens: ComponentValue[]): number | string | null {
+  switch (prop) {
+    case 'width':
+    case 'height':
+    case 'device-width':
+    case 'device-height':
+      return parseLengthToPx(tokens);
+    case 'resolution':
+      return parseResolutionToDpi(tokens);
+    case 'aspect-ratio':
+    case 'device-aspect-ratio':
+      return parseRatio(tokens);
+    case 'color':
+    case 'color-index':
+    case 'monochrome':
+    case 'grid':
+      return parseInteger(tokens);
+    default:
+      return parseIdent(tokens);
+  }
+}
+
+function evaluateBooleanFeature(baseName: string, env: MediaEnvironment): boolean {
+  const num = getActualNumeric(baseName, env);
+  if (num !== null) {
+    if (baseName === 'aspect-ratio') return env.aspectRatio[0] > 0 && env.aspectRatio[1] > 0;
+    if (baseName === 'device-aspect-ratio') return env.deviceAspectRatio[0] > 0 && env.deviceAspectRatio[1] > 0;
+    return num > 0;
+  }
+  switch (baseName) {
+    case 'hover': return env.hover !== 'none';
+    case 'pointer': return env.pointer !== 'none';
+    case 'any-hover': return env.anyHover !== 'none';
+    case 'any-pointer': return env.anyPointer !== 'none';
+    case 'prefers-contrast': return env.prefersContrast !== 'no-preference';
+    case 'prefers-reduced-motion': return env.prefersReducedMotion !== 'no-preference';
+    case 'prefers-reduced-transparency': return env.prefersReducedTransparency !== 'no-preference';
+    case 'prefers-reduced-data': return env.prefersReducedData !== 'no-preference';
+    case 'forced-colors': return env.forcedColors !== 'none';
+    case 'inverted-colors': return env.invertedColors !== 'none';
+    case 'scripting': return env.scripting !== 'none';
+    case 'dynamic-range': return env.dynamicRange === 'high';
+    case 'video-dynamic-range': return env.videoDynamicRange === 'high';
+    case 'overflow-block': return env.overflowBlock !== 'none';
+    case 'overflow-inline': return env.overflowInline !== 'none';
+    case 'nav-controls':
+    case 'navigation-controls':
+      return env.navControls !== 'none';
+    case 'resizable':
+      return env.resizable !== false;
+    default:
+      return true;
+  }
+}
+
+function getEnvDiscreteIdent(baseName: string, env: MediaEnvironment): string | null {
+  switch (baseName) {
+    case 'orientation': return env.width > env.height ? 'landscape' : 'portrait';
+    case 'display-mode': return env.displayMode;
+    case 'display-state': return env.displayState;
+    case 'prefers-color-scheme': return env.prefersColorScheme;
+    case 'prefers-contrast': return env.prefersContrast;
+    case 'prefers-reduced-motion': return env.prefersReducedMotion;
+    case 'prefers-reduced-transparency': return env.prefersReducedTransparency;
+    case 'prefers-reduced-data': return env.prefersReducedData;
+    case 'forced-colors': return env.forcedColors;
+    case 'inverted-colors': return env.invertedColors;
+    case 'dynamic-range': return env.dynamicRange;
+    case 'video-dynamic-range': return env.videoDynamicRange;
+    case 'pointer': return env.pointer;
+    case 'hover': return env.hover;
+    case 'any-pointer': return env.anyPointer;
+    case 'any-hover': return env.anyHover;
+    case 'scan': return env.scan;
+    case 'update': return env.update;
+    case 'overflow-block': return env.overflowBlock;
+    case 'overflow-inline': return env.overflowInline;
+    case 'scripting': return env.scripting;
+    case 'environment-blending': return env.environmentBlending;
+    case 'nav-controls':
+    case 'navigation-controls': return env.navControls;
+    case 'resizable': return env.resizable !== false ? 'true' : 'false';
+    default: return null;
+  }
+}
+
 export function evaluateMediaFeature(feature: MediaFeature, env: MediaEnvironment): EvalResult {
   const name = feature.name.toLowerCase();
 
-  // Custom media queries (--custom-media)
   if (name.startsWith('--')) {
-    if (!env.customMedia) {
-      return 'unknown';
-    }
-    let val: unknown;
-    if (env.customMedia instanceof Map) {
-      val = env.customMedia.get(name);
-    } else if (typeof env.customMedia === 'object' && name in env.customMedia) {
-      val = (env.customMedia as Record<string, unknown>)[name];
-    }
-    if (val === undefined) {
-      return 'unknown';
-    }
-    if (typeof val === 'boolean') {
-      return val;
-    }
-    if (typeof val === 'string') {
-      const parsed = MediaParser.parse(val);
-      return evaluateMediaQueries(parsed, env);
-    }
+    if (!env.customMedia) return 'unknown';
+    const val = env.customMedia instanceof Map
+      ? env.customMedia.get(name)
+      : (typeof env.customMedia === 'object' && name in env.customMedia)
+        ? (env.customMedia as Record<string, unknown>)[name]
+        : undefined;
+    if (val === undefined) return 'unknown';
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'string') return evaluateMediaQueries(MediaParser.parse(val), env);
     if (val && typeof val === 'object' && 'mediaText' in val) {
-      const parsed = MediaParser.parse((val as { mediaText: string }).mediaText);
-      return evaluateMediaQueries(parsed, env);
+      return evaluateMediaQueries(MediaParser.parse((val as { mediaText: string }).mediaText), env);
     }
     return 'unknown';
   }
 
-  if (isFeatureUnknown(feature)) {
-    return 'unknown';
-  }
+  if (isFeatureUnknown(feature)) return 'unknown';
 
   let baseName = name;
   let prefix: 'min' | 'max' | null = null;
@@ -1108,227 +1019,45 @@ export function evaluateMediaFeature(feature: MediaFeature, env: MediaEnvironmen
 
   const isNegRange = NEGATIVE_RANGE_FEATURES.has(baseName);
 
-  // 1. Boolean context
   if (!feature.value && !feature.range && !feature.operator) {
-    if (prefix !== null) return 'unknown'; // min-/max- invalid in boolean context
-
-    switch (baseName) {
-      case 'width': return env.width > 0;
-      case 'height': return env.height > 0;
-      case 'device-width': return env.deviceWidth > 0;
-      case 'device-height': return env.deviceHeight > 0;
-      case 'resolution': return env.resolution > 0;
-      case 'color': return env.color > 0;
-      case 'color-index': return env.colorIndex > 0;
-      case 'monochrome': return env.monochrome > 0;
-      case 'grid': return env.grid > 0;
-      case 'hover': return env.hover !== 'none';
-      case 'pointer': return env.pointer !== 'none';
-      case 'any-hover': return env.anyHover !== 'none';
-      case 'any-pointer': return env.anyPointer !== 'none';
-      case 'prefers-color-scheme': return true;
-      case 'prefers-contrast': return env.prefersContrast !== 'no-preference';
-      case 'prefers-reduced-motion': return env.prefersReducedMotion !== 'no-preference';
-      case 'prefers-reduced-transparency': return env.prefersReducedTransparency !== 'no-preference';
-      case 'prefers-reduced-data': return env.prefersReducedData !== 'no-preference';
-      case 'forced-colors': return env.forcedColors !== 'none';
-      case 'inverted-colors': return env.invertedColors !== 'none';
-      case 'scripting': return env.scripting !== 'none';
-      case 'orientation': return true;
-      case 'aspect-ratio': return env.aspectRatio[0] > 0 && env.aspectRatio[1] > 0;
-      case 'device-aspect-ratio': return env.deviceAspectRatio[0] > 0 && env.deviceAspectRatio[1] > 0;
-      case 'display-mode': return true;
-      case 'display-state': return true;
-      case 'color-gamut': return true;
-      case 'video-color-gamut': return true;
-      case 'dynamic-range': return env.dynamicRange === 'high';
-      case 'video-dynamic-range': return env.videoDynamicRange === 'high';
-      case 'scan': return true;
-      case 'update': return true;
-      case 'overflow-block': return env.overflowBlock !== 'none';
-      case 'overflow-inline': return env.overflowInline !== 'none';
-      case 'environment-blending': return true;
-      case 'nav-controls':
-      case 'navigation-controls':
-        return env.navControls !== 'none';
-      case 'resizable':
-        return env.resizable !== false;
-      default: return true;
-    }
+    if (prefix !== null) return 'unknown';
+    return evaluateBooleanFeature(baseName, env);
   }
 
-  // 2. Numeric / Length / Resolution / Ratio / Integer features
-  const getActualNumeric = (prop: string): number | null => {
-    switch (prop) {
-      case 'width': return env.width;
-      case 'height': return env.height;
-      case 'device-width': return env.deviceWidth;
-      case 'device-height': return env.deviceHeight;
-      case 'resolution': return env.resolution;
-      case 'color': return env.color;
-      case 'color-index': return env.colorIndex;
-      case 'monochrome': return env.monochrome;
-      case 'grid': return env.grid;
-      case 'aspect-ratio': return env.aspectRatio[0] / env.aspectRatio[1];
-      case 'device-aspect-ratio': return env.deviceAspectRatio[0] / env.deviceAspectRatio[1];
-      default: return null;
-    }
-  };
-
-  const parseValueForFeature = (prop: string, tokens: ComponentValue[]): number | string | null => {
-    switch (prop) {
-      case 'width':
-      case 'height':
-      case 'device-width':
-      case 'device-height':
-        return parseLengthToPx(tokens);
-      case 'resolution':
-        return parseResolutionToDpi(tokens);
-      case 'aspect-ratio':
-      case 'device-aspect-ratio':
-        return parseRatio(tokens);
-      case 'color':
-      case 'color-index':
-      case 'monochrome':
-      case 'grid':
-        return parseInteger(tokens);
-      default:
-        return parseIdent(tokens);
-    }
-  };
-
-  // 3. Two-operator Range: e.g. 400px < width <= 800px
   if (feature.range) {
-    const actual = getActualNumeric(baseName);
+    const actual = getActualNumeric(baseName, env);
     if (actual === null) return 'unknown';
 
     const leftVal = parseValueForFeature(baseName, feature.range.leftValue);
     const rightVal = parseValueForFeature(baseName, feature.range.rightValue);
     if (typeof leftVal !== 'number' || typeof rightVal !== 'number') return 'unknown';
 
-    // Left comparison: leftVal < actual  ==>  actual > leftVal
-    const leftOp = feature.range.leftOp;
-    let leftMatches = false;
-    if (leftOp === '<') leftMatches = compareOp(actual, '>', leftVal, isNegRange);
-    else if (leftOp === '<=') leftMatches = compareOp(actual, '>=', leftVal, isNegRange);
-    else if (leftOp === '>') leftMatches = compareOp(actual, '<', leftVal, isNegRange);
-    else if (leftOp === '>=') leftMatches = compareOp(actual, '<=', leftVal, isNegRange);
-
-    // Right comparison: actual < rightVal
-    const rightOp = feature.range.rightOp;
-    const rightMatches = compareOp(actual, rightOp, rightVal, isNegRange);
-
+    const invertedLeftOp = INVERT_COMPARISON_OP[feature.range.leftOp];
+    const leftMatches = invertedLeftOp ? compareOp(actual, invertedLeftOp, leftVal, isNegRange) : false;
+    const rightMatches = compareOp(actual, feature.range.rightOp, rightVal, isNegRange);
     return leftMatches && rightMatches;
   }
 
-  // 4. One-operator Range or Plain feature
   const op = feature.operator || (prefix === 'min' ? '>=' : prefix === 'max' ? '<=' : '=');
-  const tokensToParse = feature.value || [];
-  const parsedVal = parseValueForFeature(baseName, tokensToParse);
+  const parsedVal = parseValueForFeature(baseName, feature.value || []);
   if (parsedVal === null) return 'unknown';
 
   if (typeof parsedVal === 'number') {
-    const actual = getActualNumeric(baseName);
-    if (actual === null) return 'unknown';
-    return compareOp(actual, op, parsedVal, isNegRange);
+    const actual = getActualNumeric(baseName, env);
+    return actual === null ? 'unknown' : compareOp(actual, op, parsedVal, isNegRange);
   }
 
-  // 5. Discrete Ident features (equality only)
   if (typeof parsedVal === 'string') {
     if (op !== '=') return 'unknown';
-
-    let actualIdent: string | null = null;
-    switch (baseName) {
-      case 'orientation':
-        actualIdent = env.width > env.height ? 'landscape' : 'portrait';
-        break;
-      case 'display-mode':
-        actualIdent = env.displayMode;
-        break;
-      case 'display-state':
-        actualIdent = env.displayState;
-        break;
-      case 'prefers-color-scheme':
-        actualIdent = env.prefersColorScheme;
-        break;
-      case 'prefers-contrast':
-        actualIdent = env.prefersContrast;
-        break;
-      case 'prefers-reduced-motion':
-        actualIdent = env.prefersReducedMotion;
-        break;
-      case 'prefers-reduced-transparency':
-        actualIdent = env.prefersReducedTransparency;
-        break;
-      case 'prefers-reduced-data':
-        actualIdent = env.prefersReducedData;
-        break;
-      case 'forced-colors':
-        actualIdent = env.forcedColors;
-        break;
-      case 'inverted-colors':
-        actualIdent = env.invertedColors;
-        break;
-      case 'dynamic-range':
-        actualIdent = env.dynamicRange;
-        break;
-      case 'video-dynamic-range':
-        actualIdent = env.videoDynamicRange;
-        break;
-      case 'pointer':
-        actualIdent = env.pointer;
-        break;
-      case 'hover':
-        actualIdent = env.hover;
-        break;
-      case 'any-pointer':
-        actualIdent = env.anyPointer;
-        break;
-      case 'any-hover':
-        actualIdent = env.anyHover;
-        break;
-      case 'scan':
-        actualIdent = env.scan;
-        break;
-      case 'update':
-        actualIdent = env.update;
-        break;
-      case 'overflow-block':
-        actualIdent = env.overflowBlock;
-        break;
-      case 'overflow-inline':
-        actualIdent = env.overflowInline;
-        break;
-      case 'color-gamut':
-        if (parsedVal === 'srgb') return true;
-        if (parsedVal === 'p3') return env.colorGamut === 'p3' || env.colorGamut === 'rec2020';
-        if (parsedVal === 'rec2020') return env.colorGamut === 'rec2020';
-        return false;
-      case 'video-color-gamut':
-        if (parsedVal === 'srgb') return true;
-        if (parsedVal === 'p3') return env.videoColorGamut === 'p3' || env.videoColorGamut === 'rec2020';
-        if (parsedVal === 'rec2020') return env.videoColorGamut === 'rec2020';
-        return false;
-      case 'scripting':
-        actualIdent = env.scripting;
-        break;
-      case 'environment-blending':
-        actualIdent = env.environmentBlending;
-        break;
-      case 'nav-controls':
-      case 'navigation-controls':
-        actualIdent = env.navControls;
-        break;
-      case 'resizable':
-        actualIdent = env.resizable !== false ? 'true' : 'false';
-        break;
-      default:
-        return 'unknown';
+    if (baseName === 'color-gamut' || baseName === 'video-color-gamut') {
+      const gamut = baseName === 'color-gamut' ? env.colorGamut : env.videoColorGamut;
+      if (parsedVal === 'srgb') return true;
+      if (parsedVal === 'p3') return gamut === 'p3' || gamut === 'rec2020';
+      if (parsedVal === 'rec2020') return gamut === 'rec2020';
+      return false;
     }
-
-    if (actualIdent !== null) {
-      return actualIdent.toLowerCase() === parsedVal.toLowerCase();
-    }
+    const actualIdent = getEnvDiscreteIdent(baseName, env);
+    return actualIdent !== null ? actualIdent.toLowerCase() === parsedVal.toLowerCase() : 'unknown';
   }
 
   return 'unknown';
