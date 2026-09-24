@@ -52,6 +52,11 @@ To prevent unmonitored child process spawning, worker process memory ballooning,
 - **Exceptions**: Only the centralized safe kernel (`scripts/wpt/node/safe-child-process.ts`) and synchronous codegen build scripts (`scripts/codegen/generate_all.ts`, `scripts/external_suites/extract_all.ts`, `scripts/wpt/browser/run.ts`) may import `child_process`.
 - **Solution**: Always import `safeExecTestFile` and `safeWorkerPool` from `scripts/wpt/node/safe-child-process.ts`. Every child process spawned via `safeExecTestFile` is constrained with `--max-old-space-size=512`, guarded by a 250ms `/proc/[pid]/stat` RSS (>2048MB) and state 'D' watchdog (`SIGKILL`), and tracked for cleanup upon parent termination.
 
+### No Layout Guessing
+We have no layout engine ([README § Intentional Non-Goals](./README.md): "if it cannot be completely correct, partially correct is harmful").
+- **Rule**: Never compute layout-dependent used values (auto margins, `auto` min-sizes, percentages resolved against box size, font metrics, viewport sizes) in `src/` or `tests/dom-shim/`. Return the computed value instead. Never regex-parse `style` attributes to infer layout context.
+- WPT subtests that need layout are browser-only by design ([`LAYOUT_GEOMETRY` in scripts/wpt/node/README.md § 4](./scripts/wpt/node/README.md#1-layout_geometry)); do not chase them. Faked values that happen to match inflate the pass count instead of being classified.
+
 ### DOM & Cyclic Object Assertion Safety
 `node:assert/strict` structural diffs on cyclic DOM nodes explode heap memory (>8GB) and crash the host.
 - **Rule**: Never pass DOM nodes or cyclic objects directly to `assert.equal` / `assert.deepStrictEqual`. Compare scalars (`assert.equal(a?.id, '...')`), booleans (`assert.ok(a === b)`), or use cycle-safe formatters (`format_value(val)`).

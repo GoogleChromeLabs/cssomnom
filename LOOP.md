@@ -121,6 +121,7 @@ The codebase is already large enough that agents struggle to orient. Growth is a
 *   **Refactors and cleanups must be net-negative in `src/`.** A cleanup that grows `src/` is rejected.
 *   **Features and conformance fixes must justify growth**: the report names what was added and why no existing mechanism (cascade, shorthand tables, codegen data, shared helpers) could absorb it. Reviewers check that claim.
 *   **No test-shaped special cases**: reject property-, element-, or WPT-test-specific branches (`if (prop === 'x' && value === 'y')`) when the behavior can be fixed at the model level (spec algorithm, generated data, or a general rule). If a special case is truly required by the spec, it must cite the spec text.
+*   **No layout guessing** (AGENTS.md § No Layout Guessing): reject any code that fakes layout-dependent used values (box geometry, auto margins, auto min-sizes, font metrics) or infers layout from `style` attribute text, even if it flips WPT subtests green.
 *   **Duplication check**: reviewers reject new helpers that duplicate an existing one (logical-property mapping, serialization, tokenization of already-parsed values).
 
 ---
