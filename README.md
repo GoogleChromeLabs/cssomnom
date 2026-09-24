@@ -310,6 +310,7 @@ To preserve clean architectural separation and prevent circular import cycles be
 ### Intentional Non-Goals & Boundaries
 
 - **No `getComputedStyle()` Support**: We intentionally **do not** implement or expose `window.getComputedStyle()`. Resolving true computed styles requires a full visual rendering and layout engine (calculating font metrics, line heights, box-model geometry, viewport dimensions, and interaction states like `:hover` / `:focus`). In a server-side, headless Node.js environment, a partially correct `getComputedStyle()` produces subtle, misleading bugs and false confidence (**"if it cannot be completely correct, partially correct is harmful"**). Instead, `cssomnom` provides [`getCascadedStyle(element, rules)`](#static-analysis--cascade-resolution) to resolve deterministic, declarative cascade and specificity order, leaving visual layout to real browsers.
+- **No Layout Guessing in Computed Values**: Layout-dependent used values (auto margins, auto min sizes, percentage positions against box size) return computed values. We do not infer layout context or fake used-value geometry without a browser layout engine.
 
 ---
 
@@ -323,20 +324,20 @@ To preserve clean architectural separation and prevent circular import cycles be
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **94.3%** (21,227 / 22,499 passed assertions across 1,769 test files).
-* **Chrome 154 Parity**: **94.3%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **94.2%** (21,191 / 22,499 passed assertions across 1,769 test files).
+* **Chrome 154 Parity**: **94.2%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
-| **`Typed OM`** | 12,758 | 12,178 | **95.5%** | 🟢 **+1.9%** (ahead of Chrome) |
-| **`CSSOM`** | 2,150 | 2,061 | **95.9%** | -1.3% |
+| **`Typed OM`** | 12,758 | 12,180 | **95.5%** | 🟢 **+2.0%** (ahead of Chrome) |
+| **`CSSOM`** | 2,150 | 2,052 | **95.4%** | -1.7% |
 | **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
 | **`Cascade`** | 497 | 475 | **95.6%** | -4.3% |
-| **`Variables`** | 499 | 470 | **94.2%** | 🟢 **+3.6%** (ahead of Chrome) |
-| **`Selectors`** | 5,654 | 5,108 | **90.3%** | 🟢 **+4.4%** (ahead of Chrome) |
-| **`Media Queries`** | 417 | 412 | **98.8%** | 🟢 **+0.2%** (ahead of Chrome) |
-| **OVERALL** | **22,499** | **21,227** | **94.3%** | 🟢 **+1.3%** |
+| **`Variables`** | 499 | 464 | **93.0%** | 🟢 **+2.4%** (ahead of Chrome) |
+| **`Selectors`** | 5,654 | 5,088 | **90.0%** | 🟢 **+4.0%** (ahead of Chrome) |
+| **`Media Queries`** | 417 | 409 | **98.1%** | -0.5% |
+| **OVERALL** | **22,499** | **21,191** | **94.2%** | 🟢 **+1.1%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

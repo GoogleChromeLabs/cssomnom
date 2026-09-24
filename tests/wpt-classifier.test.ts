@@ -331,5 +331,35 @@ test('classifySubtestFeasibility: Phase 139 Heuristics Tuning', () => {
   });
   assert.strictEqual(selectorTextWithMetric.isBrowserOnly, false);
   assert.strictEqual(selectorTextWithMetric.category, undefined);
+  // 6. perspective-origin used value box resolution
+  const perspectiveOriginTest = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html',
+    name: 'same var() for both values of perspective-origin',
+    expected: '"50px 50px"',
+    actual: '"25% 25%"',
+    error: 'Error: expected "50px 50px" but got "25% 25%"'
+  });
+  assert.strictEqual(perspectiveOriginTest.isBrowserOnly, true);
+  assert.strictEqual(perspectiveOriginTest.category, 'LAYOUT_GEOMETRY');
+
+  // 7. Missing box metric stub (expected number but got undefined)
+  const offsetWidthUndefined = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-001.html',
+    name: 'A :lang value that matches an identical lang attribute value on the same element will produce styling.',
+    error: 'Error: expected 100 but got undefined'
+  });
+  assert.strictEqual(offsetWidthUndefined.isBrowserOnly, true);
+  assert.strictEqual(offsetWidthUndefined.category, 'LAYOUT_GEOMETRY');
+
+  // 8. Pure CSSOM getComputedStyle display/color assertion must NOT be classified
+  const pureComputedColor = classifySubtestFeasibility({
+    file: 'submodules/web-platform-tests/css/cssom/getComputedStyle-color.html',
+    name: 'getComputedStyle(el).color inheritance',
+    expected: '"rgb(255, 0, 0)"',
+    actual: '"rgb(0, 0, 0)"',
+    error: 'assert_equals: expected "rgb(255, 0, 0)" but got "rgb(0, 0, 0)"'
+  });
+  assert.strictEqual(pureComputedColor.isBrowserOnly, false);
+  assert.strictEqual(pureComputedColor.category, undefined);
 });
 

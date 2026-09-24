@@ -7,7 +7,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
-import { getCascadedStyle, normalizePseudoElement, shouldPreserveAutoMinSize } from '../src/cascade/index.ts';
+import { getCascadedStyle, normalizePseudoElement } from '../src/cascade/index.ts';
 import { parseStyleSheet } from '../src/parser.ts';
 
 describe('CSSOM: getComputedStyle Pseudo-Element Resolution & Min-Size Auto Resolution (CSSOM § 6.2 & CSS Sizing 3)', () => {
@@ -67,7 +67,7 @@ describe('CSSOM: getComputedStyle Pseudo-Element Resolution & Min-Size Auto Reso
     assert.strictEqual(style.cssText, '');
   });
 
-  it('resolves min-width and min-height auto to 0px except when preserving auto', () => {
+  it('resolves min-width and min-height to computed value auto', () => {
     const { document } = parseHTML(`
       <div id="block-box"></div>
       <div id="aspect" style="aspect-ratio: 1/1"></div>
@@ -84,14 +84,12 @@ describe('CSSOM: getComputedStyle Pseudo-Element Resolution & Min-Size Auto Reso
     const flexItem = document.getElementById('flex-item')!;
     const noneItem = document.getElementById('none-item')!;
 
-    assert.strictEqual(shouldPreserveAutoMinSize(blockBox), false);
-    assert.strictEqual(shouldPreserveAutoMinSize(aspectBox), true);
-    assert.strictEqual(shouldPreserveAutoMinSize(flexItem), true);
-    assert.strictEqual(shouldPreserveAutoMinSize(noneItem), false);
-
-    assert.strictEqual(getCascadedStyle(blockBox).getPropertyValue('min-width'), '0px');
+    // CSS Sizing 3 § 5.1 & § 5.2 / CSSOM 1 § 6.8:
+    // Without a layout engine to compute used min sizes, getComputedStyle returns the computed value 'auto'.
+    assert.strictEqual(getCascadedStyle(blockBox).getPropertyValue('min-width'), 'auto');
     assert.strictEqual(getCascadedStyle(aspectBox).getPropertyValue('min-width'), 'auto');
     assert.strictEqual(getCascadedStyle(flexItem).getPropertyValue('min-width'), 'auto');
-    assert.strictEqual(getCascadedStyle(noneItem).getPropertyValue('min-width'), '0px');
+    assert.strictEqual(getCascadedStyle(noneItem).getPropertyValue('min-width'), 'auto');
   });
 });
+

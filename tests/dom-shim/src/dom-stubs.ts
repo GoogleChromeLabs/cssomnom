@@ -255,19 +255,6 @@ function normalizeComputedColor(property: string, rawVal: TypedOM.CSSStyleValue)
   return undefined;
 }
 
-function convertCssLengthToPx(valStr: string): number | null {
-  const num = parseFloat(valStr);
-  if (isNaN(num)) return null;
-  if (valStr.endsWith('px')) return num;
-  if (valStr.endsWith('em') || valStr.endsWith('rem') || valStr.endsWith('ic')) return num * 16;
-  if (valStr.endsWith('ex') || valStr.endsWith('ch')) return num * 8;
-  if (valStr.endsWith('in')) return num * 96;
-  if (valStr.endsWith('cm')) return (num * 96) / 2.54;
-  if (valStr.endsWith('mm')) return (num * 96) / 25.4;
-  if (valStr.endsWith('pt')) return (num * 96) / 72;
-  if (valStr.endsWith('pc')) return (num * 96) / 6;
-  return null;
-}
 
 function getValidEncoding(label: string | null | undefined): string | null {
   if (!label) return null;
@@ -2155,46 +2142,6 @@ function patchElementPrototype(window: WindowType): void {
   if (window.HTMLElement && window.HTMLElement.prototype) {
     patchElementStyle(window.HTMLElement.prototype as unknown as Record<string, unknown>, window);
 
-    // cssom-view-1 § 7 #dom-htmlelement-offsetwidth
-    // Architectural Note: In this pure Node.js headless environment without a 2D layout engine,
-    // offsetWidth falls back to reading cascaded width as a test-oracle accommodation for WPT
-    // test assertions (e.g. `#box:lang(...) { width: 100px }` + `assert_equals(box.offsetWidth, 100)`).
-    // This is a test harness shim, not authentic layout geometry.
-    Object.defineProperty(window.HTMLElement.prototype, 'offsetWidth', {
-      get(this: HTMLElement) {
-        if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
-          return 800;
-        }
-        const styleW = this.style?.width || (this.ownerDocument ? getCascadedStyle(this).getPropertyValue('width') : '');
-        return (styleW ? convertCssLengthToPx(styleW) : null) ?? 0;
-      },
-      configurable: true
-    });
-
-    Object.defineProperty(window.HTMLElement.prototype, 'offsetHeight', {
-      get(this: HTMLElement) {
-        if (this === this.ownerDocument?.documentElement || this === this.ownerDocument?.body) {
-          return 600;
-        }
-        const styleH = this.style?.height || (this.ownerDocument ? getCascadedStyle(this).getPropertyValue('height') : '');
-        const px = styleH ? convertCssLengthToPx(styleH) : null;
-        if (px !== null) return px;
-
-        if (this.children && this.children.length > 0) {
-          let total = 0;
-          for (let i = 0; i < this.children.length; i++) {
-            const child = this.children[i] as HTMLElement;
-            const childH = child.style?.height || getCascadedStyle(child).getPropertyValue('height');
-            if (childH) {
-              total += parseFloat(childH) || 0;
-            }
-          }
-          if (total > 0) return total;
-        }
-        return 0;
-      },
-      configurable: true
-    });
 
     // css-typed-om § 2.3 #declared-stylepropertymap-objects
     // cssom-1 § 6.8 #the-elementcssinlinestyle-mixin

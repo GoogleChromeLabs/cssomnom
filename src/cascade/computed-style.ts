@@ -40,59 +40,6 @@ import {
 } from './value-processor.ts';
 import { parseMathFunction, simplify } from '../math-parser.ts';
 import { CSSUnitValue } from '../typed-om.ts';
-
-export function shouldPreserveAutoMinSize(element: unknown): boolean {
-  if (!element || typeof element !== 'object') return false;
-  const el = element as {
-    getAttribute?: (attr: string) => string | null;
-    parentElement?: unknown;
-    parentNode?: unknown;
-  };
-
-  // 1. Check if element or any ancestor is display: none (no box generated)
-  let curr: unknown = element;
-  while (curr && typeof curr === 'object') {
-    const currEl = curr as {
-      parentElement?: unknown;
-      parentNode?: unknown;
-      getAttribute?: (attr: string) => string | null;
-    };
-    const styleAttr = currEl.getAttribute ? currEl.getAttribute('style') : null;
-    if (styleAttr && /display\s*:\s*none\b/i.test(styleAttr)) {
-      return false;
-    }
-    curr = currEl.parentElement || currEl.parentNode;
-  }
-
-  // 2. Check if element has non-default aspect-ratio (not 'auto')
-  const styleAttr = el.getAttribute ? el.getAttribute('style') : null;
-  if (styleAttr && /aspect-ratio\s*:/i.test(styleAttr)) {
-    const match = styleAttr.match(/aspect-ratio\s*:\s*([^;]+)/i);
-    if (match) {
-      const val = match[1].trim().toLowerCase();
-      if (val !== 'auto' && val !== '') {
-        return true;
-      }
-    }
-  }
-
-  // 3. Check if parent is flex or grid container
-  const parent = el.parentElement || el.parentNode;
-  if (parent && typeof parent === 'object') {
-    const parentEl = parent as {
-      getAttribute?: (attr: string) => string | null;
-    };
-    const pStyle = parentEl.getAttribute ? parentEl.getAttribute('style') : null;
-    if (pStyle) {
-      if (/display\s*:\s*(?:inline-)?(?:flex|grid)\b/i.test(pStyle)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
 /**
  * CSSComputedStyleDeclaration represents the resolved/computed style declaration of a DOM element.
  * cssom-1 § 6.8 #resolved-values
@@ -218,46 +165,10 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return direct;
     }
 
-    // cssom-1 § 6.8 & CSS 2.1 § 10.3.3: Resolving auto margins in block layout
-    if (dashed === 'margin-top' || dashed === 'margin-bottom') {
-      const direct = super.getPropertyValue(dashed).trim();
-      if (direct === 'auto' || direct === '0') {
-        return '0px';
-      }
-    }
-
-    if (dashed === 'margin-left' || dashed === 'margin-right') {
+    // CSS Box Model 3 § 4.3 & CSSOM 1 § 6.7.2: Canonicalize unitless 0 to 0px
+    if (dashed.startsWith('margin-')) {
       const direct = super.getPropertyValue(dashed).trim();
       if (direct === '0') {
-        return '0px';
-      }
-      if (direct === 'auto' && this._element && typeof this._element === 'object') {
-        const el = this._element as { parentElement?: unknown; parentNode?: unknown };
-        const parent = el.parentElement || el.parentNode;
-        if (parent && typeof parent === 'object') {
-          let parentWidth: number | null = null;
-          let elWidth: number | null = null;
-          if (this._parentStyle) {
-            const pw = this._parentStyle.getPropertyValue('width');
-            if (pw && pw.endsWith('px')) {
-              parentWidth = parseFloat(pw);
-            }
-          }
-          const ew = this.getPropertyValue('width');
-          if (ew && ew.endsWith('px')) {
-            elWidth = parseFloat(ew);
-          }
-          if (parentWidth !== null && elWidth !== null && parentWidth >= elWidth) {
-            const remaining = parentWidth - elWidth;
-            const leftAuto = (super.getPropertyValue('margin-left') || '').trim() === 'auto' || (this._declarations.some(d => d.name === 'margin-left' && serialize(d.value).trim() === 'auto'));
-            const rightAuto = (super.getPropertyValue('margin-right') || '').trim() === 'auto' || (this._declarations.some(d => d.name === 'margin-right' && serialize(d.value).trim() === 'auto'));
-            if (leftAuto && rightAuto) {
-              return `${remaining / 2}px`;
-            } else if (leftAuto || rightAuto) {
-              return `${remaining}px`;
-            }
-          }
-        }
         return '0px';
       }
     }
@@ -273,62 +184,6 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     // css-images-4 § 5.1 #image-set-notation: computed value resolves strings to url() and adds default 1dppx
     if (dashed === 'background-image' && rawVal.toLowerCase().includes('image-set(')) {
       rawVal = rawVal.replace(/image-set\(\s*(["'])([^"']+)\1\s*\)/g, 'image-set(url("$2") 1dppx)');
-    }
-
-    if (dashed === 'min-width' || dashed === 'min-height') {
-      if (rawVal === 'auto' || rawVal === '') {
-        if (shouldPreserveAutoMinSize(this._element)) {
-          return 'auto';
-        }
-        return '0px';
-      }
-    }
-
-    // CSSOM § 6.5 & CSS Transforms 2 § 3.2: getComputedStyle() returns the resolved value, which for perspective-origin is the used value (percentages resolved against reference box width/height).
-    if (dashed === 'perspective-origin') {
-      let elWidth = 0;
-      let elHeight = 0;
-      const w = this.getPropertyValue('width');
-      if (w && w.endsWith('px')) elWidth = parseFloat(w) || 0;
-      const h = this.getPropertyValue('height');
-      if (h && h.endsWith('px')) elHeight = parseFloat(h) || 0;
-
-      const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
-
-      const resolveAxis = (token: string, baseLength: number): string => {
-        const lower = token.toLowerCase();
-        if (lower === 'left' || lower === 'top') return '0px';
-        if (lower === 'right' || lower === 'bottom') return `${baseLength}px`;
-        if (lower === 'center') return `${baseLength * 0.5}px`;
-        if (lower.endsWith('%')) {
-          const pct = parseFloat(lower);
-          return isNaN(pct) ? '0px' : `${(pct / 100) * baseLength}px`;
-        }
-        if (lower.endsWith('px')) return lower;
-        if (lower.endsWith('em')) return `${parseFloat(lower) * fs}px`;
-        if (lower.endsWith('rem')) return `${parseFloat(lower) * 16}px`;
-        if (lower === '0') return '0px';
-        return token;
-      };
-
-      const tokens = rawVal ? rawVal.trim().split(/\s+/) : ['50%', '50%'];
-      if (tokens.length === 1) {
-        const tok = tokens[0];
-        if (tok === 'top' || tok === 'bottom') {
-          return `${elWidth * 0.5}px ${resolveAxis(tok, elHeight)}`;
-        }
-        return `${resolveAxis(tok, elWidth)} ${elHeight * 0.5}px`;
-      }
-      if (tokens.length >= 2) {
-        let xTok = tokens[0];
-        let yTok = tokens[1];
-        if (xTok === 'top' || xTok === 'bottom' || yTok === 'left' || yTok === 'right') {
-          const tmp = xTok;
-          xTok = yTok;
-          yTok = tmp;
-        }
-        return `${resolveAxis(xTok, elWidth)} ${resolveAxis(yTok, elHeight)}`;
-      }
     }
 
     // svg2 § 13.2 #presentation-attributes
@@ -495,6 +350,9 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     if (dashed === 'background-color') return 'rgba(0, 0, 0, 0)';
     if (SVG_PRESENTATION_ATTRIBUTES.has(dashed)) {
       return DEFAULT_PROPERTY_VALUES[dashed] ?? '';
+    }
+    if (dashed === 'min-width' || dashed === 'min-height') {
+      return 'auto';
     }
 
     return '';

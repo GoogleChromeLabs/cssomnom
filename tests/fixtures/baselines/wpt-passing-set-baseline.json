@@ -2533,8 +2533,10 @@
     "Computed StylePropertyMap is live"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/computed/get-auto-min-size.html": [
+    "An absolute block computed StylePropertyMap.get reports the auto minimum size correctly.",
     "An absolute flex-child computed StylePropertyMap.get reports the auto minimum size correctly.",
     "An absolute grid-child computed StylePropertyMap.get reports the auto minimum size correctly.",
+    "An inflow block computed StylePropertyMap.get reports the auto minimum size correctly.",
     "An inflow flex-item computed StylePropertyMap.get reports the auto minimum size correctly.",
     "An inflow grid-item computed StylePropertyMap.get reports the auto minimum size correctly."
   ],
@@ -14454,14 +14456,6 @@
     "{}-wrapped name argument with whitespace",
     "{}-wrapped substituted name argument"
   ],
-  "submodules/web-platform-tests/css/css-variables/variable-reference-perspective-origin.html": [
-    "same var() for both values of perspective-origin",
-    "var() as both values of perspective-origin",
-    "var() as first value of perspective-origin",
-    "var() as first value with keyword",
-    "var() as second value of perspective-origin",
-    "var() as second value with keyword"
-  ],
   "submodules/web-platform-tests/css/css-variables/variable-reference-shorthands-cssom.html": [
     "anonymous-test-0"
   ],
@@ -14703,9 +14697,7 @@
   ],
   "submodules/web-platform-tests/css/cssom/computed-style-005.html": [
     "absolute_computed_left_and_right",
-    "absolute_computed_margins",
-    "relative_computed_left_and_right",
-    "relative_computed_margins"
+    "relative_computed_left_and_right"
   ],
   "submodules/web-platform-tests/css/cssom/computed-style-set-property.html": [
     "Computed style parent (should be null)",
@@ -15447,20 +15439,13 @@
     "The resolved value for 'outline-color' is the used value"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-resolved-min-size-auto.html": [
-    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-box\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-degenerate-aspect-ratio\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-two-part-degenerate-aspect-ratio\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-two-part-valid-aspect-ratio\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"block-with-valid-aspect-ratio\"",
-    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none\"",
-    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-subtree-flex-item\"",
-    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-subtree-grid-item\"",
-    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-subtree-valid-aspect-ratio\"",
-    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"display-none-valid-aspect-ratio\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"flex-item-column\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"flex-item-row\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"grid-item\"",
-    "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-box\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-with-degenerate-aspect-ratio\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-with-valid-aspect-ratio\""
   ],
@@ -17467,11 +17452,6 @@
     "Should be unknown: '(prefers-reduced-transparency: none)'",
     "Should be unknown: '(prefers-reduced-transparency: reduced)'"
   ],
-  "submodules/web-platform-tests/css/mediaqueries/relative-units-005.html": [
-    "ch unit in media queries should match initial font",
-    "ex unit in media queries should match initial font",
-    "ic unit in media queries should match initial font"
-  ],
   "submodules/web-platform-tests/css/mediaqueries/resizable.tentative.html": [
     "Check that resizable evaluates to true in the boolean context",
     "Should be known: '(resizable)'",
@@ -19467,60 +19447,6 @@
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(7)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(8)",
     "<p role=\"heading\" aria-level=\"1\" data-expect-match=\"\"></p> :heading(9)"
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-001.html": [
-    "A :lang value that matches an identical lang attribute value on the same element will produce styling."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-002.html": [
-    "A :lang value that matches an identical lang attribute value on a parent element will produce styling."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-021.html": [
-    "A lang|= value that matches an identical lang attribute value on the same element will produce styling."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-022.html": [
-    "A lang|= value that matches an identical lang attribute value on the parent element will NOT produce styling."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-041.html": [
-    "A lang= value that matches an identical lang attribute value on the same element will produce styling."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-042.html": [
-    "A lang|= value that matches an identical lang attribute value on the parent element will NOT produce styling."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-044.html": [
-    "A lang= value will match a lang attribute value regardless of case differences."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-045.html": [
-    "A lang= value will NOT match a lang attribute value when the latter contains additional subtags."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-046.html": [
-    "A lang= value will NOT match a lang attribute value when the former contains more subtags."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-047.html": [
-    "When the lang= value uses a single subtag, it will NOT match against an attribute value where it appears in a different position."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-048.html": [
-    "A lang= value with language and region subtags will match a lang attribute value with the same subtags."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-049.html": [
-    "A lang= value with multiple subtags will NOT match a lang attribute value with multiple subtags if the latter has more subtags, even if the first two subtags are the same."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-050.html": [
-    "A lang= value and a lang attribute value will NOT match if their region subtags differ."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-051.html": [
-    "A lang= value with language, script and region subtags will match a lang attribute value with the same language, script and region subtags."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-052.html": [
-    "A lang= value with language, script and region subtags will NOT match a lang attribute value with the script subtag missing."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-054.html": [
-    "A lang= value with language and region subtags will NOT match a lang attribute value with language, script and region subtags."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-055.html": [
-    "A lang= value will match a lang attribute value regardless of case differences in the script tag."
-  ],
-  "submodules/web-platform-tests/css/selectors/i18n/css3-selectors-lang-056.html": [
-    "A [lang='es'] value that matches an identical xml:lang attribute value will NOT produce styling in pages served as HTML."
   ],
   "submodules/web-platform-tests/css/selectors/i18n/lang-pseudo-class-disconnected.html": [
     ":lang pseudo class should work in a disconnected subtree"
@@ -22994,8 +22920,6 @@
     "anonymous-test-0"
   ],
   "submodules/web-platform-tests/css/selectors/selectors-case-sensitive-001.html": [
-    "CSS selector should match for Unicode uppercase element",
-    "Elements with namespace should work the same way",
     "`querySelector` should not use Unicode case-folding"
   ],
   "submodules/web-platform-tests/css/selectors/webkit-pseudo-element.html": [
