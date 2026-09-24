@@ -45,6 +45,7 @@ export interface SafeExecOptions {
   args?: string[];
   runnerPath?: string;
   maxOldSpaceSize?: number;
+  exposeGc?: boolean;
   cwd?: string;
   env?: NodeJS.ProcessEnv;
   pollIntervalMs?: number;
@@ -73,8 +74,13 @@ export function safeExecTestFile(
   const extraArgs = options.args ?? [];
   const pollIntervalMs = options.pollIntervalMs ?? 250;
 
+  const nodeFlags = [`--max-old-space-size=${maxOldSpaceSize}`];
+  if (options.exposeGc) {
+    nodeFlags.push('--expose-gc');
+  }
+
   const args = [
-    `--max-old-space-size=${maxOldSpaceSize}`,
+    ...nodeFlags,
     runnerPath,
     ...extraArgs,
     filePath,

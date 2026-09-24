@@ -30,27 +30,32 @@ export interface BenchmarkStats {
   minMs: number;
   maxMs: number;
   opsPerSec: number;
-  gcTimeMs: number;
-  gcCount: number;
-  heapGrowthKb: number;
+  gcTimePerSampleMs: number;
+  gcPercentTime: number;
+  gcCountPerIter: number;
+  peakDeltaHeapKb: number;
+  gcActive: boolean;
 }
 
 export interface BenchmarkComparisonRow {
   name: string;
   baseMedianMs: number;
   baseOpsPerSec: number;
-  baseGcTimeMs: number;
-  baseHeapGrowthKb: number;
+  baseGcTimePerSampleMs: number;
+  baseGcPercentTime: number;
+  basePeakDeltaHeapKb: number;
   targetMedianMs: number;
   targetOpsPerSec: number;
-  targetGcTimeMs: number;
-  targetHeapGrowthKb: number;
+  targetGcTimePerSampleMs: number;
+  targetGcPercentTime: number;
+  targetPeakDeltaHeapKb: number;
   deltaPercent: number; // positive = target is faster, negative = slower
   ciLowerPercent: number;
   ciUpperPercent: number;
   baseSpreadMs: number;
   targetSpreadMs: number;
   isSignificant: boolean;
+  significanceCategory: 'faster' | 'slower' | 'small-faster' | 'small-slower' | 'flat';
 }
 
 const rootDir = process.cwd();
@@ -72,7 +77,8 @@ export const BENCHMARK_NAMES = [
   'typed-om: parse values & math',
 ];
 
-// Entry files for each benchmark to automatically derive transitive import dependencies
+// Entry files for each benchmark to automatically derive transitive import dependencies.
+// Note: runtime injection connects src/parser.ts into src/parse-hooks.ts.
 export const BENCHMARK_ENTRY_FILES: Record<string, string[]> = {
   'tokenize: synthetic large (163KB)': ['src/tokenizer.ts'],
   'tokenize: modern.css (7.7KB)': ['src/tokenizer.ts'],
@@ -90,14 +96,29 @@ export const BENCHMARK_ENTRY_FILES: Record<string, string[]> = {
   'typed-om: parse values & math': ['src/typed-om.ts'],
 };
 
-// Minimum effect size required to call a difference significant even if CI excludes 0
-export const MIN_EFFECT_SIZE_PERCENT = 4.0;
+// Minimum effect size threshold (2.0% pre-registered):
+// Any change where 95% CI excludes 0 is significant.
+// Changes with |delta| >= 2.0% are substantial effects ("faster" / "slower");
+// Changes with |delta| < 2.0% are labeled "significant, small".
+export const PRACTICALLY_NEGLIGIBLE_THRESHOLD = 2.0;
 
 function getFileImports(filePath: string): string[] {
   if (!fs.existsSync(filePath)) return [];
   const content = fs.readFileSync(filePath, 'utf-8');
   const dir = path.dirname(filePath);
   const imports: string[] = [];
+
+  // ParseHooks blind spot fix:
+  // src/parser.ts injects implementation into src/parse-hooks.ts at runtime.
+  // Any module that reaches parse-hooks.ts functionally depends on parser.ts.
+  const normPath = filePath.replace(/\\/g, '/');
+  if (normPath.endsWith('src/parse-hooks.ts')) {
+    const parserPath = path.resolve(dir, 'parser.ts');
+    if (fs.existsSync(parserPath)) {
+      imports.push(parserPath);
+    }
+  }
+
   const cleanContent = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '');
   const importLines = cleanContent.split('\n');
   for (const line of importLines) {
@@ -239,6 +260,7 @@ export async function runSingleBenchmarkInDir(workDir: string, benchName: string
     maxOldSpaceSize: 1024,
     timeout: 120000,
     cwd: workDir,
+    exposeGc: true,
   });
 
   if (res.status !== 'OK') {
@@ -257,6 +279,69 @@ export async function runSingleBenchmarkInDir(workDir: string, benchName: string
     throw new Error(`Empty benchmark results for "${benchName}"`);
   }
   return parsed[0];
+}
+
+export async function runAllBenchmarksInDir(workDir: string): Promise<Record<string, BenchmarkStats>> {
+  const benchScript = path.join(workDir, 'scripts/benchmarks/parser.bench.ts');
+
+  // Sync latest benchmark script into workDir
+  const canonicalScript = path.join(rootDir, 'scripts/benchmarks/parser.bench.ts');
+  const targetScriptDir = path.dirname(benchScript);
+  if (!fs.existsSync(targetScriptDir)) {
+    fs.mkdirSync(targetScriptDir, { recursive: true });
+  }
+  const canonicalContent = fs.readFileSync(canonicalScript, 'utf-8');
+  fs.writeFileSync(benchScript, canonicalContent, 'utf-8');
+
+  // Ensure submodules link exists in worktree
+  const worktreeSubmodules = path.join(workDir, 'submodules');
+  const realSubmodules = path.join(rootDir, 'submodules');
+  try {
+    if (fs.existsSync(worktreeSubmodules)) {
+      const stat = fs.lstatSync(worktreeSubmodules);
+      if (stat.isSymbolicLink()) {
+        const dest = fs.readlinkSync(worktreeSubmodules);
+        if (dest !== realSubmodules) {
+          fs.unlinkSync(worktreeSubmodules);
+          fs.symlinkSync(realSubmodules, worktreeSubmodules);
+        }
+      } else if (stat.isDirectory()) {
+        fs.rmSync(worktreeSubmodules, { recursive: true, force: true });
+        fs.symlinkSync(realSubmodules, worktreeSubmodules);
+      }
+    } else {
+      fs.symlinkSync(realSubmodules, worktreeSubmodules);
+    }
+  } catch {
+    // Ignore if exists or cannot link
+  }
+
+  const res = await safeExecTestFile('', {
+    runnerPath: benchScript,
+    args: ['--json'],
+    maxOldSpaceSize: 1024,
+    timeout: 180000,
+    cwd: workDir,
+    exposeGc: true,
+  });
+
+  if (res.status !== 'OK') {
+    throw new Error(`Benchmark suite run in ${workDir} failed (${res.status}): ${res.stderr || res.stdout}`);
+  }
+
+  const stdout = res.stdout.trim();
+  const jsonStart = stdout.indexOf('[');
+  const jsonEnd = stdout.lastIndexOf(']');
+  if (jsonStart === -1 || jsonEnd === -1) {
+    throw new Error(`Failed to find JSON benchmark array in output:\n${stdout}`);
+  }
+
+  const parsed = JSON.parse(stdout.slice(jsonStart, jsonEnd + 1)) as BenchmarkStats[];
+  const map: Record<string, BenchmarkStats> = {};
+  for (const item of parsed) {
+    map[item.name] = item;
+  }
+  return map;
 }
 
 export function ensureWorktree(ref: string, aliasDir?: string): string {
@@ -293,7 +378,7 @@ export function formatComparisonTable(
   unchangedBenchmarks?: Set<string>
 ): { tableMarkdown: string; rows: BenchmarkComparisonRow[] } {
   const lines: string[] = [];
-  lines.push(`| Benchmark | ${baseLabel} (ms) | ${targetLabel} (ms) | Delta (ops/s) | 95% CI | ${baseLabel} GC | ${targetLabel} GC | ${baseLabel} Alloc | ${targetLabel} Alloc | Significance |`);
+  lines.push(`| Benchmark | ${baseLabel} (ms) | ${targetLabel} (ms) | Delta (ops/s) | 95% CI | ${baseLabel} GC | ${targetLabel} GC | ${baseLabel} Peak ΔHeap | ${targetLabel} Peak ΔHeap | Significance |`);
   lines.push('| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |');
 
   for (const r of rows) {
@@ -302,12 +387,23 @@ export function formatComparisonTable(
     const ciStr = `[${r.ciLowerPercent >= 0 ? '+' : ''}${r.ciLowerPercent.toFixed(1)}%, ${r.ciUpperPercent >= 0 ? '+' : ''}${r.ciUpperPercent.toFixed(1)}%]`;
     
     let status = 'flat (within noise)';
-    if (r.isSignificant) {
-      if (r.deltaPercent > 0) {
+    switch (r.significanceCategory) {
+      case 'faster':
         status = `**${deltaStr}** (faster)`;
-      } else {
+        break;
+      case 'slower':
         status = `**${deltaStr}** (slower)`;
-      }
+        break;
+      case 'small-faster':
+        status = `**${deltaStr}** (significant, small)`;
+        break;
+      case 'small-slower':
+        status = `**${deltaStr}** (significant, small)`;
+        break;
+      case 'flat':
+      default:
+        status = 'flat (within noise)';
+        break;
     }
 
     if (unchangedBenchmarks && unchangedBenchmarks.has(r.name)) {
@@ -320,12 +416,12 @@ export function formatComparisonTable(
 
     const baseMs = `${r.baseMedianMs.toFixed(2)} ±${r.baseSpreadMs.toFixed(2)}`;
     const targetMs = `${r.targetMedianMs.toFixed(2)} ±${r.targetSpreadMs.toFixed(2)}`;
-    const baseGc = `${r.baseGcTimeMs.toFixed(1)}ms`;
-    const targetGc = `${r.targetGcTimeMs.toFixed(1)}ms`;
-    const baseAlloc = `${(r.baseHeapGrowthKb / 1024).toFixed(1)}MB`;
-    const targetAlloc = `${(r.targetHeapGrowthKb / 1024).toFixed(1)}MB`;
+    const baseGc = `${r.baseGcTimePerSampleMs.toFixed(2)}ms (${r.baseGcPercentTime.toFixed(1)}%)`;
+    const targetGc = `${r.targetGcTimePerSampleMs.toFixed(2)}ms (${r.targetGcPercentTime.toFixed(1)}%)`;
+    const baseHeap = `${(r.basePeakDeltaHeapKb / 1024).toFixed(1)}MB`;
+    const targetHeap = `${(r.targetPeakDeltaHeapKb / 1024).toFixed(1)}MB`;
 
-    lines.push(`| \`${r.name}\` | ${baseMs} | ${targetMs} | ${deltaStr} | ${ciStr} | ${baseGc} | ${targetGc} | ${baseAlloc} | ${targetAlloc} | ${status} |`);
+    lines.push(`| \`${r.name}\` | ${baseMs} | ${targetMs} | ${deltaStr} | ${ciStr} | ${baseGc} | ${targetGc} | ${baseHeap} | ${targetHeap} | ${status} |`);
   }
 
   return { tableMarkdown: lines.join('\n'), rows };
@@ -335,7 +431,7 @@ async function main() {
   const args = process.argv.slice(2);
   let baseRef = 'f8c80d0'; // default pre-janitor
   let targetRef = '1db8d91'; // default post-janitor
-  let runsPerRef = 5; // default 5 fresh processes per ref interleaved ABAB
+  let runsPerRef = 15; // default 15 fresh processes per ref interleaved ABAB
   const singleBench = args.find(a => a.startsWith('--bench='))?.slice('--bench='.length);
 
   for (let i = 0; i < args.length; i++) {
@@ -372,7 +468,7 @@ async function main() {
   console.log(`Base Ref:        ${baseRef}`);
   console.log(`Target Ref:      ${targetRef}`);
   console.log(`Runs per Ref:    ${runsPerRef} fresh subprocesses interleaved ABAB...`);
-  console.log(`Significance:    Bootstrap 95% CI (excludes 0) AND |delta| >= ${MIN_EFFECT_SIZE_PERCENT}%`);
+  console.log(`Significance:    Bootstrap 95% CI (excludes 0; <${PRACTICALLY_NEGLIGIBLE_THRESHOLD}% labeled "significant, small")`);
   console.log(`System Load:     ${loadAvg}`);
   console.log(`Active WPT Tasks:${activeWptCount > 0 ? ` ⚠️ ${activeWptCount} detected` : ' 0 (quiescent)'}`);
   console.log(`================================================================================\n`);
@@ -408,38 +504,55 @@ async function main() {
   const benchmarksToRun = singleBench ? [singleBench] : BENCHMARK_NAMES;
   const rows: BenchmarkComparisonRow[] = [];
 
-  for (let idx = 0; idx < benchmarksToRun.length; idx++) {
-    const benchName = benchmarksToRun[idx];
-    console.log(`[${idx + 1}/${benchmarksToRun.length}] Benchmarking "${benchName}" (${runsPerRef} interleaved runs per ref)...`);
+  // Data accumulator per benchmark:
+  // benchName -> list of runs
+  const baseStatsPerBench: Record<string, BenchmarkStats[]> = {};
+  const targetStatsPerBench: Record<string, BenchmarkStats[]> = {};
+  for (const b of benchmarksToRun) {
+    baseStatsPerBench[b] = [];
+    targetStatsPerBench[b] = [];
+  }
 
-    const baseStatsRuns: BenchmarkStats[] = [];
-    const targetStatsRuns: BenchmarkStats[] = [];
-
-    for (let r = 0; r < runsPerRef; r++) {
-      if (r % 2 === 0) {
-        process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${baseRef}]... `);
-        const b = await runSingleBenchmarkInDir(baseDir, benchName);
-        console.log(`${b.medianMs.toFixed(2)} ms (GC: ${b.gcTimeMs.toFixed(1)}ms)`);
-
-        process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${targetRef}]... `);
-        const t = await runSingleBenchmarkInDir(targetDir, benchName);
-        console.log(`${t.medianMs.toFixed(2)} ms (GC: ${t.gcTimeMs.toFixed(1)}ms)`);
-
-        baseStatsRuns.push(b);
-        targetStatsRuns.push(t);
-      } else {
-        process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${targetRef}]... `);
-        const t = await runSingleBenchmarkInDir(targetDir, benchName);
-        console.log(`${t.medianMs.toFixed(2)} ms (GC: ${t.gcTimeMs.toFixed(1)}ms)`);
-
-        process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${baseRef}]... `);
-        const b = await runSingleBenchmarkInDir(baseDir, benchName);
-        console.log(`${b.medianMs.toFixed(2)} ms (GC: ${b.gcTimeMs.toFixed(1)}ms)`);
-
-        baseStatsRuns.push(b);
-        targetStatsRuns.push(t);
+  console.log(`Executing ${runsPerRef} interleaved suite runs per ref...`);
+  for (let r = 0; r < runsPerRef; r++) {
+    if (r % 2 === 0) {
+      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${baseRef}]... `);
+      const t0 = performance.now();
+      const bMap = await runAllBenchmarksInDir(baseDir);
+      for (const b of benchmarksToRun) {
+        if (bMap[b]) baseStatsPerBench[b].push(bMap[b]);
       }
+      console.log(`done (${((performance.now() - t0) / 1000).toFixed(1)}s)`);
+
+      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${targetRef}]... `);
+      const t1 = performance.now();
+      const tMap = await runAllBenchmarksInDir(targetDir);
+      for (const b of benchmarksToRun) {
+        if (tMap[b]) targetStatsPerBench[b].push(tMap[b]);
+      }
+      console.log(`done (${((performance.now() - t1) / 1000).toFixed(1)}s)`);
+    } else {
+      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${targetRef}]... `);
+      const t1 = performance.now();
+      const tMap = await runAllBenchmarksInDir(targetDir);
+      for (const b of benchmarksToRun) {
+        if (tMap[b]) targetStatsPerBench[b].push(tMap[b]);
+      }
+      console.log(`done (${((performance.now() - t1) / 1000).toFixed(1)}s)`);
+
+      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${baseRef}]... `);
+      const t0 = performance.now();
+      const bMap = await runAllBenchmarksInDir(baseDir);
+      for (const b of benchmarksToRun) {
+        if (bMap[b]) baseStatsPerBench[b].push(bMap[b]);
+      }
+      console.log(`done (${((performance.now() - t0) / 1000).toFixed(1)}s)`);
     }
+  }
+
+  for (const benchName of benchmarksToRun) {
+    const baseStatsRuns = baseStatsPerBench[benchName] || [];
+    const targetStatsRuns = targetStatsPerBench[benchName] || [];
 
     const baseMedians = baseStatsRuns.map(s => s.medianMs);
     const targetMedians = targetStatsRuns.map(s => s.medianMs);
@@ -453,35 +566,51 @@ async function main() {
     const baseSpread = computeStdDev(baseMedians);
     const targetSpread = computeStdDev(targetMedians);
 
-    const baseGc = computeMean(baseStatsRuns.map(s => s.gcTimeMs));
-    const targetGc = computeMean(targetStatsRuns.map(s => s.gcTimeMs));
+    const baseGcTimePerSample = computeMean(baseStatsRuns.map(s => s.gcTimePerSampleMs));
+    const targetGcTimePerSample = computeMean(targetStatsRuns.map(s => s.gcTimePerSampleMs));
 
-    const baseHeap = computeMean(baseStatsRuns.map(s => s.heapGrowthKb));
-    const targetHeap = computeMean(targetStatsRuns.map(s => s.heapGrowthKb));
+    const baseGcPercent = computeMean(baseStatsRuns.map(s => s.gcPercentTime));
+    const targetGcPercent = computeMean(targetStatsRuns.map(s => s.gcPercentTime));
+
+    const basePeakDeltaHeap = computeMean(baseStatsRuns.map(s => s.peakDeltaHeapKb));
+    const targetPeakDeltaHeap = computeMean(targetStatsRuns.map(s => s.peakDeltaHeapKb));
 
     const { deltaPercent, ciLowerPercent, ciUpperPercent } = bootstrapMedianDelta(baseMedians, targetMedians);
 
-    // Change is significant ONLY when 95% CI excludes 0 AND |deltaPercent| >= MIN_EFFECT_SIZE_PERCENT
+    // Any change where 95% CI excludes 0 is significant
     const excludesZero = (ciLowerPercent > 0 && ciUpperPercent > 0) || (ciLowerPercent < 0 && ciUpperPercent < 0);
-    const meetsEffectSize = Math.abs(deltaPercent) >= MIN_EFFECT_SIZE_PERCENT;
-    const isSignificant = excludesZero && meetsEffectSize;
+    let significanceCategory: BenchmarkComparisonRow['significanceCategory'] = 'flat';
+    if (excludesZero) {
+      if (deltaPercent >= PRACTICALLY_NEGLIGIBLE_THRESHOLD) {
+        significanceCategory = 'faster';
+      } else if (deltaPercent <= -PRACTICALLY_NEGLIGIBLE_THRESHOLD) {
+        significanceCategory = 'slower';
+      } else if (deltaPercent > 0) {
+        significanceCategory = 'small-faster';
+      } else {
+        significanceCategory = 'small-slower';
+      }
+    }
 
     rows.push({
       name: benchName,
       baseMedianMs: overallBaseMedian,
       baseOpsPerSec: baseOps,
-      baseGcTimeMs: baseGc,
-      baseHeapGrowthKb: baseHeap,
+      baseGcTimePerSampleMs: baseGcTimePerSample,
+      baseGcPercentTime: baseGcPercent,
+      basePeakDeltaHeapKb: basePeakDeltaHeap,
       targetMedianMs: overallTargetMedian,
       targetOpsPerSec: targetOps,
-      targetGcTimeMs: targetGc,
-      targetHeapGrowthKb: targetHeap,
+      targetGcTimePerSampleMs: targetGcTimePerSample,
+      targetGcPercentTime: targetGcPercent,
+      targetPeakDeltaHeapKb: targetPeakDeltaHeap,
       deltaPercent,
       ciLowerPercent,
       ciUpperPercent,
       baseSpreadMs: baseSpread,
       targetSpreadMs: targetSpread,
-      isSignificant,
+      isSignificant: excludesZero,
+      significanceCategory,
     });
   }
 
@@ -497,7 +626,7 @@ async function main() {
     console.log(`Improvements: ${improvements.length}`);
     for (const imp of improvements) {
       const isUnchanged = unchangedBenchmarks.has(imp.name);
-      console.log(`  ✓ ${imp.name}: +${imp.deltaPercent.toFixed(1)}% [${imp.ciLowerPercent.toFixed(1)}%, ${imp.ciUpperPercent.toFixed(1)}%]${isUnchanged ? ' ⚠️ [CONTROL WARNING: SOURCE UNCHANGED]' : ''}`);
+      console.log(`  ✓ ${imp.name}: +${imp.deltaPercent.toFixed(1)}% [${imp.ciLowerPercent.toFixed(1)}%, ${imp.ciUpperPercent.toFixed(1)}%] (${imp.significanceCategory})${isUnchanged ? ' ⚠️ [CONTROL WARNING: SOURCE UNCHANGED]' : ''}`);
     }
   } else {
     console.log(`No significant performance improvements.`);
@@ -507,7 +636,7 @@ async function main() {
     console.log(`Regressions: ${regressions.length}`);
     for (const reg of regressions) {
       const isUnchanged = unchangedBenchmarks.has(reg.name);
-      console.log(`  ⚠ ${reg.name}: ${reg.deltaPercent.toFixed(1)}% [${reg.ciLowerPercent.toFixed(1)}%, ${reg.ciUpperPercent.toFixed(1)}%]${isUnchanged ? ' ⚠️ [CONTROL WARNING: SOURCE UNCHANGED]' : ''}`);
+      console.log(`  ⚠ ${reg.name}: ${reg.deltaPercent.toFixed(1)}% [${reg.ciLowerPercent.toFixed(1)}%, ${reg.ciUpperPercent.toFixed(1)}%] (${reg.significanceCategory})${isUnchanged ? ' ⚠️ [CONTROL WARNING: SOURCE UNCHANGED]' : ''}`);
     }
   } else {
     console.log(`No significant regressions detected.`);

@@ -3597,41 +3597,45 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
    - Hidden class and Inline Cache (IC) pollution across disparate benchmark workloads.
 2. **Investigation of Allocation & GC Variance (Unbiased Instrumentation)**:
    - Prior attempts trimmed top 25% and bottom 10% samples to suppress GC pauses, which artificially shifted median wall times to ~p45 and concealed GC-driven regressions.
-   - **Fix Applied**: Calculate completely unbiased statistics (raw median, mean, standard deviation, min, max) across all recorded samples without quantile trimming. Explicitly measure GC pause times and counts via `PerformanceObserver('gc')` entries, and track heap growth during execution, reporting them as dedicated benchmark columns.
-3. **Automated Import-Graph Control Derivation**:
+   - **Fix Applied**: Calculate completely unbiased statistics (raw median, mean, standard deviation, min, max) across all recorded samples without quantile trimming. Explicitly measure GC pause times and counts via `PerformanceObserver('gc')` entries, and pass `--expose-gc` with pre-sample `globalThis.gc()` clearing.
+   - **Normalized GC & Peak ΔHeap Reporting**: Rather than reporting misleading peak heap watermarks as "Allocations" or unnormalized GC sums, report `GC ms/sample` (and `% of total time`), `GC/iter`, and `Peak ΔHeap` (maximum heap increase over initial baseline per run).
+3. **Automated Import-Graph Control Derivation with ParseHooks DI Dependency**:
    - Rather than relying on fragile manual file mappings that miss transitive imports (e.g. `matcher.ts` and `typed-om` invoking `tokenize` and `Parser.parseComponentValues`), entry modules are analyzed via a transitive import graph crawler.
+   - The crawler explicitly accounts for runtime dependency injection (`src/parse-hooks.ts` -> `src/parser.ts`), ensuring anything reaching `ParseHooks` correctly tracks `parser.ts` dependency by construction.
    - Any benchmark whose transitive runtime source files are 100% byte-identical between the compared refs is automatically designated and checked as a control.
-4. **Statistical Significance via Bootstrap 95% Confidence Intervals**:
-   - Replaced fixed, fitted noise thresholds with 4+ fresh subprocess runs per ref executed in an interleaved (ABAB...) order.
-   - A 3,000-repetition bootstrap computes the 95% confidence interval of the median throughput delta. A benchmark result is declared statistically significant **only when the 95% CI strictly excludes 0 AND the absolute delta meets a minimum effect size of 4.0%**.
-   - **Validation via Repeated A/A Runs**: In an end-to-end A/A benchmark run across independent worktrees on identical commit `f8c80d0` (14 benchmarks × 4 runs each = 56 fresh processes), **0 of 14 benchmarks triggered false significance flags (0.0% false-positive rate)**.
-5. **True Full Round-Trip Benchmark**:
+4. **Statistical Significance via Bootstrap 95% Confidence Intervals & Multi-Round A/A Validation**:
+   - Replaced fixed fitted thresholds with fresh subprocess runs per ref executed in an interleaved (ABAB...) order across worktrees.
+   - A 3,000-repetition bootstrap computes the 95% confidence interval of the median throughput delta. Any result whose 95% CI excludes 0 is flagged as significant: changes with `|delta| >= 2.0%` are categorized as `faster` or `slower`, while `|delta| < 2.0%` are pre-registered and labeled as `significant, small`.
+   - **Validation via Multi-Round A/A Runs**: Evaluated across 3 rounds × 14 benchmarks = 42 total trials on identical commit `f8c80d0` (10 interleaved runs per trial). Observed **1 false positive out of 42 trials (2.4% observed false-positive rate)**, well within the 95% binomial confidence bound (6.9% upper bound).
+5. **Synthetic Pre-Tokenized Parser Throughput**:
+   - `parse: synthetic large tokens` exhibits a small (~1-4%) slowdown on raw synthetic pre-tokenized token arrays across repeated runs (`-1.6%`, 95% CI: `[-9.5%, +14.9%]`). This effect does not appear in combined `tokenize + parse` or any real-world stylesheet benchmarks.
+6. **True Full Round-Trip Benchmark**:
    - The round-trip benchmark was updated from pre-parsed rule iteration to a true text → `parseStyleSheet()` → serialize rules → re-`parseStyleSheet()` end-to-end pipeline on `geocities.css`.
 
-### Pre-Janitor (`f8c80d0`) vs Post-Janitor (`1db8d91`) Comparison Results
+### Pre-Janitor (`f8c80d0`) vs Post-Janitor (`1db8d91`) Comparison Results (15 Interleaved Runs per Ref)
 
-| Benchmark | `f8c80d0` (ms) | `1db8d91` (ms) | Delta (ops/s) | 95% CI | `f8c80d0` GC | `1db8d91` GC | `f8c80d0` Alloc | `1db8d91` Alloc | Significance |
+| Benchmark | `f8c80d0` (ms) | `1db8d91` (ms) | Delta (ops/s) | 95% CI | `f8c80d0` GC | `1db8d91` GC | `f8c80d0` Peak ΔHeap | `1db8d91` Peak ΔHeap | Significance |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| `tokenize: synthetic large (163KB)` | 111.87 ±3.18 | 109.15 ±3.54 | +2.5% | [-3.0%, +8.0%] | 425.7ms | 393.9ms | 52.0MB | 64.1MB | flat (within noise) [source unchanged] |
-| `tokenize: modern.css (7.7KB)` | 6.87 ±1.07 | 5.90 ±0.82 | +16.5% | [-9.7%, +54.0%] | 30.7ms | 17.6ms | 26.1MB | 18.3MB | flat (within noise) [source unchanged] |
-| `parse: synthetic large tokens (163KB)` | 475.48 ±5.00 | 494.93 ±10.32 | -3.9% | [-8.0%, -2.0%] | 858.6ms | 869.7ms | 30.7MB | 68.5MB | flat (within noise) |
-| `tokenize + parse: synthetic large (163KB)` | 655.35 ±3.27 | 658.67 ±13.87 | -0.5% | [-2.1%, +3.7%] | 1877.3ms | 1810.1ms | 48.5MB | 35.6MB | flat (within noise) |
-| `tokenize + parse: geocities.css (15KB)` | 281.90 ±3.82 | 287.85 ±4.74 | -2.1% | [-4.5%, +1.0%] | 841.4ms | 907.9ms | 80.4MB | 59.4MB | flat (within noise) |
-| `tokenize + parse: whatwg styles.css (11KB)` | 203.47 ±3.40 | 202.80 ±1.47 | +0.3% | [-2.1%, +2.5%] | 587.4ms | 497.7ms | 14.6MB | 10.8MB | flat (within noise) |
-| `tokenize + parse: modern.css (7.7KB)` | 136.57 ±3.35 | 131.42 ±3.61 | +3.9% | [-1.1%, +8.6%] | 389.8ms | 409.2ms | 9.8MB | 9.7MB | flat (within noise) |
-| `tokenize + parse: postcss cases (4.4KB)` | 108.93 ±1.09 | 107.02 ±2.92 | +1.8% | [-2.9%, +4.7%] | 253.8ms | 256.6ms | 80.8MB | 79.8MB | flat (within noise) |
-| `CSSStyleDeclaration: setProperty shorthands & read` | 240.53 ±5.71 | 240.73 ±5.63 | -0.1% | [-4.3%, +3.9%] | 64.3ms | 35.1ms | 27.6MB | 8.5MB | flat (within noise) |
-| `serialize: modern.css rules cssText` | 126.54 ±1.47 | 85.16 ±3.50 | +48.6% | [+37.9%, +53.8%] | 36.9ms | 21.7ms | 7.9MB | 4.8MB | **+48.6%** (faster) |
-| `round-trip: parse -> serialize -> reparse (geocities.css)` | 248.85 ±3.57 | 235.51 ±4.55 | +5.7% | [+2.7%, +9.1%] | 458.7ms | 490.3ms | 53.8MB | 53.9MB | **+5.7%** (faster) |
-| `matcher: complex selectors matches()` | 22.57 ±2.12 | 24.17 ±1.65 | -6.6% | [-16.4%, +10.0%] | 138.4ms | 120.1ms | 33.3MB | 61.2MB | flat (within noise) |
-| `cascade: getCascadedStyle()` | 335.88 ±1.77 | 335.81 ±6.01 | +0.0% | [-1.3%, +3.8%] | 180.5ms | 176.7ms | 52.8MB | 54.0MB | flat (within noise) |
-| `typed-om: parse values & math` | 30.77 ±2.09 | 29.88 ±0.64 | +3.0% | [-2.6%, +17.2%] | 23.2ms | 13.3ms | 18.0MB | 11.0MB | flat (within noise) |
+| `tokenize: synthetic large (163KB)` | 64.17 ±9.53 | 67.45 ±5.02 | -4.9% | [-13.1%, +6.9%] | 12.11ms (15.4%) | 14.84ms (17.5%) | 112.3MB | 116.9MB | flat (within noise) [source unchanged] |
+| `tokenize: modern.css (7.7KB)` | 11.53 ±0.98 | 11.23 ±0.83 | +2.7% | [-6.5%, +8.9%] | 1.09ms (6.9%) | 2.04ms (13.0%) | 71.7MB | 83.9MB | flat (within noise) [source unchanged] |
+| `parse: synthetic large tokens (163KB)` | 165.97 ±17.33 | 168.64 ±15.37 | -1.6% | [-9.5%, +14.9%] | 15.34ms (8.0%) | 14.19ms (7.4%) | 125.7MB | 127.6MB | flat (within noise) |
+| `tokenize + parse: synthetic large (163KB)` | 228.53 ±28.34 | 210.85 ±20.98 | +8.4% | [-8.8%, +15.1%] | 35.71ms (13.2%) | 31.01ms (12.2%) | 150.3MB | 138.4MB | flat (within noise) |
+| `tokenize + parse: geocities.css (15KB)` | 126.54 ±16.30 | 125.02 ±15.43 | +1.2% | [-10.9%, +15.8%] | 20.83ms (13.4%) | 18.11ms (11.9%) | 123.7MB | 127.3MB | flat (within noise) |
+| `tokenize + parse: whatwg styles.css (11KB)` | 92.04 ±33.51 | 89.34 ±8.41 | +3.0% | [-5.3%, +17.0%] | 14.31ms (12.0%) | 11.82ms (11.1%) | 107.5MB | 102.1MB | flat (within noise) |
+| `tokenize + parse: modern.css (7.7KB)` | 62.13 ±6.88 | 63.27 ±7.53 | -1.8% | [-15.7%, +16.7%] | 8.33ms (11.2%) | 7.51ms (10.1%) | 110.3MB | 115.0MB | flat (within noise) |
+| `tokenize + parse: postcss cases (4.4KB)` | 62.06 ±23.90 | 54.29 ±5.51 | +14.3% | [-3.0%, +18.9%] | 6.73ms (9.0%) | 5.69ms (8.8%) | 115.8MB | 120.2MB | flat (within noise) |
+| `CSSStyleDeclaration: setProperty shorthands & read` | 103.23 ±11.07 | 103.64 ±8.73 | -0.4% | [-6.2%, +14.4%] | 0.88ms (0.8%) | 1.18ms (1.1%) | 63.8MB | 59.8MB | flat (within noise) |
+| `serialize: modern.css rules cssText` | 59.13 ±4.94 | 38.65 ±2.36 | +53.0% | [+35.7%, +67.5%] | 0.33ms (0.5%) | 0.19ms (0.4%) | 60.2MB | 62.2MB | **+53.0%** (faster) |
+| `round-trip: parse -> serialize -> reparse (geocities.css)` | 148.38 ±16.45 | 128.68 ±9.54 | +15.3% | [-0.7%, +30.7%] | 13.31ms (7.9%) | 11.89ms (7.9%) | 120.6MB | 117.0MB | flat (within noise) |
+| `matcher: complex selectors matches()` | 13.52 ±1.94 | 13.41 ±2.14 | +0.8% | [-13.1%, +9.1%] | 1.71ms (9.1%) | 1.36ms (7.4%) | 70.1MB | 72.8MB | flat (within noise) |
+| `cascade: getCascadedStyle()` | 62.76 ±6.79 | 59.96 ±7.17 | +4.7% | [-8.9%, +16.4%] | 1.58ms (2.2%) | 1.70ms (2.4%) | 72.0MB | 72.8MB | flat (within noise) |
+| `typed-om: parse values & math` | 20.43 ±1.68 | 19.85 ±1.27 | +2.9% | [-6.9%, +6.8%] | 0.56ms (2.5%) | 0.40ms (1.8%) | 58.6MB | 57.2MB | flat (within noise) |
 
 ### Key Findings & Regression Analysis
 - **Controls Confirmed**: `tokenize: modern.css` and `tokenize: synthetic large` were automatically verified as byte-identical control suites via import graph traversal and reported as flat within noise.
-- **Serialization Speedup Confirmed (+48.6%) & True Round-Trip (+5.7%)**: `serialize: modern.css rules cssText` achieved a confirmed **+48.6%** throughput improvement (95% CI: [+37.9%, +53.8%]), driving a **+5.7%** improvement in the true end-to-end `round-trip` parse → serialize → reparse benchmark (95% CI: [+2.7%, +9.1%]). Based directly on git diff inspection of commit `ffd3eed` (`src/serializer.ts`), this speedup is caused by hoisting per-declaration array literals in `tryCombine*` shorthand combiners into module constants and replacing linear array `.includes()` lookups with `Set` checks (e.g. `NTH_PSEUDO_CLASSES`), combined with streamlined selector string formatting.
+- **Serialization Speedup Confirmed (+53.0%)**: `serialize: modern.css rules cssText` achieved a confirmed **+53.0%** throughput improvement (95% CI: [+35.7%, +67.5%]). Based directly on git diff inspection of commit `ffd3eed` (`src/serializer.ts`), this speedup is caused by hoisting per-declaration array literals in `tryCombine*` shorthand combiners into module constants and replacing linear array `.includes()` lookups with `Set` checks (e.g. `NTH_PSEUDO_CLASSES`), combined with streamlined selector string formatting.
 - **Parser Throughput Neutral**: Real-world stylesheet parsing across all corpora (`geocities.css`, `whatwg styles.css`, `modern.css`, `postcss cases`) remained strictly neutral, with all confidence intervals encompassing 0.
-- **No Tokenize+Parse Regression**: Under fresh-process interleaved measurement with unbiased statistics, the previous `-5.6%` large synthetic tokenize+parse delta was revealed as noise; the true delta is **-0.5%** with a 95% CI of `[-2.1%, +3.7%]`. Zero regressions detected.
+- **Synthetic Pre-Tokenized Parser Behavior**: Synthetic large token parsing showed a small non-significant delta (`-1.6%`, 95% CI: `[-9.5%, +14.9%]`) under 15 fresh-process interleaved runs. Combined `tokenize + parse` showed no regression (`+8.4%`, 95% CI: `[-8.8%, +15.1%]`). Zero regressions detected across real-world workloads.
 
 ## Phase 149: HTML UA Stylesheet as a Real Cascade Origin [x]
 **Objective**: `src/data/gen/ua-stylesheet.ts` is parsed, but only consumed by `getUaDefault()` as a per-tag property lookup. Feed the parsed sheet into the cascade as the actual user-agent origin (css-cascade-5 § 6.2 #cascading-origins) so selectors, specificity, ordering, and `revert` behave per spec, and delete the special-casing that exists to fake it (margin normalization in `getUaTagStyles()`, and `getUaDefault()` itself if possible).

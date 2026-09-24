@@ -92,18 +92,21 @@ export interface BenchmarkStats {
   minMs: number;
   maxMs: number;
   opsPerSec: number;
-  gcTimeMs: number;
-  gcCount: number;
-  heapGrowthKb: number;
+  gcTimePerSampleMs: number;
+  gcPercentTime: number;
+  gcCountPerIter: number;
+  peakDeltaHeapKb: number;
+  gcActive: boolean;
 }
 
 export function calculateStats(
   name: string,
   sampleTimes: number[],
   iterationsPerSample: number,
-  gcTimeMs: number,
-  gcCount: number,
-  heapGrowthKb: number,
+  totalGcTimeMs: number,
+  totalGcCount: number,
+  peakDeltaHeapKb: number,
+  gcActive: boolean
 ): BenchmarkStats {
   const sorted = [...sampleTimes].sort((a, b) => a - b);
   const n = sorted.length;
@@ -119,6 +122,11 @@ export function calculateStats(
   const stdDevMs = Math.sqrt(variance);
   const opsPerSec = medianMs > 0 ? (iterationsPerSample * 1000) / medianMs : 0;
 
+  const gcTimePerSampleMs = n > 0 ? totalGcTimeMs / n : 0;
+  const gcPercentTime = (sum + totalGcTimeMs) > 0 ? (totalGcTimeMs / (sum + totalGcTimeMs)) * 100 : 0;
+  const totalIterations = n * iterationsPerSample;
+  const gcCountPerIter = totalIterations > 0 ? totalGcCount / totalIterations : 0;
+
   return {
     name,
     samples: n,
@@ -129,9 +137,11 @@ export function calculateStats(
     minMs,
     maxMs,
     opsPerSec,
-    gcTimeMs,
-    gcCount,
-    heapGrowthKb,
+    gcTimePerSampleMs,
+    gcPercentTime,
+    gcCountPerIter,
+    peakDeltaHeapKb,
+    gcActive,
   };
 }
 
@@ -159,8 +169,10 @@ async function runBench(
   }
 
   // 2. Pre-run full GC if exposed to clear warmup allocations from heap
+  let gcActive = false;
   if (typeof (globalThis as unknown as { gc?: () => void }).gc === 'function') {
     (globalThis as unknown as { gc: () => void }).gc();
+    gcActive = true;
   }
 
   // 3. Setup GC PerformanceObserver to explicitly record GC time and pause counts
@@ -197,9 +209,9 @@ async function runBench(
   await new Promise((resolve) => setTimeout(resolve, 10));
   gcObserver.disconnect();
 
-  const heapGrowthKb = Math.max(0, (peakHeapUsed - initialHeapUsed) / 1024);
+  const peakDeltaHeapKb = Math.max(0, (peakHeapUsed - initialHeapUsed) / 1024);
 
-  return calculateStats(name, sampleTimes, iterations, totalGcTimeMs, totalGcCount, heapGrowthKb);
+  return calculateStats(name, sampleTimes, iterations, totalGcTimeMs, totalGcCount, peakDeltaHeapKb, gcActive);
 }
 
 export interface BenchmarkDefinition {
@@ -259,7 +271,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize: synthetic large (163KB)',
         () => { sink(tokenize(fixtures.syntheticLarge)); },
-        { warmupRounds: 5, samples: 20, iterations: 10 }
+        { warmupRounds: 2, samples: 10, iterations: 5 }
       ),
     },
 
@@ -269,7 +281,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize: modern.css (7.7KB)',
         () => { sink(tokenize(fixtures.modernCss)); },
-        { warmupRounds: 10, samples: 20, iterations: 20 }
+        { warmupRounds: 3, samples: 10, iterations: 40 }
       ),
     },
 
@@ -282,7 +294,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           const p = new Parser(syntheticTokens);
           sink(p.parseStyleSheet());
         },
-        { warmupRounds: 5, samples: 20, iterations: 10 }
+        { warmupRounds: 2, samples: 10, iterations: 3 }
       ),
     },
 
@@ -292,7 +304,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: synthetic large (163KB)',
         () => { sink(new Parser(tokenize(fixtures.syntheticLarge)).parseStyleSheet()); },
-        { warmupRounds: 5, samples: 20, iterations: 10 }
+        { warmupRounds: 2, samples: 10, iterations: 3 }
       ),
     },
 
@@ -302,7 +314,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: geocities.css (15KB)',
         () => { sink(new Parser(tokenize(fixtures.geocitiesCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 20, iterations: 80 }
+        { warmupRounds: 3, samples: 10, iterations: 30 }
       ),
     },
 
@@ -312,7 +324,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: whatwg styles.css (11KB)',
         () => { sink(new Parser(tokenize(fixtures.htmlStylesCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 20, iterations: 80 }
+        { warmupRounds: 3, samples: 10, iterations: 30 }
       ),
     },
 
@@ -322,7 +334,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: modern.css (7.7KB)',
         () => { sink(new Parser(tokenize(fixtures.modernCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 20, iterations: 80 }
+        { warmupRounds: 3, samples: 10, iterations: 30 }
       ),
     },
 
@@ -332,7 +344,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       run: () => runBench(
         'tokenize + parse: postcss cases (4.4KB)',
         () => { sink(new Parser(tokenize(fixtures.postcssCss)).parseStyleSheet()); },
-        { warmupRounds: 6, samples: 20, iterations: 100 }
+        { warmupRounds: 3, samples: 10, iterations: 40 }
       ),
     },
 
@@ -352,7 +364,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(d.getPropertyValue('border'));
           sink(d.cssText);
         },
-        { warmupRounds: 6, samples: 20, iterations: 150 }
+        { warmupRounds: 3, samples: 10, iterations: 60 }
       ),
     },
 
@@ -368,7 +380,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           }
           sink(len);
         },
-        { warmupRounds: 6, samples: 20, iterations: 100 }
+        { warmupRounds: 3, samples: 10, iterations: 40 }
       ),
     },
 
@@ -386,7 +398,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           const reParsed = new Parser(tokenize(fullText)).parseStyleSheet();
           sink(reParsed.cssRules.length);
         },
-        { warmupRounds: 6, samples: 20, iterations: 20 }
+        { warmupRounds: 3, samples: 10, iterations: 10 }
       ),
     },
 
@@ -401,7 +413,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(matches(targetElement, ':not(span, a)'));
           sink(matches(cardElement, 'div[data-state="visible"] > a.btn.primary'));
         },
-        { warmupRounds: 15, samples: 20, iterations: 1000 }
+        { warmupRounds: 5, samples: 10, iterations: 400 }
       ),
     },
 
@@ -414,7 +426,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(getCascadedStyle(targetElement, cascadeRules));
           sink(getCascadedStyle(cardElement, cascadeRules));
         },
-        { warmupRounds: 8, samples: 20, iterations: 150 }
+        { warmupRounds: 3, samples: 10, iterations: 20 }
       ),
     },
 
@@ -430,7 +442,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(CSSNumericValue.parse('calc(10px + 20px * 2)'));
           sink(CSSNumericValue.parse('clamp(10px, 5vw, 50px)'));
         },
-        { warmupRounds: 15, samples: 20, iterations: 600 }
+        { warmupRounds: 5, samples: 10, iterations: 200 }
       ),
     },
   ];
@@ -450,42 +462,47 @@ export async function runAllBenchmarks(filterName?: string): Promise<BenchmarkSt
 
 // Print formatted console table
 export function printResultsTable(results: BenchmarkStats[]): void {
-  console.log('\n==============================================================================================================================');
+  console.log('\n========================================================================================================================================');
   console.log('CSSOMNOM BENCHMARK SUITE');
-  console.log('==============================================================================================================================');
+  console.log('========================================================================================================================================');
   console.log(
-    'Benchmark'.padEnd(48) +
+    'Benchmark'.padEnd(46) +
     'Median (ms)'.padStart(13) +
     'Spread (±)'.padStart(11) +
     'Ops/sec'.padStart(13) +
-    'GC time (ms)'.padStart(14) +
-    'GC count'.padStart(10) +
-    'Heap (KB)'.padStart(12) +
+    'GC ms/sample'.padStart(14) +
+    'GC % time'.padStart(11) +
+    'GC/iter'.padStart(10) +
+    'Peak ΔHeap'.padStart(13) +
     'Samples'.padStart(9)
   );
-  console.log('-'.repeat(126));
+  console.log('-'.repeat(136));
 
   for (const r of results) {
-    const name = r.name.length > 46 ? r.name.slice(0, 43) + '...' : r.name;
+    const name = r.name.length > 44 ? r.name.slice(0, 41) + '...' : r.name;
     const medianStr = r.medianMs.toFixed(2) + ' ms';
     const spreadStr = '±' + r.stdDevMs.toFixed(2);
     const opsStr = r.opsPerSec.toFixed(1) + ' op/s';
-    const gcTimeStr = r.gcTimeMs.toFixed(1) + ' ms';
-    const gcCountStr = r.gcCount.toString();
-    const heapStr = r.heapGrowthKb.toFixed(0) + ' KB';
+    const gcTimeStr = r.gcTimePerSampleMs.toFixed(2) + ' ms';
+    const gcPctStr = r.gcPercentTime.toFixed(1) + '%';
+    const gcIterStr = r.gcCountPerIter.toFixed(3);
+    const heapStr = r.peakDeltaHeapKb >= 1024
+      ? (r.peakDeltaHeapKb / 1024).toFixed(1) + ' MB'
+      : r.peakDeltaHeapKb.toFixed(0) + ' KB';
     const samplesStr = `${r.samples}×${r.iterationsPerSample}`;
     console.log(
-      name.padEnd(48) +
+      name.padEnd(46) +
       medianStr.padStart(13) +
       spreadStr.padStart(11) +
       opsStr.padStart(13) +
       gcTimeStr.padStart(14) +
-      gcCountStr.padStart(10) +
-      heapStr.padStart(12) +
+      gcPctStr.padStart(11) +
+      gcIterStr.padStart(10) +
+      heapStr.padStart(13) +
       samplesStr.padStart(9)
     );
   }
-  console.log('==============================================================================================================================\n');
+  console.log('========================================================================================================================================\n');
 }
 
 // If executed directly
