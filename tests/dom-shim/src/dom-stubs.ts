@@ -1749,11 +1749,9 @@ function patchLinkElementPrototype(window: WindowType): void {
     if (val) {
       this.setAttribute('disabled', '');
       explicitlyEnabledMap.set(this, false);
-      (this as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = false;
       const sheet = styleSheetMap.get(this);
       if (sheet) {
         (sheet as unknown as { _ownerNode: unknown })._ownerNode = null;
-        (sheet as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = false;
       }
     } else {
       // HTML § 4.8.4:
@@ -1763,16 +1761,12 @@ function patchLinkElementPrototype(window: WindowType): void {
       }
       this.removeAttribute('disabled');
       explicitlyEnabledMap.set(this, true);
-      (this as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = true;
       let sheet = styleSheetMap.get(this);
       if (!sheet) {
         sheet = loadLinkStyleSheet(this, window);
         styleSheetMap.set(this, sheet);
       } else {
         (sheet as unknown as { _ownerNode: unknown })._ownerNode = this;
-      }
-      if (sheet) {
-        (sheet as unknown as { _explicitlyEnabled?: boolean })._explicitlyEnabled = true;
       }
       queueMicrotask(() => {
         try {

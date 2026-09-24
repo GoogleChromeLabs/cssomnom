@@ -1319,13 +1319,15 @@ export class Parser {
       const i2 = lastNonWsIndex(i1 - 1);
       const t2 = declValue[i2];
       if (i2 >= 0 && t2 && t2.type === 'delim' && t2.value === '!') {
-
         important = true;
         declValue.splice(i2);
-        while (declValue.length > 0 && declValue[declValue.length - 1].type === 'whitespace') {
-          declValue.pop();
-        }
       }
+    }
+
+    // css-syntax-3 § 5.5.5 #consume-a-declaration Step 7
+    // While the last item in decl's value is a whitespace-token, remove that token.
+    while (declValue.length > 0 && declValue[declValue.length - 1].type === 'whitespace') {
+      declValue.pop();
     }
 
     if (!name.startsWith('--')) {

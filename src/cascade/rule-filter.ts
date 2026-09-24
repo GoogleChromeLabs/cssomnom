@@ -145,10 +145,7 @@ export function collectStyleSheetsAndRules(
   // HTML § 4.8.4 #dom-link-disabled
   // cssom-1 § 4.6 #the-linkstyle-interface
   const isSheetEnabledForSet = (sheet: unknown): boolean => {
-    const s = sheet as { ownerNode?: { _explicitlyEnabled?: boolean }; _explicitlyEnabled?: boolean };
-    if (s._explicitlyEnabled || s.ownerNode?._explicitlyEnabled) {
-      return true;
-    }
+    if (!sheet || typeof sheet !== 'object') return false;
     const title = getSheetTitle(sheet);
     const rel = getSheetRel(sheet) || '';
     const isAlternate = rel.toLowerCase().includes('alternate');
@@ -157,6 +154,9 @@ export function collectStyleSheetsAndRules(
     }
     if (preferredTitleFound && preferredTitle !== null) {
       return title === preferredTitle;
+    }
+    if ((sheet as { ownerNode?: unknown }).ownerNode) {
+      return true;
     }
     return !isAlternate;
   };
