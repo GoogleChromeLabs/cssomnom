@@ -25,6 +25,7 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
        - `README.md`
        - `PLAN.md`
        - `AGENTS.md`
+       - `ARCHITECTURE.md`
        - `LOOP.md`
        - `MAINTENANCE.md`
        - `CONTRIBUTING.md`
@@ -35,6 +36,11 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
          - Audit `README.md § Architecture & Spec Boundaries` against actual codebase exports in `src/index.ts` and `tests/api-surface.test.ts`.
          - Ensure documented standard CSSOM / Houdini interfaces, Bridge utilities, intentional spec deviations, and non-goals (e.g. no `getComputedStyle()`) are factually accurate, up to date, and omit no methods or deviations.
          - Ensure consistent documentation of `ParseHooks` (`src/parse-hooks.ts`) for circular dependency inversion.
+       - **`ARCHITECTURE.md` Accuracy (code map)**: Agents rely on this file to orient, so drift is costly. Verify against the code on disk:
+         - Every file, directory, and entry point it names exists and still owns what it claims (open the file; don't trust names).
+         - Every `src/` module and directory (excluding `src/data/gen/`) is covered, and none that were deleted or renamed are still listed.
+         - The pipeline description, `ParseHooks` injection point, UA stylesheet entry into the cascade, codegen flow, and the "where do I look for X" table match current code.
+         - It stays short (roughly under 150 lines) and contains no phase history.
        - **Execution Rules & Scripts**: Enforce that documentation consistently specifies native Node execution (`node script.ts`, NOT `npx tsx` or `ts-node`) and valid npm scripts (`pnpm run preflight`, `pnpm run codegen`, `pnpm run maintain`, `pnpm test`, `wpt:node:*`, `wpt:browser:*`).
      - Identify any contradictory claims, outdated API signatures, or conflicting guidelines between files.
 
@@ -73,6 +79,8 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
      - Check for un-tracked open questions, `TODO` / `TBD` markers, or incomplete phase tasks (`[ ]`).
      - Verify that resolved items are marked `[x]` with appropriate completion descriptions.
      - Highlight any open decision items that lack an assigned phase or owner.
+     - `PLAN.archive.md` holds completed phases only; do not audit it for open items, but flag any `[ ]` task found there (open work must stay in `PLAN.md`).
+     - Flag when `PLAN.md` holds more than ~40 completed phases, recommending the oldest batch (~20) be moved to `PLAN.archive.md`, keeping a buffer of recent completed phases in `PLAN.md`.
 
   6. **Git Repository Health Check**:
      - Execute `git status` to inspect working-tree health.

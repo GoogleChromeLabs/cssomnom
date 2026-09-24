@@ -67,6 +67,7 @@ Since subagent definitions are session-specific and do not persist across conver
     - Reject snapshot sanitizers or regex output-censoring.
     - Ensure tests are strong and contain valid assertions.
     - Conformance Delta Audit: Verify that the patch eliminated the target failure cluster without leaving trivial serialization / harness mismatches in the top remaining cluster.
+    - Code Size Gate (LOOP.md § 3): check the net `src/` delta. Reject cleanups that grow `src/`, unjustified growth in features, test-shaped special cases, and helpers that duplicate existing ones.
     
     Format your response exactly as:
     # Code Review Report
@@ -111,6 +112,16 @@ Reviewers and Grizz MUST reject any of the following shortcuts:
     *   No adding of failing WPT sandbox tests to the `exclude` or `knownFailures` lists in `tests/fixtures/baselines/wpt-sandbox-known-failures.json` unless it represents a spec deviation documented in `README.md`.
 *   **Oracle Isolation**:
     *   Do not modify the `submodules/` specs or test suites to make tests pass.
+
+### Code Size Gate
+
+The codebase is already large enough that agents struggle to orient. Growth is a cost that must be paid for.
+
+*   **Report the delta**: Every developer report states the net `src/` line delta (excluding `src/data/gen/`) separately from tests, e.g. `git diff --shortstat <base>..HEAD -- src ':!src/data/gen'`.
+*   **Refactors and cleanups must be net-negative in `src/`.** A cleanup that grows `src/` is rejected.
+*   **Features and conformance fixes must justify growth**: the report names what was added and why no existing mechanism (cascade, shorthand tables, codegen data, shared helpers) could absorb it. Reviewers check that claim.
+*   **No test-shaped special cases**: reject property-, element-, or WPT-test-specific branches (`if (prop === 'x' && value === 'y')`) when the behavior can be fixed at the model level (spec algorithm, generated data, or a general rule). If a special case is truly required by the spec, it must cite the spec text.
+*   **Duplication check**: reviewers reject new helpers that duplicate an existing one (logical-property mapping, serialization, tokenization of already-parsed values).
 
 ---
 

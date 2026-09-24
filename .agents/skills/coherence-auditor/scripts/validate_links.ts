@@ -15,6 +15,7 @@ const CANONICAL_DOCS = [
   'README.md',
   'PLAN.md',
   'AGENTS.md',
+  'ARCHITECTURE.md',
   'LOOP.md',
   'MAINTENANCE.md',
   'CONTRIBUTING.md',
