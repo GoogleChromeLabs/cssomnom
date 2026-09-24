@@ -280,11 +280,31 @@ export function getGitCommitInfo(): { commitHash: string; isDirty: boolean } {
   return { commitHash, isDirty };
 }
 
-export function execGit(args: string[]): string {
+export function execGit(args: string[], options: { cwd?: string } = {}): string {
   try {
-    return execFileSync('git', args, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'ignore'] }).trim();
-  } catch {
-    return '';
+    return execFileSync('git', args, {
+      cwd: options.cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch (err: unknown) {
+    const error = err as { stderr?: string | Buffer; stdout?: string | Buffer; message?: string };
+    const stderr = error.stderr ? error.stderr.toString().trim() : '';
+    throw new Error(`git command failed ("git ${args.join(' ')}"): ${stderr || error.message}`);
+  }
+}
+
+export function execCommand(command: string, args: string[], options: { cwd?: string } = {}): string {
+  try {
+    return execFileSync(command, args, {
+      cwd: options.cwd,
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch (err: unknown) {
+    const error = err as { stderr?: string | Buffer; stdout?: string | Buffer; message?: string };
+    const stderr = error.stderr ? error.stderr.toString().trim() : '';
+    throw new Error(`Command failed ("${command} ${args.join(' ')}"): ${stderr || error.message}`);
   }
 }
 

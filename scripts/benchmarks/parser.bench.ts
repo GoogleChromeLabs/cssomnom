@@ -17,7 +17,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { performance } from 'node:perf_hooks';
+import { performance, PerformanceObserver } from 'node:perf_hooks';
 import { parseHTML } from 'linkedom';
 
 // Root-relative imports (ensuring ParseHooks and all prototypes are initialized)
@@ -92,31 +92,30 @@ export interface BenchmarkStats {
   minMs: number;
   maxMs: number;
   opsPerSec: number;
+  gcTimeMs: number;
+  gcCount: number;
+  heapGrowthKb: number;
 }
 
-function calculateStats(name: string, sampleTimes: number[], iterationsPerSample: number): BenchmarkStats {
+export function calculateStats(
+  name: string,
+  sampleTimes: number[],
+  iterationsPerSample: number,
+  gcTimeMs: number,
+  gcCount: number,
+  heapGrowthKb: number,
+): BenchmarkStats {
   const sorted = [...sampleTimes].sort((a, b) => a - b);
   const n = sorted.length;
   const minMs = sorted[0];
   const maxMs = sorted[n - 1];
 
-  // For 20 samples, trim top 5 (25% top tail to eliminate GC pauses)
-  // and bottom 2 (10% bottom tail to eliminate fluke cache hits).
-  // This measures the steady-state V8 execution speed cleanly.
-  let trimmed: number[];
-  if (n >= 18) {
-    trimmed = sorted.slice(2, n - 5);
-  } else if (n >= 9) {
-    trimmed = sorted.slice(1, n - 2);
-  } else {
-    trimmed = sorted;
-  }
-
-  const tn = trimmed.length;
-  const medianMs = tn % 2 === 1 ? trimmed[Math.floor(tn / 2)] : (trimmed[tn / 2 - 1] + trimmed[tn / 2]) / 2;
-  const sum = trimmed.reduce((acc, v) => acc + v, 0);
-  const meanMs = sum / tn;
-  const variance = trimmed.reduce((acc, v) => acc + (v - meanMs) ** 2, 0) / tn;
+  // Completely UNBIASED statistics across ALL raw recorded samples:
+  // No trimming top or bottom percentiles.
+  const medianMs = n % 2 === 1 ? sorted[Math.floor(n / 2)] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+  const sum = sorted.reduce((acc, v) => acc + v, 0);
+  const meanMs = sum / n;
+  const variance = sorted.reduce((acc, v) => acc + (v - meanMs) ** 2, 0) / n;
   const stdDevMs = Math.sqrt(variance);
   const opsPerSec = medianMs > 0 ? (iterationsPerSample * 1000) / medianMs : 0;
 
@@ -130,6 +129,9 @@ function calculateStats(name: string, sampleTimes: number[], iterationsPerSample
     minMs,
     maxMs,
     opsPerSec,
+    gcTimeMs,
+    gcCount,
+    heapGrowthKb,
   };
 }
 
@@ -139,12 +141,12 @@ export function sink(val: unknown): void {
   _blackHoleSink = val;
 }
 
-// Run a benchmark with adaptive warmup, multiple samples, and outer GC
-function runBench(
+// Run a benchmark with warmup, multiple samples, and explicit GC & memory instrumentation
+async function runBench(
   name: string,
   fn: () => void,
   options: { warmupRounds?: number; samples?: number; iterations?: number } = {}
-): BenchmarkStats {
+): Promise<BenchmarkStats> {
   const warmupRounds = options.warmupRounds ?? 8;
   const samples = options.samples ?? 20;
   const iterations = options.iterations ?? 10;
@@ -161,7 +163,21 @@ function runBench(
     (globalThis as unknown as { gc: () => void }).gc();
   }
 
-  // 3. Timed samples (no GC during or between individual sample measurements)
+  // 3. Setup GC PerformanceObserver to explicitly record GC time and pause counts
+  let totalGcTimeMs = 0;
+  let totalGcCount = 0;
+  const gcObserver = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      totalGcTimeMs += entry.duration;
+      totalGcCount++;
+    }
+  });
+  gcObserver.observe({ entryTypes: ['gc'] });
+
+  const initialHeapUsed = process.memoryUsage().heapUsed;
+  let peakHeapUsed = initialHeapUsed;
+
+  // 4. Timed samples (unbiased: includes natural GC pauses occurring during execution)
   const sampleTimes: number[] = [];
   for (let s = 0; s < samples; s++) {
     const t0 = performance.now();
@@ -170,14 +186,25 @@ function runBench(
     }
     const t1 = performance.now();
     sampleTimes.push(t1 - t0);
+
+    const currentHeap = process.memoryUsage().heapUsed;
+    if (currentHeap > peakHeapUsed) {
+      peakHeapUsed = currentHeap;
+    }
   }
 
-  return calculateStats(name, sampleTimes, iterations);
+  // Yield to Node event loop so all pending PerformanceObserver GC entries fire
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  gcObserver.disconnect();
+
+  const heapGrowthKb = Math.max(0, (peakHeapUsed - initialHeapUsed) / 1024);
+
+  return calculateStats(name, sampleTimes, iterations, totalGcTimeMs, totalGcCount, heapGrowthKb);
 }
 
 export interface BenchmarkDefinition {
   name: string;
-  run: () => BenchmarkStats;
+  run: () => Promise<BenchmarkStats>;
 }
 
 export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
@@ -185,11 +212,8 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
 
   // Pre-tokenize / pre-parse fixtures for isolated benchmarks
   const syntheticTokens = tokenize(fixtures.syntheticLarge);
-  const geocitiesTokens = tokenize(fixtures.geocitiesCss);
   const modernTokens = tokenize(fixtures.modernCss);
-
   const modernSheet = new Parser(modernTokens).parseStyleSheet();
-  const geocitiesSheet = new Parser(geocitiesTokens).parseStyleSheet();
 
   // DOM setup for matcher & cascade
   const domHtml = `
@@ -348,21 +372,21 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       ),
     },
 
-    // 11. Full parse -> serialize -> re-parse round-trip
+    // 11. Full parse -> serialize -> re-parse round-trip: true text -> parse -> serialize -> reparse
     {
       name: 'round-trip: parse -> serialize -> reparse (geocities.css)',
       run: () => runBench(
         'round-trip: parse -> serialize -> reparse (geocities.css)',
         () => {
-          let total = 0;
-          for (let i = 0; i < geocitiesSheet.cssRules.length; i++) {
-            const text = geocitiesSheet.cssRules[i].cssText;
-            const reParsed = new Parser(tokenize(text)).parseStyleSheet();
-            total += reParsed.cssRules.length;
+          const initialSheet = new Parser(tokenize(fixtures.geocitiesCss)).parseStyleSheet();
+          let fullText = '';
+          for (let i = 0; i < initialSheet.cssRules.length; i++) {
+            fullText += initialSheet.cssRules[i].cssText + '\n';
           }
-          sink(total);
+          const reParsed = new Parser(tokenize(fullText)).parseStyleSheet();
+          sink(reParsed.cssRules.length);
         },
-        { warmupRounds: 6, samples: 20, iterations: 60 }
+        { warmupRounds: 6, samples: 20, iterations: 20 }
       ),
     },
 
@@ -412,13 +436,13 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
   ];
 }
 
-export function runAllBenchmarks(filterName?: string): BenchmarkStats[] {
+export async function runAllBenchmarks(filterName?: string): Promise<BenchmarkStats[]> {
   const defs = getBenchmarkDefinitions();
   const results: BenchmarkStats[] = [];
 
   for (const def of defs) {
     if (filterName && def.name !== filterName) continue;
-    results.push(def.run());
+    results.push(await def.run());
   }
 
   return results;
@@ -426,37 +450,46 @@ export function runAllBenchmarks(filterName?: string): BenchmarkStats[] {
 
 // Print formatted console table
 export function printResultsTable(results: BenchmarkStats[]): void {
-  console.log('\n========================================================================================================');
+  console.log('\n==============================================================================================================================');
   console.log('CSSOMNOM BENCHMARK SUITE');
-  console.log('========================================================================================================');
+  console.log('==============================================================================================================================');
   console.log(
-    'Benchmark'.padEnd(52) +
-    'Median (ms)'.padStart(14) +
-    'Spread (±)'.padStart(12) +
-    'Ops/sec'.padStart(14) +
-    'Samples'.padStart(10)
+    'Benchmark'.padEnd(48) +
+    'Median (ms)'.padStart(13) +
+    'Spread (±)'.padStart(11) +
+    'Ops/sec'.padStart(13) +
+    'GC time (ms)'.padStart(14) +
+    'GC count'.padStart(10) +
+    'Heap (KB)'.padStart(12) +
+    'Samples'.padStart(9)
   );
-  console.log('-'.repeat(102));
+  console.log('-'.repeat(126));
 
   for (const r of results) {
-    const name = r.name.length > 50 ? r.name.slice(0, 47) + '...' : r.name;
+    const name = r.name.length > 46 ? r.name.slice(0, 43) + '...' : r.name;
     const medianStr = r.medianMs.toFixed(2) + ' ms';
     const spreadStr = '±' + r.stdDevMs.toFixed(2);
     const opsStr = r.opsPerSec.toFixed(1) + ' op/s';
+    const gcTimeStr = r.gcTimeMs.toFixed(1) + ' ms';
+    const gcCountStr = r.gcCount.toString();
+    const heapStr = r.heapGrowthKb.toFixed(0) + ' KB';
     const samplesStr = `${r.samples}×${r.iterationsPerSample}`;
     console.log(
-      name.padEnd(52) +
-      medianStr.padStart(14) +
-      spreadStr.padStart(12) +
-      opsStr.padStart(14) +
-      samplesStr.padStart(10)
+      name.padEnd(48) +
+      medianStr.padStart(13) +
+      spreadStr.padStart(11) +
+      opsStr.padStart(13) +
+      gcTimeStr.padStart(14) +
+      gcCountStr.padStart(10) +
+      heapStr.padStart(12) +
+      samplesStr.padStart(9)
     );
   }
-  console.log('========================================================================================================\n');
+  console.log('==============================================================================================================================\n');
 }
 
 // If executed directly
-if (process.argv[1] && (process.argv[1].endsWith('parser.bench.ts') || process.argv[1].endsWith('parser.bench.js'))) {
+async function main() {
   const isJson = process.argv.includes('--json');
   let filterName: string | undefined;
   for (let i = 2; i < process.argv.length; i++) {
@@ -467,10 +500,17 @@ if (process.argv[1] && (process.argv[1].endsWith('parser.bench.ts') || process.a
     }
   }
 
-  const results = runAllBenchmarks(filterName);
+  const results = await runAllBenchmarks(filterName);
   if (isJson) {
     console.log(JSON.stringify(results, null, 2));
   } else {
     printResultsTable(results);
   }
+}
+
+if (process.argv[1] && (process.argv[1].endsWith('parser.bench.ts') || process.argv[1].endsWith('parser.bench.js'))) {
+  main().catch((err) => {
+    console.error('Benchmark execution error:', err);
+    process.exit(1);
+  });
 }
