@@ -610,3 +610,39 @@ Phase 148's final harness (`a816dff`) was not re-audited. Known gaps:
 - [ ] **Low power**: 95% CIs in the Phase 148 table are roughly ±10–15% wide, so only large changes (like the +53% serializer speedup) are detectable. Reduce per-run variance (e.g. more iterations per sample, CPU pinning, quieter machine) until A/A CIs are a few percent wide.
 - [ ] **`parse: synthetic large tokens`**: earlier runs showed a CI-excluding-zero ~2–4% slowdown pre- vs post-janitor; the 15-run table shows -1.6% with CI [-9.5%, +14.9%]. Unresolved; re-measure once power improves, and profile with `--cpu-prof` before attributing a cause.
 - [ ] **Review open questions**: whether pre-sample `globalThis.gc()` hides allocation cost from wall time, and whether the `|delta| < 2.0%` "significant, small" label was chosen a priori.
+
+## Phase 152: Remove Layout Guessing from Computed Style [/]
+**Objective**: Enforce [AGENTS.md § Browser-Only Capabilities](./AGENTS.md). Delete code that fakes layout-dependent used values and return computed values instead; lost WPT subtests must classify as `LAYOUT_GEOMETRY`, not count as genuine failures.
+
+### Tasks
+- [ ] Delete `shouldPreserveAutoMinSize` (regex over inline `style` attributes), auto `margin-left/right` centering arithmetic, and `perspective-origin` box-size resolution in [`computed-style.ts`](./src/cascade/computed-style.ts).
+- [ ] Delete the `offsetWidth` / `offsetHeight` layout stub in [`dom-stubs.ts`](./tests/dom-shim/src/dom-stubs.ts).
+- [ ] Narrow [`classifier.ts`](./scripts/wpt/node/core/classifier.ts) if needed (with tests in `tests/wpt-classifier.test.ts`), regenerate the passing-set baseline, and list every lost subtest.
+- [ ] README § Intentional Non-Goals: layout-dependent used values return computed values.
+
+Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `computed-style.ts` (`clip`) and `variable-resolver.ts` should resolve against the root element's font-size; relative-position `auto` insets should negate the opposite inset.
+
+## Phase 153: Single Rule Model — Retire `ASTAtRule` from the Public `Rule` Type [ ]
+**Objective**: `Rule = ASTAtRule | CSSRule` ([types.ts](./src/types.ts)) forces every consumer to handle a plain-object at-rule shape that only one feature still produces, which is where the cascade's `Rule | CSSRule | Declaration` signatures and `instanceof X || type === N` duck typing come from.
+
+**History** (`history` branch): the union was a snapshot of a half-migrated parser written during an `any`-removal pass (`e788178`, Apr 13). Known at-rules became `CSSRule` classes on Apr 14 (`0fd930e`), unknown at-rules became `CSSAtRule` on Apr 25 (`8ae172d`). Since then `ASTAtRule` escapes the parser only via the `atRules` option ([parser.ts `finalizeAtRule`](./src/parser.ts), added in `0909f19`), used by the CSS Parser API ([parser-api.ts](./src/parser-api.ts)). Phase 126 removed double casts but kept the union.
+
+### Tasks
+- [ ] Return `atRules`-option custom at-rules as `CSSAtRule` (with child rules/declarations) instead of raw `ASTAtRule`; update `tests/parser-api.test.ts`.
+- [ ] Make public `Rule` mean `CSSRule`; keep `ASTAtRule` private to the parser (scratch object for at-rule handlers). Stop exporting it from [index.ts](./src/index.ts); update the API surface snapshot and README.
+- [ ] Narrow signatures and delete the dual-shape handling in `src/cascade/` (`index.ts`, `rule-filter.ts`, `layer-manager.ts`, `at-rule-manager.ts`) and `toParserRule` in `parser-api.ts`; remove the `(r as { type?: number }).type === N` fallbacks where `instanceof` suffices.
+- [ ] Net-negative `src/`; 0 WPT regressions.
+
+## Potential Roadmap (Needs Discussion)
+Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
+
+- **Dead exports** (~60 lines): `compareLayerOrder`, `hasUnknownFeature`, `PAGE_DESCRIPTORS`, `isKeywordValue`, `radToDeg` etc. have no references outside their defining file.
+- **`Parser.resolveVariables`** (~140): a second variable-substitution engine in [parser.ts](./src/parser.ts) alongside [variable-resolver.ts](./src/cascade/variable-resolver.ts). Public API, so a thin wrapper would remain.
+- **`StreamingTokenizerStream`** (~50): only used by `tests/streaming.test.ts`.
+- **Codegen hand-maintained lists** (~70): `INHERITED_PROPERTIES`, extra initial values, known pseudo-element sets from `mdn-data` / `@webref/css`.
+- **Codegen box-shorthand tables and shorthand getters** (~580): `shorthands.ts`, `serializer.ts`, `computed-style.ts`.
+- **Unify math engines** (~250): unit tables and simplification duplicated between [math-parser.ts](./src/math-parser.ts) and Typed OM `CSSMathOperations.ts`.
+- **Unify color handling** (~110): [color-resolver.ts](./src/cascade/color-resolver.ts) vs Typed OM `color-spaces.ts`.
+- **Keep parsed tokens on declarations** (overlaps Phase 150): declaration values stored as strings cause most of the 73 `tokenize()` calls; Blink keeps parsed values and never re-tokenizes.
+- **Considered and not recommended**: reorganizing `src/` by feature (git co-change data shows commits cluster at engine boundaries, median 4 files); Blink-style per-property classes (Blink's hand-written hooks still collapse into 12.8k-line `longhands_custom.cc`, so it organizes without shrinking).
+- **Possible perf idea**: Blink's bit-packed `CascadePriority` for single-integer cascade comparisons; speed, not size.
