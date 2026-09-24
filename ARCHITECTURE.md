@@ -52,11 +52,16 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - [`src/specificity.ts`](./src/specificity.ts): Specificity calculation `[A, B, C]` and comparisons.
 - [`src/matcher.ts`](./src/matcher.ts): DOM element selector matching engine (`matches`, `querySelector`, `querySelectorAll`).
 - [`src/MediaParser.ts`](./src/MediaParser.ts): Media Queries Level 4/5 parser and 3-valued boolean environment evaluator.
-- [`src/math-parser.ts`](./src/math-parser.ts): CSS Math parser and simplifier (`calc()`, `min()`, `max()`, `clamp()`, `round()`).
+- [`src/math-parser.ts`](./src/math-parser.ts): CSS Math parser and simplifier (`calc()`, `min()`, `max()`, `clamp()`, `round()`); owns AST simplification algorithms (`simplify()`) consumed by Typed OM and cascade.
 - [`src/DOMMatrix.ts`](./src/DOMMatrix.ts): Geometry API matrix transformation and decomposition implementation.
 - [`src/PropertyRegistry.ts`](./src/PropertyRegistry.ts): Houdini `@property` and `CSS.registerProperty()` syntax validator and registry.
 - [`src/parser-api.ts`](./src/parser-api.ts): WICG CSS Parser API and `CSS.*` utility namespace (`CSS.escape`, `CSS.supports`).
 - [`src/webidl.ts`](./src/webidl.ts): WebIDL prototype descriptors, brand checks, arity enforcement, and constants.
+- [`src/cascade.ts`](./src/cascade.ts): Thin barrel export redirecting root cascade imports to `src/cascade/index.ts`.
+- [`src/css-escape.ts`](./src/css-escape.ts): Spec-compliant `CSS.escape()` implementation per CSSOM § 3.
+- [`src/internal-token.ts`](./src/internal-token.ts): Internal symbol token guarding non-constructible CSSOM rule constructors per WebIDL § 3.6.3.
+- [`src/utils.ts`](./src/utils.ts): Common helper utilities (`camelToDashed`, `createIndexedProxy`, `deleteRuleFromArray`).
+- [`src/utils/format.ts`](./src/utils/format.ts): Number formatting utility using `Intl.NumberFormat` with spec float precision.
 - [`src/cascade/`](./src/cascade/): Cascade resolution and computed style engine:
   - [`cascade/index.ts`](./src/cascade/index.ts): Main pipeline orchestration for `getCascadedStyle()`.
   - [`cascade/rule-filter.ts`](./src/cascade/rule-filter.ts): Rule harvesting, media query filtering, and selector matching.
@@ -68,13 +73,16 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
   - [`cascade/value-processor.ts`](./src/cascade/value-processor.ts): Standard property processing and initial value fallback.
   - [`cascade/computed-style.ts`](./src/cascade/computed-style.ts): `CSSComputedStyleDeclaration` resolving computed property values.
   - [`cascade/types.ts`](./src/cascade/types.ts): Cascade types (`MatchedDeclaration`, `CascadeOrigin`).
-- [`src/typed-om/`](./src/typed-om/): CSS Typed OM Level 1 & 2 implementation:
-  - [`typed-om/values/`](./src/typed-om/values/): Style values (`CSSStyleValue`, `CSSKeywordValue`, `CSSImageValue`, `CSSUnparsedValue`).
-  - [`typed-om/numeric/`](./src/typed-om/numeric/): Numeric values (`CSSUnitValue`, `CSSMathValue`, math expressions, type math).
-  - [`typed-om/color/`](./src/typed-om/color/): Typed colors (`CSSRGB`, `CSSHSL`, `CSSLab`, `CSSOKLCH`, `CSSColorValue`).
-  - [`typed-om/transform/`](./src/typed-om/transform/): Matrix and 3D transform components (`CSSTranslate`, `CSSRotate`, `CSSTransformValue`).
-  - [`typed-om/position/`](./src/typed-om/position/): `CSSPositionValue`.
-  - [`typed-om/style-map/`](./src/typed-om/style-map/): Map interfaces (`StylePropertyMapReadOnly`, `StylePropertyMap`).
+- [`src/typed-om.ts`](./src/typed-om.ts): Barrel re-export file for `src/typed-om/index.ts`.
+- [`src/typed-om/`](./src/typed-om/): CSS Typed OM Level 1 & 2 implementation (`index.ts` WebIDL descriptors and transforms hook):
+  - [`typed-om/values/`](./src/typed-om/values/): Style values (`CSSStyleValue.ts`, `CSSKeywordValue.ts`, `CSSImageValue.ts`, `CSSUnparsedValue.ts`, `CSSVariableReferenceValue.ts`), value factory (`style-value-factory.ts`), and parser (`style-value-parser.ts`).
+  - [`typed-om/numeric/`](./src/typed-om/numeric/): Base numeric types (`CSSNumericValue.ts`, `CSSUnitValue.ts`, `CSSNumericArray.ts`, `CSSNumericType.ts`) and arithmetic/conversion methods (`numeric-methods.ts`).
+  - [`typed-om/numeric/math/`](./src/typed-om/numeric/math/): Math expression classes (`CSSMathOperations.ts` for `CSSMathSum`, `CSSMathProduct`, etc.; `CSSMathValue.ts`; canonical sorting in `math-sorting.ts`).
+  - [`typed-om/color/`](./src/typed-om/color/): Color spaces (`CSSColorValue.ts`, `color-spaces.ts` for `CSSRGB`, `CSSHSL`, `CSSLab`, `CSSOKLCH`), rectification (`color-rectify.ts`), and reification (`color-reify.ts`).
+  - [`typed-om/transform/`](./src/typed-om/transform/): Matrix and 3D transforms (`CSSTransformValue.ts`, `CSSTransformComponent.ts`, `transform-components.ts`, string parser in `transform-parser.ts`).
+  - [`typed-om/position/`](./src/typed-om/position/): 2D positioning value object (`CSSPositionValue.ts`) and grammar parser (`position-parser.ts`).
+  - [`typed-om/style-map/`](./src/typed-om/style-map/): Map interfaces (`StylePropertyMapReadOnly.ts`, mutable `StylePropertyMap.ts`, and property grammar validation in `style-validation.ts`).
+  - [`typed-om/utils/`](./src/typed-om/utils/): Typed OM validation (`validation.ts`), type guards (`type-guards.ts`), formatting (`formatting.ts`), and global constructor retrieval (`host-env.ts`).
 - [`src/data/gen/`](./src/data/gen/): Generated data modules produced by `scripts/codegen/`.
 - [`scripts/codegen/`](./scripts/codegen/): Codegen scripts deriving properties, syntaxes, colors, units, and UA styles from `@webref` and MDN.
 
@@ -82,6 +90,8 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 
 - **ParseHooks Dependency Inversion**:
   To prevent circular imports between the parser (`src/parser.ts`) and CSSOM/Typed OM layers (`src/CSSOM.ts`, `src/typed-om.ts`), `src/parse-hooks.ts` declares hook signatures that throw by default. At bootstrap, `src/parser.ts` injects concrete implementations into `ParseHooks` (`ParseHooks.consumeRule = ...`, `ParseHooks.parseStyleAttribute = ...`). Never import `Parser` directly into `src/CSSOM.ts` or `src/typed-om/`.
+- **Math Simplification Ownership**:
+  `src/math-parser.ts` owns math expression parsing (`parseMathFunction()`) and canonical algebraic simplification (`simplify()`). Typed OM (`src/typed-om/numeric/numeric-methods.ts`, `style-value-factory.ts`) delegates `calc()` tree parsing and reduction to `src/math-parser.ts`, while wrapping simplified results into `CSSMathValue` or `CSSUnitValue` trees.
 - **Public Entry Points**:
   - `src/index.ts`: Primary library entry point for Node.js and bundlers.
   - `src/browser-entry.ts`: Browser environment entry point exposing globals with WebIDL property descriptors.
