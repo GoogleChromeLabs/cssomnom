@@ -43,8 +43,130 @@ export function getUaDefault(prop: string, element: unknown): string {
   const el = element as { tagName?: string; nodeName?: string };
   const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
 
-  if (prop === 'margin' || prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-left' || prop === 'margin-right') {
-    return tag === 'BODY' ? '8px' : '0px';
+  // html § 15.3.4 #flow-content-3, html § 15.3.3 #phrasing-content-3, css-cascade-5 § 6.2 #default
+  // Standard HTML UA default margins for headings, paragraphs, blockquotes, and body
+  if (tag === 'H1') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '21.44px'; // 0.67em of 32px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '0px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '21.44px 0px';
+    }
+    if (prop === 'margin-inline') {
+      return '0px';
+    }
+  } else if (tag === 'H2') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '19.92px'; // 0.83em of 24px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '0px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '19.92px 0px';
+    }
+    if (prop === 'margin-inline') {
+      return '0px';
+    }
+  } else if (tag === 'H3') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '18.72px'; // 1em of 18.72px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '0px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '18.72px 0px';
+    }
+    if (prop === 'margin-inline') {
+      return '0px';
+    }
+  } else if (tag === 'H4') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '21.28px'; // 1.33em of 16px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '0px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '21.28px 0px';
+    }
+    if (prop === 'margin-inline') {
+      return '0px';
+    }
+  } else if (tag === 'H5') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '22.176px'; // 1.67em of 13.28px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '0px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '22.176px 0px';
+    }
+    if (prop === 'margin-inline') {
+      return '0px';
+    }
+  } else if (tag === 'H6') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '24.971px'; // 2.33em of 10.72px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '0px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '24.971px 0px';
+    }
+    if (prop === 'margin-inline') {
+      return '0px';
+    }
+  } else if (tag === 'P') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '16px'; // 1em of 16px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '0px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '16px 0px';
+    }
+    if (prop === 'margin-inline') {
+      return '0px';
+    }
+  } else if (tag === 'BLOCKQUOTE') {
+    if (prop === 'margin-top' || prop === 'margin-block-start' || prop === 'margin-bottom' || prop === 'margin-block-end') {
+      return '16px'; // 1em of 16px font-size
+    }
+    if (prop === 'margin-left' || prop === 'margin-inline-start' || prop === 'margin-right' || prop === 'margin-inline-end') {
+      return '40px';
+    }
+    if (prop === 'margin' || prop === 'margin-block') {
+      return '16px 40px';
+    }
+    if (prop === 'margin-inline') {
+      return '40px';
+    }
+  } else if (tag === 'BODY') {
+    if (
+      prop === 'margin' || prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-left' || prop === 'margin-right' ||
+      prop === 'margin-block-start' || prop === 'margin-block-end' || prop === 'margin-inline-start' || prop === 'margin-inline-end' ||
+      prop === 'margin-block' || prop === 'margin-inline'
+    ) {
+      return '8px';
+    }
+  }
+
+  if (prop === 'margin') {
+    return '0px';
+  }
+  if (
+    prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-left' || prop === 'margin-right' ||
+    prop === 'margin-block-start' || prop === 'margin-block-end' || prop === 'margin-inline-start' || prop === 'margin-inline-end'
+  ) {
+    return '';
   }
   if (prop === 'display') {
     return BLOCK_TAGS.has(tag) ? 'block' : 'inline';
@@ -214,17 +336,19 @@ export function processStandardDeclarations(
           i = prevIdx + 1;
           continue;
         } else {
-          const val = (parentCascaded && INHERITED_PROPERTIES.has(prop))
+          const ua = getUaDefault(prop, element);
+          const val = ua || ((parentCascaded && INHERITED_PROPERTIES.has(prop))
             ? parentCascaded.getPropertyValue(prop)
-            : getUaDefault(prop, element);
+            : getInitialValue(prop, element));
           winningDeclarations.set(prop, { ...decl, value: val });
           break;
         }
       }
       if (trimmedVal === 'revert') {
-        const val = (parentCascaded && INHERITED_PROPERTIES.has(prop))
+        const ua = getUaDefault(prop, element);
+        const val = ua || ((parentCascaded && INHERITED_PROPERTIES.has(prop))
           ? parentCascaded.getPropertyValue(prop)
-          : getUaDefault(prop, element);
+          : getInitialValue(prop, element));
         winningDeclarations.set(prop, { ...decl, value: val });
         break;
       }

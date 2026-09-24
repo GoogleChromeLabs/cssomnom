@@ -3427,16 +3427,16 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
   - In `src/parser.ts:1690-1694` (`normalizeNestedSelector`): Check if enclosing rule context is an `@scope` rule. When inside `@scope`, preserve relative combinator syntax (`> .foo`) without prepending `& `.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/at-scope-relative-syntax.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/at-scope-relative-syntax.html) (+2 tests).
 
-#### Phase 141.2: Layer Ordering & Cascade Precedence (+20 tests) [ ]
-- [ ] **Implicit Sub-layer Sorting (+12 tests)**:
+#### Phase 141.2: Layer Ordering & Cascade Precedence (+20 tests) [x]
+- [x] **Implicit Sub-layer Sorting (+12 tests)**:
   - In `src/cascade/layer-manager.ts` and `src/cascade/rule-filter.ts:467`:
     - Implement `css-cascade-5 § 6.4.3`: unlayered style rules within an `@layer` block are assigned to an implicit sub-layer that is sorted **after** any explicitly nested layers.
     - Normal rules in the implicit sub-layer must win over explicit nested layers.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/layer-basic.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-basic.html) (+12 tests).
-- [ ] **Media-Conditioned Layer Scanning (+6 tests)**:
+- [x] **Media-Conditioned Layer Scanning (+6 tests)**:
   - In `scanLayers()`, pass the active media query environment so conditionally defined layers inside `@media` only establish layer precedence if their condition evaluates to true per `css-cascade-5 § 6.4.3`.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/layer-media-query.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/layer-media-query.html) (+6 tests).
-- [ ] **HTML UA Stylesheet Heading Margins (+2 tests)**:
+- [x] **HTML UA Stylesheet Heading Margins (+2 tests)**:
   - In `getUaDefault()`, add default block margins for heading tags (`h1`-`h6`, `p`, `blockquote`) matching HTML rendering specifications.
   - *Target*: Fixes [`submodules/web-platform-tests/css/css-cascade/revert-val-005.html`](file:///usr/local/google/home/paulirish/code/cssom/submodules/web-platform-tests/css/css-cascade/revert-val-005.html) (+2 tests).
 

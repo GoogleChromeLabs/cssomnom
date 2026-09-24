@@ -718,7 +718,27 @@ export class CSSImportRule extends CSSRule {
   // cssom-1 § 6.4.3 #dom-cssimportrule-stylesheet
   get styleSheet(): CSSStyleSheet | null {
     if (!this._styleSheet) {
-      this._styleSheet = CSSStyleSheet.createInternal([], (text: string) => {
+      let initialRules: Rule[] = [];
+      if (this._href && this._href.startsWith('data:')) {
+        const commaIdx = this._href.indexOf(',');
+        if (commaIdx !== -1) {
+          const meta = this._href.slice(5, commaIdx).toLowerCase();
+          const content = this._href.slice(commaIdx + 1);
+          try {
+            let rawData: string;
+            if (meta.includes(';base64')) {
+              rawData = typeof atob === 'function' ? atob(content) : Buffer.from(content, 'base64').toString('utf-8');
+            } else {
+              rawData = decodeURIComponent(content);
+            }
+            const tokens = tokenize(rawData);
+            initialRules = ParseHooks.consumeListOfRules(tokens, true);
+          } catch {
+            initialRules = [];
+          }
+        }
+      }
+      this._styleSheet = CSSStyleSheet.createInternal(initialRules, (text: string) => {
         const tokens = tokenize(text);
         return ParseHooks.consumeRule(tokens);
       });

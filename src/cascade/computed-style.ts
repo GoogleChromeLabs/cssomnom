@@ -375,11 +375,12 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
     }
 
-    if (this._element && (dashed === 'display' || dashed === 'margin')) {
+    if (this._element && (dashed === 'display' || dashed === 'margin' || dashed.startsWith('margin-'))) {
       const el = this._element as { tagName?: string; nodeName?: string };
       const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
       if (tag) {
-        return getUaDefault(dashed, this._element);
+        const ua = getUaDefault(dashed, this._element);
+        if (ua) return ua;
       }
     }
 

@@ -16,6 +16,7 @@
  */
 
 import { calculateSpecificity, compareSpecificity } from '../specificity.ts';
+import { resolveMediaEnvironment } from './layer-manager.ts';
 import {
   CSSRule,
   CSSNestedDeclarations,
@@ -47,7 +48,6 @@ import type {
   ComponentValue,
   Declaration,
   ASTAtRule,
-  MediaEnvironment,
   InternalRuleMetadata,
   ElementLike,
   DocumentLike,
@@ -555,37 +555,7 @@ export function collectMatchedDeclarations(
         ((rule as ASTAtRule).type === 'at-rule' && (rule as ASTAtRule).name === 'media')
       ) {
         const mediaText = rule instanceof CSSMediaRule ? rule.media.mediaText : serialize((rule as ASTAtRule).prelude || []).trim();
-        const doc = (element as { ownerDocument?: { defaultView?: Record<string, unknown> } }).ownerDocument;
-        const win = doc?.defaultView;
-        let env: Partial<MediaEnvironment> | undefined;
-        if (win) {
-          let width = 800;
-          let height = 600;
-          if (typeof win.innerWidth === 'number' && !isNaN(win.innerWidth)) width = win.innerWidth;
-          if (typeof win.innerHeight === 'number' && !isNaN(win.innerHeight)) height = win.innerHeight;
-          const frameEl = win.frameElement as { width?: string | number; height?: string | number; style?: { width?: string; height?: string }; getAttribute?: (n: string) => string | null } | undefined;
-          if (frameEl) {
-            const styleW = frameEl.style?.width || (frameEl.width !== undefined ? String(frameEl.width) : null) || frameEl.getAttribute?.('width');
-            if (styleW) {
-              const parsed = parseFloat(styleW);
-              if (!isNaN(parsed) && parsed > 0) width = parsed;
-            }
-            const styleH = frameEl.style?.height || (frameEl.height !== undefined ? String(frameEl.height) : null) || frameEl.getAttribute?.('height');
-            if (styleH) {
-              const parsed = parseFloat(styleH);
-              if (!isNaN(parsed) && parsed > 0) height = parsed;
-            }
-          }
-          env = {
-            width,
-            height,
-            deviceWidth: width,
-            deviceHeight: height,
-            aspectRatio: [width, height],
-            deviceAspectRatio: [width, height],
-            orientation: width > height ? 'landscape' : 'portrait',
-          };
-        }
+        const env = resolveMediaEnvironment(element);
         if (MediaParser.evaluate(mediaText, env)) {
           const childRules = (rule instanceof CSSGroupingRule ? rule.cssRules : (rule as ASTAtRule).childRules) || [];
           walkRules(childRules, parentSelector, currentLayer, scopeNode, scopeProximity);
@@ -596,24 +566,7 @@ export function collectMatchedDeclarations(
       ) {
         // css-cascade-6 § 5 #at-import
         const mediaText = rule instanceof CSSImportRule ? rule.media?.mediaText : '';
-        const doc = (element as { ownerDocument?: { defaultView?: Record<string, unknown> } }).ownerDocument;
-        const win = doc?.defaultView;
-        let env: Partial<MediaEnvironment> | undefined;
-        if (win) {
-          let width = 800;
-          let height = 600;
-          if (typeof win.innerWidth === 'number' && !isNaN(win.innerWidth)) width = win.innerWidth;
-          if (typeof win.innerHeight === 'number' && !isNaN(win.innerHeight)) height = win.innerHeight;
-          env = {
-            width,
-            height,
-            deviceWidth: width,
-            deviceHeight: height,
-            aspectRatio: [width, height],
-            deviceAspectRatio: [width, height],
-            orientation: width > height ? 'landscape' : 'portrait',
-          };
-        }
+        const env = resolveMediaEnvironment(element);
         if (mediaText && !MediaParser.evaluate(mediaText, env)) {
           continue;
         }

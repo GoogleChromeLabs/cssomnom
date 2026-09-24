@@ -34,7 +34,7 @@ export * from './color-resolver.ts';
 export * from './value-processor.ts';
 export * from './computed-style.ts';
 
-import { getLayerDeclarationOrder } from './layer-manager.ts';
+import { getLayerDeclarationOrder, resolveMediaEnvironment } from './layer-manager.ts';
 import {
   collectStyleSheetsAndRules,
   collectMatchedDeclarations,
@@ -182,7 +182,8 @@ export function getCascadedStyle(
   }
 
   // 2. Discover @layer ordering (CSS Cascade 5 § 6.4 #layer-ordering)
-  const layerDeclarationOrder = getLayerDeclarationOrder(ruleList);
+  const env = resolveMediaEnvironment(element);
+  const layerDeclarationOrder = getLayerDeclarationOrder(ruleList, env);
 
   // 3. Collect matched declarations from stylesheet rules
   const { matchedDeclarations, sourceOrderCounter } = collectMatchedDeclarations(
