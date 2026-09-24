@@ -57,6 +57,13 @@ function resolveUaLengthPx(raw: string, fontSizePx: number): string {
   return trimmed;
 }
 
+const MARGIN_PAIRS: ReadonlyArray<[string, string]> = [
+  ['margin-block-start', 'margin-top'],
+  ['margin-block-end', 'margin-bottom'],
+  ['margin-inline-start', 'margin-left'],
+  ['margin-inline-end', 'margin-right'],
+];
+
 function getUaTagStyles(): Map<string, CSSStyleDeclaration> {
   if (cachedUaTagStyles) return cachedUaTagStyles;
   const map = new Map<string, CSSStyleDeclaration>();
@@ -82,6 +89,30 @@ function getUaTagStyles(): Map<string, CSSStyleDeclaration> {
     }
   }
 
+  for (const tagStyle of map.values()) {
+    const fontSizeVal = tagStyle.getPropertyValue('font-size');
+    const fontSizePx = fontSizeVal.endsWith('em') ? parseFloat(fontSizeVal) * 16 : 16;
+
+    for (let i = 0; i < tagStyle.length; i++) {
+      const prop = tagStyle.item(i);
+      const val = tagStyle.getPropertyValue(prop);
+      if (val.endsWith('em')) {
+        tagStyle.setProperty(prop, resolveUaLengthPx(val, fontSizePx));
+      }
+    }
+
+    const hasAnyMargin = MARGIN_PAIRS.some(
+      ([log, phys]) => Boolean(tagStyle.getPropertyValue(log) || tagStyle.getPropertyValue(phys)),
+    );
+    if (hasAnyMargin) {
+      for (const [log, phys] of MARGIN_PAIRS) {
+        const resolved = tagStyle.getPropertyValue(phys) || tagStyle.getPropertyValue(log) || '0px';
+        tagStyle.setProperty(log, resolved);
+        tagStyle.setProperty(phys, resolved);
+      }
+    }
+  }
+
   cachedUaTagStyles = map;
   return map;
 }
@@ -89,119 +120,10 @@ function getUaTagStyles(): Map<string, CSSStyleDeclaration> {
 export function getUaDefault(prop: string, element: unknown): string {
   const el = element as { tagName?: string; nodeName?: string };
   const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
-  const tagStyle = tag ? getUaTagStyles().get(tag) : undefined;
-
-  const isMargin = prop === 'margin' || prop.startsWith('margin-');
-  if (isMargin) {
-    if (tagStyle) {
-      const rawTop = tagStyle.getPropertyValue('margin-top');
-      const rawBottom = tagStyle.getPropertyValue('margin-bottom');
-      const rawLeft = tagStyle.getPropertyValue('margin-left');
-      const rawRight = tagStyle.getPropertyValue('margin-right');
-      const rawBlockStart = tagStyle.getPropertyValue('margin-block-start');
-      const rawBlockEnd = tagStyle.getPropertyValue('margin-block-end');
-      const rawInlineStart = tagStyle.getPropertyValue('margin-inline-start');
-      const rawInlineEnd = tagStyle.getPropertyValue('margin-inline-end');
-
-      const hasMargin = Boolean(
-        rawTop || rawBottom || rawLeft || rawRight ||
-        rawBlockStart || rawBlockEnd || rawInlineStart || rawInlineEnd
-      );
-
-      if (hasMargin) {
-        const fontSizeVal = tagStyle.getPropertyValue('font-size');
-        const fontSizePx = (fontSizeVal && fontSizeVal.endsWith('em'))
-          ? parseFloat(fontSizeVal) * 16
-          : 16;
-
-        const effTop = rawTop || rawBlockStart;
-        const effBottom = rawBottom || rawBlockEnd;
-        const effLeft = rawLeft || rawInlineStart;
-        const effRight = rawRight || rawInlineEnd;
-
-        const effBlockStart = rawBlockStart || rawTop;
-        const effBlockEnd = rawBlockEnd || rawBottom;
-        const effInlineStart = rawInlineStart || rawLeft;
-        const effInlineEnd = rawInlineEnd || rawRight;
-
-        if (prop === 'margin-top') {
-          return effTop ? resolveUaLengthPx(effTop, fontSizePx) : (effLeft || effRight ? '0px' : '');
-        }
-        if (prop === 'margin-bottom') {
-          return effBottom ? resolveUaLengthPx(effBottom, fontSizePx) : (effLeft || effRight ? '0px' : '');
-        }
-        if (prop === 'margin-left') {
-          return effLeft ? resolveUaLengthPx(effLeft, fontSizePx) : (effTop || effBottom ? '0px' : '');
-        }
-        if (prop === 'margin-right') {
-          return effRight ? resolveUaLengthPx(effRight, fontSizePx) : (effTop || effBottom ? '0px' : '');
-        }
-
-        if (prop === 'margin-block-start') {
-          return effBlockStart ? resolveUaLengthPx(effBlockStart, fontSizePx) : (effInlineStart || effInlineEnd ? '0px' : '');
-        }
-        if (prop === 'margin-block-end') {
-          return effBlockEnd ? resolveUaLengthPx(effBlockEnd, fontSizePx) : (effInlineStart || effInlineEnd ? '0px' : '');
-        }
-        if (prop === 'margin-inline-start') {
-          return effInlineStart ? resolveUaLengthPx(effInlineStart, fontSizePx) : (effBlockStart || effBlockEnd ? '0px' : '');
-        }
-        if (prop === 'margin-inline-end') {
-          return effInlineEnd ? resolveUaLengthPx(effInlineEnd, fontSizePx) : (effBlockStart || effBlockEnd ? '0px' : '');
-        }
-
-        if (prop === 'margin-block') {
-          const bs = effBlockStart ? resolveUaLengthPx(effBlockStart, fontSizePx) : (effInlineStart || effInlineEnd ? '0px' : '');
-          const be = effBlockEnd ? resolveUaLengthPx(effBlockEnd, fontSizePx) : (effInlineStart || effInlineEnd ? '0px' : '');
-          if (bs && be) return bs === be ? bs : `${bs} ${be}`;
-          if (bs) return bs;
-          if (be) return be;
-          return '0px';
-        }
-
-        if (prop === 'margin-inline') {
-          const is = effInlineStart ? resolveUaLengthPx(effInlineStart, fontSizePx) : (effBlockStart || effBlockEnd ? '0px' : '');
-          const ie = effInlineEnd ? resolveUaLengthPx(effInlineEnd, fontSizePx) : (effBlockStart || effBlockEnd ? '0px' : '');
-          if (is && ie) return is === ie ? is : `${is} ${ie}`;
-          if (is) return is;
-          if (ie) return ie;
-          return '0px';
-        }
-
-        if (prop === 'margin') {
-          const t = effTop ? resolveUaLengthPx(effTop, fontSizePx) : '0px';
-          const r = effRight ? resolveUaLengthPx(effRight, fontSizePx) : '0px';
-          const b = effBottom ? resolveUaLengthPx(effBottom, fontSizePx) : '0px';
-          const l = effLeft ? resolveUaLengthPx(effLeft, fontSizePx) : '0px';
-          if (t === r && r === b && b === l) return t;
-          if (t === b && r === l) return `${t} ${r}`;
-          if (r === l) return `${t} ${r} ${b}`;
-          return `${t} ${r} ${b} ${l}`;
-        }
-      }
-    }
-
-    if (prop === 'margin') {
-      return '0px';
-    }
-    if (
-      prop === 'margin-top' || prop === 'margin-bottom' || prop === 'margin-left' || prop === 'margin-right' ||
-      prop === 'margin-block-start' || prop === 'margin-block-end' || prop === 'margin-inline-start' || prop === 'margin-inline-end' ||
-      prop === 'margin-block' || prop === 'margin-inline'
-    ) {
-      return '';
-    }
-  }
-
-  if (tagStyle) {
-    const val = tagStyle.getPropertyValue(prop);
-    if (val) return val;
-  }
-
-  if (prop === 'display') {
-    return 'inline';
-  }
-
+  const val = tag ? getUaTagStyles().get(tag)?.getPropertyValue(prop) : '';
+  if (val) return val;
+  if (prop === 'margin') return '0px';
+  if (prop.startsWith('margin-')) return '';
   return getInitialValue(prop, element);
 }
 
