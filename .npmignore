@@ -19,6 +19,7 @@ tsup*.config.ts
 .oxlintrc.json
 .eslintignore
 PLAN.md
+PLAN.archive.md
 LOOP.md
 MAINTENANCE.md
 AGENTS.md

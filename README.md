@@ -355,6 +355,6 @@ pnpm test
 
 ## Project Documents
 
-- `PLAN.md`: High-level project plan and roadmap.
+- `PLAN.md`: High-level project plan and roadmap (older completed phases in `PLAN.archive.md`).
 - `AGENTS.md`: Instructions and context for AI agents working on this repo.
 - `LOOP.md`: Details the multi-agent PR lifecycle loops.
