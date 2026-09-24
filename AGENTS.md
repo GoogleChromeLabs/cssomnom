@@ -38,10 +38,18 @@ Consult these Bikeshed (`.bs`) sources for normative algorithms and edge cases b
 ### `ParseHooks` (circular dependency inversion)
 Do NOT import `Parser` into `src/CSSOM.ts`, `src/typed-om.ts`, or cascade files. Use `ParseHooks` ([src/parse-hooks.ts](./src/parse-hooks.ts)); see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-### No Layout Guessing
-We have no layout engine ([README § Intentional Non-Goals](./README.md): "if it cannot be completely correct, partially correct is harmful").
-- **Rule**: Never compute layout-dependent used values (auto margins, `auto` min-sizes, percentages resolved against box size, font metrics, viewport sizes) in `src/` or `tests/dom-shim/`. Return the computed value instead. Never regex-parse `style` attributes to infer layout context.
-- WPT subtests that need layout are browser-only by design ([`LAYOUT_GEOMETRY` in scripts/wpt/node/README.md § 4](./scripts/wpt/node/README.md#1-layout_geometry)); do not chase them. Faked values that happen to match inflate the pass count instead of being classified.
+### Browser-Only Capabilities: Never Fake Them
+We run in Node with no layout engine, renderer, or input devices ([README § Intentional Non-Goals](./README.md): "if it cannot be completely correct, partially correct is harmful"). WPT subtests needing these are classified browser-only by [scripts/wpt/node/core/classifier.ts](./scripts/wpt/node/core/classifier.ts) into 7 boundaries ([details: scripts/wpt/node/README.md § 4](./scripts/wpt/node/README.md#4-the-7-objective-browser-capability-boundaries)):
+1. `LAYOUT_GEOMETRY`: box sizes/positions from layout (`width`, `margin`, `flex-basis` used values, font metrics).
+2. `VIEWPORT_GEOMETRY`: screen coordinates and hit-testing (`getBoundingClientRect`, `elementFromPoint`).
+3. `HARDWARE_INPUT_DRIVER`: real input events (`test_driver` actions, live `:hover`/`:active`/`:focus-visible`).
+4. `ANIMATION_SCHEDULER`: live animation timelines (`element.animate()`, frame-clock interpolation).
+5. `CONTAINER_LAYOUT`: `@container` size queries and `cqw`/`cqh`.
+6. `MODAL_TOP_LAYER`: top layer and focus trapping (`showModal()`, `::backdrop`, `:modal`).
+7. `HTTP_CHARSET_STREAM`: network headers, legacy charset decoding, Resource Timing.
+
+- **Rule**: Never fake any of these in `src/` or `tests/dom-shim/` to flip tests green. For layout specifically: never compute layout-dependent used values (auto margins, `auto` min-sizes, percentages resolved against box size, font metrics, viewport sizes); return the computed value, and never regex-parse `style` attributes to infer layout context.
+- Faked values that happen to match inflate the pass count instead of being classified. Don't classify a failure as browser-only just because it is hard; that bar is "impossible without a browser engine".
 
 ### Child Processes
 Import `child_process` only via [scripts/wpt/node/safe-child-process.ts](./scripts/wpt/node/safe-child-process.ts) (`safeExecTestFile`, `safeWorkerPool`), which enforces memory limits and hang watchdogs. Enforced by `pnpm run check:safe-exec`; the few other allowed importers are listed in [scripts/ci/check-safe-exec.ts](./scripts/ci/check-safe-exec.ts).
