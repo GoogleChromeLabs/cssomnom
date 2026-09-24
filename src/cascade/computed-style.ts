@@ -221,14 +221,14 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     // cssom-1 § 6.8 & CSS 2.1 § 10.3.3: Resolving auto margins in block layout
     if (dashed === 'margin-top' || dashed === 'margin-bottom') {
       const direct = super.getPropertyValue(dashed).trim();
-      if (direct === 'auto' || direct === '0' || direct === '0px') {
+      if (direct === 'auto' || direct === '0') {
         return '0px';
       }
     }
 
     if (dashed === 'margin-left' || dashed === 'margin-right') {
       const direct = super.getPropertyValue(dashed).trim();
-      if (direct === '0' || direct === '0px') {
+      if (direct === '0') {
         return '0px';
       }
       if (direct === 'auto' && this._element && typeof this._element === 'object') {

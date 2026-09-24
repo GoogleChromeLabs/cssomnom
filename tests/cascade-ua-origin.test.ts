@@ -126,4 +126,26 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const style = Parser.getCascadedStyle(h, rules);
     assert.equal(style.getPropertyValue('margin-top'), '0.67em');
   });
+
+  it('keyframe animation with revert inherits parent value when no UA declaration exists', () => {
+    // css-cascade-5 § 6.2: revert on an element with no UA declaration rolls back as unset,
+    // inheriting inherited properties from the parent element.
+    const css = `
+      @keyframes anim {
+        from { color: revert; }
+        to { color: green; }
+      }
+      .child {
+        color: blue;
+        animation: anim 1s paused;
+      }
+    `;
+    const rules = parseStyleSheet(css);
+    const { document } = parseHTML('<html><body><div id="parent" style="color: red;"><div id="child" class="child">Text</div></div></body></html>');
+    const child = document.getElementById('child');
+
+    const style = Parser.getCascadedStyle(child, rules);
+    assert.equal(style.getPropertyValue('color'), 'rgb(255, 0, 0)');
+  });
 });
+

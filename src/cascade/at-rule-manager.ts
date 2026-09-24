@@ -60,8 +60,7 @@ export function collectActiveAtRules(
     return candidate.sourceOrder > existing.sourceOrder;
   }
 
-  function walk(rules: ArrayLike<Rule | CSSRule | Declaration> | undefined | null, currentLayer?: string) {
-    if (!rules || typeof rules.length !== 'number') return;
+  function walk(rules: ArrayLike<Rule | CSSRule | Declaration>, currentLayer?: string) {
     for (let i = 0; i < rules.length; i++) {
       const r = rules[i];
       if (!r) continue;
@@ -110,15 +109,15 @@ export function collectActiveAtRules(
         const assigned = (r as { _assignedLayerName?: string })._assignedLayerName;
         const rawName = r.name;
         const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
-        walk(r.cssRules, layerName);
+        if (r.cssRules) walk(r.cssRules, layerName);
       } else if (r instanceof CSSMediaRule || (r as { type?: number }).type === 4) {
         const mediaText = (r as CSSMediaRule).media?.mediaText;
-        if (!mediaText || MediaParser.evaluate(mediaText, env)) {
+        if ((!mediaText || MediaParser.evaluate(mediaText, env)) && (r as CSSMediaRule).cssRules) {
           walk((r as CSSMediaRule).cssRules, currentLayer);
         }
       } else if (r instanceof CSSSupportsRule || (r as { type?: number }).type === 12) {
         const cond = (r as CSSSupportsRule).conditionText;
-        if (!cond || supports(cond)) {
+        if ((!cond || supports(cond)) && (r as CSSSupportsRule).cssRules) {
           walk((r as CSSSupportsRule).cssRules, currentLayer);
         }
       } else if (r instanceof CSSImportRule || (r as { type?: number }).type === 3) {
@@ -130,7 +129,7 @@ export function collectActiveAtRules(
             : currentLayer;
           walk(importedSheet.cssRules, layerName);
         }
-      } else if (r instanceof CSSGroupingRule || (r as { cssRules?: unknown }).cssRules) {
+      } else if ((r instanceof CSSGroupingRule || (r as { cssRules?: unknown }).cssRules) && (r as CSSGroupingRule).cssRules) {
         walk((r as CSSGroupingRule).cssRules, currentLayer);
       }
     }

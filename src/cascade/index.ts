@@ -49,7 +49,7 @@ import {
 import { groupDeclarationsByProperty } from './cascade-sorter.ts';
 import { resolveCustomProperties } from './variable-resolver.ts';
 import { normalizeComputedColor } from './color-resolver.ts';
-import { processStandardDeclarations, isSvgElement, getInitialValue } from './value-processor.ts';
+import { processStandardDeclarations, isSvgElement } from './value-processor.ts';
 import { CSSComputedStyleDeclaration } from './computed-style.ts';
 
 export const KNOWN_PSEUDO_ELEMENTS = new Set([
@@ -347,27 +347,37 @@ export function getCascadedStyle(
           }
         }
       }
-      if (startKf && startKf.style) {
-        const kfStyle = startKf.style as { length: number; item?(i: number): string; [index: number]: string; getPropertyValue(p: string): string };
+      if (startKf?.style) {
+        const kfStyle = startKf.style;
         for (let k = 0; k < kfStyle.length; k++) {
-          const propName = typeof kfStyle.item === 'function' ? kfStyle.item(k) : kfStyle[k];
+          const propName = kfStyle.item(k);
           let propVal = kfStyle.getPropertyValue(propName);
           const existing = winningDeclarations.get(propName);
           if (!existing || !existing.important) {
-            // css-cascade-5 § 6.2 #default: revert in animation origin rolls back as if in author origin,
-            // falling back to UA-origin declarations including logical property mappings.
             if (propVal.trim() === 'revert') {
+              const syntheticDecl: MatchedDeclaration = {
+                name: propName,
+                value: 'revert',
+                important: false,
+                isInline: false,
+                layerOrder: Infinity,
+                specificity: [0, 0, 0],
+                sourceOrder: Infinity,
+                origin: 'author',
+              };
+              const reverted = processStandardDeclarations(
+                [...uaDeclarations, syntheticDecl],
+                resolvedCustomProps,
+                cyclicProps,
+                parentCascaded,
+                element,
+                taintedProps,
+                activeProperties,
+                writingMode,
+                direction
+              );
               const targetPhysical = propName in LOGICAL_MAPPING ? resolveLogicalProperty(propName, writingMode, direction).toLowerCase() : propName.toLowerCase();
-              let uaVal: string | undefined;
-              for (let ui = uaDeclarations.length - 1; ui >= 0; ui--) {
-                const ud = uaDeclarations[ui];
-                const udPhysical = ud.name in LOGICAL_MAPPING ? resolveLogicalProperty(ud.name, writingMode, direction).toLowerCase() : ud.name.toLowerCase();
-                if (udPhysical === targetPhysical || ud.name.toLowerCase() === targetPhysical) {
-                  uaVal = typeof ud.value === 'string' ? ud.value : serialize(ud.value);
-                  break;
-                }
-              }
-              propVal = uaVal !== undefined ? uaVal : getInitialValue(propName, element);
+              propVal = reverted.get(targetPhysical)?.value ?? '';
             }
             winningDeclarations.set(propName, {
               name: propName,
