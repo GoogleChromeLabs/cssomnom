@@ -359,3 +359,7 @@ pnpm test
 - `PLAN.md`: High-level project plan and roadmap (older completed phases in `PLAN.archive.md`).
 - `AGENTS.md`: Instructions and context for AI agents working on this repo.
 - `LOOP.md`: Details the multi-agent PR lifecycle loops.
+
+## Related Proposals
+
+- [CSS Parser Extensions](https://github.com/bramus/css-parser-extensions): A proposal along similar lines to the CSS Parser API by Bramus.

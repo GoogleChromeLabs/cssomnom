@@ -118,7 +118,7 @@ Reviewers and Grizz MUST reject any of the following shortcuts:
 The codebase is already large enough that agents struggle to orient. Growth is a cost that must be paid for.
 
 *   **Report the delta**: Every developer report states the net `src/` line delta (excluding `src/data/gen/`) separately from tests, e.g. `git diff --shortstat <base>..HEAD -- src ':!src/data/gen'`.
-*   **Refactors and cleanups must be net-negative in `src/`.** A cleanup that grows `src/` is rejected.
+*   **Refactors and cleanups aim to be net-negative in `src/`.** This is a target, not a hard block. Make one honest pass looking for code to delete or reuse; if `src/` still grows, **stop iterating**: commit the correct change and explain in the report what was added and why it couldn't be absorbed. The orchestrator and reviewers decide whether that's acceptable. Never trade correctness or readability for line count (no code golf, no cramming statements onto one line).
 *   **Features and conformance fixes must justify growth**: the report names what was added and why no existing mechanism (cascade, shorthand tables, codegen data, shared helpers) could absorb it. Reviewers check that claim.
 *   **No test-shaped special cases**: reject property-, element-, or WPT-test-specific branches (`if (prop === 'x' && value === 'y')`) when the behavior can be fixed at the model level (spec algorithm, generated data, or a general rule). If a special case is truly required by the spec, it must cite the spec text.
 *   **No layout guessing** (AGENTS.md § No Layout Guessing): reject any code that fakes layout-dependent used values (box geometry, auto margins, auto min-sizes, font metrics) or infers layout from `style` attribute text, even if it flips WPT subtests green.

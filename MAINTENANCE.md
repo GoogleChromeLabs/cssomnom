@@ -133,3 +133,7 @@ Every auditor should:
 The `scripts/external_suites/extract_wpt.ts` script reads from the submodules and generates JSON fixtures used by the tests. If you add new test files to WPT or need to support new properties, you may need to update this script or run it to include the new data.
 
 *Note: We rely on Node's ability to run `.ts` files directly (supported in Node 24.11.0+), so no build step is needed for scripts.*
+
+## WPT Progress Log
+
+- **Progress Hash Reconciliation**: Unfinalized pre-commit hashes (`*`) in `wpt-progress.md` are reconciled via `syncProgressFromNotes()` ([scripts/wpt/node/core/progress.ts](./scripts/wpt/node/core/progress.ts)) using `git notes` and `git log`.
