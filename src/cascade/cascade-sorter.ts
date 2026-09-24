@@ -44,6 +44,22 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
       scopeScore = decl.important ? 1 : 2;
     }
 
+    // css-cascade-5 § 6.1 #cascade-origin, § 6.2 #cascading-origins
+    // 1. Important user-agent declarations (beat important author)
+    // 2. Important author declarations
+    // 3. Animation declarations (beats normal author)
+    // 4. Normal author declarations
+    // 5. Normal user-agent declarations
+    if (decl.origin === 'user-agent') {
+      if (decl.important) {
+        return 3000;
+      }
+      return -100;
+    }
+    if (decl.origin === 'animation') {
+      return 500;
+    }
+
     if (decl.important) {
       // css-cascade-5 § 6.1 #style-attr, § 6.3 #importance
       const inlineBonus = decl.isInline ? 50 : 0;

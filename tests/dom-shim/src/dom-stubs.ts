@@ -34,10 +34,9 @@ import {
 } from '../../../src/CSSOM.ts';
 import { CSSStyleProperties } from '../../../src/data/gen/properties.ts';
 import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
-import { getCascadedStyle } from '../../../src/cascade.ts';
+import { getCascadedStyle, normalizePseudoElement } from '../../../src/cascade.ts';
 import { PropertyRegistry } from '../../../src/PropertyRegistry.ts';
-import { normalizePseudoElement } from '../../../src/cascade/index.ts';
-import { getUaDefault, getInitialValue } from '../../../src/cascade/value-processor.ts';
+import { getInitialValue } from '../../../src/cascade/value-processor.ts';
 import { matches, querySelectorAll, querySelector } from '../../../src/matcher.ts';
 import { camelToDashed } from '../../../src/utils.ts';
 import { MediaParser } from '../../../src/MediaParser.ts';
@@ -304,7 +303,7 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
       let cascadedVal = cascaded.getPropertyValue(property);
       if (!cascadedVal) {
         const dashed = camelToDashed(property).toLowerCase();
-        cascadedVal = getUaDefault(dashed, this._element) || getInitialValue(dashed, this._element);
+        cascadedVal = getInitialValue(dashed, this._element);
       }
       if (cascadedVal) {
         if (property === 'line-height' || property === 'lineHeight') {
@@ -330,7 +329,11 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
       const isConnected = el.isConnected ?? (el.ownerDocument?.documentElement && el.ownerDocument.contains ? el.ownerDocument.contains(el) : false);
       if (!isConnected) return [];
       const cascaded = getCascadedStyle(this._element);
-      const cascadedVal = cascaded.getPropertyValue(property);
+      let cascadedVal = cascaded.getPropertyValue(property);
+      if (!cascadedVal) {
+        const dashed = camelToDashed(property).toLowerCase();
+        cascadedVal = getInitialValue(dashed, this._element);
+      }
       if (cascadedVal) {
         try {
           return TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
@@ -2704,6 +2707,13 @@ function patchWindowStyles(window: WindowType): void {
               const cascaded = getCascaded();
               const val = cascaded.getPropertyValue(p);
               if (val !== '') {
+                const dashed = camelToDashed(p).toLowerCase();
+                if (normalizedPseudo && dashed === 'display') {
+                  const elDisp = (element as { style?: { getPropertyValue?: (prop: string) => string } }).style?.getPropertyValue?.('display') || getCascadedStyle(element as Element).getPropertyValue('display');
+                  if (elDisp === 'flex' || elDisp === 'inline-flex' || elDisp === 'grid' || elDisp === 'inline-grid') {
+                    return 'block';
+                  }
+                }
                 if ((p === 'width' || p === 'height') && val.endsWith('%')) {
                   const pct = parseFloat(val);
                   if (!isNaN(pct)) {
@@ -2740,15 +2750,12 @@ function patchWindowStyles(window: WindowType): void {
                 }
               }
               if (normalizedPseudo && dashed === 'display') {
-                const elStyle = (element as { style?: { getPropertyValue?: (prop: string) => string } }).style;
-                const elDisp = elStyle?.getPropertyValue ? elStyle.getPropertyValue('display') : '';
+                const elDisp = getCascadedStyle(element as Element).getPropertyValue('display');
                 if (elDisp === 'flex' || elDisp === 'inline-flex' || elDisp === 'grid' || elDisp === 'inline-grid') {
                   return 'block';
                 }
                 return 'inline';
               }
-              const ua = getUaDefault(dashed, element);
-              if (ua) return ua;
               return getInitialValue(dashed, element);
             };
           }

@@ -35,7 +35,6 @@ import {
   formatAlpha,
 } from './color-resolver.ts';
 import {
-  getUaDefault,
   getInitialValue,
   isSvgElement,
 } from './value-processor.ts';
@@ -104,19 +103,22 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
   private _parentStyle: CSSStyleDeclaration | null;
   private _element: unknown;
   private _pseudoElement: string | null;
+  private _priorOriginDeclarations?: Map<string, string>;
 
   constructor(
     declarations: Declaration[] = [],
     readonlyFlag: boolean = false,
     parentStyle: CSSStyleDeclaration | null = null,
     element: unknown = null,
-    pseudoElement: string | null = null
+    pseudoElement: string | null = null,
+    priorOriginDeclarations?: Map<string, string>
   ) {
     super(declarations, readonlyFlag);
     this._parentStyle = parentStyle;
     this._element = element;
     this._pseudoElement = pseudoElement;
     this._parentRule = null;
+    this._priorOriginDeclarations = priorOriginDeclarations;
   }
 
   override get cssText(): string {
@@ -406,11 +408,14 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
       // css-cascade-5 § 6.2 #default
       if (lowerRaw === 'revert' || lowerRaw === 'revert-layer' || lowerRaw === 'revert-rule') {
+        if (this._priorOriginDeclarations && this._priorOriginDeclarations.has(dashed)) {
+          return this._priorOriginDeclarations.get(dashed)!;
+        }
         if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
           if (parentVal) return parentVal;
         }
-        return getUaDefault(dashed, this._element);
+        return getInitialValue(dashed, this._element);
       }
       if (dashed === 'box-shadow' || dashed === 'text-shadow') {
         // css-backgrounds-3 § 3.10 #box-shadow, css-text-decor-3 § 4 #text-shadow
@@ -480,14 +485,6 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
     }
 
-    if (this._element && (dashed === 'display' || dashed === 'margin' || dashed.startsWith('margin-'))) {
-      const el = this._element as { tagName?: string; nodeName?: string };
-      const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
-      if (tag) {
-        const ua = getUaDefault(dashed, this._element);
-        if (ua) return ua;
-      }
-    }
 
     if (dashed.endsWith('-width') && (dashed.startsWith('border-') || dashed.startsWith('outline-'))) {
       const side = dashed.replace(/-width$/, '');

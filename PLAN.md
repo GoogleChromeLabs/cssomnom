@@ -3633,14 +3633,14 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - **Parser Throughput Neutral**: Real-world stylesheet parsing across all corpora (`geocities.css`, `whatwg styles.css`, `modern.css`, `postcss cases`) remained strictly neutral, with all confidence intervals encompassing 0.
 - **No Tokenize+Parse Regression**: Under fresh-process interleaved measurement with unbiased statistics, the previous `-5.6%` large synthetic tokenize+parse delta was revealed as noise; the true delta is **-0.5%** with a 95% CI of `[-2.1%, +3.7%]`. Zero regressions detected.
 
-## Phase 149: HTML UA Stylesheet as a Real Cascade Origin [ ]
+## Phase 149: HTML UA Stylesheet as a Real Cascade Origin [x]
 **Objective**: `src/data/gen/ua-stylesheet.ts` is parsed, but only consumed by `getUaDefault()` as a per-tag property lookup. Feed the parsed sheet into the cascade as the actual user-agent origin (css-cascade-5 § 6.2 #cascading-origins) so selectors, specificity, ordering, and `revert` behave per spec, and delete the special-casing that exists to fake it (margin normalization in `getUaTagStyles()`, and `getUaDefault()` itself if possible).
 
 ### Tasks
-- [ ] Insert the UA stylesheet's rules as the user-agent origin in the cascade (normal and `!important`), matched via the real selector matcher.
-- [ ] Make `revert` roll back to UA-origin declarations.
-- [ ] Delete `getUaTagStyles()` margin/em normalization and as much of `getUaDefault()` as the cascade now covers. Net-negative line count expected.
-- [ ] Zero WPT regressions (`pnpm run wpt:verify`) and `pnpm run preflight` clean.
+- [x] Insert the UA stylesheet's rules as the user-agent origin in the cascade (normal and `!important`), matched via the real selector matcher.
+- [x] Make `revert` roll back to UA-origin declarations.
+- [x] Delete `getUaTagStyles()` margin/em normalization and as much of `getUaDefault()` as the cascade now covers. Net-negative line count expected.
+- [x] Zero WPT regressions (`pnpm run wpt:verify`) and `pnpm run preflight` clean.
 
 ## Phase 150 (Future): Parser Performance — Eliminate Re-tokenization & Operate on Token Stream [ ]
 **Gate**: Only start once Phase 148 benchmarks show where parser time goes; compare every change against that baseline.

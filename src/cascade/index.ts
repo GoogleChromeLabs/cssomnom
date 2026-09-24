@@ -22,7 +22,10 @@ import { isElement } from '../matcher.ts';
 import type { Token } from '../types.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
+import { HTML_UA_STYLESHEET_TEXT } from '../data/gen/ua-stylesheet.ts';
+import { ParseHooks } from '../parse-hooks.ts';
 import type { Rule, CSSRuleList, Declaration, InternalStyleDeclaration, ElementLike } from '../types.ts';
+import type { MatchedDeclaration } from './types.ts';
 
 // Domain Modules
 export * from './types.ts';
@@ -147,6 +150,9 @@ export function normalizePseudoElement(pseudo: string): { valid: boolean; normal
   return { valid: false, normalized: '', isKnown: false };
 }
 
+let cachedUaRules: Rule[] | null = null;
+const emptyLayerOrder = new Map<string, number>();
+
 /**
  * Resolves the cascaded style statically for a DOM element according to CSS Cascade 5 and CSS Variables 1.
  * css-cascade-5 § 3 #cascading
@@ -189,12 +195,28 @@ export function getCascadedStyle(
   const { activeProperties, activeKeyframes } = collectActiveAtRules(ruleList, layerDeclarationOrder, env);
 
   // 3. Collect matched declarations from stylesheet rules
-  const { matchedDeclarations, sourceOrderCounter } = collectMatchedDeclarations(
+  // 3a. User-Agent origin rules (CSS Cascade 5 § 6.1 #cascade-origin, § 6.2 #cascading-origins)
+  if (!cachedUaRules) {
+    cachedUaRules = ParseHooks.consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true);
+  }
+  const { matchedDeclarations: uaDeclarations } = collectMatchedDeclarations(
+    element,
+    cachedUaRules,
+    emptyLayerOrder,
+    normalizedPseudoStr,
+    'user-agent'
+  );
+
+  // 3b. Author origin rules
+  const { matchedDeclarations: authorDeclarations, sourceOrderCounter } = collectMatchedDeclarations(
     element,
     ruleList,
     layerDeclarationOrder,
-    normalizedPseudoStr
+    normalizedPseudoStr,
+    'author'
   );
+
+  const matchedDeclarations: MatchedDeclaration[] = [...uaDeclarations, ...authorDeclarations];
 
   if (!normalizedPseudoStr) {
     // 4. Collect SVG presentation attributes
@@ -287,7 +309,9 @@ export function getCascadedStyle(
     parentCascaded,
     element,
     taintedProps,
-    activeProperties
+    activeProperties,
+    writingMode,
+    direction
   );
 
   // 10.1. Apply animation declarations (css-cascade-5 § 6.1 #cascade-sort, css-animations-1 § 4 #keyframes)
@@ -311,11 +335,22 @@ export function getCascadedStyle(
 
     if (animName && activeKeyframes.has(animName)) {
       const kfRule = activeKeyframes.get(animName)!;
-      const startKf = kfRule.findRule('0%') || kfRule.findRule('from');
+      let startKf: { style?: { length: number; item(i: number): string; getPropertyValue(p: string): string } } | undefined;
+      if (typeof (kfRule as { findRule?: (k: string) => unknown }).findRule === 'function') {
+        startKf = (kfRule.findRule('0%') || kfRule.findRule('from')) as typeof startKf;
+      } else if (kfRule.cssRules) {
+        for (let i = 0; i < kfRule.cssRules.length; i++) {
+          const r = kfRule.cssRules[i] as { keyText?: string; style?: unknown };
+          if (r.keyText === '0%' || r.keyText === 'from') {
+            startKf = r as typeof startKf;
+            break;
+          }
+        }
+      }
       if (startKf && startKf.style) {
-        const kfStyle = startKf.style as { length: number; item(i: number): string; getPropertyValue(p: string): string };
+        const kfStyle = startKf.style as { length: number; item?(i: number): string; [index: number]: string; getPropertyValue(p: string): string };
         for (let k = 0; k < kfStyle.length; k++) {
-          const propName = kfStyle.item(k);
+          const propName = typeof kfStyle.item === 'function' ? kfStyle.item(k) : kfStyle[k];
           const propVal = kfStyle.getPropertyValue(propName);
           const existing = winningDeclarations.get(propName);
           if (!existing || !existing.important) {
@@ -391,7 +426,17 @@ export function getCascadedStyle(
     }
   }
 
-  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, true, parentCascaded, element, normalizedPseudoStr);
+  const priorOriginMap = new Map<string, string>();
+  for (const uaDecl of uaDeclarations) {
+    const rawVal = typeof uaDecl.value === 'string' ? uaDecl.value : serialize(uaDecl.value);
+    const mapped = resolveLogicalProperty(uaDecl.name, writingMode, direction);
+    priorOriginMap.set(mapped, rawVal);
+    if (mapped !== uaDecl.name) {
+      priorOriginMap.set(uaDecl.name, rawVal);
+    }
+  }
+
+  const resultStyle = new CSSComputedStyleDeclaration(finalDeclarations, true, parentCascaded, element, normalizedPseudoStr, priorOriginMap);
 
   (resultStyle as CSSComputedStyleDeclaration & InternalStyleDeclaration)._readonly = true;
 

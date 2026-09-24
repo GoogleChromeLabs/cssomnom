@@ -111,6 +111,7 @@ export function matches(element: unknown, selector: string | ComplexSelector | S
         // Mock threw
       }
     }
+    return false;
   }
 
   for (const complex of list.selectors) {

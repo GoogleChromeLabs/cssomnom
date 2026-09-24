@@ -16,7 +16,6 @@
  */
 
 import { DEFAULT_PROPERTY_VALUES } from '../data/gen/cascade-data.ts';
-import { HTML_UA_STYLESHEET_TEXT } from '../data/gen/ua-stylesheet.ts';
 import { SHORTHANDS } from '../shorthands.ts';
 import { tokenize } from '../tokenizer.ts';
 import { serialize } from '../serializer.ts';
@@ -24,10 +23,10 @@ import { ParseHooks } from '../parse-hooks.ts';
 import { INHERITED_PROPERTIES } from './types.ts';
 import type { MatchedDeclaration } from './types.ts';
 import { substituteVariables } from './variable-resolver.ts';
+import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
-import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
+import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import '../parser.ts';
-import type { CSSStyleRule } from '../CSSOM.ts';
 import type { PropertyDefinition } from '../PropertyRegistry.ts';
 
 const EXTRA_INITIAL_VALUES: Record<string, string> = {
@@ -43,89 +42,6 @@ const EXTRA_INITIAL_VALUES: Record<string, string> = {
   'font-presentation': 'auto',
   'stop-opacity': '1',
 };
-
-let cachedUaTagStyles: Map<string, CSSStyleDeclaration> | null = null;
-
-function resolveUaLengthPx(raw: string, fontSizePx: number): string {
-  const trimmed = raw.trim();
-  if (!trimmed) return '';
-  if (trimmed.endsWith('em')) {
-    const px = Number((parseFloat(trimmed) * fontSizePx).toFixed(3));
-    return `${px}px`;
-  }
-  if (trimmed === '0') return '0px';
-  return trimmed;
-}
-
-const MARGIN_PAIRS: ReadonlyArray<[string, string]> = [
-  ['margin-block-start', 'margin-top'],
-  ['margin-block-end', 'margin-bottom'],
-  ['margin-inline-start', 'margin-left'],
-  ['margin-inline-end', 'margin-right'],
-];
-
-function getUaTagStyles(): Map<string, CSSStyleDeclaration> {
-  if (cachedUaTagStyles) return cachedUaTagStyles;
-  const map = new Map<string, CSSStyleDeclaration>();
-  const rules = ParseHooks.consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true);
-
-  for (const rule of rules) {
-    const styleRule = rule as CSSStyleRule;
-    if (!styleRule.selectorText || !styleRule.style) continue;
-    const style = styleRule.style;
-
-    for (const rawSel of styleRule.selectorText.split(',')) {
-      const tag = rawSel.trim().toUpperCase();
-      if (!tag) continue;
-      let tagStyle = map.get(tag);
-      if (!tagStyle) {
-        tagStyle = new CSSStyleDeclaration();
-        map.set(tag, tagStyle);
-      }
-      for (let i = 0; i < style.length; i++) {
-        const name = style.item(i);
-        tagStyle.setProperty(name, style.getPropertyValue(name), style.getPropertyPriority(name));
-      }
-    }
-  }
-
-  for (const tagStyle of map.values()) {
-    const fontSizeVal = tagStyle.getPropertyValue('font-size');
-    const fontSizePx = fontSizeVal.endsWith('em') ? parseFloat(fontSizeVal) * 16 : 16;
-
-    for (let i = 0; i < tagStyle.length; i++) {
-      const prop = tagStyle.item(i);
-      const val = tagStyle.getPropertyValue(prop);
-      if (val.endsWith('em')) {
-        tagStyle.setProperty(prop, resolveUaLengthPx(val, fontSizePx));
-      }
-    }
-
-    const hasAnyMargin = MARGIN_PAIRS.some(
-      ([log, phys]) => Boolean(tagStyle.getPropertyValue(log) || tagStyle.getPropertyValue(phys)),
-    );
-    if (hasAnyMargin) {
-      for (const [log, phys] of MARGIN_PAIRS) {
-        const resolved = tagStyle.getPropertyValue(phys) || tagStyle.getPropertyValue(log) || '0px';
-        tagStyle.setProperty(log, resolved);
-        tagStyle.setProperty(phys, resolved);
-      }
-    }
-  }
-
-  cachedUaTagStyles = map;
-  return map;
-}
-
-export function getUaDefault(prop: string, element: unknown): string {
-  const el = element as { tagName?: string; nodeName?: string };
-  const tag = (el?.tagName || el?.nodeName || '').toUpperCase();
-  const val = tag ? getUaTagStyles().get(tag)?.getPropertyValue(prop) : '';
-  if (val) return val;
-  if (prop === 'margin') return '0px';
-  if (prop.startsWith('margin-')) return '';
-  return getInitialValue(prop, element);
-}
 
 export function isSvgElement(element: unknown): boolean {
   if (!element || typeof element !== 'object') return false;
@@ -281,7 +197,9 @@ export function processStandardDeclarations(
   parentCascaded: CSSStyleDeclaration | null,
   element: unknown,
   taintedProps: Set<string> = new Set(),
-  activeProperties?: Map<string, PropertyDefinition>
+  activeProperties?: Map<string, PropertyDefinition>,
+  writingMode: string = 'horizontal-tb',
+  direction: string = 'ltr'
 ): Map<string, MatchedDeclaration> {
   const standardDeclarationsByProperty = new Map<string, MatchedDeclaration[]>();
   for (const decl of matchedDeclarations) {
@@ -289,10 +207,13 @@ export function processStandardDeclarations(
     const expandedList = expandShorthandWithVariables(decl, resolvedCustomProps, cyclicProps, element, taintedProps, activeProperties);
     for (const expDecl of expandedList) {
       const key = expDecl.name.toLowerCase();
-      if (!standardDeclarationsByProperty.has(key)) {
-        standardDeclarationsByProperty.set(key, []);
+      // css-logical-1 § 4 #box: Corresponding flow-relative and physical properties share a computed value
+      // determined by cascading declarations of both properties together as one.
+      const targetProp = key in LOGICAL_MAPPING ? resolveLogicalProperty(key, writingMode, direction).toLowerCase() : key;
+      if (!standardDeclarationsByProperty.has(targetProp)) {
+        standardDeclarationsByProperty.set(targetProp, []);
       }
-      standardDeclarationsByProperty.get(key)!.push(expDecl);
+      standardDeclarationsByProperty.get(targetProp)!.push(expDecl);
     }
   }
 
@@ -347,6 +268,7 @@ export function processStandardDeclarations(
           winningDeclarations.set(prop, { ...decl, value: val });
           break;
         }
+        // css-cascade-5 § 6.3 #revert-layer: rolls back to earlier cascade layer
         let prevIdx = i - 1;
         while (prevIdx >= 0 && decls[prevIdx].layerOrder >= decl.layerOrder) {
           prevIdx--;
@@ -355,19 +277,38 @@ export function processStandardDeclarations(
           i = prevIdx + 1;
           continue;
         } else {
-          const ua = getUaDefault(prop, element);
-          const val = ua || ((parentCascaded && INHERITED_PROPERTIES.has(prop))
+          // If no earlier layer in the current origin, roll back to previous origin
+          const currOrigin = decl.origin || 'author';
+          let originIdx = i - 1;
+          while (originIdx >= 0 && (decls[originIdx].origin || 'author') === currOrigin) {
+            originIdx--;
+          }
+          if (originIdx >= 0) {
+            i = originIdx + 1;
+            continue;
+          }
+          const val = (INHERITED_PROPERTIES.has(prop) && parentCascaded)
             ? parentCascaded.getPropertyValue(prop)
-            : getInitialValue(prop, element));
+            : getInitialValue(prop, element);
           winningDeclarations.set(prop, { ...decl, value: val });
           break;
         }
       }
       if (trimmedVal === 'revert') {
-        const ua = getUaDefault(prop, element);
-        const val = ua || ((parentCascaded && INHERITED_PROPERTIES.has(prop))
+        // css-cascade-5 § 6.2 #default: rolls back the cascaded value to the earlier origin
+        const currOrigin = decl.origin || 'author';
+        let prevOriginIdx = i - 1;
+        while (prevOriginIdx >= 0 && (decls[prevOriginIdx].origin || 'author') === currOrigin) {
+          prevOriginIdx--;
+        }
+        if (prevOriginIdx >= 0) {
+          i = prevOriginIdx + 1;
+          continue;
+        }
+        // If at user-agent origin or no earlier origin declaration, behaves as unset
+        const val = (INHERITED_PROPERTIES.has(prop) && parentCascaded)
           ? parentCascaded.getPropertyValue(prop)
-          : getInitialValue(prop, element));
+          : getInitialValue(prop, element);
         winningDeclarations.set(prop, { ...decl, value: val });
         break;
       }

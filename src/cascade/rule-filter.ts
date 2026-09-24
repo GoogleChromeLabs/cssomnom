@@ -493,7 +493,8 @@ export function collectMatchedDeclarations(
   element: ElementLike,
   ruleList: (Rule | CSSRule)[],
   layerDeclarationOrder: Map<string, number>,
-  pseudoElement?: string | null
+  pseudoElement?: string | null,
+  origin: 'user-agent' | 'user' | 'author' = 'author'
 ): { matchedDeclarations: MatchedDeclaration[]; sourceOrderCounter: number } {
   const matchedDeclarations: MatchedDeclaration[] = [];
   let sourceOrderCounter = 0;
@@ -673,6 +674,7 @@ export function collectMatchedDeclarations(
                   sourceOrder: sourceOrderCounter++,
                   ruleId: currentRuleId,
                   treeScope: matchingTreeScope,
+                  origin,
                 });
               }
             } else if (Array.isArray((style as { _declarations?: unknown[] })._declarations)) {
@@ -689,6 +691,7 @@ export function collectMatchedDeclarations(
                   sourceOrder: sourceOrderCounter++,
                   ruleId: currentRuleId,
                   treeScope: matchingTreeScope,
+                  origin,
                 });
               }
             }
@@ -708,6 +711,7 @@ export function collectMatchedDeclarations(
                 sourceOrder: sourceOrderCounter++,
                 ruleId: currentRuleId,
                 treeScope: matchingTreeScope,
+                origin,
               });
             }
           }
@@ -1016,6 +1020,7 @@ export function collectInlineDeclarations(
         layerOrder: Infinity,
         specificity: [1, 0, 0],
         sourceOrder: sourceOrderCounter++,
+        origin: 'author',
       });
     }
   }
