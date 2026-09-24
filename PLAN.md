@@ -611,14 +611,16 @@ Phase 148's final harness (`a816dff`) was not re-audited. Known gaps:
 - [ ] **`parse: synthetic large tokens`**: earlier runs showed a CI-excluding-zero ~2–4% slowdown pre- vs post-janitor; the 15-run table shows -1.6% with CI [-9.5%, +14.9%]. Unresolved; re-measure once power improves, and profile with `--cpu-prof` before attributing a cause.
 - [ ] **Review open questions**: whether pre-sample `globalThis.gc()` hides allocation cost from wall time, and whether the `|delta| < 2.0%` "significant, small" label was chosen a priori.
 
-## Phase 152: Remove Layout Guessing from Computed Style [/]
+## Phase 152: Remove Layout Guessing from Computed Style [x]
 **Objective**: Enforce [AGENTS.md § Browser-Only Capabilities](./AGENTS.md). Delete code that fakes layout-dependent used values and return computed values instead; lost WPT subtests must classify as `LAYOUT_GEOMETRY`, not count as genuine failures.
 
 ### Tasks
-- [ ] Delete `shouldPreserveAutoMinSize` (regex over inline `style` attributes), auto `margin-left/right` centering arithmetic, and `perspective-origin` box-size resolution in [`computed-style.ts`](./src/cascade/computed-style.ts).
-- [ ] Delete the `offsetWidth` / `offsetHeight` layout stub in [`dom-stubs.ts`](./tests/dom-shim/src/dom-stubs.ts).
-- [ ] Narrow [`classifier.ts`](./scripts/wpt/node/core/classifier.ts) if needed (with tests in `tests/wpt-classifier.test.ts`), regenerate the passing-set baseline, and list every lost subtest.
-- [ ] README § Intentional Non-Goals: layout-dependent used values return computed values.
+- [x] Delete `shouldPreserveAutoMinSize` (regex over inline `style` attributes), auto `margin-left/right` centering arithmetic, and `perspective-origin` box-size resolution in [`computed-style.ts`](./src/cascade/computed-style.ts). `perspective-origin` now returns its computed `<position>` (keywords → percentages, `px`/`em` absolutized; `rem`/`ch`/`ex` left unresolved).
+- [x] Delete the `offsetWidth` / `offsetHeight` layout stub, 100×100 `getBoundingClientRect` rects, and 800×600 percentage guessing in [`dom-stubs.ts`](./tests/dom-shim/src/dom-stubs.ts).
+- [x] [`classifier.ts`](./scripts/wpt/node/core/classifier.ts): classify by failure signature scoped to the failing subtest (fails closed when the subtest can't be located), plus a px-expected/percent-actual rule for layout properties. No filename rules. Tests in `tests/wpt-classifier.test.ts`.
+- [x] README § Intentional Non-Goals: layout-dependent used values return computed values.
+
+Result (`cdb0479`, `426a5a0`, `9e1f301`): raw passing 21,227 → 21,184 (46 fake passes removed, 3 genuine new passes), browser-only 100 → 150, normalized 94.61% → 94.79%. `css3-selectors-lang-*` oracles are `offsetWidth`, so they classify as browser-only; the underlying `:lang()` gaps are tracked as `todo` tests in `tests/selectors-lang.test.ts` (Phase 154).
 
 Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `computed-style.ts` (`clip`) and `variable-resolver.ts` should resolve against the root element's font-size; relative-position `auto` insets should negate the opposite inset.
 
