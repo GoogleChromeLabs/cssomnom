@@ -28,3 +28,7 @@
 [submodule "submodules/css-typed-om-polyfill"]
 	path = submodules/css-typed-om-polyfill
 	url = https://github.com/bramus/css-typed-om-polyfill
+[submodule "submodules/whatwg-html"]
+	path = submodules/whatwg-html
+	url = https://github.com/whatwg/html.git
+	shallow = true

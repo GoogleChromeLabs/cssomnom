@@ -23,6 +23,7 @@ Relevant Specifications:
 - CSS Style Attributes: `submodules/csswg-drafts/css-style-attr-1/Overview.src.html`
 - CSS Properties and Values API (Houdini): `submodules/css-houdini-drafts/css-properties-values-api/Overview.bs`
 - CSS Typed OM 2 (Houdini): `submodules/css-houdini-drafts/css-typed-om-2/Overview.bs`
+- HTML Standard (Rendering / UA stylesheet): `submodules/whatwg-html/source` (single ~8MB file; search for `<h3 split-filename="rendering"`)
 
 ### Related Proposals
 - [CSS Parser Extensions](https://github.com/bramus/css-parser-extensions): A proposal along similar lines to the CSS Parser API by Bramus.

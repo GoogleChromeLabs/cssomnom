@@ -18,11 +18,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-const WHATWG_RENDERING_URL = 'https://html.spec.whatwg.org/multipage/rendering.html';
+// WHATWG HTML Standard § 15.3 Rendering (https://html.spec.whatwg.org/multipage/rendering.html),
+// read from the whatwg/html submodule so `pnpm run maintain` updates it alongside the other specs.
+const SPEC_SOURCE_PATH = path.resolve(import.meta.dirname, '../../submodules/whatwg-html/source');
 const OUTPUT_PATH = path.resolve(import.meta.dirname, '../../src/data/gen/ua-stylesheet.ts');
 
 function decodeHtmlEntities(html: string): string {
   return html
+    .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<[^>]+>/g, '')
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
@@ -79,28 +82,15 @@ function escapeTemplateLiteral(str: string): string {
     .replace(/\$\{/g, '\\${');
 }
 
-async function fetchBlocks(): Promise<string[]> {
-  let html: string;
-  try {
-    const res = await fetch(WHATWG_RENDERING_URL, { signal: AbortSignal.timeout(15000) });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    html = await res.text();
-  } catch (err) {
-    if (fs.existsSync(OUTPUT_PATH)) {
-      console.warn(
-        `[WARN] Failed to fetch WHATWG rendering.html (${err instanceof Error ? err.message : String(err)}). Keeping existing ${OUTPUT_PATH}.`,
-      );
-      process.exit(0);
-    }
-    throw err;
-  }
-
-  const preRegex = /([\s\S]{0,220})<pre><code class=['"]css['"]>([\s\S]*?)<\/code><\/pre>/gi;
+function extractBlocks(source: string): string[] {
+  const preRegex = /<pre><code class="css"[^>]*>([\s\S]*?)<\/code><\/pre>(\s*<!--([\s\S]*?)-->)?/g;
   const extractedBlocks: string[] = [];
-  let match: RegExpExecArray | null;
 
-  while ((match = preRegex.exec(html)) !== null) {
-    const context = decodeHtmlEntities(match[1]).replace(/\s+/g, ' ').toLowerCase();
+  for (const match of source.matchAll(preRegex)) {
+    // The nearest preceding <p> or <h*> introduces the block ("In quirks mode, the following rules…").
+    const preceding = source.slice(Math.max(0, match.index - 3000), match.index);
+    const introStart = Math.max(...[...preceding.matchAll(/<(?:p|h\d)[\s>]/g)].map(m => m.index), 0);
+    const context = decodeHtmlEntities(preceding.slice(introStart)).replace(/\s+/g, ' ').toLowerCase();
     // Skip quirks-mode, legacy encoding, and optional customizable-select appearance branches
     if (
       context.includes('quirks mode') ||
@@ -111,30 +101,32 @@ async function fetchBlocks(): Promise<string[]> {
       continue;
     }
 
-    const decoded = decodeHtmlEntities(match[2]).trim();
+    const decoded = decodeHtmlEntities(match[1]).trim();
     if (!decoded.startsWith('@namespace')) continue;
 
-    const normalized = normalizeWhatwgCssBlock(decoded);
-    const tagRules = extractPureTagRules(normalized);
-    if (tagRules.length > 0) {
-      extractedBlocks.push(tagRules.join('\n'));
-    }
-
-    // HTML § 15.3.2 (#the-page) normative prose specifies 8px default margin on <body>
-    if (decoded.includes('html, body { display: block; }')) {
-      extractedBlocks.push('body { margin: 8px; }');
-    }
+    const tagRules = extractPureTagRules(normalizeWhatwgCssBlock(decoded));
+    // HTML § 15.3.3 (#the-page) states the <body> 8px margin in prose (it's really a presentational
+    // hint with attribute overrides), but the spec source carries the CSS equivalent as an editor's
+    // comment directly after the block: `<!-- body { margin: 8px; } -->`.
+    const trailingCommentCss = match[3] ? extractPureTagRules(match[3]) : [];
+    if (tagRules.length > 0) extractedBlocks.push(tagRules.join('\n'));
+    if (trailingCommentCss.length > 0) extractedBlocks.push(trailingCommentCss.join('\n'));
   }
 
   if (extractedBlocks.length === 0) {
-    throw new Error('Failed to extract UA stylesheet blocks from WHATWG rendering.html');
+    throw new Error(`Failed to extract UA stylesheet blocks from ${SPEC_SOURCE_PATH}`);
   }
-
+  if (!extractedBlocks.some(b => /^body \{ margin: /m.test(b))) {
+    throw new Error(
+      `Expected the "<!-- body { margin: ... } -->" comment after "The page" CSS block in ${SPEC_SOURCE_PATH}. ` +
+      'The spec source changed; update extractBlocks().',
+    );
+  }
   return extractedBlocks;
 }
 
-async function main() {
-  const blocks = await fetchBlocks();
+function main() {
+  const blocks = extractBlocks(fs.readFileSync(SPEC_SOURCE_PATH, 'utf-8'));
   const stylesheetText = blocks.join('\n\n');
 
   const output = `/**

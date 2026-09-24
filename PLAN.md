@@ -3577,7 +3577,7 @@ Objective: Close key spec conformance gaps in `css/css-variables` (61.13% -> 85%
 - SVG 2 § 13.2 (Presentation attributes & initial defaults)
 
 ### Tasks
-- [x] Create `scripts/codegen/generate_ua_stylesheet.ts` that fetches/extracts the `<pre><code class="css">` blocks from WHATWG HTML Standard `rendering.html` (with offline cache fallback), strips `@namespace` / pseudo-rules that don't apply, and generates `src/data/gen/ua-stylesheet.ts`.
+- [x] Create `scripts/codegen/generate_ua_stylesheet.ts` that extracts the `<pre><code class="css">` blocks from the WHATWG HTML spec source (`submodules/whatwg-html/source`, shallow submodule updated by `pnpm run maintain`), strips `@namespace` / pseudo-rules that don't apply, and generates `src/data/gen/ua-stylesheet.ts`. The `<body>` 8px margin comes from the spec source's `<!-- body { margin: 8px; } -->` editor comment; codegen fails loudly if it disappears.
 - [x] Wire `generate_ua_stylesheet.ts` into `scripts/codegen/generate_all.ts` and document in `MAINTENANCE.md` so `pnpm run codegen` and `pnpm run maintain` automatically regenerate `src/data/gen/ua-stylesheet.ts`.
 - [x] Lazily parse `UA_STYLESHEET_CSS` via `parseStyleSheet()` and integrate it into the cascade / UA fallback resolution so `em` units, logical properties (`margin-block-start`), and shorthands (`margin`) resolve dynamically through our engine.
 - [x] Delete the imperative `if (tag === 'H1') ...` ladder and `BLOCK_TAGS` duplication from `getUaDefault()` in `src/cascade/value-processor.ts`.
