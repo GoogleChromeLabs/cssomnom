@@ -109,7 +109,7 @@ Reviewers and Grizz MUST reject any of the following shortcuts:
     *   No file-level `/* eslint-disable */`.
 *   **Assertion & Test Sandbox Integrity**:
     *   No test normalization/regex-scrubbing to hide layout or structural mismatches. Comparisons must be raw (e.g., `expect(actual).toEqual(expected)`).
-    *   No adding of failing WPT sandbox tests to the `exclude` or `knownFailures` lists in `tests/fixtures/baselines/wpt-sandbox-known-failures.json` unless it represents a spec deviation documented in `README.md`.
+    *   No gaming WPT conformance by manually modifying `tests/fixtures/baselines/wpt-passing-set-baseline.json` or broadening `scripts/wpt/node/core/classifier.ts` beyond true browser-only engine capabilities.
 *   **Oracle Isolation**:
     *   Do not modify the `submodules/` specs or test suites to make tests pass.
 
