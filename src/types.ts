@@ -16,6 +16,7 @@
  */
 import type { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import type { StylePropertyMapReadOnly } from './typed-om.ts';
+import type { CSSRule as CSSRuleClass } from './rules/base.ts';
 
 
 /**
@@ -205,7 +206,7 @@ export interface ASTAtRule {
   block?: SimpleBlock;
 }
 
-export type Rule = CSSRule;
+export type Rule = CSSRuleClass;
 
 /**
  * CSSOM Interfaces according to CSSOM spec.
@@ -274,12 +275,6 @@ export interface CSSRule extends CSSRuleConstants {
   readonly parentRule: CSSRule | null;
   readonly parentStyleSheet: CSSStyleSheet | null;
   readonly type: number; // Historical
-  _assignedLayerName?: string | null;
-  _parentRule: CSSRule | null;
-  _parentStyleSheet: CSSStyleSheet | null;
-  _location?: RuleSourceLocation;
-  readonly location: RuleSourceLocation | undefined;
-  readonly [Symbol.toStringTag]: string;
 }
 
 export interface CSSRuleConstructor extends CSSRuleConstants {

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import type { Rule, MediaQuery } from '../types.ts';
+import type { MediaQuery } from '../types.ts';
 import { MediaParser, serializeMediaQuery } from '../MediaParser.ts';
 import { createIndexedProxy } from '../utils.ts';
 import type { CSSStyleSheet, CSSRule } from '../CSSOM.ts';

@@ -16,8 +16,8 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet, CSSStyleRule, CSSNamespaceRule } from '../src/index.ts';
-import type { Rule } from '../src/types.ts';
+import { CSSStyleSheet, CSSStyleRule } from '../src/index.ts';
+import { parseRule } from '../src/parser.ts';
 
 describe('CSSStyleSheet Constructed Restrictions', () => {
   it('should throw SyntaxError when inserting @import into a constructed stylesheet', () => {
@@ -34,7 +34,7 @@ describe('CSSStyleSheet Constructed Restrictions', () => {
   });
 
   it('should allow inserting @import into a non-constructed stylesheet', () => {
-    const sheet = CSSStyleSheet.createInternal([], (_t: string) => ({ type: 'at-rule', name: 'import', prelude: [] } as unknown as Rule));
+    const sheet = CSSStyleSheet.createInternal([], parseRule);
     // This is a non-constructed stylesheet because we passed an array.
     // Wait, the constructor logic for non-constructed:
     // 452:     if (Array.isArray(rulesOrOptions)) {
@@ -53,10 +53,7 @@ describe('CSSStyleSheet Constructed Restrictions', () => {
   });
 
   it('should throw InvalidStateError when inserting @namespace after regular rules', () => {
-    const sheet = CSSStyleSheet.createInternal([], (t: string) => {
-      if (t.startsWith('@namespace')) return new CSSNamespaceRule('', 'http://www.w3.org/1999/xhtml', Symbol.for('CSSRule.internal'));
-      return new CSSStyleRule('.a', [], [], () => null as unknown as Rule);
-    });
+    const sheet = CSSStyleSheet.createInternal([], parseRule);
     sheet.insertRule('.a { color: red; }', 0);
     
     assert.throws(() => {

@@ -52,6 +52,7 @@ export class CSSRule {
   _parentStyleSheet: CSSStyleSheet | null = null;
   /** @internal */
   _location?: RuleSourceLocation;
+  _assignedLayerName?: string | null;
 
   // Tooling extension: original character offsets from source CSS
   get location(): RuleSourceLocation | undefined {
@@ -119,7 +120,7 @@ applyWebIDLConstants(CSSRule, RULE_CONSTANTS);
 
 export class CSSGroupingRule extends CSSRule {
   private _cssRules!: CSSRuleList;
-  protected _rules: (Rule | CSSRule)[];
+  protected _rules: CSSRule[];
   private _parseRuleInBlock: (text: string, nested?: boolean) => Rule;
 
   // cssom-1 § 6.4.3 #dom-cssgroupingrule-cssrules
@@ -130,7 +131,7 @@ export class CSSGroupingRule extends CSSRule {
     return this._cssRules;
   }
 
-  constructor(rules: (Rule | CSSRule)[], parseRuleInBlock: (text: string, nested?: boolean) => Rule) {
+  constructor(rules: CSSRule[], parseRuleInBlock: (text: string, nested?: boolean) => Rule) {
     super();
     this._rules = rules;
     this._cssRules = new CSSRuleList(() => this._rules);
@@ -152,7 +153,10 @@ export class CSSGroupingRule extends CSSRule {
       throw new DOMException('Index size error', 'IndexSizeError');
     }
 
-    const isNested = this.constructor.name === 'CSSStyleRule' || this.constructor.name === 'CSSScopeRule' || this.parentRule !== null;
+    // Rule subclasses live in modules that import this one, so identify them by their WebIDL class string.
+    const isScopeRule = (r: CSSRule) => r[Symbol.toStringTag] === 'CSSScopeRule';
+    const isStyleRule = (r: CSSRule) => r[Symbol.toStringTag] === 'CSSStyleRule';
+    const isNested = isStyleRule(this) || isScopeRule(this) || this.parentRule !== null;
 
     // Check if the input rule is a top-level rule to validate hierarchy constraints
     let topRule: Rule | null = null;
@@ -163,19 +167,11 @@ export class CSSGroupingRule extends CSSRule {
       if (isImportRule(topRule) || isNamespaceRule(topRule)) {
         throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
       }
-      if (isNested && !isImportRule(topRule) && !isNamespaceRule(topRule)) {
-        const atRuleName = ('name' in topRule && typeof (topRule as { name?: string }).name === 'string'
-          ? (topRule as { name: string }).name
-          : topRule.constructor.name.replace(/^CSS/, '').replace(/Rule$/, '').toLowerCase());
-        const isGroupingRule = topRule instanceof CSSGroupingRule || ['media', 'supports', 'container', 'layer', 'scope', 'starting-style', 'style'].includes(atRuleName);
-        if (!isGroupingRule && topRule.constructor.name !== 'CSSStyleRule') {
-          throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');
-        }
+      // css-nesting-1 § 2: only style rules and conditional group rules may be nested
+      if (isNested && !(topRule instanceof CSSGroupingRule)) {
+        throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');
       }
     }
-
-    const isScopeRule = (r: CSSRule) => r[Symbol.toStringTag] === 'CSSScopeRule' || r.constructor.name === 'CSSScopeRule';
-    const isStyleRule = (r: CSSRule) => ('type' in r && (r as { type: number }).type === 1) || r[Symbol.toStringTag] === 'CSSStyleRule' || r.constructor.name === 'CSSStyleRule';
 
     let isDirectlyInScope = isScopeRule(this);
     if (!isDirectlyInScope && !isStyleRule(this)) {
@@ -204,7 +200,7 @@ export class CSSGroupingRule extends CSSRule {
       throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
     }
 
-    if ((parsedRule as { constructor?: { name: string } }).constructor?.name === 'CSSNestedDeclarations') {
+    if (parsedRule[Symbol.toStringTag] === 'CSSNestedDeclarations') {
       if (!isNested) {
         throw new DOMException('Syntax error: CSSNestedDeclarations cannot be inserted into top-level grouping rule', 'SyntaxError');
       }

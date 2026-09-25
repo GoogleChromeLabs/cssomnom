@@ -180,22 +180,20 @@ export function collectStyleSheetsAndRules(
     if (isInsideTemplate(node)) {
       return;
     }
-    const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
+    const s = sheet as { disabled?: boolean; textContent?: string; sheet?: unknown };
     if (s.disabled) return;
     if (!isSheetEnabledForSet(sheet)) return;
+    // Foreign CSSOM (e.g. linkedom's style.sheet) is ignored; its <style> text is re-parsed below.
     try {
-      if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
+      if (s.sheet instanceof CSSStyleSheet) {
         addSheetRules(s.sheet);
         return;
       }
     } catch {
       // linkedom style.sheet throws on modern CSS syntax (@layer, nesting)
     }
-    if (s.cssRules && s.cssRules.length !== undefined) {
-      for (let j = 0; j < s.cssRules.length; j++) {
-        const r = s.cssRules[j];
-        if (r) ruleList.push(r as CSSRule);
-      }
+    if (sheet instanceof CSSStyleSheet) {
+      ruleList.push(...Array.from(sheet.cssRules));
       return;
     }
     if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {

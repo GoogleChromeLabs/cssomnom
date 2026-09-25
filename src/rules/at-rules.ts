@@ -458,6 +458,10 @@ export class CSSKeyframeRule extends CSSRule {
 export class CSSNestedDeclarations extends CSSRule {
   private _style: CSSStyleDeclaration;
 
+  get [Symbol.toStringTag](): string {
+    return 'CSSNestedDeclarations';
+  }
+
   constructor(styleDeclarations: Declaration[]) {
     super();
     this._style = new CSSStyleDeclaration(styleDeclarations);

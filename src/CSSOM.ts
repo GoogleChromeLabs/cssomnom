@@ -113,7 +113,7 @@ export class CSSStyleSheet extends StyleSheet {
   protected override _parentStyleSheet: CSSStyleSheet | null = null;
   protected _ownerRule: CSSRule | null = null;
   private _cssRules: CSSRuleList;
-  private _rules: Rule[];
+  private _rules: CSSRule[];
   private _parseRule: (text: string) => Rule | null;
   private _registeredProperties: string[] = [];
 
@@ -230,7 +230,7 @@ export class CSSStyleSheet extends StyleSheet {
   }
 
   /** @internal */
-  static createInternal(rules: Rule[], parseRule: (text: string) => Rule | null, originClean: boolean = true): CSSStyleSheet {
+  static createInternal(rules: CSSRule[], parseRule: (text: string) => Rule | null, originClean: boolean = true): CSSStyleSheet {
     const sheet = new CSSStyleSheet();
     sheet._rules.push(...rules);
     sheet._parseRule = parseRule;

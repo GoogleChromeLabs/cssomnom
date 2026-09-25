@@ -624,7 +624,7 @@ Result (`cdb0479`, `426a5a0`, `9e1f301`): raw passing 21,227 → 21,184 (46 fake
 
 Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `computed-style.ts` (`clip`) and `variable-resolver.ts` should resolve against the root element's font-size; relative-position `auto` insets should negate the opposite inset.
 
-## Phase 153: Single Rule Model — Retire `ASTAtRule` from the Public `Rule` Type [/]
+## Phase 153: Single Rule Model — Retire `ASTAtRule` from the Public `Rule` Type [x]
 **Objective**: `Rule = ASTAtRule | CSSRule` ([types.ts](./src/types.ts)) forces every consumer to handle a plain-object at-rule shape that only one feature still produces, which is where the cascade's `Rule | CSSRule | Declaration` signatures and `instanceof X || type === N` duck typing come from.
 
 **History** (`history` branch): the union was a snapshot of a half-migrated parser written during an `any`-removal pass (`e788178`, Apr 13). Known at-rules became `CSSRule` classes on Apr 14 (`0fd930e`), unknown at-rules became `CSSAtRule` on Apr 25 (`8ae172d`). Since then `ASTAtRule` escapes the parser only via the `atRules` option ([parser.ts `finalizeAtRule`](./src/parser.ts), added in `0909f19`), used by the CSS Parser API ([parser-api.ts](./src/parser-api.ts)). Phase 126 removed double casts but kept the union.
@@ -634,7 +634,9 @@ Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `co
 - [x] Make public `Rule` mean `CSSRule`; keep `ASTAtRule` private to the parser (scratch object for at-rule handlers). Stop exporting it from [index.ts](./src/index.ts); update the API surface snapshot and README.
 - [x] Narrow signatures and delete the dual-shape handling in `src/cascade/` (`index.ts`, `rule-filter.ts`, `layer-manager.ts`, `at-rule-manager.ts`) and `toParserRule` in `parser-api.ts`; remove the `(r as { type?: number }).type === N` fallbacks where `instanceof` suffices.
 - [x] Net-negative `src/`; 0 WPT regressions.
-- [/] Review fix-forward (`4b83f60`, `b47d814` left `typecheck`/`preflight` red): drop internal fields leaked into `interface CSSRule`, type internal rule arrays as the concrete class, replace `constructor.name` / `'name' in` duck typing in `rules/base.ts` with `instanceof`, no `as unknown as`. Scoped narrowly; the interface/class split moves to Phase 155.
+- [x] Review fix-forward (`4b83f60`, `b47d814` left `typecheck`/`preflight` red): drop internal fields leaked into `interface CSSRule`, type internal rule arrays as the concrete class, replace `constructor.name` / `'name' in` duck typing in `rules/base.ts` with `instanceof`, no `as unknown as`. Scoped narrowly; the interface/class split moves to Phase 155.
+
+Result: public `Rule` is a type-only alias of the concrete `CSSRule` class; `toParserRule` dispatches by `instanceof` (qualified rules now include their declarations; `@keyframes` reports `keyframes`); `insertRule` nesting checks use `instanceof CSSGroupingRule` and WebIDL class strings; the cascade ignores foreign CSSOM from linkedom's `style.sheet` and re-parses `<style>` text. `src/` net −102 lines since `2fcab88`; WPT 21,184 / 0 regressions.
 
 ## Phase 154: Fix :lang() Matching [ ]
 **Objective**: Implement spec-compliant CSS Selectors 4 § 7.2 `:lang()` pseudo-class matching using RFC 4647 extended language range filtering.

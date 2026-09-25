@@ -21,11 +21,10 @@ import {
   CSSImportRule,
   CSSMediaRule,
   CSSGroupingRule,
-  CSSRule,
   CSSStyleRule,
 } from '../CSSOM.ts';
 import { MediaParser } from '../MediaParser.ts';
-import type { Rule, InternalRuleMetadata, MediaEnvironment, ElementLike } from '../types.ts';
+import type { Rule, MediaEnvironment, ElementLike } from '../types.ts';
 
 export interface LayerState {
   nextLayerIndex: number;

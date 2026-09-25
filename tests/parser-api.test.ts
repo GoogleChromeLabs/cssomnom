@@ -38,6 +38,11 @@ describe('CSS Parser API', () => {
         const rules = await CSS.parseStylesheet(css);
         assert.strictEqual(rules.length, 1);
         assert.ok(rules[0] instanceof CSSParserQualifiedRule);
+        const decl = (rules[0] as CSSParserQualifiedRule).body[0];
+        assert.ok(decl instanceof CSSParserDeclaration);
+        assert.strictEqual(decl.name, 'color');
+        const [kf] = await CSS.parseStylesheet('@keyframes spin { to { opacity: 0; } }');
+        assert.strictEqual((kf as CSSParserAtRule).name, 'keyframes');
     });
 
     test('CSS.parseRule', () => {
