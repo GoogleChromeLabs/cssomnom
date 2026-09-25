@@ -624,7 +624,7 @@ Result (`cdb0479`, `426a5a0`, `9e1f301`): raw passing 21,227 → 21,184 (46 fake
 
 Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `computed-style.ts` (`clip`) and `variable-resolver.ts` should resolve against the root element's font-size; relative-position `auto` insets should negate the opposite inset.
 
-## Phase 153: Single Rule Model — Retire `ASTAtRule` from the Public `Rule` Type [x]
+## Phase 153: Single Rule Model — Retire `ASTAtRule` from the Public `Rule` Type [/]
 **Objective**: `Rule = ASTAtRule | CSSRule` ([types.ts](./src/types.ts)) forces every consumer to handle a plain-object at-rule shape that only one feature still produces, which is where the cascade's `Rule | CSSRule | Declaration` signatures and `instanceof X || type === N` duck typing come from.
 
 **History** (`history` branch): the union was a snapshot of a half-migrated parser written during an `any`-removal pass (`e788178`, Apr 13). Known at-rules became `CSSRule` classes on Apr 14 (`0fd930e`), unknown at-rules became `CSSAtRule` on Apr 25 (`8ae172d`). Since then `ASTAtRule` escapes the parser only via the `atRules` option ([parser.ts `finalizeAtRule`](./src/parser.ts), added in `0909f19`), used by the CSS Parser API ([parser-api.ts](./src/parser-api.ts)). Phase 126 removed double casts but kept the union.
@@ -634,6 +634,7 @@ Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `co
 - [x] Make public `Rule` mean `CSSRule`; keep `ASTAtRule` private to the parser (scratch object for at-rule handlers). Stop exporting it from [index.ts](./src/index.ts); update the API surface snapshot and README.
 - [x] Narrow signatures and delete the dual-shape handling in `src/cascade/` (`index.ts`, `rule-filter.ts`, `layer-manager.ts`, `at-rule-manager.ts`) and `toParserRule` in `parser-api.ts`; remove the `(r as { type?: number }).type === N` fallbacks where `instanceof` suffices.
 - [x] Net-negative `src/`; 0 WPT regressions.
+- [/] Review fix-forward (`4b83f60`, `b47d814` left `typecheck`/`preflight` red): drop internal fields leaked into `interface CSSRule`, type internal rule arrays as the concrete class, replace `constructor.name` / `'name' in` duck typing in `rules/base.ts` with `instanceof`, no `as unknown as`. Scoped narrowly; the interface/class split moves to Phase 155.
 
 ## Phase 154: Fix :lang() Matching [ ]
 **Objective**: Implement spec-compliant CSS Selectors 4 § 7.2 `:lang()` pseudo-class matching using RFC 4647 extended language range filtering.
@@ -653,6 +654,9 @@ Currently, `src/matcher.ts` uses basic prefix matching (`elementLang === clean |
   - Argument list parsing resilience for numbers/idents (e.g., `:lang(de, nl, 0, fr)`, `:lang(0)`).
 - [ ] **XML Document `xml:lang` Attribute Semantics**:
   - Support `xml:lang` lookup in XML documents while ignoring it in HTML documents per CSS Selectors 4 / HTML specification.
+
+## Phase 155: One CSSOM Type Per Interface — Reconcile `types.ts` Interfaces with Concrete Classes [ ]
+**Objective**: [types.ts](./src/types.ts) declares hand-written WebIDL-shaped interfaces (`CSSRule`, `CSSStyleSheet`, …) that diverge from the concrete classes ([rules/base.ts](./src/rules/base.ts), [CSSOM.ts](./src/CSSOM.ts)). With `Rule = CSSRule` (Phase 153) the two `CSSRule`s are not assignable to each other (found while fixing Phase 153; 18 errors in 7 files). Pick one source of truth (likely type-only re-exports of the classes), delete the redundant interfaces, and keep the ParseHooks rule. Needs a short design discussion first: public `.d.ts` shape and API snapshot impact.
 
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
