@@ -60,7 +60,7 @@ export function collectActiveAtRules(
     return candidate.sourceOrder > existing.sourceOrder;
   }
 
-  function walk(rules: ArrayLike<Rule | CSSRule | Declaration>, currentLayer?: string) {
+  function walk(rules: ArrayLike<CSSRule | Declaration>, currentLayer?: string) {
     for (let i = 0; i < rules.length; i++) {
       const r = rules[i];
       if (!r) continue;

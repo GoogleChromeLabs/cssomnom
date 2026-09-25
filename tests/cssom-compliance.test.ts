@@ -16,7 +16,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet, CSSStyleRule } from '../src/index.ts';
+import { CSSStyleSheet, CSSStyleRule, CSSNamespaceRule } from '../src/index.ts';
 import type { Rule } from '../src/types.ts';
 
 describe('CSSStyleSheet Constructed Restrictions', () => {
@@ -54,8 +54,8 @@ describe('CSSStyleSheet Constructed Restrictions', () => {
 
   it('should throw InvalidStateError when inserting @namespace after regular rules', () => {
     const sheet = CSSStyleSheet.createInternal([], (t: string) => {
-      if (t.startsWith('@namespace')) return { type: 'at-rule', name: 'namespace', prelude: [] } as unknown as Rule;
-      return { type: 'style-rule', selectorText: '.a', style: { declarations: [] } } as unknown as CSSStyleRule;
+      if (t.startsWith('@namespace')) return new CSSNamespaceRule('', 'http://www.w3.org/1999/xhtml', Symbol.for('CSSRule.internal'));
+      return new CSSStyleRule('.a', [], [], () => null as unknown as Rule);
     });
     sheet.insertRule('.a { color: red; }', 0);
     

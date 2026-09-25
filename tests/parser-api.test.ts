@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSS, parse, CSSAtRule } from '../src/index.ts';
+import { CSS, parse, CSSAtRule, CSSStyleRule } from '../src/index.ts';
 import { CSSParserAtRule, CSSParserDeclaration, CSSParserQualifiedRule, CSSParserFunction, CSSParserToken } from '../src/parser-api.ts';
 
 describe('CSS Parser API', () => {
@@ -224,6 +224,9 @@ describe('CSS Parser API', () => {
         assert.strictEqual(atRuleDecl.name, 'foo');
         assert.ok(atRuleDecl.declarations && atRuleDecl.declarations.length === 1);
         assert.strictEqual(atRuleDecl.declarations[0].name, 'color');
+        assert.strictEqual(atRuleDecl.declarations[0].value.length > 0, true);
+        assert.strictEqual(atRuleDecl.declarations[0].important, false);
+        assert.strictEqual(atRuleDecl.cssText.trim(), '@foo {\n  color: red;\n}');
 
         const cssRule = '@bar { div { color: red; } }';
         const sheetRule = parse(cssRule, { atRules: { bar: 'rule' } });
@@ -232,5 +235,8 @@ describe('CSS Parser API', () => {
         const atRuleRule = sheetRule.cssRules[0] as CSSAtRule;
         assert.strictEqual(atRuleRule.name, 'bar');
         assert.ok(atRuleRule.childRules && atRuleRule.childRules.length === 1);
+        assert.ok(atRuleRule.childRules[0] instanceof CSSStyleRule);
+        assert.strictEqual((atRuleRule.childRules[0] as CSSStyleRule).selectorText, 'div');
+        assert.strictEqual(atRuleRule.cssText.trim(), '@bar {\n  div { color: red; }\n}');
     });
 });

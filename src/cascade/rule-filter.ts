@@ -19,6 +19,8 @@ import { calculateSpecificity, compareSpecificity } from '../specificity.ts';
 import { resolveMediaEnvironment } from './layer-manager.ts';
 import {
   CSSRule,
+  CSSStyleRule,
+  CSSAtRule,
   CSSNestedDeclarations,
   CSSGroupingRule,
   CSSScopeRule,
@@ -40,7 +42,6 @@ import { ParseHooks } from '../parse-hooks.ts';
 import { SVG_PRESENTATION_ATTRIBUTES } from '../data/gen/cascade-data.ts';
 import type {
   Rule,
-  CSSStyleRule,
   CSSRuleList,
   SelectorList,
   ComplexSelector,
@@ -204,8 +205,8 @@ export function collectStyleSheetsAndRules(
     }
   };
 
-  const collectFilteredRules = (targetRoot: unknown, keyword: '::part(' | '::slotted('): (Rule | CSSRule)[] => {
-    const result: (Rule | CSSRule)[] = [];
+  const collectFilteredRules = (targetRoot: unknown, keyword: '::part(' | '::slotted('): CSSRule[] => {
+    const result: CSSRule[] = [];
     const tObj = targetRoot as {
       styleSheets?: ArrayLike<CSSStyleSheet>;
       adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
@@ -213,9 +214,9 @@ export function collectStyleSheetsAndRules(
     };
     const seenNodes = new Set<unknown>();
 
-    const checkAndAddRule = (r: Rule | CSSRule) => {
-      if ('selectorText' in r && typeof (r as CSSStyleRule).selectorText === 'string') {
-        if ((r as CSSStyleRule).selectorText.includes(keyword)) {
+    const checkAndAddRule = (r: CSSRule) => {
+      if (r instanceof CSSStyleRule) {
+        if (r.selectorText.includes(keyword)) {
           result.push(r);
         }
       } else if (r instanceof CSSGroupingRule) {
@@ -223,8 +224,8 @@ export function collectStyleSheetsAndRules(
         for (let i = 0; i < children.length; i++) {
           checkAndAddRule(children[i]);
         }
-      } else if ('prelude' in r && Array.isArray((r as { prelude?: ComponentValue[] }).prelude)) {
-        if (serialize((r as { prelude: ComponentValue[] }).prelude).includes(keyword)) {
+      } else if (r instanceof CSSAtRule && r.prelude) {
+        if (serialize(r.prelude).includes(keyword)) {
           result.push(r);
         }
       }
@@ -500,7 +501,7 @@ export function collectMatchedDeclarations(
   let ruleCounter = 0;
 
   const walkRules = (
-    list: (Rule | CSSRule | Declaration)[] | CSSRuleList,
+    list: (CSSRule | Declaration)[] | CSSRuleList,
     parentSelector: string = '',
     currentLayer: string | null = null,
     scopeNode?: DOMElement,
@@ -508,15 +509,11 @@ export function collectMatchedDeclarations(
   ) => {
     const count = list.length;
     for (let i = 0; i < count; i++) {
-      const rule = list[i] as Rule | CSSRule | Declaration;
+      const rule = list[i] as CSSRule | Declaration;
 
-      if (
-        (rule as CSSRule).type === CSSRule.STYLE_RULE ||
-        (rule as { type: string }).type === 'style-rule' ||
-        (rule as { type: string }).type === 'qualified-rule'
-      ) {
+      if (rule instanceof CSSStyleRule) {
         const currentRuleId = ++ruleCounter;
-        const selectorText = (rule as CSSStyleRule).selectorText || serialize((rule as { prelude?: ComponentValue[] }).prelude || []).trim();
+        const selectorText = rule.selectorText;
         const resolvedSelector = resolveNestedSelector(selectorText, parentSelector);
         const selectors = splitSelectorList(resolvedSelector);
 
@@ -636,7 +633,7 @@ export function collectMatchedDeclarations(
 
         if (isMatchingSelector && maxSpecificity) {
           const spec = maxSpecificity;
-          const style = (rule as CSSStyleRule).style;
+          const style = rule.style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
           const ruleBase = getRuleBaseURL(rule, element);
 
@@ -694,35 +691,16 @@ export function collectMatchedDeclarations(
                 });
               }
             }
-          } else if ((rule as { block?: { value?: ComponentValue[] } }).block?.value) {
-            const blockVal = (rule as { block?: { value?: ComponentValue[] } }).block!.value || [];
-            const decls = ParseHooks.parseStyleAttribute(tokenize(serialize(blockVal)));
-            for (const d of decls._declarations) {
-              const rawValStr = serialize(d.value);
-              matchedDeclarations.push({
-                name: d.name,
-                value: resolveUrlsInValue(rawValStr, ruleBase),
-                important: d.important,
-                isInline: false,
-                layerOrder,
-                specificity: spec,
-                scopeProximity,
-                sourceOrder: sourceOrderCounter++,
-                ruleId: currentRuleId,
-                treeScope: matchingTreeScope,
-                origin,
-              });
-            }
           }
         }
 
         // Nested rules inside CSSStyleRule
-        const nestedRules = (rule as CSSStyleRule).cssRules;
+        const nestedRules = rule.cssRules;
         if (nestedRules && nestedRules.length > 0) {
           walkRules(nestedRules, resolvedSelector, currentLayer, scopeNode, scopeProximity);
         }
       } else if (rule instanceof CSSLayerBlockRule) {
-        const assigned = (rule as CSSRule & InternalRuleMetadata)._assignedLayerName;
+        const assigned = rule._assignedLayerName;
         const rawName = rule.name;
         const layerName = assigned || (currentLayer ? (rawName ? `${currentLayer}.${rawName}` : currentLayer) : rawName);
         if (rule.cssRules) {
@@ -747,7 +725,7 @@ export function collectMatchedDeclarations(
         const importedSheet = rule.styleSheet;
         if (importedSheet && importedSheet.cssRules && importedSheet.cssRules.length > 0) {
           const rawLayer = rule.layerName;
-          const assignedLayer = (rule as unknown as InternalRuleMetadata)._assignedLayerName;
+          const assignedLayer = rule._assignedLayerName;
           const layerName = assignedLayer || (rawLayer !== null && rawLayer !== undefined ? (currentLayer ? (rawLayer ? `${currentLayer}.${rawLayer}` : currentLayer) : rawLayer) : currentLayer);
           
           const isScoped = rule.isScoped;

@@ -22,6 +22,7 @@ import {
   CSSMediaRule,
   CSSGroupingRule,
   CSSRule,
+  CSSStyleRule,
 } from '../CSSOM.ts';
 import { MediaParser } from '../MediaParser.ts';
 import type { Rule, InternalRuleMetadata, MediaEnvironment, ElementLike } from '../types.ts';
@@ -131,7 +132,7 @@ export function scanLayers(
         fullName = prefix ? `${prefix}.${rawName}` : rawName;
       }
       root.registerPath(fullName);
-      (r as CSSRule & InternalRuleMetadata)._assignedLayerName = fullName;
+      r._assignedLayerName = fullName;
       const childRules = r.cssRules;
       if (childRules && childRules.length > 0) {
         scanLayers(Array.from(childRules), root, state, fullName, env, isInsideStyleRule);
@@ -152,7 +153,7 @@ export function scanLayers(
         } else {
           fullName = prefix ? `${prefix}.${rawLayer}` : rawLayer;
         }
-        (r as unknown as InternalRuleMetadata)._assignedLayerName = fullName;
+        r._assignedLayerName = fullName;
         root.registerPath(fullName);
         const importedSheet = r.styleSheet;
         if (importedSheet && importedSheet.cssRules) {
@@ -175,9 +176,9 @@ export function scanLayers(
       if (childRules && childRules.length > 0) {
         scanLayers(Array.from(childRules), root, state, prefix, env, isInsideStyleRule);
       }
-    } else if ('style' in r && 'selectorText' in r) {
-      if ('cssRules' in r && (r as { cssRules?: unknown }).cssRules) {
-        scanLayers(Array.from((r as { cssRules: ArrayLike<Rule> }).cssRules), root, state, prefix, env, true);
+    } else if (r instanceof CSSStyleRule) {
+      if (r.cssRules && r.cssRules.length > 0) {
+        scanLayers(Array.from(r.cssRules), root, state, prefix, env, true);
       }
     } else if (r instanceof CSSGroupingRule && r.cssRules) {
       scanLayers(Array.from(r.cssRules), root, state, prefix, env, isInsideStyleRule);

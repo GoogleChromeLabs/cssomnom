@@ -537,12 +537,12 @@ export class CSSStyleRule extends CSSGroupingRule {
     let allowRelative = false;
     let currParent: CSSRule | null = this.parentRule;
     while (currParent !== null) {
-      if (currParent.type === 1 || currParent.constructor.name === 'CSSStyleRule') {
+      if (currParent.type === 1 || currParent[Symbol.toStringTag] === 'CSSStyleRule') {
         isNested = true;
         allowRelative = true;
         break;
       }
-      if (currParent.constructor.name === 'CSSScopeRule') {
+      if (currParent[Symbol.toStringTag] === 'CSSScopeRule') {
         allowRelative = true;
         break;
       }

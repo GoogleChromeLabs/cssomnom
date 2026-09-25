@@ -137,9 +137,9 @@ export class MediaList {
 
 export class CSSRuleList {
   [index: number]: CSSRule;
-  private _getRules: () => (Rule | CSSRule)[];
+  private _getRules: () => CSSRule[];
 
-  constructor(rulesOrGetter: (Rule | CSSRule)[] | (() => (Rule | CSSRule)[])) {
+  constructor(rulesOrGetter: CSSRule[] | (() => CSSRule[])) {
     this._getRules = typeof rulesOrGetter === 'function' ? rulesOrGetter : () => rulesOrGetter;
     return createIndexedProxy(this, (t) => t._getRules(), (v) => v as CSSRule);
   }

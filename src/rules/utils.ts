@@ -39,9 +39,9 @@ export function isRegularRule(r: Rule): boolean {
 }
 
 // cssom-1 § 6.4.3 #the-cssgroupingrule-interface
-export function serializeGroupingRule(atKeyword: string, condition: string, rules: (Rule | CSSRule)[]): string {
+export function serializeGroupingRule(atKeyword: string, condition: string, rules: CSSRule[]): string {
   const cond = condition ? ' ' + condition : '';
-  const ruleTexts = rules.map(r => (r as CSSRule).cssText).filter(p => p !== '');
+  const ruleTexts = rules.map(r => r.cssText).filter(p => p !== '');
   if (ruleTexts.length === 0) {
     if (atKeyword === 'keyframes') {
       return `@${atKeyword}${cond} { }`;

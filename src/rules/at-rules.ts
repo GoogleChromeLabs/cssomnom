@@ -244,7 +244,7 @@ export class CSSScopeRule extends CSSGroupingRule {
   readonly startSelector: string | null;
   readonly endSelector: string | null;
 
-  constructor(startSelector: string | null, endSelector: string | null, rules: (Rule | CSSRule)[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(startSelector: string | null, endSelector: string | null, rules: CSSRule[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
     this.startSelector = startSelector;
     this.endSelector = endSelector;
@@ -942,14 +942,14 @@ export class CSSAtRule extends CSSRule {
   public name: string;
   public prelude: ComponentValue[];
   public block?: SimpleBlock | null;
-  public childRules?: Rule[];
+  public childRules?: CSSRule[];
   public declarations?: Declaration[];
 
   constructor(
     name: string,
     prelude: ComponentValue[],
     block?: SimpleBlock | null,
-    childRules?: Rule[],
+    childRules?: CSSRule[],
     declarations?: Declaration[]
   ) {
     super();
@@ -965,7 +965,8 @@ export class CSSAtRule extends CSSRule {
   }
 
   get cssText(): string {
-    const cond = this.prelude.length > 0 ? ' ' + serialize(this.prelude).trim() : '';
+    const serializedPrelude = serialize(this.prelude).trim();
+    const cond = serializedPrelude.length > 0 ? ' ' + serializedPrelude : '';
     if (!this.block) return `@${this.name}${cond};`;
 
     const childRules = this.childRules || [];

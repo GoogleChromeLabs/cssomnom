@@ -29,6 +29,9 @@ const ctor: CSSRuleConstructor = {
   KEYFRAME_RULE: 8,
   MARGIN_RULE: 9,
   NAMESPACE_RULE: 10,
+  COUNTER_STYLE_RULE: 11,
+  SUPPORTS_RULE: 12,
+  FONT_FEATURE_VALUES_RULE: 14,
 };
 
 console.log(ctor);

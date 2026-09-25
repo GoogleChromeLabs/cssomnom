@@ -250,6 +250,7 @@ export interface CSSRuleList {
   readonly length: number;
   item(index: number): CSSRule | null;
   [index: number]: CSSRule;
+  [Symbol.iterator](): Iterator<CSSRule>;
 }
 
 export interface CSSRuleConstants {
@@ -263,6 +264,9 @@ export interface CSSRuleConstants {
   readonly KEYFRAME_RULE: number;
   readonly MARGIN_RULE: number;
   readonly NAMESPACE_RULE: number;
+  readonly COUNTER_STYLE_RULE: number;
+  readonly SUPPORTS_RULE: number;
+  readonly FONT_FEATURE_VALUES_RULE: number;
 }
 
 export interface CSSRule extends CSSRuleConstants {
@@ -270,6 +274,12 @@ export interface CSSRule extends CSSRuleConstants {
   readonly parentRule: CSSRule | null;
   readonly parentStyleSheet: CSSStyleSheet | null;
   readonly type: number; // Historical
+  _assignedLayerName?: string | null;
+  _parentRule: CSSRule | null;
+  _parentStyleSheet: CSSStyleSheet | null;
+  _location?: RuleSourceLocation;
+  readonly location: RuleSourceLocation | undefined;
+  readonly [Symbol.toStringTag]: string;
 }
 
 export interface CSSRuleConstructor extends CSSRuleConstants {

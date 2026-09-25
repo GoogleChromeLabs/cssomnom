@@ -209,6 +209,7 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
 - **Source Location Tracking (`CSSRule.prototype.location`)**: Parsed CSS rules expose their 0-based character offsets (`{ start: number, end: number, bodyStart?: number, bodyEnd?: number }`) relative to the original source text via a non-enumerable `location` property on `CSSRule.prototype`, enabling source maps, DevTools coverage pruning, and refactoring tools without breaking standard IDL enumeration or serialization.
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
+- **Single Rule Model (`CSSRule`)**: The public `Rule` type is an alias for `CSSRule`. The parser-private `ASTAtRule` scratch type is internal and not exported. Custom at-rules parsed via the `atRules` option with `parse()` produce standard `CSSAtRule` instances exposing `.declarations` (for declaration blocks) or `.childRules` (for rule blocks) and standard `.cssText`.
 
 ---
 
