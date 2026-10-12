@@ -181,4 +181,53 @@ describe('coverage-prune: Coverage-guided CSS dead-code pruner', () => {
       assert.ok(result.removedRules.includes('.dead-widget'));
     });
   });
+
+  describe('Selector Resolution & Scope Hygiene', () => {
+    it('preserves comma-separated nested & interactive pseudo-classes when parent is active', () => {
+      const css = `.tab {\n  color: blue;\n  &:hover, &:focus-visible {\n    color: red;\n  }\n  @media (min-width: 600px) {\n    &:active {\n      color: green;\n    }\n  }\n}`;
+      const tabStart = css.indexOf('.tab {');
+      const declEnd = css.indexOf('color: blue;') + 'color: blue;'.length;
+      const res = pruneUnusedCss(css, [{ start: tabStart, end: declEnd }]);
+
+      assert.ok(res.retainedRules.includes('&:hover, &:focus-visible'));
+      assert.ok(res.retainedRules.includes('&:active'));
+      assert.equal(res.reviewQueue.length, 0);
+      assert.ok(res.prunedCss.includes('&:hover, &:focus-visible'));
+      assert.ok(res.prunedCss.includes('&:active'));
+    });
+
+    it('does not leak active :scope across distinct @scope blocks', () => {
+      const css = `@scope (.used-widget) {\n  :scope {\n    color: green;\n  }\n}\n@scope (.unused-widget) {\n  :scope:hover {\n    color: red;\n  }\n}`;
+      const usedStart = css.indexOf(':scope {');
+      const usedEnd = css.indexOf('}', usedStart) + 1;
+      const res = pruneUnusedCss(css, [{ start: usedStart, end: usedEnd }]);
+
+      assert.ok(!res.retainedRules.includes(':scope:hover'));
+      assert.ok(res.reviewQueue.some(item => item.reason === 'INTERACTIVE_WITHOUT_BASE' && item.header === ':scope:hover'));
+    });
+  });
+
+  describe('Nested Rule Pruning & Whitespace Gap Hygiene', () => {
+    it('removes unused nested child rules without leaving blank empty lines inside parent', () => {
+      const css = `.parent {\n  color: red;\n  .unused-child {\n    color: blue;\n  }\n}`;
+      const parentStart = css.indexOf('.parent {');
+      const declEnd = css.indexOf('color: red;') + 'color: red;'.length;
+      const res = pruneUnusedCss(css, [{ start: parentStart, end: declEnd }]);
+
+      assert.ok(!res.prunedCss.includes('.unused-child'));
+      assert.ok(!res.prunedCss.includes('\n  \n'));
+      assert.equal(res.prunedCss, '.parent {\n  color: red;\n}');
+    });
+
+    it('strips empty style rule shells when all nested rules are pruned', () => {
+      const css = `iframe {\n  &.unused { display: none; }\n}`;
+      const res = pruneUnusedCss(css, []);
+
+      assert.equal(res.prunedCss, '');
+      assert.ok(res.removedRules.includes('iframe'));
+      assert.ok(res.removedRules.includes('&.unused'));
+    });
+  });
 });
+
+

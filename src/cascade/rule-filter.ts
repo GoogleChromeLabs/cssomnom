@@ -484,6 +484,20 @@ function getElementRootNode(el: ElementLike): { host?: ElementLike } | null {
 }
 
 /**
+ * Extracts normalized string value for a parsed declaration.
+ * Custom properties preserve raw source text, except when `var()` references are present,
+ * which require AST re-serialization to normalize whitespace and tokens for cascade matching.
+ */
+function getDeclarationStringValue(d: Declaration): string {
+  const isCustom = d.name.startsWith('--');
+  let rawValStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, isCustom).trim();
+  if (isCustom && !rawValStr) {
+    rawValStr = ' ';
+  }
+  return rawValStr;
+}
+
+/**
  * Traverses rule list, evaluates conditional at-rules and selectors, and collects matched declarations.
  * css-cascade-5 § 2 #filtering
  */
@@ -645,7 +659,23 @@ export function collectMatchedDeclarations(
               [property: string]: unknown;
             }
             const s = style as StyleDeclarationLike;
-            if (typeof s.length === 'number' && s.length >= 0) {
+            if ('_declarations' in style && Array.isArray(style._declarations)) {
+              for (const d of style._declarations) {
+                matchedDeclarations.push({
+                  name: d.name,
+                  value: resolveUrlsInValue(getDeclarationStringValue(d), ruleBase),
+                  important: d.important,
+                  isInline: false,
+                  layerOrder,
+                  specificity: spec,
+                  scopeProximity,
+                  sourceOrder: sourceOrderCounter++,
+                  ruleId: currentRuleId,
+                  treeScope: matchingTreeScope,
+                  origin,
+                });
+              }
+            } else if (typeof s.length === 'number' && s.length >= 0) {
               const len = s.length;
               for (let k = 0; k < len; k++) {
                 const name = typeof s.item === 'function' ? s.item(k) : s[k];
@@ -661,23 +691,6 @@ export function collectMatchedDeclarations(
                   name,
                   value: resolveUrlsInValue(rawValStr, ruleBase),
                   important: priority === 'important',
-                  isInline: false,
-                  layerOrder,
-                  specificity: spec,
-                  scopeProximity,
-                  sourceOrder: sourceOrderCounter++,
-                  ruleId: currentRuleId,
-                  treeScope: matchingTreeScope,
-                  origin,
-                });
-              }
-            } else if (Array.isArray((style as { _declarations?: unknown[] })._declarations)) {
-              for (const d of (style as { _declarations: Declaration[] })._declarations) {
-                const rawValStr = serialize(d.value);
-                matchedDeclarations.push({
-                  name: d.name,
-                  value: resolveUrlsInValue(rawValStr, ruleBase),
-                  important: d.important,
                   isInline: false,
                   layerOrder,
                   specificity: spec,
@@ -893,14 +906,11 @@ export function collectMatchedDeclarations(
           const style = rule.style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
           const ruleBase = getRuleBaseURL(rule, element);
-          for (let k = 0; k < style.length; k++) {
-            const name = style.item(k);
-            const value = style.getPropertyValue(name);
-            const priority = style.getPropertyPriority(name);
+          for (const d of style._declarations) {
             matchedDeclarations.push({
-              name,
-              value: resolveUrlsInValue(value, ruleBase),
-              important: priority === 'important',
+              name: d.name,
+              value: resolveUrlsInValue(getDeclarationStringValue(d), ruleBase),
+              important: d.important,
               isInline: false,
               layerOrder,
               specificity: spec,
@@ -968,14 +978,9 @@ export function collectInlineDeclarations(
   if (styleAttrText && styleAttrText.trim()) {
     const inlineDecls = ParseHooks.parseStyleAttribute(tokenize(styleAttrText));
     for (const d of inlineDecls._declarations) {
-      const isCustom = d.name.startsWith('--');
-      let valStr = (d.raw && !d.raw.includes('var(')) ? d.raw : serialize(d.value, isCustom).trim();
-      if (isCustom && !valStr) {
-        valStr = ' ';
-      }
       declarations.push({
         name: d.name,
-        value: valStr,
+        value: getDeclarationStringValue(d),
         important: d.important,
         isInline: true,
         layerOrder: Infinity,

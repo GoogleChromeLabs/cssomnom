@@ -130,13 +130,13 @@ assert.equal(result.beforeCount, result.afterCount);
  
  When performing structural selector changes (e.g. converting BEM `.block__elem--mod` to modular utility classes `.flex .items-center`), AST diffing cannot prove equivalence because the selectors themselves differ.
  
- Use the cascaded style diff tool at [`skills/bulk-css-operation/scripts/cascaded-diff.ts`](./scripts/cascaded-diff.ts):
+ Use the cascaded style diff tool at [`skills/bulk-css-operation/scripts/cascaded-diff.ts`](./scripts/cascaded-diff.ts). It accepts either a raw HTML string (parsed automatically with LinkeDOM) or an array of `DOMElement`s, and deduplicates inherited `--*` custom property diffs so `:root` token changes are only reported on the root element:
  
  ```typescript
  import { diffCascadedStyles } from './skills/bulk-css-operation/scripts/cascaded-diff.ts';
  
- // Test representative DOM elements against before and after stylesheets
- const result = diffCascadedStyles(testElements, originalCss, refactoredCss);
+ // Pass a raw HTML string or an array of DOMElement nodes
+ const result = diffCascadedStyles(htmlOrElements, originalCss, refactoredCss);
  if (!result.valid) {
    console.error('Cascaded style differences detected:', result.differences);
  }

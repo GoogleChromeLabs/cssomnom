@@ -210,6 +210,37 @@ describe('bulk-css-operation: verification scripts', () => {
       assert.equal(result.differences[0].beforeValue, 'rgb(0, 0, 255)');
       assert.equal(result.differences[0].afterValue, 'rgb(0, 128, 0)');
     });
+
+    it('accepts raw HTML string and deduplicates inherited --* custom property diffs', () => {
+      const html = '<html><body><div class="card"><p>Text</p></div></body></html>';
+      const before = ':root { --brand: red; }';
+      const after = ':root { --brand: blue; }';
+
+      const result = diffCascadedStyles(html, before, after);
+      assert.equal(result.valid, false);
+      const brandDiffs = result.differences.filter(d => d.property === '--brand');
+      assert.equal(brandDiffs.length, 1);
+      assert.equal(brandDiffs[0].elementDescription, '<html>');
+      assert.equal(brandDiffs[0].beforeValue, 'red');
+      assert.equal(brandDiffs[0].afterValue, 'blue');
+    });
+
+    it('reports child --* override change on child element without repeating on descendants', () => {
+      const html = '<html><body><div class="card"><p>Text</p></div></body></html>';
+      const before = ':root { --brand: red; } .card { --brand: green; }';
+      const after = ':root { --brand: blue; } .card { --brand: yellow; }';
+
+      const result = diffCascadedStyles(html, before, after);
+      assert.equal(result.valid, false);
+      const brandDiffs = result.differences.filter(d => d.property === '--brand');
+      assert.equal(brandDiffs.length, 2);
+      assert.equal(brandDiffs[0].elementDescription, '<html>');
+      assert.equal(brandDiffs[0].beforeValue, 'red');
+      assert.equal(brandDiffs[0].afterValue, 'blue');
+      assert.equal(brandDiffs[1].elementDescription, '<div class="card">');
+      assert.equal(brandDiffs[1].beforeValue, 'green');
+      assert.equal(brandDiffs[1].afterValue, 'yellow');
+    });
   });
 
   describe('Comprehensive fixture verification: modern.css', () => {

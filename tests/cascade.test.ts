@@ -329,3 +329,23 @@ test('Cascade: Automatic stylesheet extraction from document.styleSheets', () =>
   const style = Parser.getCascadedStyle(el);
   assert.strictEqual(style.getPropertyValue('color'), 'rgb(0, 0, 139)');
 });
+
+test('Cascade: border shorthand with var() and longhand override', () => {
+  const css = `
+    :root { --divider: rgb(211 227 253 / 100%); }
+    .box {
+      border: 1px solid var(--divider);
+      border-width: 1px 0;
+    }
+  `;
+  const rules = parseStyleSheet(css);
+  const { document } = parseHTML('<html><body><div class="box"></div></body></html>');
+  const el = document.querySelector('.box')!;
+
+  const style = Parser.getCascadedStyle(el, rules);
+  assert.strictEqual(style.getPropertyValue('border-top-style'), 'solid');
+  assert.strictEqual(style.getPropertyValue('border-top-width'), '1px');
+  assert.strictEqual(style.getPropertyValue('border-left-width'), '0px');
+  assert.strictEqual(style.getPropertyValue('border-top-color'), 'rgb(211, 227, 253)');
+});
+

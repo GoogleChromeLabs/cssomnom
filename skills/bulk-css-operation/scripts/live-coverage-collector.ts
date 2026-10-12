@@ -171,6 +171,15 @@ export async function collectLiveCssCoverage(
     cdp.on('CSS.styleSheetAdded', (event) => {
       const header = event.header;
       if (!header?.styleSheetId) return;
+      // Filter user-agent, injected, and internal shadow-DOM UA stylesheets
+      // (e.g. <details>, <video>) that have no sourceURL and are neither inline nor constructed.
+      if (
+        header.origin === 'user-agent' ||
+        header.origin === 'injected' ||
+        (!header.sourceURL && !header.isInline && !header.isConstructed)
+      ) {
+        return;
+      }
       const fetchPromise = cdp
         .send('CSS.getStyleSheetText', { styleSheetId: header.styleSheetId })
         .then((resp) => {

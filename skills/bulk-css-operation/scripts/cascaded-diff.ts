@@ -15,8 +15,9 @@
  * limitations under the License.
  */
 
-import { CSSStyleSheet, getCascadedStyle } from '../../../src/index.ts';
-import type { DOMElement } from '../../../src/matcher.ts';
+import { CSSStyleSheet, getCascadedStyle, type CSSStyleDeclaration } from '../../../src/index.ts';
+import { isElement, type DOMElement } from '../../../src/matcher.ts';
+import { parseHTML } from 'linkedom';
 
 export interface CascadedStyleDifference {
   elementDescription: string;
@@ -37,14 +38,22 @@ export type DomSampleResult = CascadedDiffResult;
 
 /**
  * Stage 3 Verification: Cascaded Style DOM Verification.
- * Evaluates cascaded winning declarations for a collection of DOM elements
+ * Evaluates cascaded winning declarations for a collection of DOM elements (or an HTML string)
  * against before and after stylesheets using `getCascadedStyle`.
  */
 export function diffCascadedStyles(
-  elements: DOMElement[],
+  elementsOrHtml: DOMElement[] | string,
   beforeCss: string | string[],
   afterCss: string | string[]
 ): CascadedDiffResult {
+  let elements: DOMElement[];
+  if (typeof elementsOrHtml === 'string') {
+    const { document } = parseHTML(elementsOrHtml);
+    elements = Array.from(document.querySelectorAll('*')).filter(isElement);
+  } else {
+    elements = elementsOrHtml;
+  }
+
   const beforeText = Array.isArray(beforeCss) ? beforeCss.join('\n') : beforeCss;
   const afterText = Array.isArray(afterCss) ? afterCss.join('\n') : afterCss;
 
@@ -56,14 +65,29 @@ export function diffCascadedStyles(
 
   const differences: CascadedStyleDifference[] = [];
 
+  function createStyleGetter(rules: CSSStyleSheet['cssRules']) {
+    const cache = new Map<DOMElement, CSSStyleDeclaration>();
+    return (el: DOMElement) => {
+      let s = cache.get(el);
+      if (!s) {
+        s = getCascadedStyle(el, rules);
+        cache.set(el, s);
+      }
+      return s;
+    };
+  }
+
+  const getBeforeStyle = createStyleGetter(sheetBefore.cssRules);
+  const getAfterStyle = createStyleGetter(sheetAfter.cssRules);
+
   for (const el of elements) {
     const tagName = el.tagName || el.localName || 'element';
     const className = el.className || '';
     const id = el.id ? `#${el.id}` : '';
     const desc = `<${tagName.toLowerCase()}${id}${className ? ` class="${className}"` : ''}>`;
 
-    const beforeStyle = getCascadedStyle(el, sheetBefore.cssRules);
-    const afterStyle = getCascadedStyle(el, sheetAfter.cssRules);
+    const beforeStyle = getBeforeStyle(el);
+    const afterStyle = getAfterStyle(el);
 
     const checkedProps = new Set<string>([...beforeStyle, ...afterStyle]);
 
@@ -71,6 +95,16 @@ export function diffCascadedStyles(
       const bVal = beforeStyle.getPropertyValue(prop);
       const aVal = afterStyle.getPropertyValue(prop);
       if (bVal !== aVal) {
+        if (prop.startsWith('--') && el.parentElement) {
+          const parentBefore = getBeforeStyle(el.parentElement);
+          const parentAfter = getAfterStyle(el.parentElement);
+          if (
+            parentBefore.getPropertyValue(prop) === bVal &&
+            parentAfter.getPropertyValue(prop) === aVal
+          ) {
+            continue;
+          }
+        }
         differences.push({
           elementDescription: desc,
           property: prop,

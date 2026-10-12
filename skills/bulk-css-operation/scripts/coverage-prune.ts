@@ -100,6 +100,116 @@ function extractBaseSelector(selector: string): string {
 }
 
 /**
+ * Splits a selector list on top-level commas, respecting parentheses and brackets.
+ */
+function splitSelectorList(selectorText: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let inString: string | null = null;
+
+  for (let i = 0; i < selectorText.length; i++) {
+    const char = selectorText[i];
+    if (inString) {
+      current += char;
+      if (char === '\\' && i + 1 < selectorText.length) {
+        current += selectorText[++i];
+      } else if (char === inString) {
+        inString = null;
+      }
+    } else if (char === '\\' && i + 1 < selectorText.length) {
+      current += char + selectorText[++i];
+    } else if (char === '"' || char === "'") {
+      inString = char;
+      current += char;
+    } else if (char === '(') {
+      parenDepth++;
+      current += char;
+    } else if (char === ')') {
+      if (parenDepth > 0) parenDepth--;
+      current += char;
+    } else if (char === '[') {
+      bracketDepth++;
+      current += char;
+    } else if (char === ']') {
+      if (bracketDepth > 0) bracketDepth--;
+      current += char;
+    } else if (char === ',' && parenDepth === 0 && bracketDepth === 0) {
+      if (current.trim()) parts.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
+/**
+ * Walks up parentRule through intermediate conditional grouping rules (@media, @supports, etc.)
+ * to find the nearest enclosing CSSStyleRule (stopping at @scope boundaries).
+ */
+function getEnclosingStyleRule(rule: CSSRule): CSSStyleRule | null {
+  let curr: CSSRule | null = rule.parentRule;
+  while (curr) {
+    if (curr instanceof CSSStyleRule) return curr;
+    if (curr instanceof CSSScopeRule) return null;
+    curr = curr.parentRule;
+  }
+  return null;
+}
+
+/**
+ * Resolves all base selectors for a style rule, expanding any '&' occurrences
+ * against enclosing parent style rule base selectors.
+ */
+function resolveSelectorBases(rule: CSSStyleRule): string[] {
+  const selectors = splitSelectorList(rule.selectorText);
+  const results: string[] = [];
+  const parentStyleRule = getEnclosingStyleRule(rule);
+
+  for (const sel of selectors) {
+    const base = extractBaseSelector(sel);
+    if (!base) continue;
+
+    if (base.includes('&') && parentStyleRule) {
+      const parentBases = resolveSelectorBases(parentStyleRule);
+      if (parentBases.length > 0) {
+        for (const pb of parentBases) {
+          results.push(base.replaceAll('&', pb));
+        }
+      } else {
+        results.push(base);
+      }
+    } else {
+      results.push(base);
+    }
+  }
+
+  return results.length > 0 ? results : [extractBaseSelector(rule.selectorText)];
+}
+
+/**
+ * Returns the enclosing @scope rule prelude if rule is nested within @scope.
+ */
+function getEnclosingScopeContext(rule: CSSRule, source: string): string | null {
+  let curr: CSSRule | null = rule.parentRule;
+  while (curr) {
+    if (curr instanceof CSSScopeRule) {
+      return getRuleHeader(curr, source);
+    }
+    curr = curr.parentRule;
+  }
+  return null;
+}
+
+function toScopedBaseKey(base: string, scopeContext: string | null): string {
+  return scopeContext ? `${scopeContext} >>> ${base}` : base;
+}
+
+
+/**
  * Environmental media queries that should be guaranteed preserved because point-in-time
  * browser capture does not evaluate alternative color schemes or print output.
  */
@@ -313,7 +423,13 @@ export function pruneUnusedCss(
 
     if (rule instanceof CSSStyleRule) {
       if (isCovered(loc.start, loc.end, coverageRanges, parentSpan)) {
-        activeBaseSelectors.add(extractBaseSelector(rule.selectorText));
+        const scopeContext = getEnclosingScopeContext(rule, css);
+        const bases = resolveSelectorBases(rule);
+        for (const b of bases) {
+          if (b) {
+            activeBaseSelectors.add(toScopedBaseKey(b, scopeContext));
+          }
+        }
       }
     }
 
@@ -454,13 +570,10 @@ export function pruneUnusedCss(
       const isDynamicState = DYNAMIC_STATE_PSEUDO_REGEX.test(sel);
 
       if (isInteractive || isDynamicState) {
-        let base = extractBaseSelector(sel);
-        // If nested selector starts with '&', resolve against parent style rule
-        if (base.startsWith('&') && rule.parentRule instanceof CSSStyleRule) {
-          const parentBase = extractBaseSelector(rule.parentRule.selectorText);
-          base = parentBase + base.slice(1);
-        }
-        const baseActive = base !== '' && activeBaseSelectors.has(base);
+        const scopeContext = getEnclosingScopeContext(rule, css);
+        const bases = resolveSelectorBases(rule);
+        const baseActive = bases.some(b => b !== '' && activeBaseSelectors.has(toScopedBaseKey(b, scopeContext)));
+        const primaryBase = bases[0] || extractBaseSelector(sel);
 
         if (preserveInteractive && isInteractive && baseActive) {
           // Guaranteed preserve: base selector is actively in use
@@ -473,7 +586,7 @@ export function pruneUnusedCss(
           const item: ReviewItem = {
             header,
             reason: 'DYNAMIC_STATE_PSEUDO',
-            description: `Dynamic state pseudo-class on active base selector '${base}'.`,
+            description: `Dynamic state pseudo-class on active base selector '${primaryBase}'.`,
             rule,
           };
           reviewQueue.push(item);
@@ -484,7 +597,7 @@ export function pruneUnusedCss(
           const item: ReviewItem = {
             header,
             reason: 'INTERACTIVE_WITHOUT_BASE',
-            description: `Interactive pseudo-class without active base selector '${base || sel}'.`,
+            description: `Interactive pseudo-class without active base selector '${primaryBase || sel}'.`,
             rule,
           };
           reviewQueue.push(item);
@@ -562,12 +675,19 @@ export function pruneUnusedCss(
 
     for (const child of children) {
       const childLoc = child.location!;
-      innerContent += css.slice(lastPos, childLoc.start);
+      const gap = css.slice(lastPos, childLoc.start);
 
       if (retainedSet.has(child)) {
+        innerContent += gap;
         innerContent += serializeKeptSlice(child);
       } else if (annotatedReviewMap.has(child)) {
+        innerContent += gap;
         innerContent += formatReviewAnnotation(annotatedReviewMap.get(child), css.slice(childLoc.start, childLoc.end));
+      } else {
+        const trimmedGap = gap.replace(/(?:\r?\n[ \t]*)+$/, '');
+        if (/[^\s]/.test(trimmedGap)) {
+          innerContent += trimmedGap;
+        }
       }
       lastPos = childLoc.end;
     }

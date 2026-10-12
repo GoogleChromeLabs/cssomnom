@@ -147,9 +147,11 @@ describe('Live CSS Coverage Integration: Headless Chrome CDP to cssomnom Pruning
     <div class="animated-spinner"></div>
     <div class="fade-widget">Fading</div>
     <input type="checkbox" class="toggle" id="t1"><label for="t1">Toggle</label>
+    <details><summary>More</summary><p>Info</p></details>
   </div>
 </body>
 </html>
+
 `;
 
     // Note: Called with ZERO options to verify canonical baked-in defaults!
