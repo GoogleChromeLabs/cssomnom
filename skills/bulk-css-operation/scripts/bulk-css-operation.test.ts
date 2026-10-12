@@ -148,6 +148,55 @@ describe('bulk-css-operation: verification scripts', () => {
       const result = checkCascadeConflicts(before, after);
       assert.equal(result.valid, true);
     });
+
+    it('catches cascade conflict between compound/complex selectors when order is swapped', () => {
+      const before = `
+        div.btn { color: blue; }
+        div.btn-primary { color: red; }
+      `;
+      const after = `
+        div.btn-primary { color: red; }
+        div.btn { color: blue; }
+      `;
+
+      const result = checkCascadeConflicts(before, after);
+      assert.equal(result.valid, false);
+      assert.equal(result.conflicts.length, 1);
+      assert.equal(result.conflicts[0].selectorA, 'div.btn');
+      assert.equal(result.conflicts[0].selectorB, 'div.btn-primary');
+    });
+
+    it('catches cascade conflict between multi-level complex selectors (.card .btn vs .card .btn-primary)', () => {
+      const before = `
+        .card .btn { color: blue; }
+        .card .btn-primary { color: red; }
+      `;
+      const after = `
+        .card .btn-primary { color: red; }
+        .card .btn { color: blue; }
+      `;
+
+      const result = checkCascadeConflicts(before, after);
+      assert.equal(result.valid, false);
+      assert.equal(result.conflicts.length, 1);
+      assert.equal(result.conflicts[0].selectorA, '.card .btn');
+      assert.equal(result.conflicts[0].selectorB, '.card .btn-primary');
+    });
+
+    it('ignores reordering of rules with incompatible type selectors like div.box and span.box', () => {
+      const before = `
+        div.box { color: blue; }
+        span.box { color: red; }
+      `;
+      const after = `
+        span.box { color: red; }
+        div.box { color: blue; }
+      `;
+
+      const result = checkCascadeConflicts(before, after);
+      assert.equal(result.valid, true);
+      assert.equal(result.conflicts.length, 0);
+    });
   });
 
   describe('Stage 3: diffCascadedStyles', () => {

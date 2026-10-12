@@ -21,10 +21,13 @@ import {
   CSSGroupingRule,
   type CSSRuleList,
 } from '../../../src/index.ts';
+import type { SelectorList } from '../../../src/types.ts';
+import { getRuleHeader } from './coverage-prune.ts';
 
 export interface RuleRecord {
   context: string;
   selector: string;
+  selectorAST: SelectorList | null;
   declarations: Map<string, { value: string; priority: string }>;
   originalIndex: number;
 }
@@ -50,27 +53,34 @@ export function extractRuleRecords(
     const rule = rules[i];
 
     if (rule instanceof CSSStyleRule) {
-      const decls = new Map<string, { value: string; priority: string }>();
-      const style = rule.style;
-      for (const prop of style) {
-        decls.set(prop, {
-          value: style.getPropertyValue(prop).trim(),
-          priority: style.getPropertyPriority(prop).trim(),
+      if (rule.style.length > 0 || !rule.cssRules || rule.cssRules.length === 0) {
+        const decls = new Map<string, { value: string; priority: string }>();
+        const style = rule.style;
+        for (const prop of style) {
+          decls.set(prop, {
+            value: style.getPropertyValue(prop).trim(),
+            priority: style.getPropertyPriority(prop).trim(),
+          });
+        }
+
+        records.push({
+          context: parentContext,
+          selector: rule.selectorText.trim(),
+          selectorAST: rule.selectorAST,
+          declarations: decls,
+          originalIndex: counter.index++,
         });
       }
 
-      records.push({
-        context: parentContext,
-        selector: rule.selectorText.trim(),
-        declarations: decls,
-        originalIndex: counter.index++,
-      });
-    } else if (rule instanceof CSSGroupingRule || (rule && typeof rule === 'object' && 'cssRules' in rule)) {
-      const grouping = rule as CSSGroupingRule;
-      const rawText = (rule as { cssText?: string }).cssText || '';
-      const header = rawText.split('{')[0]?.trim() || '@group';
+      if (rule.cssRules && rule.cssRules.length > 0) {
+        const header = getRuleHeader(rule);
+        const nestedContext = parentContext ? `${parentContext} > ${header}` : header;
+        records.push(...extractRuleRecords(rule.cssRules, nestedContext, counter));
+      }
+    } else if (rule instanceof CSSGroupingRule) {
+      const header = getRuleHeader(rule);
       const nestedContext = parentContext ? `${parentContext} > ${header}` : header;
-      records.push(...extractRuleRecords(grouping.cssRules, nestedContext, counter));
+      records.push(...extractRuleRecords(rule.cssRules, nestedContext, counter));
     }
   }
 

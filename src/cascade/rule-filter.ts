@@ -380,37 +380,13 @@ export function collectStyleSheetsAndRules(
 }
 
 function splitSelectorList(selectorText: string): string[] {
-  const result: string[] = [];
-  let depth = 0;
-  let inString: string | null = null;
-  let current = '';
-
-  for (let i = 0; i < selectorText.length; i++) {
-    const char = selectorText[i];
-    if (inString) {
-      current += char;
-      if (char === '\\' && i + 1 < selectorText.length) {
-        current += selectorText[++i];
-      } else if (char === inString) {
-        inString = null;
-      }
-    } else if (char === '"' || char === "'") {
-      inString = char;
-      current += char;
-    } else if (char === '(' || char === '[' || char === '{') {
-      depth++;
-      current += char;
-    } else if (char === ')' || char === ']' || char === '}') {
-      if (depth > 0) depth--;
-      current += char;
-    } else if (char === ',' && depth === 0) {
-      if (current.trim()) result.push(current.trim());
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  if (current.trim()) result.push(current.trim());
+  const list = new SelectorParser(
+    ParseHooks.parseComponentValues(tokenize(selectorText)),
+    { allowRelative: true, forgiving: true }
+  ).parse();
+  const result = list.selectors
+    .map(s => (s.type === 'invalid-selector' ? serialize(s.tokens).trim() : serializeSelectorList({ type: 'selector-list', selectors: [s] })))
+    .filter(Boolean);
   return result.length > 0 ? result : [selectorText];
 }
 

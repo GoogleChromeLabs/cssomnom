@@ -205,6 +205,16 @@ describe('coverage-prune: Coverage-guided CSS dead-code pruner', () => {
       assert.ok(!res.retainedRules.includes(':scope:hover'));
       assert.ok(res.reviewQueue.some(item => item.reason === 'INTERACTIVE_WITHOUT_BASE' && item.header === ':scope:hover'));
     });
+
+    it('uses selectorAST so commas and :hover inside attribute strings are not misparsed as pseudo-classes', () => {
+      const css = `.btn[data-tip="a, :hover"] { color: blue; }\n.btn[data-tip="a, :hover"]:hover { color: red; }\n.unused[data-tip=":hover"] { color: gray; }`;
+      const btnEnd = css.indexOf('}') + 1;
+      const res = pruneUnusedCss(css, [{ start: 0, end: btnEnd }]);
+
+      assert.ok(res.retainedRules.includes('.btn[data-tip="a, :hover"]:hover'));
+      assert.ok(res.removedRules.includes('.unused[data-tip=":hover"]'));
+      assert.equal(res.reviewQueue.length, 0);
+    });
   });
 
   describe('Nested Rule Pruning & Whitespace Gap Hygiene', () => {

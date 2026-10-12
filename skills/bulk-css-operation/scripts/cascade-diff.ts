@@ -17,6 +17,7 @@
 
 import { CSSStyleSheet } from '../../../src/index.ts';
 import { calculateSpecificity, compareSpecificity } from '../../../src/specificity.ts';
+import type { ComplexSelector, CompoundSelector } from '../../../src/types.ts';
 import { extractRuleRecords, type RuleRecord } from './ast-diff.ts';
 
 export interface CascadeConflict {
@@ -34,24 +35,67 @@ export interface CascadeCheckResult {
   conflicts: CascadeConflict[];
 }
 
+function getSubjectCompound(complex: ComplexSelector): CompoundSelector | null {
+  for (let i = complex.items.length - 1; i >= 0; i--) {
+    const it = complex.items[i];
+    if (it.type === 'compound-selector') {
+      return it;
+    }
+  }
+  return null;
+}
+
+function canComplexSelectorsOverlap(selA: ComplexSelector, selB: ComplexSelector): boolean {
+  const compA = getSubjectCompound(selA);
+  const compB = getSubjectCompound(selB);
+  if (!compA || !compB) return true;
+
+  // 1. Incompatible type selectors
+  const typeA = compA.selectors.find(s => s.type === 'type-selector');
+  const typeB = compB.selectors.find(s => s.type === 'type-selector');
+  if (typeA && typeB && typeA.name.toLowerCase() !== typeB.name.toLowerCase()) {
+    return false;
+  }
+
+  // 2. Incompatible ID selectors
+  const idA = compA.selectors.find(s => s.type === 'id-selector');
+  const idB = compB.selectors.find(s => s.type === 'id-selector');
+  if (idA && idB && idA.name !== idB.name) {
+    return false;
+  }
+
+  // 3. Pseudo-element matching
+  const pseudoElemA = compA.selectors.find(s => s.type === 'pseudo-element-selector');
+  const pseudoElemB = compB.selectors.find(s => s.type === 'pseudo-element-selector');
+  const pseudoNameA = pseudoElemA ? pseudoElemA.name.toLowerCase() : null;
+  const pseudoNameB = pseudoElemB ? pseudoElemB.name.toLowerCase() : null;
+  if (pseudoNameA !== pseudoNameB) {
+    return false;
+  }
+
+  return true;
+}
+
 /**
- * Checks if two selectors can plausibly match the same element or target.
- * Conservative heuristic:
- * - Same selector: definitely overlaps
- * - Both are class/attribute selectors without incompatible type selectors
+ * Checks if two rules' selectors can plausibly match the same element or target.
+ * Uses structured selector AST when available to eliminate incompatible type, ID,
+ * or pseudo-element combinations.
  */
-function canSelectorsOverlap(selA: string, selB: string): boolean {
-  if (selA === selB) return true;
+export function canSelectorsOverlap(rA: RuleRecord, rB: RuleRecord): boolean {
+  if (rA.selector === rB.selector) return true;
+  if (!rA.selectorAST || !rB.selectorAST) {
+    return true;
+  }
 
-  // Simple heuristic: if both are class selectors on potential elements (e.g. .btn and .btn-primary)
-  const isClassA = selA.startsWith('.');
-  const isClassB = selB.startsWith('.');
-  if (isClassA && isClassB) return true;
-
-  // If one is an element and the other is a class (e.g. 'button' and '.btn'), they can overlap
-  const isTagA = /^[a-z0-9_-]+$/i.test(selA);
-  const isTagB = /^[a-z0-9_-]+$/i.test(selB);
-  if ((isTagA && isClassB) || (isTagB && isClassA)) return true;
+  for (const selA of rA.selectorAST.selectors) {
+    if (selA.type !== 'complex-selector') continue;
+    for (const selB of rB.selectorAST.selectors) {
+      if (selB.type !== 'complex-selector') continue;
+      if (canComplexSelectorsOverlap(selA, selB)) {
+        return true;
+      }
+    }
+  }
 
   return false;
 }
@@ -99,7 +143,7 @@ export function checkCascadeConflicts(
       if (rA.context !== rB.context) continue;
 
       // Check if selectors can plausibly match the same element
-      if (!canSelectorsOverlap(rA.selector, rB.selector)) continue;
+      if (!canSelectorsOverlap(rA, rB)) continue;
 
       // Check for shared properties
       const sharedProps: string[] = [];
@@ -111,8 +155,8 @@ export function checkCascadeConflicts(
       if (sharedProps.length === 0) continue;
 
       // Check specificity equality
-      const specA = calculateSpecificity(rA.selector)[0] || [0, 0, 0];
-      const specB = calculateSpecificity(rB.selector)[0] || [0, 0, 0];
+      const specA = calculateSpecificity(rA.selectorAST ?? rA.selector)[0] || [0, 0, 0];
+      const specB = calculateSpecificity(rB.selectorAST ?? rB.selector)[0] || [0, 0, 0];
 
       if (compareSpecificity(specA, specB) !== 0) continue;
 

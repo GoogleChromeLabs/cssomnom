@@ -34,6 +34,16 @@ import {
   CSSScopeRule,
   CSSPageRule,
 } from '../../../src/index.ts';
+import { serializeSelectorList } from '../../../src/serializer.ts';
+import type {
+  SelectorList,
+  ComplexSelector,
+  CompoundSelector,
+  Combinator,
+  MediaCondition,
+  MediaFeature,
+  GeneralEnclosed,
+} from '../../../src/types.ts';
 
 export interface CoverageRange {
   start: number;
@@ -84,145 +94,242 @@ export interface PruneOptions {
 }
 
 /**
- * Common interactive and dynamic pseudo-classes.
+ * Common interactive and dynamic pseudo-classes and environmental media features.
  */
-const INTERACTIVE_PSEUDO_REGEX = /:(?:focus-visible|focus-within|popover-open|hover|focus|active|target|visited)\b/i;
-const DYNAMIC_STATE_PSEUDO_REGEX = /:(?:checked|disabled|enabled|valid|invalid|required|optional|read-only|read-write|empty|indeterminate|default)\b/i;
+export const INTERACTIVE_PSEUDOS = new Set([
+  'focus-visible',
+  'focus-within',
+  'popover-open',
+  'hover',
+  'focus',
+  'active',
+  'target',
+  'visited',
+]);
 
-/**
- * Strips pseudo-classes to retrieve the base selector for matching against active rules.
- */
-function extractBaseSelector(selector: string): string {
-  return selector
-    .replace(new RegExp(INTERACTIVE_PSEUDO_REGEX.source, 'gi'), '')
-    .replace(new RegExp(DYNAMIC_STATE_PSEUDO_REGEX.source, 'gi'), '')
-    .trim();
+export const DYNAMIC_STATE_PSEUDOS = new Set([
+  'checked',
+  'disabled',
+  'enabled',
+  'valid',
+  'invalid',
+  'required',
+  'optional',
+  'read-only',
+  'read-write',
+  'empty',
+  'indeterminate',
+  'default',
+]);
+
+export const ENVIRONMENTAL_FEATURES = new Set([
+  'prefers-color-scheme',
+  'prefers-reduced-motion',
+  'prefers-contrast',
+  'forced-colors',
+  'dynamic-range',
+  'inverted-colors',
+  'prefers-reduced-transparency',
+  'prefers-reduced-data',
+]);
+
+const ANIMATION_KEYWORDS = new Set([
+  'normal',
+  'reverse',
+  'alternate',
+  'alternate-reverse',
+  'infinite',
+  'none',
+  'forwards',
+  'backwards',
+  'both',
+  'running',
+  'paused',
+  'ease',
+  'linear',
+  'ease-in',
+  'ease-out',
+  'ease-in-out',
+  'step-start',
+  'step-end',
+  'inherit',
+  'initial',
+  'unset',
+  'revert',
+  'revert-layer',
+]);
+
+export function hasPseudoClass(
+  selectorAST: SelectorList | null | undefined,
+  targetSet: Set<string>
+): boolean {
+  if (!selectorAST || !selectorAST.selectors) return false;
+  for (const sel of selectorAST.selectors) {
+    if (sel.type !== 'complex-selector') continue;
+    if (hasPseudoClassInComplex(sel, targetSet)) return true;
+  }
+  return false;
 }
 
-/**
- * Splits a selector list on top-level commas, respecting parentheses and brackets.
- */
-function splitSelectorList(selectorText: string): string[] {
-  const parts: string[] = [];
-  let current = '';
-  let parenDepth = 0;
-  let bracketDepth = 0;
-  let inString: string | null = null;
-
-  for (let i = 0; i < selectorText.length; i++) {
-    const char = selectorText[i];
-    if (inString) {
-      current += char;
-      if (char === '\\' && i + 1 < selectorText.length) {
-        current += selectorText[++i];
-      } else if (char === inString) {
-        inString = null;
+function hasPseudoClassInComplex(
+  complex: ComplexSelector,
+  targetSet: Set<string>
+): boolean {
+  for (const item of complex.items) {
+    if (item.type !== 'compound-selector') continue;
+    for (const simple of item.selectors) {
+      if (simple.type === 'pseudo-class-selector') {
+        if (targetSet.has(simple.name.toLowerCase())) {
+          return true;
+        }
+        if (
+          simple.argument &&
+          typeof simple.argument === 'object' &&
+          'type' in simple.argument &&
+          simple.argument.type === 'selector-list'
+        ) {
+          if (hasPseudoClass(simple.argument, targetSet)) {
+            return true;
+          }
+        }
       }
-    } else if (char === '\\' && i + 1 < selectorText.length) {
-      current += char + selectorText[++i];
-    } else if (char === '"' || char === "'") {
-      inString = char;
-      current += char;
-    } else if (char === '(') {
-      parenDepth++;
-      current += char;
-    } else if (char === ')') {
-      if (parenDepth > 0) parenDepth--;
-      current += char;
-    } else if (char === '[') {
-      bracketDepth++;
-      current += char;
-    } else if (char === ']') {
-      if (bracketDepth > 0) bracketDepth--;
-      current += char;
-    } else if (char === ',' && parenDepth === 0 && bracketDepth === 0) {
-      if (current.trim()) parts.push(current.trim());
-      current = '';
-    } else {
-      current += char;
     }
   }
-  if (current.trim()) parts.push(current.trim());
-  return parts;
+  return false;
+}
+
+export function stripStatefulPseudos(complex: ComplexSelector): ComplexSelector | null {
+  const newItems: (CompoundSelector | Combinator)[] = [];
+
+  for (const item of complex.items) {
+    if (item.type === 'combinator') {
+      newItems.push({ ...item });
+    } else if (item.type === 'compound-selector') {
+      const remainingSelectors: CompoundSelector['selectors'] = [];
+      for (const s of item.selectors) {
+        if (s.type === 'pseudo-class-selector') {
+          const name = s.name.toLowerCase();
+          if (INTERACTIVE_PSEUDOS.has(name) || DYNAMIC_STATE_PSEUDOS.has(name)) {
+            continue;
+          }
+          if (
+            s.argument &&
+            typeof s.argument === 'object' &&
+            'type' in s.argument &&
+            s.argument.type === 'selector-list'
+          ) {
+            const strippedArgs = s.argument.selectors
+              .map(sub => (sub.type === 'complex-selector' ? stripStatefulPseudos(sub) : sub))
+              .filter((sub): sub is NonNullable<typeof sub> => sub !== null);
+            if (strippedArgs.length === 0) {
+              continue;
+            }
+            remainingSelectors.push({
+              ...s,
+              argument: { type: 'selector-list', selectors: strippedArgs },
+            });
+            continue;
+          }
+        }
+        remainingSelectors.push({ ...s });
+      }
+      if (remainingSelectors.length > 0) {
+        newItems.push({
+          type: 'compound-selector',
+          selectors: remainingSelectors,
+        });
+      }
+    }
+  }
+
+  while (newItems.length > 0 && newItems[0].type === 'combinator') {
+    newItems.shift();
+  }
+  while (newItems.length > 0 && newItems[newItems.length - 1].type === 'combinator') {
+    newItems.pop();
+  }
+
+  const cleanedItems: (CompoundSelector | Combinator)[] = [];
+  for (const it of newItems) {
+    if (
+      it.type === 'combinator' &&
+      cleanedItems.length > 0 &&
+      cleanedItems[cleanedItems.length - 1].type === 'combinator'
+    ) {
+      cleanedItems[cleanedItems.length - 1] = it;
+    } else {
+      cleanedItems.push(it);
+    }
+  }
+
+  if (!cleanedItems.some(it => it.type === 'compound-selector')) {
+    return null;
+  }
+
+  return {
+    type: 'complex-selector',
+    items: cleanedItems,
+    tokens: [],
+  };
 }
 
 /**
  * Walks up parentRule through intermediate conditional grouping rules (@media, @supports, etc.)
- * to find the nearest enclosing CSSStyleRule (stopping at @scope boundaries).
+ * to find the nearest enclosing CSSStyleRule or CSSScopeRule (or null at top-level).
  */
-function getEnclosingStyleRule(rule: CSSRule): CSSStyleRule | null {
+function getEnclosingRuleContext(rule: CSSRule): CSSStyleRule | CSSScopeRule | null {
   let curr: CSSRule | null = rule.parentRule;
   while (curr) {
-    if (curr instanceof CSSStyleRule) return curr;
-    if (curr instanceof CSSScopeRule) return null;
+    if (curr instanceof CSSStyleRule || curr instanceof CSSScopeRule) return curr;
     curr = curr.parentRule;
   }
   return null;
 }
 
-/**
- * Resolves all base selectors for a style rule, expanding any '&' occurrences
- * against enclosing parent style rule base selectors.
- */
-function resolveSelectorBases(rule: CSSStyleRule): string[] {
-  const selectors = splitSelectorList(rule.selectorText);
-  const results: string[] = [];
-  const parentStyleRule = getEnclosingStyleRule(rule);
-
+function getStrippedBaseSelectors(rule: CSSStyleRule): string[] {
+  const selectors = rule.selectorAST?.selectors ?? [];
+  const bases: string[] = [];
   for (const sel of selectors) {
-    const base = extractBaseSelector(sel);
-    if (!base) continue;
+    if (sel.type !== 'complex-selector') continue;
+    const stripped = stripStatefulPseudos(sel);
+    if (!stripped) continue;
+    bases.push(serializeSelectorList({ type: 'selector-list', selectors: [stripped] }));
+  }
+  return bases;
+}
 
-    if (base.includes('&') && parentStyleRule) {
-      const parentBases = resolveSelectorBases(parentStyleRule);
-      if (parentBases.length > 0) {
-        for (const pb of parentBases) {
-          results.push(base.replaceAll('&', pb));
-        }
-      } else {
-        results.push(base);
-      }
-    } else {
-      results.push(base);
+function hasEnvironmentalFeature(
+  node: MediaCondition | MediaFeature | GeneralEnclosed | undefined
+): boolean {
+  if (!node) return false;
+  if (node.type === 'media-feature') {
+    return ENVIRONMENTAL_FEATURES.has(node.name.toLowerCase());
+  }
+  if (node.type === 'media-condition') {
+    return node.children.some(child => hasEnvironmentalFeature(child));
+  }
+  if (node.type === 'general-enclosed') {
+    if (node.name && ENVIRONMENTAL_FEATURES.has(node.name.toLowerCase())) {
+      return true;
     }
   }
-
-  return results.length > 0 ? results : [extractBaseSelector(rule.selectorText)];
+  return false;
 }
-
-/**
- * Returns the enclosing @scope rule prelude if rule is nested within @scope.
- */
-function getEnclosingScopeContext(rule: CSSRule, source: string): string | null {
-  let curr: CSSRule | null = rule.parentRule;
-  while (curr) {
-    if (curr instanceof CSSScopeRule) {
-      return getRuleHeader(curr, source);
-    }
-    curr = curr.parentRule;
-  }
-  return null;
-}
-
-function toScopedBaseKey(base: string, scopeContext: string | null): string {
-  return scopeContext ? `${scopeContext} >>> ${base}` : base;
-}
-
 
 /**
  * Environmental media queries that should be guaranteed preserved because point-in-time
  * browser capture does not evaluate alternative color schemes or print output.
  */
-function isEnvironmentalMedia(conditionText: string): boolean {
-  const lower = conditionText.toLowerCase();
-  return (
-    lower.includes('print') ||
-    lower.includes('prefers-color-scheme') ||
-    lower.includes('prefers-reduced-motion') ||
-    lower.includes('prefers-contrast') ||
-    lower.includes('forced-colors') ||
-    lower.includes('dynamic-range')
-  );
+export function isEnvironmentalMediaRule(rule: CSSMediaRule): boolean {
+  const queries = rule.media.mediaQueriesAST;
+  if (!queries || queries.length === 0) return false;
+  return queries.some(q => {
+    if (q.mediaType && q.mediaType.toLowerCase() === 'print' && q.modifier?.toLowerCase() !== 'not') {
+      return true;
+    }
+    if (q.condition && hasEnvironmentalFeature(q.condition)) return true;
+    return false;
+  });
 }
 
 /**
@@ -237,14 +344,12 @@ function isCovered(
   parentSpan?: { start: number; end: number; bodyStart?: number }
 ): boolean {
   for (const r of ranges) {
-    // If an enclosing parent span exists and this coverage range envelops the parent
-    // (CDP often starts the range at the prelude/name after '@layer ' rather than the '@' token,
-    // up to the closing brace), it was generated by CDP for the grouping rule block itself,
-    // not for this specific child rule.
     if (
       parentSpan &&
       r.end >= parentSpan.end &&
-      (r.start <= parentSpan.start || (parentSpan.bodyStart !== undefined && r.start <= parentSpan.bodyStart))
+      (r.start <= parentSpan.start ||
+        (parentSpan.bodyStart !== undefined &&
+          r.start <= parentSpan.bodyStart))
     ) {
       continue;
     }
@@ -258,7 +363,7 @@ function isCovered(
 /**
  * Extracts the canonical rule header (selector or at-rule prelude) cleanly.
  */
-function getRuleHeader(rule: CSSRule, source: string): string {
+export function getRuleHeader(rule: CSSRule, source?: string): string {
   if (rule instanceof CSSStyleRule) {
     return rule.selectorText;
   }
@@ -290,9 +395,10 @@ function getRuleHeader(rule: CSSRule, source: string): string {
     return '@starting-style';
   }
   if (rule instanceof CSSScopeRule) {
-    const start = rule.start ? `(${rule.start})` : '';
-    const end = rule.end ? ` to (${rule.end})` : '';
-    const prelude = `${start}${end}`.trim();
+    let prelude = rule.startSelector || '';
+    if (rule.endSelector) {
+      prelude += `${prelude ? ' ' : ''}to ${rule.endSelector}`;
+    }
     return prelude ? `@scope ${prelude}` : '@scope';
   }
   if (rule instanceof CSSPageRule) {
@@ -302,7 +408,11 @@ function getRuleHeader(rule: CSSRule, source: string): string {
     return rule.cssText.replace(/;$/, '').trim();
   }
   const loc = rule.location;
-  if (!loc) return '';
+  if (!loc || !source) {
+    const text = rule.cssText;
+    const braceIdx = text.indexOf('{');
+    return braceIdx !== -1 ? text.slice(0, braceIdx).trim() : text.replace(/;$/, '').trim();
+  }
   if (loc.bodyStart !== undefined) {
     const braceIdx = source.lastIndexOf('{', loc.bodyStart);
     const headerEnd = braceIdx >= loc.start ? braceIdx : loc.bodyStart;
@@ -317,8 +427,8 @@ function getRuleHeader(rule: CSSRule, source: string): string {
  * Returns prunable child CSS rules that have source locations.
  */
 function getChildRules(rule: CSSRule): CSSRule[] {
-  if ('cssRules' in rule && rule.cssRules) {
-    const list = (rule as CSSGroupingRule).cssRules;
+  if (rule instanceof CSSGroupingRule) {
+    const list = rule.cssRules;
     const children: CSSRule[] = [];
     for (let i = 0; i < list.length; i++) {
       const item = list[i];
@@ -338,6 +448,16 @@ function isGroupingRule(rule: CSSRule): boolean {
   return rule instanceof CSSGroupingRule && getChildRules(rule).length > 0;
 }
 
+export function extractFontFamilyName(rule: CSSFontFaceRule): string {
+  const decl = rule.style._declarations.find(d => d.name === 'font-family');
+  if (!decl) return '';
+  return decl.value
+    .filter(t => t.type === 'string' || t.type === 'ident')
+    .map(t => String(t.value))
+    .join(' ')
+    .trim();
+}
+
 /**
  * Recursively walks rules and collects all referenced animation names and font family names
  * declared across all active style rules.
@@ -352,27 +472,42 @@ function collectActiveAssetReferences(
   function walk(rule: CSSRule) {
     if (isRetained(rule)) {
       if (rule instanceof CSSStyleRule) {
-        const style = rule.style;
-        const animName = style.getPropertyValue('animation-name');
-        if (animName) {
-          animName.split(',').forEach(s => animations.add(s.trim()));
-        }
-        const anim = style.getPropertyValue('animation');
-        if (anim) {
-          anim.split(/\s+/).forEach(token => animations.add(token.trim()));
-        }
-        const fontFam = style.getPropertyValue('font-family');
-        if (fontFam) {
-          fontFam.split(',').forEach(s => fonts.add(s.trim().replace(/^['"]|['"]$/g, '')));
-        }
-        const font = style.getPropertyValue('font');
-        if (font) {
-          font.split(/\s+/).forEach(s => fonts.add(s.trim().replace(/^['"]|['"]$/g, '')));
+        for (const d of rule.style._declarations) {
+          if (d.name === 'animation-name' || d.name === 'animation') {
+            for (const t of d.value) {
+              if (t.type === 'ident' || t.type === 'string') {
+                const val = String(t.value);
+                if (!ANIMATION_KEYWORDS.has(val.toLowerCase())) {
+                  animations.add(val);
+                }
+              }
+            }
+          } else if (d.name === 'font-family' || d.name === 'font') {
+            let currentFamily: string[] = [];
+            for (const t of d.value) {
+              if (t.type === 'comma') {
+                if (currentFamily.length > 0) {
+                  fonts.add(currentFamily.join(' '));
+                  currentFamily = [];
+                }
+              } else if (t.type === 'string') {
+                fonts.add(String(t.value));
+              } else if (t.type === 'ident') {
+                if (d.name === 'font') {
+                  fonts.add(String(t.value));
+                }
+                currentFamily.push(String(t.value));
+              }
+            }
+            if (currentFamily.length > 0) {
+              fonts.add(currentFamily.join(' '));
+            }
+          }
         }
       }
     }
-    if ('cssRules' in rule && rule.cssRules) {
-      const list = (rule as CSSGroupingRule).cssRules;
+    if (rule instanceof CSSGroupingRule) {
+      const list = rule.cssRules;
       for (let i = 0; i < list.length; i++) {
         walk(list[i]);
       }
@@ -413,8 +548,9 @@ export function pruneUnusedCss(
   const reviewQueue: ReviewItem[] = [];
   const annotatedReviewMap = new Map<CSSRule, ReviewItem>();
 
-  // Set of base selectors that have confirmed usage across retained rules
-  const activeBaseSelectors = new Set<string>();
+  // Set of active style rules and scoped base selectors from confirmed coverage
+  const activeContextRules = new Set<CSSStyleRule>();
+  const activeScopedSelectors = new Map<CSSStyleRule | CSSScopeRule | null, Set<string>>();
 
   // First pass: identify all high-confidence used rules from coverage
   function identifyActiveRules(rule: CSSRule, parentSpan?: { start: number; end: number }) {
@@ -423,11 +559,16 @@ export function pruneUnusedCss(
 
     if (rule instanceof CSSStyleRule) {
       if (isCovered(loc.start, loc.end, coverageRanges, parentSpan)) {
-        const scopeContext = getEnclosingScopeContext(rule, css);
-        const bases = resolveSelectorBases(rule);
-        for (const b of bases) {
+        activeContextRules.add(rule);
+        const ctx = getEnclosingRuleContext(rule);
+        let scopedSet = activeScopedSelectors.get(ctx);
+        if (!scopedSet) {
+          scopedSet = new Set<string>();
+          activeScopedSelectors.set(ctx, scopedSet);
+        }
+        for (const b of getStrippedBaseSelectors(rule)) {
           if (b) {
-            activeBaseSelectors.add(toScopedBaseKey(b, scopeContext));
+            scopedSet.add(b);
           }
         }
       }
@@ -455,6 +596,26 @@ export function pruneUnusedCss(
     }
   );
 
+  function isRootOrHtmlRule(rule: CSSStyleRule): boolean {
+    if (!rule.selectorAST) {
+      const sel = rule.selectorText.trim();
+      return sel === ':root' || sel.startsWith(':root') || sel === 'html' || sel.startsWith('html') || sel === ':host';
+    }
+    for (const s of rule.selectorAST.selectors) {
+      if (s.type !== 'complex-selector') continue;
+      const firstCompound = s.items.find(it => it.type === 'compound-selector');
+      if (firstCompound && firstCompound.type === 'compound-selector') {
+        const isRoot = firstCompound.selectors.some(
+          simple =>
+            (simple.type === 'pseudo-class-selector' && (simple.name === 'root' || simple.name === 'host')) ||
+            (simple.type === 'type-selector' && simple.name.toLowerCase() === 'html')
+        );
+        if (isRoot) return true;
+      }
+    }
+    return false;
+  }
+
   // Main rule evaluation pass
   function evaluateRuleUsage(rule: CSSRule, parentSpan?: { start: number; end: number }): boolean {
     const loc = rule.location;
@@ -473,12 +634,11 @@ export function pruneUnusedCss(
     }
 
     // 2. TIER 2: Guaranteed Preserves - Environmental media queries (print, dark mode)
-    if (preserveEnvironmental && rule instanceof CSSMediaRule && isEnvironmentalMedia(rule.conditionText)) {
+    if (preserveEnvironmental && rule instanceof CSSMediaRule && isEnvironmentalMediaRule(rule)) {
       const children = getChildRules(rule);
       const activeChildren = children.filter((child) => {
         if (!preserveRootCustomProperties && child instanceof CSSStyleRule) {
-          const sel = child.selectorText.trim();
-          if (sel === ':root' || sel.startsWith(':root') || sel === 'html' || sel.startsWith('html')) {
+          if (isRootOrHtmlRule(child)) {
             return false;
           }
         }
@@ -504,10 +664,8 @@ export function pruneUnusedCss(
         return true;
       }
       if (rule instanceof CSSStyleRule) {
-        const sel = rule.selectorText.trim();
         const hasCustomProps = rule.style._declarations.some(d => d.name.startsWith('--'));
-        const isRootSelector = sel === ':root' || sel === 'html' || sel === ':host';
-        if (hasCustomProps && (isRootSelector || sel.startsWith(':root') || sel.startsWith('html'))) {
+        if (hasCustomProps && isRootOrHtmlRule(rule)) {
           retainedRules.push(header);
           retainedSet.add(rule);
           return true;
@@ -545,7 +703,7 @@ export function pruneUnusedCss(
         removedRules.push(header);
         return false;
       }
-      const fontFam = rule.style.getPropertyValue('font-family').replace(/^['"]|['"]$/g, '').trim();
+      const fontFam = extractFontFamilyName(rule);
       const isReferenced = fontFam ? activeAssets.fonts.has(fontFam) : false;
       if (isReferenced) {
         retainedRules.push(header);
@@ -565,15 +723,19 @@ export function pruneUnusedCss(
 
     // 6. Interactive & Dynamic State Pseudo-Classes
     if (rule instanceof CSSStyleRule) {
-      const sel = rule.selectorText;
-      const isInteractive = INTERACTIVE_PSEUDO_REGEX.test(sel);
-      const isDynamicState = DYNAMIC_STATE_PSEUDO_REGEX.test(sel);
+      const isInteractive = hasPseudoClass(rule.selectorAST, INTERACTIVE_PSEUDOS);
+      const isDynamicState = hasPseudoClass(rule.selectorAST, DYNAMIC_STATE_PSEUDOS);
 
       if (isInteractive || isDynamicState) {
-        const scopeContext = getEnclosingScopeContext(rule, css);
-        const bases = resolveSelectorBases(rule);
-        const baseActive = bases.some(b => b !== '' && activeBaseSelectors.has(toScopedBaseKey(b, scopeContext)));
-        const primaryBase = bases[0] || extractBaseSelector(sel);
+        const ctx = getEnclosingRuleContext(rule);
+        const bases = getStrippedBaseSelectors(rule);
+        const baseActive = bases.some(
+          b =>
+            b !== '' &&
+            ((b === '&' && ctx instanceof CSSStyleRule && activeContextRules.has(ctx)) ||
+              (activeScopedSelectors.get(ctx)?.has(b) ?? false))
+        );
+        const primaryBase = bases.find(b => b !== '') || '';
 
         if (preserveInteractive && isInteractive && baseActive) {
           // Guaranteed preserve: base selector is actively in use
@@ -586,7 +748,7 @@ export function pruneUnusedCss(
           const item: ReviewItem = {
             header,
             reason: 'DYNAMIC_STATE_PSEUDO',
-            description: `Dynamic state pseudo-class on active base selector '${primaryBase}'.`,
+            description: `Dynamic state pseudo-class on active base selector '${primaryBase || rule.selectorText}'.`,
             rule,
           };
           reviewQueue.push(item);
@@ -597,7 +759,7 @@ export function pruneUnusedCss(
           const item: ReviewItem = {
             header,
             reason: 'INTERACTIVE_WITHOUT_BASE',
-            description: `Interactive pseudo-class without active base selector '${primaryBase || sel}'.`,
+            description: `Interactive pseudo-class without active base selector '${primaryBase || rule.selectorText}'.`,
             rule,
           };
           reviewQueue.push(item);
