@@ -97,246 +97,81 @@ export interface PruneOptions {
  * Common interactive and dynamic pseudo-classes and environmental media features.
  */
 export const INTERACTIVE_PSEUDOS = new Set([
-  'focus-visible',
-  'focus-within',
-  'popover-open',
-  'hover',
-  'focus',
-  'active',
-  'target',
-  'visited',
+  'focus-visible', 'focus-within', 'popover-open', 'hover', 'focus', 'active', 'target', 'visited',
 ]);
 
 export const DYNAMIC_STATE_PSEUDOS = new Set([
-  'checked',
-  'disabled',
-  'enabled',
-  'valid',
-  'invalid',
-  'required',
-  'optional',
-  'read-only',
-  'read-write',
-  'empty',
-  'indeterminate',
-  'default',
+  'checked', 'disabled', 'enabled', 'valid', 'invalid', 'required',
+  'optional', 'read-only', 'read-write', 'empty', 'indeterminate', 'default',
 ]);
 
 export const ENVIRONMENTAL_FEATURES = new Set([
-  'prefers-color-scheme',
-  'prefers-reduced-motion',
-  'prefers-contrast',
-  'forced-colors',
-  'dynamic-range',
-  'inverted-colors',
-  'prefers-reduced-transparency',
-  'prefers-reduced-data',
+  'prefers-color-scheme', 'prefers-reduced-motion', 'prefers-contrast', 'forced-colors',
+  'dynamic-range', 'inverted-colors', 'prefers-reduced-transparency', 'prefers-reduced-data',
 ]);
 
-const ANIMATION_KEYWORDS = new Set([
-  'normal',
-  'reverse',
-  'alternate',
-  'alternate-reverse',
-  'infinite',
-  'none',
-  'forwards',
-  'backwards',
-  'both',
-  'running',
-  'paused',
-  'ease',
-  'linear',
-  'ease-in',
-  'ease-out',
-  'ease-in-out',
-  'step-start',
-  'step-end',
-  'inherit',
-  'initial',
-  'unset',
-  'revert',
-  'revert-layer',
-]);
-
-export function hasPseudoClass(
-  selectorAST: SelectorList | null | undefined,
-  targetSet: Set<string>
-): boolean {
-  if (!selectorAST || !selectorAST.selectors) return false;
-  for (const sel of selectorAST.selectors) {
-    if (sel.type !== 'complex-selector') continue;
-    if (hasPseudoClassInComplex(sel, targetSet)) return true;
-  }
-  return false;
-}
-
-function hasPseudoClassInComplex(
-  complex: ComplexSelector,
-  targetSet: Set<string>
-): boolean {
-  for (const item of complex.items) {
-    if (item.type !== 'compound-selector') continue;
-    for (const simple of item.selectors) {
-      if (simple.type === 'pseudo-class-selector') {
-        if (targetSet.has(simple.name.toLowerCase())) {
-          return true;
-        }
-        if (
-          simple.argument &&
-          typeof simple.argument === 'object' &&
-          'type' in simple.argument &&
-          simple.argument.type === 'selector-list'
-        ) {
-          if (hasPseudoClass(simple.argument, targetSet)) {
-            return true;
-          }
-        }
-      }
-    }
-  }
-  return false;
+export function hasPseudoClass(ast: SelectorList | null | undefined, targetSet: Set<string>): boolean {
+  return Boolean(ast?.selectors.some(sel =>
+    sel.type === 'complex-selector' && sel.items.some(it =>
+      it.type === 'compound-selector' && it.selectors.some(s =>
+        s.type === 'pseudo-class-selector' && (
+          targetSet.has(s.name.toLowerCase()) ||
+          (typeof s.argument === 'object' && s.argument !== null && 'type' in s.argument &&
+            s.argument.type === 'selector-list' && hasPseudoClass(s.argument, targetSet))
+        )
+      )
+    )
+  ));
 }
 
 export function stripStatefulPseudos(complex: ComplexSelector): ComplexSelector | null {
-  const newItems: (CompoundSelector | Combinator)[] = [];
-
+  const items: (CompoundSelector | Combinator)[] = [];
   for (const item of complex.items) {
     if (item.type === 'combinator') {
-      newItems.push({ ...item });
-    } else if (item.type === 'compound-selector') {
-      const remainingSelectors: CompoundSelector['selectors'] = [];
-      for (const s of item.selectors) {
-        if (s.type === 'pseudo-class-selector') {
-          const name = s.name.toLowerCase();
-          if (INTERACTIVE_PSEUDOS.has(name) || DYNAMIC_STATE_PSEUDOS.has(name)) {
-            continue;
-          }
-          if (
-            s.argument &&
-            typeof s.argument === 'object' &&
-            'type' in s.argument &&
-            s.argument.type === 'selector-list'
-          ) {
-            const strippedArgs = s.argument.selectors
-              .map(sub => (sub.type === 'complex-selector' ? stripStatefulPseudos(sub) : sub))
-              .filter((sub): sub is NonNullable<typeof sub> => sub !== null);
-            if (strippedArgs.length === 0) {
-              continue;
-            }
-            remainingSelectors.push({
-              ...s,
-              argument: { type: 'selector-list', selectors: strippedArgs },
-            });
-            continue;
-          }
-        }
-        remainingSelectors.push({ ...s });
-      }
-      if (remainingSelectors.length > 0) {
-        newItems.push({
-          type: 'compound-selector',
-          selectors: remainingSelectors,
-        });
-      }
+      if (items.length > 0 && items[items.length - 1].type !== 'combinator') items.push(item);
+      continue;
     }
+    const selectors = item.selectors.filter(
+      s => s.type !== 'pseudo-class-selector' ||
+        (!INTERACTIVE_PSEUDOS.has(s.name.toLowerCase()) && !DYNAMIC_STATE_PSEUDOS.has(s.name.toLowerCase()))
+    );
+    if (selectors.length > 0) items.push({ type: 'compound-selector', selectors });
   }
-
-  while (newItems.length > 0 && newItems[0].type === 'combinator') {
-    newItems.shift();
-  }
-  while (newItems.length > 0 && newItems[newItems.length - 1].type === 'combinator') {
-    newItems.pop();
-  }
-
-  const cleanedItems: (CompoundSelector | Combinator)[] = [];
-  for (const it of newItems) {
-    if (
-      it.type === 'combinator' &&
-      cleanedItems.length > 0 &&
-      cleanedItems[cleanedItems.length - 1].type === 'combinator'
-    ) {
-      cleanedItems[cleanedItems.length - 1] = it;
-    } else {
-      cleanedItems.push(it);
-    }
-  }
-
-  if (!cleanedItems.some(it => it.type === 'compound-selector')) {
-    return null;
-  }
-
-  return {
-    type: 'complex-selector',
-    items: cleanedItems,
-    tokens: [],
-  };
+  if (items[items.length - 1]?.type === 'combinator') items.pop();
+  return items.length > 0 ? { type: 'complex-selector', items, tokens: [] } : null;
 }
 
-/**
- * Walks up parentRule through intermediate conditional grouping rules (@media, @supports, etc.)
- * to find the nearest enclosing CSSStyleRule or CSSScopeRule (or null at top-level).
- */
 function getEnclosingRuleContext(rule: CSSRule): CSSStyleRule | CSSScopeRule | null {
-  let curr: CSSRule | null = rule.parentRule;
-  while (curr) {
+  for (let curr = rule.parentRule; curr; curr = curr.parentRule) {
     if (curr instanceof CSSStyleRule || curr instanceof CSSScopeRule) return curr;
-    curr = curr.parentRule;
   }
   return null;
 }
 
 function getStrippedBaseSelectors(rule: CSSStyleRule): string[] {
-  const selectors = rule.selectorAST?.selectors ?? [];
   const bases: string[] = [];
-  for (const sel of selectors) {
+  for (const sel of rule.selectorAST?.selectors ?? []) {
     if (sel.type !== 'complex-selector') continue;
     const stripped = stripStatefulPseudos(sel);
-    if (!stripped) continue;
-    bases.push(serializeSelectorList({ type: 'selector-list', selectors: [stripped] }));
+    if (stripped) bases.push(serializeSelectorList({ type: 'selector-list', selectors: [stripped] }));
   }
   return bases;
 }
 
-function hasEnvironmentalFeature(
-  node: MediaCondition | MediaFeature | GeneralEnclosed | undefined
-): boolean {
+function hasEnvironmentalFeature(node?: MediaCondition | MediaFeature | GeneralEnclosed): boolean {
   if (!node) return false;
-  if (node.type === 'media-feature') {
-    return ENVIRONMENTAL_FEATURES.has(node.name.toLowerCase());
+  if (node.type === 'media-feature' || node.type === 'general-enclosed') {
+    return Boolean(node.name && ENVIRONMENTAL_FEATURES.has(node.name.toLowerCase()));
   }
-  if (node.type === 'media-condition') {
-    return node.children.some(child => hasEnvironmentalFeature(child));
-  }
-  if (node.type === 'general-enclosed') {
-    if (node.name && ENVIRONMENTAL_FEATURES.has(node.name.toLowerCase())) {
-      return true;
-    }
-  }
-  return false;
+  return node.children.some(hasEnvironmentalFeature);
 }
 
-/**
- * Environmental media queries that should be guaranteed preserved because point-in-time
- * browser capture does not evaluate alternative color schemes or print output.
- */
 export function isEnvironmentalMediaRule(rule: CSSMediaRule): boolean {
-  const queries = rule.media.mediaQueriesAST;
-  if (!queries || queries.length === 0) return false;
-  return queries.some(q => {
-    if (q.mediaType && q.mediaType.toLowerCase() === 'print' && q.modifier?.toLowerCase() !== 'not') {
-      return true;
-    }
-    if (q.condition && hasEnvironmentalFeature(q.condition)) return true;
-    return false;
-  });
+  return Boolean(rule.media.mediaQueriesAST?.some(
+    q => (q.mediaType?.toLowerCase() === 'print' && q.modifier?.toLowerCase() !== 'not') || hasEnvironmentalFeature(q.condition)
+  ));
 }
 
-/**
- * Determines whether any range intersects with [start, end).
- * If parentSpan is provided, ranges that envelop the entire parent span are ignored
- * so that outer grouping at-rules (@layer, .parent) do not swallow unused children.
- */
 function isCovered(
   start: number,
   end: number,
@@ -347,121 +182,68 @@ function isCovered(
     if (
       parentSpan &&
       r.end >= parentSpan.end &&
-      (r.start <= parentSpan.start ||
-        (parentSpan.bodyStart !== undefined &&
-          r.start <= parentSpan.bodyStart))
+      (r.start <= parentSpan.start || (parentSpan.bodyStart !== undefined && r.start <= parentSpan.bodyStart))
     ) {
       continue;
     }
-    if (Math.max(start, r.start) < Math.min(end, r.end)) {
-      return true;
-    }
+    if (Math.max(start, r.start) < Math.min(end, r.end)) return true;
   }
   return false;
 }
 
-/**
- * Extracts the canonical rule header (selector or at-rule prelude) cleanly.
- */
 export function getRuleHeader(rule: CSSRule, source?: string): string {
-  if (rule instanceof CSSStyleRule) {
-    return rule.selectorText;
-  }
-  if (rule instanceof CSSMediaRule) {
-    return `@media ${rule.conditionText}`;
-  }
-  if (rule instanceof CSSSupportsRule) {
-    return `@supports ${rule.conditionText}`;
-  }
-  if (rule instanceof CSSContainerRule) {
-    return `@container ${rule.conditionText}`;
-  }
-  if (rule instanceof CSSLayerBlockRule) {
-    return rule.name ? `@layer ${rule.name}` : '@layer';
-  }
-  if (rule instanceof CSSLayerStatementRule) {
-    return `@layer ${rule.nameList.join(', ')}`;
-  }
-  if (rule instanceof CSSKeyframesRule) {
-    return `@keyframes ${rule.name}`;
-  }
-  if (rule instanceof CSSFontFaceRule) {
-    return '@font-face';
-  }
-  if (rule instanceof CSSPropertyRule) {
-    return `@property ${rule.name}`;
-  }
-  if (rule instanceof CSSStartingStyleRule) {
-    return '@starting-style';
-  }
+  if (rule instanceof CSSStyleRule) return rule.selectorText;
+  if (rule instanceof CSSMediaRule) return `@media ${rule.conditionText}`;
+  if (rule instanceof CSSSupportsRule) return `@supports ${rule.conditionText}`;
+  if (rule instanceof CSSContainerRule) return `@container ${rule.conditionText}`;
+  if (rule instanceof CSSLayerBlockRule) return rule.name ? `@layer ${rule.name}` : '@layer';
+  if (rule instanceof CSSLayerStatementRule) return `@layer ${rule.nameList.join(', ')}`;
+  if (rule instanceof CSSKeyframesRule) return `@keyframes ${rule.name}`;
+  if (rule instanceof CSSFontFaceRule) return '@font-face';
+  if (rule instanceof CSSPropertyRule) return `@property ${rule.name}`;
+  if (rule instanceof CSSStartingStyleRule) return '@starting-style';
   if (rule instanceof CSSScopeRule) {
     let prelude = rule.startSelector || '';
-    if (rule.endSelector) {
-      prelude += `${prelude ? ' ' : ''}to ${rule.endSelector}`;
-    }
+    if (rule.endSelector) prelude += `${prelude ? ' ' : ''}to ${rule.endSelector}`;
     return prelude ? `@scope ${prelude}` : '@scope';
   }
-  if (rule instanceof CSSPageRule) {
-    return rule.selectorText ? `@page ${rule.selectorText}` : '@page';
-  }
+  if (rule instanceof CSSPageRule) return rule.selectorText ? `@page ${rule.selectorText}` : '@page';
   if (rule instanceof CSSImportRule || rule instanceof CSSNamespaceRule) {
     return rule.cssText.replace(/;$/, '').trim();
   }
   const loc = rule.location;
   if (!loc || !source) {
-    const text = rule.cssText;
-    const braceIdx = text.indexOf('{');
-    return braceIdx !== -1 ? text.slice(0, braceIdx).trim() : text.replace(/;$/, '').trim();
+    const braceIdx = rule.cssText.indexOf('{');
+    return (braceIdx !== -1 ? rule.cssText.slice(0, braceIdx) : rule.cssText.replace(/;$/, '')).trim();
   }
   if (loc.bodyStart !== undefined) {
     const braceIdx = source.lastIndexOf('{', loc.bodyStart);
-    const headerEnd = braceIdx >= loc.start ? braceIdx : loc.bodyStart;
-    return source.slice(loc.start, headerEnd).trim();
+    return source.slice(loc.start, braceIdx >= loc.start ? braceIdx : loc.bodyStart).trim();
   }
   const semiIdx = source.lastIndexOf(';', loc.end);
-  const headerEnd = semiIdx >= loc.start ? semiIdx : loc.end;
-  return source.slice(loc.start, headerEnd).trim();
+  return source.slice(loc.start, semiIdx >= loc.start ? semiIdx : loc.end).trim();
 }
 
-/**
- * Returns prunable child CSS rules that have source locations.
- */
 function getChildRules(rule: CSSRule): CSSRule[] {
-  if (rule instanceof CSSGroupingRule) {
-    const list = rule.cssRules;
-    const children: CSSRule[] = [];
-    for (let i = 0; i < list.length; i++) {
-      const item = list[i];
-      if (item.location) {
-        children.push(item);
-      }
-    }
-    return children;
-  }
-  return [];
+  return rule instanceof CSSGroupingRule ? Array.from(rule.cssRules).filter(r => Boolean(r.location)) : [];
 }
 
-/**
- * Checks if a rule is a grouping rule with nested child rules that can be pruned individually.
- */
 function isGroupingRule(rule: CSSRule): boolean {
   return rule instanceof CSSGroupingRule && getChildRules(rule).length > 0;
 }
 
-export function extractFontFamilyName(rule: CSSFontFaceRule): string {
-  const decl = rule.style._declarations.find(d => d.name === 'font-family');
-  if (!decl) return '';
-  return decl.value
-    .filter(t => t.type === 'string' || t.type === 'ident')
-    .map(t => String(t.value))
-    .join(' ')
-    .trim();
+function extractFontFamilies(tokens: { type: string; value?: unknown }[]): string[] {
+  const families: string[] = [];
+  let idents: string[] = [];
+  for (const t of tokens) {
+    if (t.type === 'string') families.push(String(t.value));
+    else if (t.type === 'ident') idents.push(String(t.value));
+    else if (t.type === 'comma' && idents.length) { families.push(idents.join(' ')); idents = []; }
+  }
+  if (idents.length) families.push(idents.join(' '));
+  return families;
 }
 
-/**
- * Recursively walks rules and collects all referenced animation names and font family names
- * declared across all active style rules.
- */
 function collectActiveAssetReferences(
   rules: CSSRule[],
   isRetained: (r: CSSRule) => boolean
@@ -470,47 +252,19 @@ function collectActiveAssetReferences(
   const fonts = new Set<string>();
 
   function walk(rule: CSSRule) {
-    if (isRetained(rule)) {
-      if (rule instanceof CSSStyleRule) {
-        for (const d of rule.style._declarations) {
-          if (d.name === 'animation-name' || d.name === 'animation') {
-            for (const t of d.value) {
-              if (t.type === 'ident' || t.type === 'string') {
-                const val = String(t.value);
-                if (!ANIMATION_KEYWORDS.has(val.toLowerCase())) {
-                  animations.add(val);
-                }
-              }
-            }
-          } else if (d.name === 'font-family' || d.name === 'font') {
-            let currentFamily: string[] = [];
-            for (const t of d.value) {
-              if (t.type === 'comma') {
-                if (currentFamily.length > 0) {
-                  fonts.add(currentFamily.join(' '));
-                  currentFamily = [];
-                }
-              } else if (t.type === 'string') {
-                fonts.add(String(t.value));
-              } else if (t.type === 'ident') {
-                if (d.name === 'font') {
-                  fonts.add(String(t.value));
-                }
-                currentFamily.push(String(t.value));
-              }
-            }
-            if (currentFamily.length > 0) {
-              fonts.add(currentFamily.join(' '));
-            }
+    if (isRetained(rule) && rule instanceof CSSStyleRule) {
+      for (const d of rule.style._declarations) {
+        if (d.name === 'animation-name' || d.name === 'animation') {
+          for (const t of d.value) {
+            if (t.type === 'ident' || t.type === 'string') animations.add(String(t.value));
           }
+        } else if (d.name === 'font-family' || d.name === 'font') {
+          for (const f of extractFontFamilies(d.value)) fonts.add(f);
         }
       }
     }
     if (rule instanceof CSSGroupingRule) {
-      const list = rule.cssRules;
-      for (let i = 0; i < list.length; i++) {
-        walk(list[i]);
-      }
+      for (let i = 0; i < rule.cssRules.length; i++) walk(rule.cssRules[i]);
     }
   }
 
@@ -597,23 +351,13 @@ export function pruneUnusedCss(
   );
 
   function isRootOrHtmlRule(rule: CSSStyleRule): boolean {
-    if (!rule.selectorAST) {
-      const sel = rule.selectorText.trim();
-      return sel === ':root' || sel.startsWith(':root') || sel === 'html' || sel.startsWith('html') || sel === ':host';
-    }
-    for (const s of rule.selectorAST.selectors) {
-      if (s.type !== 'complex-selector') continue;
-      const firstCompound = s.items.find(it => it.type === 'compound-selector');
-      if (firstCompound && firstCompound.type === 'compound-selector') {
-        const isRoot = firstCompound.selectors.some(
-          simple =>
-            (simple.type === 'pseudo-class-selector' && (simple.name === 'root' || simple.name === 'host')) ||
-            (simple.type === 'type-selector' && simple.name.toLowerCase() === 'html')
-        );
-        if (isRoot) return true;
-      }
-    }
-    return false;
+    return Boolean(rule.selectorAST?.selectors.some(s =>
+      s.type === 'complex-selector' && s.items[0]?.type === 'compound-selector' &&
+      s.items[0].selectors.some(p =>
+        (p.type === 'pseudo-class-selector' && (p.name === 'root' || p.name === 'host')) ||
+        (p.type === 'type-selector' && p.name.toLowerCase() === 'html')
+      )
+    ));
   }
 
   // Main rule evaluation pass
@@ -636,14 +380,9 @@ export function pruneUnusedCss(
     // 2. TIER 2: Guaranteed Preserves - Environmental media queries (print, dark mode)
     if (preserveEnvironmental && rule instanceof CSSMediaRule && isEnvironmentalMediaRule(rule)) {
       const children = getChildRules(rule);
-      const activeChildren = children.filter((child) => {
-        if (!preserveRootCustomProperties && child instanceof CSSStyleRule) {
-          if (isRootOrHtmlRule(child)) {
-            return false;
-          }
-        }
-        return true;
-      });
+      const activeChildren = children.filter(
+        child => preserveRootCustomProperties || !(child instanceof CSSStyleRule && isRootOrHtmlRule(child))
+      );
 
       if (activeChildren.length > 0) {
         retainedRules.push(header);
@@ -703,7 +442,7 @@ export function pruneUnusedCss(
         removedRules.push(header);
         return false;
       }
-      const fontFam = extractFontFamilyName(rule);
+      const fontFam = extractFontFamilies(rule.style._declarations.find(d => d.name === 'font-family')?.value ?? [])[0] ?? '';
       const isReferenced = fontFam ? activeAssets.fonts.has(fontFam) : false;
       if (isReferenced) {
         retainedRules.push(header);

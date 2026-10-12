@@ -17,7 +17,7 @@
 
 import { CSSStyleSheet } from '../../../src/index.ts';
 import { calculateSpecificity, compareSpecificity } from '../../../src/specificity.ts';
-import type { ComplexSelector, CompoundSelector } from '../../../src/types.ts';
+import type { ComplexSelector } from '../../../src/types.ts';
 import { extractRuleRecords, type RuleRecord } from './ast-diff.ts';
 
 export interface CascadeConflict {
@@ -35,69 +35,27 @@ export interface CascadeCheckResult {
   conflicts: CascadeConflict[];
 }
 
-function getSubjectCompound(complex: ComplexSelector): CompoundSelector | null {
-  for (let i = complex.items.length - 1; i >= 0; i--) {
-    const it = complex.items[i];
-    if (it.type === 'compound-selector') {
-      return it;
-    }
-  }
-  return null;
-}
-
 function canComplexSelectorsOverlap(selA: ComplexSelector, selB: ComplexSelector): boolean {
-  const compA = getSubjectCompound(selA);
-  const compB = getSubjectCompound(selB);
-  if (!compA || !compB) return true;
-
-  // 1. Incompatible type selectors
-  const typeA = compA.selectors.find(s => s.type === 'type-selector');
-  const typeB = compB.selectors.find(s => s.type === 'type-selector');
-  if (typeA && typeB && typeA.name.toLowerCase() !== typeB.name.toLowerCase()) {
-    return false;
-  }
-
-  // 2. Incompatible ID selectors
-  const idA = compA.selectors.find(s => s.type === 'id-selector');
-  const idB = compB.selectors.find(s => s.type === 'id-selector');
-  if (idA && idB && idA.name !== idB.name) {
-    return false;
-  }
-
-  // 3. Pseudo-element matching
-  const pseudoElemA = compA.selectors.find(s => s.type === 'pseudo-element-selector');
-  const pseudoElemB = compB.selectors.find(s => s.type === 'pseudo-element-selector');
-  const pseudoNameA = pseudoElemA ? pseudoElemA.name.toLowerCase() : null;
-  const pseudoNameB = pseudoElemB ? pseudoElemB.name.toLowerCase() : null;
-  if (pseudoNameA !== pseudoNameB) {
-    return false;
-  }
-
-  return true;
+  const compA = selA.items.at(-1);
+  const compB = selB.items.at(-1);
+  if (compA?.type !== 'compound-selector' || compB?.type !== 'compound-selector') return true;
+  const typeA = compA.selectors.find(s => s.type === 'type-selector')?.name.toLowerCase();
+  const typeB = compB.selectors.find(s => s.type === 'type-selector')?.name.toLowerCase();
+  if (typeA && typeB && typeA !== typeB) return false;
+  const idA = compA.selectors.find(s => s.type === 'id-selector')?.name;
+  const idB = compB.selectors.find(s => s.type === 'id-selector')?.name;
+  if (idA && idB && idA !== idB) return false;
+  const pseudoA = compA.selectors.find(s => s.type === 'pseudo-element-selector')?.name.toLowerCase();
+  const pseudoB = compB.selectors.find(s => s.type === 'pseudo-element-selector')?.name.toLowerCase();
+  return pseudoA === pseudoB;
 }
 
-/**
- * Checks if two rules' selectors can plausibly match the same element or target.
- * Uses structured selector AST when available to eliminate incompatible type, ID,
- * or pseudo-element combinations.
- */
 export function canSelectorsOverlap(rA: RuleRecord, rB: RuleRecord): boolean {
-  if (rA.selector === rB.selector) return true;
-  if (!rA.selectorAST || !rB.selectorAST) {
-    return true;
-  }
-
-  for (const selA of rA.selectorAST.selectors) {
-    if (selA.type !== 'complex-selector') continue;
-    for (const selB of rB.selectorAST.selectors) {
-      if (selB.type !== 'complex-selector') continue;
-      if (canComplexSelectorsOverlap(selA, selB)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  if (rA.selector === rB.selector || !rA.selectorAST || !rB.selectorAST) return true;
+  const listB = rB.selectorAST.selectors;
+  return rA.selectorAST.selectors.some(
+    a => a.type === 'complex-selector' && listB.some(b => b.type === 'complex-selector' && canComplexSelectorsOverlap(a, b))
+  );
 }
 
 /**
