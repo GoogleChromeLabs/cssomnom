@@ -21,18 +21,13 @@ import {
   CSSStyleRule,
   CSSGroupingRule,
   CSSMediaRule,
-  CSSSupportsRule,
-  CSSContainerRule,
-  CSSLayerBlockRule,
   CSSLayerStatementRule,
   CSSKeyframesRule,
   CSSFontFaceRule,
   CSSPropertyRule,
   CSSImportRule,
   CSSNamespaceRule,
-  CSSStartingStyleRule,
   CSSScopeRule,
-  CSSPageRule,
 } from '../../../src/index.ts';
 import { serializeSelectorList } from '../../../src/serializer.ts';
 import type {
@@ -193,35 +188,12 @@ function isCovered(
 
 export function getRuleHeader(rule: CSSRule, source?: string): string {
   if (rule instanceof CSSStyleRule) return rule.selectorText;
-  if (rule instanceof CSSMediaRule) return `@media ${rule.conditionText}`;
-  if (rule instanceof CSSSupportsRule) return `@supports ${rule.conditionText}`;
-  if (rule instanceof CSSContainerRule) return `@container ${rule.conditionText}`;
-  if (rule instanceof CSSLayerBlockRule) return rule.name ? `@layer ${rule.name}` : '@layer';
-  if (rule instanceof CSSLayerStatementRule) return `@layer ${rule.nameList.join(', ')}`;
-  if (rule instanceof CSSKeyframesRule) return `@keyframes ${rule.name}`;
-  if (rule instanceof CSSFontFaceRule) return '@font-face';
-  if (rule instanceof CSSPropertyRule) return `@property ${rule.name}`;
-  if (rule instanceof CSSStartingStyleRule) return '@starting-style';
-  if (rule instanceof CSSScopeRule) {
-    let prelude = rule.startSelector || '';
-    if (rule.endSelector) prelude += `${prelude ? ' ' : ''}to ${rule.endSelector}`;
-    return prelude ? `@scope ${prelude}` : '@scope';
-  }
-  if (rule instanceof CSSPageRule) return rule.selectorText ? `@page ${rule.selectorText}` : '@page';
-  if (rule instanceof CSSImportRule || rule instanceof CSSNamespaceRule) {
-    return rule.cssText.replace(/;$/, '').trim();
-  }
   const loc = rule.location;
-  if (!loc || !source) {
-    const braceIdx = rule.cssText.indexOf('{');
-    return (braceIdx !== -1 ? rule.cssText.slice(0, braceIdx) : rule.cssText.replace(/;$/, '')).trim();
+  if (loc && source) {
+    return source.slice(loc.start, loc.bodyStart !== undefined ? loc.bodyStart - 1 : loc.end).replace(/;$/, '').trim();
   }
-  if (loc.bodyStart !== undefined) {
-    const braceIdx = source.lastIndexOf('{', loc.bodyStart);
-    return source.slice(loc.start, braceIdx >= loc.start ? braceIdx : loc.bodyStart).trim();
-  }
-  const semiIdx = source.lastIndexOf(';', loc.end);
-  return source.slice(loc.start, semiIdx >= loc.start ? semiIdx : loc.end).trim();
+  const braceIdx = rule.cssText.indexOf('{');
+  return (braceIdx !== -1 ? rule.cssText.slice(0, braceIdx) : rule.cssText.replace(/;$/, '')).trim();
 }
 
 function getChildRules(rule: CSSRule): CSSRule[] {
