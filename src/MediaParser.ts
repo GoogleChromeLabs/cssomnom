@@ -931,8 +931,8 @@ function evaluateBooleanFeature(baseName: string, env: MediaEnvironment): boolea
     case 'forced-colors': return env.forcedColors !== 'none';
     case 'inverted-colors': return env.invertedColors !== 'none';
     case 'scripting': return env.scripting !== 'none';
-    case 'dynamic-range': return env.dynamicRange === 'high';
-    case 'video-dynamic-range': return env.videoDynamicRange === 'high';
+    case 'dynamic-range': return Boolean(env.dynamicRange);
+    case 'video-dynamic-range': return Boolean(env.videoDynamicRange);
     case 'overflow-block': return env.overflowBlock !== 'none';
     case 'overflow-inline': return env.overflowInline !== 'none';
     case 'nav-controls':

@@ -54,6 +54,25 @@
     "> .foo in @scope,.nest,@media screen created by insertRule valid",
     "> .foo in @scope,.nest,@media screen created by string valid"
   ],
+  "submodules/web-platform-tests/css/css-cascade/duplicate-stylesheets.html": [
+    "!important in a run of duplicates wins over a later normal declaration",
+    "!important reverses anonymous layer order across a run of duplicates",
+    "!important reverses named layer order across runs of duplicates",
+    "A later !important wins over an !important run of duplicates",
+    "A later anonymous layer wins over a run of duplicate anonymous layers",
+    "A later sheet wins over a run of duplicates",
+    "A nested implicitly scoped rule keeps each sheet's own scope root",
+    "A run of 20 identical sheets applies",
+    "A run of duplicate anonymous layers wins over an earlier anonymous layer",
+    "A run of duplicate revert-layer declarations chains back to the same value",
+    "An unlayered run of duplicates wins over a layered declaration",
+    "Duplicates added incrementally cascade in order of appearance",
+    "Duplicates after an intervening sheet still win over it",
+    "Duplicates in named layers cascade by layer order, not sheet order",
+    "Higher specificity wins over a run of duplicates",
+    "Identical implicitly scoped sheets keep their own scope roots",
+    "revert-layer past a run of duplicates reverts to the duplicated value"
+  ],
   "submodules/web-platform-tests/css/css-cascade/idlharness.html": [
     "CSSLayerBlockRule interface object length",
     "CSSLayerBlockRule interface object name",
@@ -156,6 +175,20 @@
     "@counter-style override update with appended sheet 2",
     "@counter-style unlayered overrides layered"
   ],
+  "submodules/web-platform-tests/css/css-cascade/layer-cssom-insert-after-style.html": [
+    "Deleting a layer block reorders existing layers",
+    "Deleting a layer statement reorders existing layers",
+    "Inserting a dotted layer statement reorders existing sublayers",
+    "Inserting a layer block in a shadow tree reorders existing layers",
+    "Inserting a layer block reorders existing layers",
+    "Inserting a layer statement reorders existing layers",
+    "Inserting a multi-name layer statement in the same sheet reorders existing layers",
+    "Inserting a nested layer block reorders existing sublayers",
+    "Inserting a new layer at the end applies its rules",
+    "Inserting a new layer at the start doesn't override existing layers",
+    "Inserting a new layer doesn't override unlayered styles",
+    "Inserting an existing layer name without changing order doesn't change styles"
+  ],
   "submodules/web-platform-tests/css/css-cascade/layer-cssom-order-reverse-at-property.html": [
     "Delete layer invalidates @property"
   ],
@@ -200,6 +233,12 @@
   ],
   "submodules/web-platform-tests/css/css-cascade/layer-replaceSync-clears-stale.html": [
     "replaceSync clears stale layer statements"
+  ],
+  "submodules/web-platform-tests/css/css-cascade/layer-rule-invalid-name.html": [
+    "@layer with lone dash (-) name is dropped",
+    "@layer with numeric name (123) is dropped",
+    "@layer with numeric segment (foo.123) is dropped",
+    "@layer with valid ident name is accepted"
   ],
   "submodules/web-platform-tests/css/css-cascade/layer-rules-cssom.html": [
     "Anonymous layer block name",
@@ -405,6 +444,25 @@
     "Single scope, :scope pseudo in to-selector",
     "The scoping limit is not in scope"
   ],
+  "submodules/web-platform-tests/css/css-cascade/scope-implicit-constructed-document.html": [
+    "& with a descendant combinator in implicit @scope in a constructed stylesheet adopted by a document",
+    "Explicit :scope with a descendant combinator in implicit @scope in a constructed stylesheet adopted by a document",
+    "Implicit @scope in a constructed stylesheet adopted by a document does not match in shadow trees",
+    "Implicit @scope in a constructed stylesheet adopted by a document loses to a closer scoping root by proximity",
+    "Implicit @scope in a constructed stylesheet adopted by a document matches descendants",
+    "Implicit @scope in a constructed stylesheet adopted by a document wins over unscoped rules by proximity",
+    "Implicit @scope in a constructed stylesheet adopted by both a document and a shadow root",
+    "Implicit @scope in a constructed stylesheet stops matching once the document no longer adopts it",
+    "Implicit @scope with a scope end in a constructed stylesheet adopted by a document",
+    "Nested @scope inside implicit @scope in a constructed stylesheet adopted by a document"
+  ],
+  "submodules/web-platform-tests/css/css-cascade/scope-implicit-remove-sheet.html": [
+    "@scope rule no longer matches after sheet removal",
+    "Implicit @scope rule initially matches"
+  ],
+  "submodules/web-platform-tests/css/css-cascade/scope-implicit-sibling-mutations.html": [
+    "Sibling implicit scopes update independently when sheets move or disappear"
+  ],
   "submodules/web-platform-tests/css/css-cascade/scope-implicit.html": [
     ":scope can style implicit root",
     "@scope with effectively empty :is() must not match anything",
@@ -446,12 +504,14 @@
     "Scope-imported rule does not apply outside of scope"
   ],
   "submodules/web-platform-tests/css/css-cascade/scope-invalidation.html": [
+    ":empty in scope root, invalidated by child insertion/removal",
     ":not(scope) in ancestor",
     ":not(scope) in limit ancestor",
     ":not(scope) in limit subject",
     ":not(scope) in subject",
     ":nth-child() in scope limit",
     ":nth-child() in scope root",
+    ":nth-child() in scope root, invalidated by sibling insertion/removal",
     "Ancestor element affecting nested scope root (Through latter selector in list)",
     "Element becoming root via + combinator",
     "Element becoming root via ~ combinator",
@@ -524,6 +584,9 @@
     "Proximity wins over order of appearance",
     "Specificity wins over proximity"
   ],
+  "submodules/web-platform-tests/css/css-cascade/scope-rule-attr-with-colons.html": [
+    "@scope with :: in attribute value is not rejected as a pseudo-element"
+  ],
   "submodules/web-platform-tests/css/css-cascade/scope-shadow.html": [
     ":scope matches host via the scoping root",
     ":scope within :is() matches host via the scoping root",
@@ -567,12 +630,16 @@
     "@scope with cousin style sharing, first sibling does not have implicit scope",
     "@scope with cousin style sharing, first sibling enters scope",
     "@scope with cousin style sharing, first sibling enters scope ID selector",
+    "@scope with cousin style sharing, first sibling enters scope attribute selector",
+    "@scope with cousin style sharing, first sibling enters scope trivial attribute selector",
     "@scope with cousin style sharing, first sibling enters scope with :has",
     "@scope with cousin style sharing, first sibling exits scope",
     "@scope with cousin style sharing, first sibling parent does not have implicit scope",
     "@scope with cousin style sharing, second sibling does not have implicit scope",
     "@scope with cousin style sharing, second sibling enters scope",
     "@scope with cousin style sharing, second sibling enters scope ID selector",
+    "@scope with cousin style sharing, second sibling enters scope attribute selector",
+    "@scope with cousin style sharing, second sibling enters scope trivial attribute selector",
     "@scope with cousin style sharing, second sibling enters scope with :has",
     "@scope with cousin style sharing, second sibling exits scope",
     "@scope with cousin style sharing, second sibling parent does not have implicit scope",
@@ -684,8 +751,21 @@
     "anonymous-test-2",
     "anonymous-test-3"
   ],
+  "submodules/web-platform-tests/css/css-nesting/nested-media-in-layer.html": [
+    "Nested @media in @layer with CSS Nesting parses correctly"
+  ],
   "submodules/web-platform-tests/css/css-nesting/nested-rule-cssom-invalidation.html": [
     "Nested rule responds to parent selector text change"
+  ],
+  "submodules/web-platform-tests/css/css-nesting/nesting-braces-in-strings.html": [
+    "Multiple declarations after string containing } are all preserved",
+    "Nested rule with { in string followed by more declarations in parent",
+    "Nested rule with { in string value preserves declarations",
+    "Nested rule with {} pair in string value preserves declarations",
+    "Nested rule with } in string as only child of parent rule",
+    "Nested rule with } in string followed by more declarations in parent",
+    "Nested rule with } in string value preserves declarations",
+    "Nested rule with } in string: trailing custom properties do not corrupt the rule"
   ],
   "submodules/web-platform-tests/css/css-nesting/nesting-layer.html": [
     "@layer can be nested"
@@ -871,6 +951,9 @@
   "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-charset-attribute-bogus.html": [
     "anonymous-test"
   ],
+  "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-charset-attribute-empty.html": [
+    "anonymous-test"
+  ],
   "submodules/web-platform-tests/css/css-syntax/charset/page-windows-1251-css-at-charset-1250-charset-attribute-windows-1253.html": [
     "anonymous-test"
   ],
@@ -988,8 +1071,19 @@
     "\"foo\u0000\" becomes \"foo�\"",
     "\"fooU+d800\" becomes \"foo�\""
   ],
+  "submodules/web-platform-tests/css/css-syntax/invalid-margin-trim-block-balancing.html": [
+    "Check that syntax error in .foo rule does not consume .green rule"
+  ],
   "submodules/web-platform-tests/css/css-syntax/invalid-nested-rules.html": [
     "Continues parsing after block on invalid rule error"
+  ],
+  "submodules/web-platform-tests/css/css-syntax/invalid-shape-block-balancing.html": [
+    "Check that syntax error in .foo rule does not consume .green rule"
+  ],
+  "submodules/web-platform-tests/css/css-syntax/parse-invalid-input.html": [
+    "color: red; /*",
+    "color: red; }",
+    "color: red;'"
   ],
   "submodules/web-platform-tests/css/css-syntax/serialize-consecutive-tokens.html": [
     "Comments are handled correctly when computing a/* comment */b using t1:.",
@@ -2502,6 +2596,7 @@
     "Parsing calc() with complex expression is successful",
     "Parsing calc() with incompatible length units does not simplify the expression",
     "Parsing calc() with multiplication is successful",
+    "Parsing calc() with numbers is successful",
     "Parsing calc() with subtraction is successful",
     "Parsing clamp() is successful",
     "Parsing division with unsupported sign() function throws a SyntaxError instead of crashing",
@@ -3140,6 +3235,7 @@
     "Can set 'animation-name' to CSS-wide keywords: initial",
     "Can set 'animation-name' to CSS-wide keywords: revert",
     "Can set 'animation-name' to CSS-wide keywords: unset",
+    "Can set 'animation-name' to the 'auto' keyword: auto",
     "Can set 'animation-name' to the 'custom-ident' keyword: custom-ident",
     "Can set 'animation-name' to the 'none' keyword: none",
     "Can set 'animation-name' to var() references:  var(--A)",
@@ -3168,7 +3264,8 @@
     "Setting 'animation-name' to an angle: -3.14deg throws TypeError",
     "Setting 'animation-name' to an angle: 0deg throws TypeError",
     "Setting 'animation-name' to an angle: 3.14rad throws TypeError",
-    "Setting 'animation-name' to an angle: calc(0deg + 0rad) throws TypeError"
+    "Setting 'animation-name' to an angle: calc(0deg + 0rad) throws TypeError",
+    "Setting 'animation-name' to the 'default' keyword: default throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/animation-play-state.html": [
     "Can set 'animation-play-state' to CSS-wide keywords: inherit",
@@ -5342,6 +5439,7 @@
     "Can set 'container-name' to CSS-wide keywords: initial",
     "Can set 'container-name' to CSS-wide keywords: revert",
     "Can set 'container-name' to CSS-wide keywords: unset",
+    "Can set 'container-name' to the 'auto' keyword: auto",
     "Can set 'container-name' to the 'my-container' keyword: my-container",
     "Can set 'container-name' to the 'none' keyword: none",
     "Can set 'container-name' to var() references:  var(--A)",
@@ -5370,7 +5468,8 @@
     "Setting 'container-name' to an angle: -3.14deg throws TypeError",
     "Setting 'container-name' to an angle: 0deg throws TypeError",
     "Setting 'container-name' to an angle: 3.14rad throws TypeError",
-    "Setting 'container-name' to an angle: calc(0deg + 0rad) throws TypeError"
+    "Setting 'container-name' to an angle: calc(0deg + 0rad) throws TypeError",
+    "Setting 'container-name' to the 'default' keyword: default throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/container-type.html": [
     "Can set 'container-type' to CSS-wide keywords: inherit",
@@ -10589,6 +10688,7 @@
     "Can set 'page' to CSS-wide keywords: unset",
     "Can set 'page' to the 'auto' keyword: auto",
     "Can set 'page' to the 'custom-ident' keyword: custom-ident",
+    "Can set 'page' to the 'row' keyword: row",
     "Can set 'page' to var() references:  var(--A)",
     "Setting 'page' to a flexible length: -3.14fr throws TypeError",
     "Setting 'page' to a flexible length: 0fr throws TypeError",
@@ -10615,7 +10715,8 @@
     "Setting 'page' to an angle: -3.14deg throws TypeError",
     "Setting 'page' to an angle: 0deg throws TypeError",
     "Setting 'page' to an angle: 3.14rad throws TypeError",
-    "Setting 'page' to an angle: calc(0deg + 0rad) throws TypeError"
+    "Setting 'page' to an angle: calc(0deg + 0rad) throws TypeError",
+    "Setting 'page' to the 'default' keyword: default throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/paint-order.html": [
     "'paint-order' does not support 'fill stroke'",
@@ -10733,17 +10834,17 @@
     "Setting 'pointer-events' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/position-visibility.html": [
-    "'position-visibility' does not support 'anchors-valid anchors-visible no-overflow'",
-    "'position-visibility' does not support 'anchors-valid anchors-visible'",
-    "'position-visibility' does not support 'anchors-valid no-overflow'",
-    "'position-visibility' does not support 'anchors-visible no-overflow'",
+    "'position-visibility' does not support 'anchor-valid anchor-visible no-overflow'",
+    "'position-visibility' does not support 'anchor-valid anchor-visible'",
+    "'position-visibility' does not support 'anchor-valid no-overflow'",
+    "'position-visibility' does not support 'anchor-visible no-overflow'",
     "Can set 'position-visibility' to CSS-wide keywords: inherit",
     "Can set 'position-visibility' to CSS-wide keywords: initial",
     "Can set 'position-visibility' to CSS-wide keywords: revert",
     "Can set 'position-visibility' to CSS-wide keywords: unset",
     "Can set 'position-visibility' to the 'always' keyword: always",
-    "Can set 'position-visibility' to the 'anchors-valid' keyword: anchors-valid",
-    "Can set 'position-visibility' to the 'anchors-visible' keyword: anchors-visible",
+    "Can set 'position-visibility' to the 'anchor-valid' keyword: anchor-valid",
+    "Can set 'position-visibility' to the 'anchor-visible' keyword: anchor-visible",
     "Can set 'position-visibility' to the 'no-overflow' keyword: no-overflow",
     "Can set 'position-visibility' to var() references:  var(--A)",
     "Setting 'position-visibility' to a flexible length: -3.14fr throws TypeError",
@@ -14110,6 +14211,9 @@
     "Declaration changes on 'color' propagate to all variable references",
     "Declaration changes on 'white-space' propagate to all variable references"
   ],
+  "submodules/web-platform-tests/css/css-variables/custom-properties-inherit.html": [
+    "Inheritance of custom properties"
+  ],
   "submodules/web-platform-tests/css/css-variables/revert-in-fallback.html": [
     "var(--unknown, revert) in custom property",
     "var(--unknown, revert) in longhand",
@@ -14131,6 +14235,9 @@
   "submodules/web-platform-tests/css/css-variables/revert-rule-to-var.html": [
     "Using revert-rule to revert to a value containing var()"
   ],
+  "submodules/web-platform-tests/css/css-variables/transition-with-attribute-taint.html": [
+    "Attribute tainted value blocked"
+  ],
   "submodules/web-platform-tests/css/css-variables/url-token-serialization.html": [
     "Colons, slashes, periods, question marks, equals, ampersands, and hash in url() token must not be escaped",
     "Escaped space in url() token must be serialized as an escape",
@@ -14143,8 +14250,7 @@
     "Referencing a custom property with ident()",
     "ident() causing lookup of invalid custom property",
     "ident() causing lookup of invalid custom property, fallback",
-    "ident() causing lookup of invalid custom property, fallback, CSS-wide keyword",
-    "ident() remains unresolved on custom properties"
+    "ident() causing lookup of invalid custom property, fallback, CSS-wide keyword"
   ],
   "submodules/web-platform-tests/css/css-variables/var-parsing.html": [
     "e.style['width'] = \"var()\" should not set the property value",
@@ -14652,10 +14758,39 @@
     "border-style should serialize to the empty string when border references a variable",
     "border-width should serialize to the empty string when border references a variable"
   ],
+  "submodules/web-platform-tests/css/cssom/adoptedstylesheets-cascade-order.html": [
+    "Mutating a duplicated adopted stylesheet while inserting a leading sheet updates cascade order",
+    "Reordering a document.adoptedStyleSheets suffix after a replacement updates cascade order",
+    "Reordering a shadowRoot.adoptedStyleSheets suffix after a replacement updates cascade order",
+    "Reordering adopted stylesheets while inserting one updates cascade order",
+    "Reordering adopted stylesheets while removing one updates cascade order",
+    "Reordering adopted stylesheets with media queries updates cascade order",
+    "Reordering after an unchanged leading adopted stylesheet updates cascade order",
+    "Reordering around a mutated adopted stylesheet updates cascade order",
+    "Reordering document.adoptedStyleSheets updates cascade order",
+    "Reordering duplicated adopted stylesheets updates cascade order",
+    "Reordering shadowRoot.adoptedStyleSheets updates cascade order",
+    "Rotating document.adoptedStyleSheets updates cascade order",
+    "Rotating shadowRoot.adoptedStyleSheets updates cascade order"
+  ],
   "submodules/web-platform-tests/css/cssom/adoptedstylesheets-modify-array-and-sheet.html": [
     "Add the two sheets. Text should be red.",
     "Flip the two sheet. Still red.",
     "Modify the color declaration. Should now be green."
+  ],
+  "submodules/web-platform-tests/css/cssom/adoptedstylesheets-observablearray-removal.html": [
+    "Document: modifying a sheet still applies after overwriting its duplicate",
+    "Document: modifying a sheet still applies after popping its duplicate",
+    "Document: modifying a sheet still applies after reassigning the array with it",
+    "Document: modifying a sheet still applies after truncating its duplicate",
+    "Document: setting length to 0 removes the adopted styles",
+    "Document: shrinking length removes the truncated styles",
+    "ShadowRoot: modifying a sheet still applies after overwriting its duplicate",
+    "ShadowRoot: modifying a sheet still applies after popping its duplicate",
+    "ShadowRoot: modifying a sheet still applies after reassigning the array with it",
+    "ShadowRoot: modifying a sheet still applies after truncating its duplicate",
+    "ShadowRoot: setting length to 0 removes the adopted styles",
+    "ShadowRoot: shrinking length removes the truncated styles"
   ],
   "submodules/web-platform-tests/css/cssom/adoptedstylesheets-observablearray.html": [
     "adoptedStyleSheets should not expose its backing object via prototype",
@@ -14695,11 +14830,18 @@
     "Exception thrown when trying to change a computed style declaration via property",
     "Exception thrown when trying to change a computed style declaration via setProperty"
   ],
+  "submodules/web-platform-tests/css/cssom/CSS-escape-numeric-id.html": [
+    "ID selector matches with CSS.escape()"
+  ],
   "submodules/web-platform-tests/css/cssom/CSS-namespace-object-class-string.html": [
     "@@toStringTag exists on the namespace object with the appropriate descriptor",
     "Object.prototype.toString applied after deleting @@toStringTag",
     "Object.prototype.toString applied after modifying the namespace object's @@toStringTag",
     "Object.prototype.toString applied to the namespace object"
+  ],
+  "submodules/web-platform-tests/css/cssom/css-rule-selector-text.html": [
+    "Each cssRule",
+    "cssRules"
   ],
   "submodules/web-platform-tests/css/cssom/css-style-attr-decl-block.html": [
     "Changes to CSS declaration block should queue mutation record for style attribute",
@@ -14720,6 +14862,18 @@
   "submodules/web-platform-tests/css/cssom/css-style-reparse.html": [
     "style.innerHTML modification",
     "style.textContent modification"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSS-supports.html": [
+    "CSS.supports and implementation: keyword",
+    "CSS.supports and implementation: min function",
+    "CSS.supports and shorthand / longhand",
+    "CSS.supports invalid value semi",
+    "CSS.supports() requires at least one argument",
+    "CSS.supports(conditionText) with logical operators",
+    "CSS.supports(conditionText) with parentheses",
+    "CSS.supports(conditionText) without parentheses",
+    "CSS.supports(property, value) with invalid inputs",
+    "CSS.supports(property, value) with valid inputs"
   ],
   "submodules/web-platform-tests/css/cssom/CSSConditionRule-conditionText.html": [
     "anonymous-test-0"
@@ -14747,6 +14901,9 @@
   "submodules/web-platform-tests/css/cssom/CSSGroupingRule-cssRules.html": [
     "[SameObject] is honored"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSGroupingRule-insertRule-computed.html": [
+    "Styles should be recomputed correctly after insertRule and deleteRule on a CSSGroupingRule."
+  ],
   "submodules/web-platform-tests/css/cssom/CSSGroupingRule-insertRule.html": [
     "CSS parsing error",
     "constraint violation",
@@ -14755,6 +14912,9 @@
     "index before first",
     "index exceeds length",
     "index not specified"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSImportRule-insertRule-styleSheet-parentStyleSheet.html": [
+    "insertRule @import produces a styleSheet whose parentStyleSheet is the containing sheet"
   ],
   "submodules/web-platform-tests/css/cssom/cssimportrule-parent.html": [
     "@import stylesheet is properly unlinked from parent after removal"
@@ -14775,9 +14935,52 @@
     "Values of CSSImportRule attributes",
     "Values of CSSRule attributes"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSKeyframeRule-keyText-edge-cases.html": [
+    "getter normalizes .5% from parsed stylesheet",
+    "getter normalizes 100.0% from parsed stylesheet",
+    "getter normalizes 1e1% from parsed stylesheet",
+    "setter accepts and normalizes .5%",
+    "setter accepts and normalizes 0.0%",
+    "setter accepts and normalizes 100.0%",
+    "setter accepts and normalizes 1e1%",
+    "setter accepts and normalizes FROM",
+    "setter accepts and normalizes To",
+    "setter accepts and normalizes mixed-case From, TO",
+    "setter rejects -5%",
+    "setter rejects 150%",
+    "setter trims whitespace",
+    "setter trims whitespace in comma-separated selectors"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSKeyframeRule-keyText.html": [
+    "getter normalizes 'from' to '0%'",
+    "getter normalizes 'to' to '100%'",
+    "getter normalizes comma-separated selectors",
+    "getter preserves percentage values",
+    "setter accepts a valid percentage",
+    "setter accepts comma-separated percentages",
+    "setter normalizes 'from' to '0%'",
+    "setter normalizes 'to' to '100%'",
+    "setter normalizes comma-separated from/to",
+    "setter throws SyntaxError for empty string",
+    "setter throws SyntaxError for invalid selector"
+  ],
   "submodules/web-platform-tests/css/cssom/CSSKeyframeRule.html": [
     "CSSKeyframeRule: style property",
     "CSSKeyframeRule: style property has [PutForwards]"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSKeyframesRule-appendRule-invalid.html": [
+    "appendRule with valid single keyframe works normally"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSKeyframesRule-appendRule-multiple.html": [
+    "appendRule with a single keyframe rule works"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSKeyframesRule-indexed-getter.html": [
+    "indexed getter returns the last rule",
+    "indexed getter returns the rule at the given index",
+    "indexed getter returns undefined for large out-of-bounds index",
+    "indexed getter returns undefined for negative index",
+    "indexed getter returns undefined for out-of-bounds index",
+    "length reflects number of keyframe rules"
   ],
   "submodules/web-platform-tests/css/cssom/CSSKeyframesRule.html": [
     "indexed getter, length",
@@ -14921,6 +15124,22 @@
     "shorthand padding can be set with setProperty",
     "shorthand padding can be set with setProperty and priority !important"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSRule-type.html": [
+    "CSSContainerRule.type is 0 (no constant defined)",
+    "CSSCounterStyleRule.type is COUNTER_STYLE_RULE (11)",
+    "CSSFontFaceRule.type is FONT_FACE_RULE (5)",
+    "CSSImportRule.type is IMPORT_RULE (3)",
+    "CSSKeyframeRule.type is KEYFRAME_RULE (8)",
+    "CSSKeyframesRule.type is KEYFRAMES_RULE (7)",
+    "CSSLayerBlockRule.type is 0 (no constant defined)",
+    "CSSLayerStatementRule.type is 0 (no constant defined)",
+    "CSSMediaRule.type is MEDIA_RULE (4)",
+    "CSSNamespaceRule.type is NAMESPACE_RULE (10)",
+    "CSSPageRule.type is PAGE_RULE (6)",
+    "CSSScopeRule.type is 0 (no constant defined)",
+    "CSSStyleRule.type is STYLE_RULE (1)",
+    "CSSSupportsRule.type is SUPPORTS_RULE (12)"
+  ],
   "submodules/web-platform-tests/css/cssom/CSSRuleList.html": [
     "anonymous-test-0"
   ],
@@ -14985,6 +15204,13 @@
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-custom-properties.html": [
     "Custom properties are included in computed style"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSStyleDeclaration-indexed-properties.html": [
+    "in operator works for indexed properties",
+    "indexed access on empty style returns undefined",
+    "indexed access returns property names in insertion order",
+    "indexed access updates after removeProperty",
+    "indexed access works after setting cssText"
+  ],
   "submodules/web-platform-tests/css/cssom/CSSStyleDeclaration-iterator.html": [
     "anonymous-test-0"
   ],
@@ -15040,6 +15266,15 @@
   ],
   "submodules/web-platform-tests/css/cssom/cssstyledeclaration-setter-logical.html": [
     "newly set declaration should be after all declarations in the same logical property group but have different logical kind"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSStyleRule-selectorText-setter.html": [
+    "Setting a valid selector list updates selectorText",
+    "Setting a valid selector updates selectorText",
+    "Setting an empty string does not change selectorText",
+    "Setting an invalid selector does not change selectorText",
+    "Setting an unclosed bracket does not change selectorText",
+    "cssText reflects the updated selectorText",
+    "selectorText getter returns the initial selector"
   ],
   "submodules/web-platform-tests/css/cssom/CSSStyleRule-set-selectorText-namespace.html": [
     "CSSStyleRule: selectorText value: |*|*.style1  | isMatch: true",
@@ -15197,8 +15432,25 @@
     "new CSSStyleSheet produces empty CSSStyleSheet",
     "title can be set in the CSSStyleSheet constructor"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSStyleSheet-insertRule-computed.html": [
+    "Styles should be recomputed correctly after insertRule even if the style cache was warmed up."
+  ],
   "submodules/web-platform-tests/css/cssom/CSSStyleSheet-modify-after-removal.html": [
     "Modify sheet from removed iframe"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSStyleSheet-replace-detach-old-rules.html": [
+    "replace() nullifies parentStyleSheet on old nested rules after replacement",
+    "replace() nullifies parentStyleSheet on old rules after replacement",
+    "replaceSync() nullifies parentStyleSheet on old nested rules",
+    "replaceSync() nullifies parentStyleSheet on old rules"
+  ],
+  "submodules/web-platform-tests/css/cssom/CSSStyleSheet-replace-parse-errors.html": [
+    "replace() sheet remains usable after parse error",
+    "replace() with completely invalid CSS clears existing rules",
+    "replace() with empty string clears existing rules",
+    "replaceSync() sheet remains usable after parse error",
+    "replaceSync() with completely invalid CSS clears existing rules",
+    "replaceSync() with empty string clears existing rules"
   ],
   "submodules/web-platform-tests/css/cssom/CSSStyleSheet.html": [
     "addRule with #foo selectors",
@@ -15258,6 +15510,8 @@
     "Specified: quoted 'default' stays quoted",
     "Specified: quoted 'inherit' stays quoted",
     "Specified: quoted 'initial' stays quoted",
+    "Specified: quoted 'revert' stays quoted",
+    "Specified: quoted 'revert-layer' stays quoted",
     "Specified: quoted 'sans-serif' stays quoted",
     "Specified: quoted 'serif' stays quoted",
     "Specified: quoted 'unset' stays quoted",
@@ -15278,8 +15532,24 @@
     "font-variant: normal serialization",
     "font-variant: normal with non-default longhands"
   ],
+  "submodules/web-platform-tests/css/cssom/functional-values-comma.html": [
+    "min(): multiple spaces should be collapsed to a single space",
+    "rgb(): already spaced input should remain correctly spaced"
+  ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-animations-replaced-into-ib-split.html": [
     "getComputedStyle() should return animation styles for nodes just inserted into the document, even if they're in an IB-split"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-basic.html": [
+    "Sanity check",
+    "cssText",
+    "removeProperty",
+    "setProperty"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-calc.html": [
+    "getComputedStyle() returns computed value for calc(-1 * 8px)",
+    "getComputedStyle() returns computed value for calc(608px - env(safe-area-inset-top))",
+    "getComputedStyle() returns computed value for calc(8px * 2)",
+    "getComputedStyle() returns computed value for calc(var(--gap) - 4px)"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-detached-subtree.html": [
     "getComputedStyle returns no style for descendant outside the flat tree",
@@ -15298,6 +15568,9 @@
   "submodules/web-platform-tests/css/cssom/getComputedStyle-display-none-003.html": [
     "getComputedStyle gets invalidated in display: none subtrees due to attribute mutations"
   ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-display-none-shadow-invalidation.html": [
+    "getComputedStyle gets invalidated for slotted content of a display: none shadow host"
+  ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-dynamic-subdoc.html": [
     "getComputedStyle cross-doc properly reflects media query changes"
   ],
@@ -15313,6 +15586,10 @@
     "max-width",
     "width"
   ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-important.html": [
+    "getComputedStyle should return !important stylesheet value over inline style",
+    "getComputedStyle should return !important stylesheet value rather than the subsequent stylesheet value"
+  ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-insets-absolute-roundtrip.html": [
     "Fixed-length bottom property value should roundtrip",
     "Fixed-length left property value should roundtrip",
@@ -15325,11 +15602,33 @@
     "line-height: 10px",
     "line-height: normal"
   ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-live.html": [
+    "anonymous-test-0"
+  ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-margins-roundtrip.html": [
     "Fixed-length margin-bottom property value should roundtrip",
     "Fixed-length margin-left property value should roundtrip",
     "Fixed-length margin-right property value should roundtrip",
     "Fixed-length margin-top property value should roundtrip"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-math-function-percentage.html": [
+    "getComputedStyle() preserves the case of line names around a math function",
+    "getComputedStyle() returns computed value for width: 50%"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-mutations.html": [
+    "Assigning to attribute updates the computed style",
+    "Emptying an element updates the computed style",
+    "Initial style value",
+    "Inserting an element updates the computed style",
+    "Removing an attribute updates the computed style",
+    "Removing an element updates the computed style",
+    "Replacing an attribute updates the computed style",
+    "Replacing an element updates the computed style",
+    "Setting an attribute updates the computed style"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-pointerEvents.html": [
+    "Body element has the initial value for pointerEvents",
+    "Parent element returns the directly specified value for pointerEvents"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-property-order.html": [
     "Computed style properties should be sorted lexicographically"
@@ -15338,6 +15637,9 @@
     "Resolution of width is correct for pseudo-element (due to double-colon)",
     "Resolution of width is correct when pseudo-element argument is ignored (due to no colon)",
     "Resolution of width is correct when pseudo-element argument is ignored (due to single-colon)"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-pseudo-class.html": [
+    "getComputedStyle should return the default style, not :hover style"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-pseudo-picker-icon.html": [
     "Resolution of width is correct for pseudo-element (due to double-colon)",
@@ -15434,8 +15736,45 @@
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-with-degenerate-aspect-ratio\"",
     "Resolved value of min-width & min-height 'auto' keyword behaves as expected on element with id=\"inline-with-valid-aspect-ratio\""
   ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-root-variables.html": [
+    "getComputedStyle should return CSS variables defined on :root"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-root.html": [
+    "Accessing variables in :root pseudo-selector"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-shadow-host.html": [
+    "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-shadow-inherit.html": [
+    "Sanity check"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-style-element-updates.html": [
+    "Inserting a new CSS element that overrides the old one updates the computed style",
+    "Removing the inserted CSS element updates the computed style back to original value",
+    "Sanity check: getComputedStyle works as expected",
+    "Updating the inserted CSS element changes the computed style"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-visibility-nominal-case.html": [
+    "Real check: getComputedStyle returns hidden visibility",
+    "Sanity check: getComputedStyle returns apparent visibility"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-visibility-override.html": [
+    "Sanity check: Parent is actually visibly hidden",
+    "computed visibility can be visible even if the parent is not"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-visibility-unset.html": [
+    "Sanity check: Parent is actually visibly hidden",
+    "computed visibility gets unset and inherits from parent"
+  ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-width-scroll.tentative.html": [
     "getComputedStyle() round-trips in presence of scrollbars"
+  ],
+  "submodules/web-platform-tests/css/cssom/grouping-rule-no-nested-declarations.html": [
+    "Bare declaration inside top-level @media produces no child rules",
+    "Bare declaration inside top-level @supports produces no child rules",
+    "Declaration after style rule inside top-level @media is dropped, not wrapped",
+    "Declaration inside @media in nesting context is correctly wrapped as CSSNestedDeclarations",
+    "Multiple bare declarations inside top-level @media produce no child rules"
   ],
   "submodules/web-platform-tests/css/cssom/historical.html": [
     "Historical CSSStyleDeclaration member: getPropertyCSSValue",
@@ -15525,8 +15864,10 @@
     "CSSImportRule interface: existence and properties of interface prototype object's \"constructor\" property",
     "CSSImportRule interface: existence and properties of interface prototype object's @@unscopables property",
     "CSSImportRule interface: sheet.cssRules[0] must inherit property \"href\" with the proper type",
+    "CSSImportRule interface: sheet.cssRules[0] must inherit property \"layerName\" with the proper type",
     "CSSImportRule interface: sheet.cssRules[0] must inherit property \"media\" with the proper type",
     "CSSImportRule interface: sheet.cssRules[0] must inherit property \"styleSheet\" with the proper type",
+    "CSSImportRule interface: sheet.cssRules[0] must inherit property \"supportsText\" with the proper type",
     "CSSImportRule must be primary interface of sheet.cssRules[0]",
     "CSSMarginRule interface object length",
     "CSSMarginRule interface object name",
@@ -15962,6 +16303,10 @@
     "idl_test setup",
     "idl_test validation"
   ],
+  "submodules/web-platform-tests/css/cssom/import-namespace-invalid-prelude.html": [
+    "Valid @import with URL string is kept",
+    "Valid @namespace with URL is kept"
+  ],
   "submodules/web-platform-tests/css/cssom/inline-style-001.html": [
     "CSSStyleDeclaration_accessible",
     "csstext_write",
@@ -15976,6 +16321,9 @@
   "submodules/web-platform-tests/css/cssom/insertRule-charset-no-index.html": [
     "insertRule with charset and omitted index argument",
     "insertRule with charset and undefined index argument"
+  ],
+  "submodules/web-platform-tests/css/cssom/insertRule-font-face.html": [
+    "insertRule with font-face rule should not throw"
   ],
   "submodules/web-platform-tests/css/cssom/insertRule-import-no-index.html": [
     "insertRule with import and omitted index argument",
@@ -16025,6 +16373,26 @@
     "appendMedium_correctly_appends_medium_to_empty_MediaList",
     "appendMedium_correctly_appends_medium_to_nonempty_MediaList"
   ],
+  "submodules/web-platform-tests/css/cssom/medialist-mutation-after-owner-gc.html": [
+    "CSSMediaRule media: appendMedium() after owner GC",
+    "CSSMediaRule media: deleteMedium() after owner GC",
+    "CSSMediaRule media: mediaText setter after owner GC"
+  ],
+  "submodules/web-platform-tests/css/cssom/MediaList-parsing.html": [
+    "A single invalid query becomes \"not all\"",
+    "Initial media from stylesheet is normalized",
+    "Invalid queries in a list become \"not all\"",
+    "Setting mediaText to empty string empties the list",
+    "appendMedium adds a new medium",
+    "appendMedium deduplicates by normalized form",
+    "appendMedium with invalid input appends \"not all\"",
+    "deleteMedium matches by normalized form",
+    "deleteMedium throws NotFoundError for non-existent medium",
+    "deleteMedium throws NotFoundError when no \"not all\" entry exists",
+    "mediaText setter collapses internal whitespace and lowercases",
+    "mediaText setter lowercases media types",
+    "mediaText setter trims and normalizes whitespace"
+  ],
   "submodules/web-platform-tests/css/cssom/MediaList.html": [
     "anonymous-test-0"
   ],
@@ -16047,6 +16415,26 @@
     "Single value overflow on element with non-CSS-wide keyword should serialize correctly.",
     "Single value overflow with CSS-wide keyword should serialize correctly.",
     "Single value overflow with non-CSS-wide keyword should serialize correctly."
+  ],
+  "submodules/web-platform-tests/css/cssom/page-descriptors.html": [
+    "@page margin descriptor expands to its longhands",
+    "@page margin-bottom and marginBottom are aliases",
+    "@page margin-left and marginLeft are aliases",
+    "@page margin-right and marginRight are aliases",
+    "@page margin-top and marginTop are aliases",
+    "@page page-orientation descriptor is parsed and serialized from CSS",
+    "@page size descriptor is parsed and serialized from CSS",
+    "CSSPageDescriptors exposes \"margin\"",
+    "CSSPageDescriptors exposes \"margin-bottom\"",
+    "CSSPageDescriptors exposes \"margin-left\"",
+    "CSSPageDescriptors exposes \"margin-right\"",
+    "CSSPageDescriptors exposes \"margin-top\"",
+    "CSSPageDescriptors exposes \"marginBottom\"",
+    "CSSPageDescriptors exposes \"marginLeft\"",
+    "CSSPageDescriptors exposes \"marginRight\"",
+    "CSSPageDescriptors exposes \"marginTop\"",
+    "CSSPageDescriptors exposes \"page-orientation\"",
+    "CSSPageDescriptors exposes \"size\""
   ],
   "submodules/web-platform-tests/css/cssom/preferred-stylesheet-order.html": [
     "Preferred stylesheet where insertion order is reversed tree order"
@@ -16906,6 +17294,9 @@
     "Shorthand with variable preserves original serialization but trims whitespace: without whitespace",
     "Shorthand with variable preserves original serialization: with whitespace"
   ],
+  "submodules/web-platform-tests/css/cssom/serialize-whitespace.html": [
+    "anonymous-test-0"
+  ],
   "submodules/web-platform-tests/css/cssom/set-selector-text-attachment.html": [
     "Modifying property value invalidates style, even after selectorText mutation"
   ],
@@ -16913,6 +17304,11 @@
     "Verify that setting a CSS property priority to null is treated like empty string.",
     "Verify that setting a CSS property priority to undefined is accepted.",
     "Verify that setting a CSS property to null is treated like empty string."
+  ],
+  "submodules/web-platform-tests/css/cssom/shadow-dom-style-sheet.html": [
+    "Style element in shadow root has a CSSStyleSheet",
+    "insertRule() and deleteRule() work on a pre-populated shadow root stylesheet",
+    "insertRule() works on a style element's sheet inside a shadow root"
   ],
   "submodules/web-platform-tests/css/cssom/shorthand-serialization.html": [
     "Shorthand serialization after setting",
@@ -16946,8 +17342,93 @@
     "The serialization of overflow-x: scroll; overflow-y: scroll; should be canonical.",
     "The serialization of padding-top: 1px; padding-right: 2px; padding-bottom: 3px; padding-left: 4px; should be canonical."
   ],
+  "submodules/web-platform-tests/css/cssom/style-attr-stray-braces.tentative.html": [
+    "cssText setter: @foo{}z-index: 1",
+    "cssText setter: z-index: 1; }",
+    "cssText setter: z-index: 1; }color: red",
+    "cssText setter: {}color: red",
+    "cssText setter: {}color: red; z-index: 1",
+    "cssText setter: }color: red",
+    "style attribute: @foo{}z-index: 1",
+    "style attribute: z-index: 1; }",
+    "style attribute: z-index: 1; }color: red",
+    "style attribute: {}color: red",
+    "style attribute: {}color: red; z-index: 1",
+    "style attribute: }color: red"
+  ],
   "submodules/web-platform-tests/css/cssom/style-attr-update-across-documents.html": [
     "Changing the style of a node that switched documents works"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-background-position.html": [
+    "Sanity check"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-background-repeat.html": [
+    "1 value",
+    "Sanity check"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-backgroundcolor-table-row.html": [
+    "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-backgroundimage-lineargradient.html": [
+    "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-border-shorthand-var.html": [
+    "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-color-values.html": [
+    "Color keyword",
+    "Global keyword",
+    "Sanity check"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-color.html": [
+    "Setting a color with a decimal transparency should update the style"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-cssText-mutations.html": [
+    "Reading cssText preserves style mutation records",
+    "cssText reflects style attribute replacement and removal",
+    "inline cssText reflects property, priority, shorthand, and declaration replacements",
+    "rule cssText reflects property, priority, shorthand, and declaration replacements"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-element-inline-important.html": [
+    "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-element-insertion-removal-computed.html": [
+    "Styles should be recomputed correctly after a <style> element is inserted.",
+    "Styles should be recomputed correctly after a <style> element is removed."
+  ],
+  "submodules/web-platform-tests/css/cssom/style-font-shorthand.html": [
+    "should get normalized value for font shorthand"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-global-variable.html": [
+    "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-set-cssText.html": [
+    "initial value of cssRule.style.cssText"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-set-custom-property-priority.html": [
+    "Sanity check",
+    "Set custom property to parent",
+    "Set custom property with priority to self"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-set-custom-property.html": [
+    "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/style-set-property.html": [
+    "initial value of cssRule.style",
+    "initial value of div.style",
+    "set BigInt for div.style[property]",
+    "set Object.toString for div.style[property]",
+    "set empty string for cssRule.style.setProperty",
+    "set empty string for div.style.setProperty",
+    "set empty string for div.style[property]",
+    "set new value for cssRule.style.setProperty",
+    "set new value for div.style.setProperty",
+    "set new value for div.style[property]",
+    "set null for cssRule.style.setProperty",
+    "set null for div.style.setProperty",
+    "set null for div.style[property]",
+    "set toString() returning null for div.style.setProperty custom property",
+    "set true for div.style.setProperty custom property"
   ],
   "submodules/web-platform-tests/css/cssom/style-sheet-interfaces-001.html": [
     "CSSStyleSheet_properties",
@@ -16961,6 +17442,39 @@
   "submodules/web-platform-tests/css/cssom/style-sheet-interfaces-002.html": [
     "add_rule",
     "delete_rule"
+  ],
+  "submodules/web-platform-tests/css/cssom/StyleSheet-properties.html": [
+    "<link>: cssRules is a CSSRuleList with rules",
+    "<link>: disabled is false initially",
+    "<link>: media is empty when the link element has no media attribute",
+    "<link>: media reflects the link element's media attribute",
+    "<link>: ownerNode is the link element",
+    "<link>: ownerRule is null for non-imported sheets",
+    "<link>: parentStyleSheet is null for top-level sheets",
+    "<link>: title is null when the link element has no title attribute",
+    "<link>: title reflects the link element's title attribute",
+    "<link>: type is 'text/css'",
+    "<style>: cssRules is a CSSRuleList with rules",
+    "<style>: disabled is false initially",
+    "<style>: href is null for inline sheets",
+    "<style>: media is empty when the style element has no media attribute",
+    "<style>: media reflects the style element's media attribute",
+    "<style>: ownerNode is the style element",
+    "<style>: ownerRule is null for non-imported sheets",
+    "<style>: parentStyleSheet is null for top-level sheets",
+    "<style>: title is null when the style element has no title attribute",
+    "<style>: title reflects the style element's title attribute",
+    "<style>: type is 'text/css'",
+    "@import: imported sheet cssRules is a CSSRuleList with rules",
+    "@import: imported sheet disabled is false initially",
+    "@import: imported sheet media is empty when @import has no media query",
+    "@import: imported sheet ownerNode is null",
+    "@import: imported sheet ownerRule is the CSSImportRule",
+    "@import: imported sheet parentStyleSheet is the importing sheet",
+    "@import: imported sheet title is null",
+    "@import: imported sheet type is 'text/css'",
+    "Programmatically setting title on a <style> element is reflected in sheet.title",
+    "StyleSheet and CSSStyleSheet properties"
   ],
   "submodules/web-platform-tests/css/cssom/stylesheet-same-origin.sub.html": [
     "Origin-clean check in copied cross-origin CSSOM Stylesheets",
@@ -16989,6 +17503,13 @@
   ],
   "submodules/web-platform-tests/css/cssom/StyleSheetList.html": [
     "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/system-color-inherit.html": [
+    "Dynamically override inherited color",
+    "Test color inheritance"
+  ],
+  "submodules/web-platform-tests/css/cssom/system-color-lowercase.html": [
+    "Sanity check"
   ],
   "submodules/web-platform-tests/css/cssom/ttwf-cssom-doc-ext-load-count.html": [
     "stylesheet.css should be loaded and styleSheets.length === 1"
@@ -17086,9 +17607,9 @@
   ],
   "submodules/web-platform-tests/css/mediaqueries/dynamic-range.html": [
     "Check that dynamic-range always matches 'standard'",
-    "Check that dynamic-range evaluates to false in the boolean context",
+    "Check that dynamic-range evaluates to true in the boolean context",
     "Check that video-dynamic-range always matches 'standard'",
-    "Check that video-dynamic-range evaluates to false in the boolean context",
+    "Check that video-dynamic-range evaluates to true in the boolean context",
     "Check that video-dynamic-range is not 'invalid'",
     "Should be known: '(dynamic-range)'",
     "Should be known: '(dynamic-range: high)'",
@@ -17231,6 +17752,9 @@
     "Should be parseable: '(navigation-controls: none back-button)'",
     "Should be unknown: '(navigation-controls: back-button/none)'",
     "Should be unknown: '(navigation-controls: none back-button)'"
+  ],
+  "submodules/web-platform-tests/css/mediaqueries/nested-media-queries.html": [
+    "Nested media queries should parse correctly"
   ],
   "submodules/web-platform-tests/css/mediaqueries/overflow-media-features.html": [
     "Check that overflow-block: none doesn't match non printing documents",
@@ -17438,7 +17962,7 @@
     "Should be unknown: '(prefers-reduced-transparency: reduced)'"
   ],
   "submodules/web-platform-tests/css/mediaqueries/resizable.tentative.html": [
-    "Check that resizable evaluates to true in the boolean context",
+    "Check that resizable evaluates in the boolean context",
     "Should be known: '(resizable)'",
     "Should be known: '(resizable: false)'",
     "Should be known: '(resizable: true)'",
@@ -17502,6 +18026,30 @@
     "[*|foo=\"bar\" s] insertRule in @media",
     "[*|foo=\"bar\" s] setting CSSStyleRule#selectorText",
     "[*|foo=\"bar\" s] setting CSSStyleRule#selectorText in @media",
+    "[class~=\"bar\" i] getting CSSRule#cssText",
+    "[class~=\"bar\" i] getting CSSRule#cssText in @media",
+    "[class~=\"bar\" i] getting CSSStyleRule#selectorText",
+    "[class~=\"bar\" i] getting CSSStyleRule#selectorText in @media",
+    "[class~=\"bar\" i] insertRule",
+    "[class~=\"bar\" i] insertRule in @media",
+    "[class~=\"bar\" i] setting CSSStyleRule#selectorText",
+    "[class~=\"bar\" i] setting CSSStyleRule#selectorText in @media",
+    "[class~=\"bar\" s] getting CSSRule#cssText",
+    "[class~=\"bar\" s] getting CSSRule#cssText in @media",
+    "[class~=\"bar\" s] getting CSSStyleRule#selectorText",
+    "[class~=\"bar\" s] getting CSSStyleRule#selectorText in @media",
+    "[class~=\"bar\" s] insertRule",
+    "[class~=\"bar\" s] insertRule in @media",
+    "[class~=\"bar\" s] setting CSSStyleRule#selectorText",
+    "[class~=\"bar\" s] setting CSSStyleRule#selectorText in @media",
+    "[class~=\"bar\"] getting CSSRule#cssText",
+    "[class~=\"bar\"] getting CSSRule#cssText in @media",
+    "[class~=\"bar\"] getting CSSStyleRule#selectorText",
+    "[class~=\"bar\"] getting CSSStyleRule#selectorText in @media",
+    "[class~=\"bar\"] insertRule",
+    "[class~=\"bar\"] insertRule in @media",
+    "[class~=\"bar\"] setting CSSStyleRule#selectorText",
+    "[class~=\"bar\"] setting CSSStyleRule#selectorText in @media",
     "[foo=\"bar\" /**/ i] getting CSSRule#cssText",
     "[foo=\"bar\" /**/ i] getting CSSRule#cssText in @media",
     "[foo=\"bar\" /**/ i] getting CSSStyleRule#selectorText",
@@ -18951,6 +19499,26 @@
     "Expected HTML element to not match :nth-last-of-type(2) with matches, querySelector(), and querySelectorAll()",
     "Expected HTML element to not match :nth-of-type(2) with matches, querySelector(), and querySelectorAll()"
   ],
+  "submodules/web-platform-tests/css/selectors/class-prefix-selector-matching-quirks.tentative.html": [
+    "class=\"FOO-bar\" does not match .FOO-* in quirks mode: unlike a regular class selector, the class prefix selector itself is never case-folded, so writing it in a different case than the (quirks-mode-lowercased) class attribute never matches"
+  ],
+  "submodules/web-platform-tests/css/selectors/class-prefix-selector-matching.tentative.html": [
+    "an element with no class attribute does not match .foo-*",
+    "class=\"foo-\" does not match .foo-* (no character beyond the prefix)",
+    "class=\"foo---baz\" does not match .foo--* (the separator is \"---\", not \"--\")",
+    "class=\"foo--bar\" does not match .foo-* (the separator is \"--\", not \"-\")",
+    "class=\"foo-bar-\" does not match .foo-bar-* (nothing left after the prefix)",
+    "class=\"foobar\" does not match .foo-* (no \"-\" separator)"
+  ],
+  "submodules/web-platform-tests/css/selectors/class-prefix-selector-queryselector.tentative.html": [
+    "Element.closest() returns null when no ancestor matches the class prefix selector"
+  ],
+  "submodules/web-platform-tests/css/selectors/class-selector-change.html": [
+    "toggle class sync"
+  ],
+  "submodules/web-platform-tests/css/selectors/class-selector-escape-exclamation.html": [
+    "Class selector with escaped exclamation mark should parse correctly"
+  ],
   "submodules/web-platform-tests/css/selectors/dir-pseudo-on-bdi-element.html": [
     "bdi element with dir=auto content attribute",
     "bdi element with dir=ltr content attribute",
@@ -18987,6 +19555,57 @@
     ":dir() allows any ident value but strings other than ltr/rtl don't match",
     ":dir() works in complex selectors",
     ":dir() works in compound selectors"
+  ],
+  "submodules/web-platform-tests/css/selectors/featureless-006.html": [
+    "::before does not match the shadow host",
+    ":has(.inner) does not match the shadow host",
+    ":host matches the shadow host",
+    ":host(.host) matches the shadow host",
+    ":host(.nope) does not match the shadow host",
+    ":host(.nope) matches the shadow host after a class change",
+    ":host::before matches the shadow host",
+    ":is(:host)::before matches the shadow host",
+    ":is(:not(:host(.nope))) matches the shadow host",
+    ":is(:not(:not(:host))) matches the shadow host",
+    ":not(:has(.nope):host) matches the shadow host",
+    ":not(:host(#nope)) does not match the shadow host after an id change",
+    ":not(:host(.host)) does not match the shadow host",
+    ":not(:host(.nope)) does not match the shadow host after a class change",
+    ":not(:host(.nope)) matches the shadow host",
+    ":not(:host([a])) does not match the shadow host after an attribute change",
+    ":not(:host) does not match the shadow host",
+    ":not(:host.host) does not match the shadow host",
+    ":not(:host:has(.nope)) matches the shadow host",
+    ":not(:is(:host, div)) does not match the shadow host",
+    ":not(:not(:host)) matches the shadow host",
+    ":not(:not(:host))::before matches the shadow host",
+    ":not(:not(:not(:host))) does not match the shadow host",
+    ":not(div) does not match the shadow host",
+    ":nth-child(0 of :host) does not match the shadow host",
+    ":nth-child(0):host does not match the shadow host",
+    ":nth-child(1):host does not match the shadow host",
+    ":where(:host) matches the shadow host",
+    "[a]:host does not match the shadow host",
+    "[a^='']:host does not match the shadow host"
+  ],
+  "submodules/web-platform-tests/css/selectors/featureless-007.html": [
+    ":host matches the shadow host with a default namespace the host is in",
+    ":host matches the shadow host with a foreign default namespace",
+    ":host matches the shadow host with a foreign prefixed namespace",
+    ":host matches the shadow host with no namespace",
+    ":host(.host) matches the shadow host with a default namespace the host is in",
+    ":host(.host) matches the shadow host with a foreign prefixed namespace",
+    ":host(.host) matches the shadow host with no namespace",
+    ":host:host matches the shadow host with a default namespace the host is in",
+    ":host:host matches the shadow host with a foreign default namespace",
+    ":host:host matches the shadow host with a foreign prefixed namespace",
+    ":host:host matches the shadow host with no namespace",
+    ":is(:host) matches the shadow host with a foreign prefixed namespace",
+    ":is(:host) matches the shadow host with no namespace",
+    ":not(:not(:host)) matches the shadow host with a foreign prefixed namespace",
+    ":not(:not(:host)) matches the shadow host with no namespace",
+    ":where(:host) matches the shadow host with a foreign prefixed namespace",
+    ":where(:host) matches the shadow host with no namespace"
   ],
   "submodules/web-platform-tests/css/selectors/first-child.html": [
     "A comment node should be ignored.",
@@ -19147,6 +19766,10 @@
   "submodules/web-platform-tests/css/selectors/focus-within-removal.html": [
     "anonymous-test-0"
   ],
+  "submodules/web-platform-tests/css/selectors/focus-within.html": [
+    ":focus-within applies to ancestor",
+    ":focus-within applies to focused element"
+  ],
   "submodules/web-platform-tests/css/selectors/has-argument-with-explicit-scope.html": [
     ".a:has(:scope) .c and :is(.a :scope .c) returns same elements on scope1",
     ".a:has(:scope) .c and :is(.a :scope .c) returns same elements on scope2",
@@ -19242,6 +19865,9 @@
     ":has(span, li, p) wins over :has(span, lo, p)",
     "latter .baz wins over :has(.foo)",
     "latter :has(.foo) wins over .baz"
+  ],
+  "submodules/web-platform-tests/css/selectors/has-where-computed.html": [
+    "getComputedStyle()"
   ],
   "submodules/web-platform-tests/css/selectors/hash-collision-cssom.html": [
     "anonymous-test-0"
@@ -22632,6 +23258,9 @@
     "\"body > p\" should be a valid selector",
     "\"div ol>li p\" should be a valid selector"
   ],
+  "submodules/web-platform-tests/css/selectors/parsing/parse-class-prefix.tentative.html": [
+    "\".foo- *\" should be a valid selector"
+  ],
   "submodules/web-platform-tests/css/selectors/parsing/parse-class.html": [
     "\"*.pastoral\" should be a valid selector",
     "\".pastoral\" should be a valid selector",
@@ -22889,6 +23518,12 @@
   "submodules/web-platform-tests/css/selectors/selector-placeholder-shown-emptify-placeholder.html": [
     "input:placeholder-shown should not be matched",
     "textarea:placeholder-shown should not be matched"
+  ],
+  "submodules/web-platform-tests/css/selectors/selector-specificity.html": [
+    "!important flag",
+    "Basic",
+    "Logical :is()",
+    "Logical :where()"
   ],
   "submodules/web-platform-tests/css/selectors/selectors-4/lang-singleton-subtag-matching.html": [
     ":lang(cocoa-1) matches lang=\"cocoa-1-bar\" (singleton \"1\" matches)",

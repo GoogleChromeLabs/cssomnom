@@ -328,20 +328,20 @@ To preserve clean architectural separation and prevent circular import cycles be
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **94.2%** (21,184 / 22,499 passed assertions across 1,769 test files).
-* **Chrome 154 Parity**: **94.2%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **93.4%** (21,637 / 23,157 passed assertions across 1,882 test files).
+* **Chrome 154 Parity**: **93.4%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
-| **`Typed OM`** | 12,758 | 12,179 | **95.5%** | 🟢 **+1.9%** (ahead of Chrome) |
-| **`CSSOM`** | 2,150 | 2,046 | **95.2%** | -2.0% |
-| **`Nesting`** | 117 | 117 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
-| **`Syntax`** | 407 | 406 | **99.8%** | 🟢 **+1.4%** (ahead of Chrome) |
-| **`Cascade`** | 497 | 475 | **95.6%** | -4.3% |
-| **`Variables`** | 499 | 464 | **93.0%** | 🟢 **+2.4%** (ahead of Chrome) |
-| **`Selectors`** | 5,654 | 5,088 | **90.0%** | 🟢 **+4.0%** (ahead of Chrome) |
-| **`Media Queries`** | 417 | 409 | **98.1%** | -0.5% |
-| **OVERALL** | **22,499** | **21,184** | **94.2%** | 🟢 **+1.1%** |
+| **`Typed OM`** | 12,768 | 12,186 | **95.4%** | 🟢 **+1.9%** (ahead of Chrome) |
+| **`CSSOM`** | 2,527 | 2,333 | **92.3%** | -4.8% |
+| **`Nesting`** | 126 | 126 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
+| **`Syntax`** | 418 | 412 | **98.6%** | 🟢 **+0.2%** (ahead of Chrome) |
+| **`Cascade`** | 556 | 528 | **95.0%** | -4.9% |
+| **`Variables`** | 501 | 465 | **92.8%** | 🟢 **+2.3%** (ahead of Chrome) |
+| **`Selectors`** | 5,842 | 5,177 | **88.6%** | 🟢 **+2.6%** (ahead of Chrome) |
+| **`Media Queries`** | 419 | 410 | **97.9%** | -0.7% |
+| **OVERALL** | **23,157** | **21,637** | **93.4%** | 🟢 **+0.4%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

@@ -3833,11 +3833,11 @@
     },
     {
       "input": "1 * min(NaN * 2px, NaN * 4em)",
-      "expected": "calc(NaN * 1px)"
+      "expected": "calc(1 * min(NaN * 1px, NaN * 1em))"
     },
     {
       "input": "1 * clamp(NaN * 2em, NaN * 4px, NaN * 8pt)",
-      "expected": "clamp(NaN * 1em, NaN * 1px, NaN * 1px)"
+      "expected": "calc(1 * clamp(NaN * 1em, NaN * 1px, NaN * 1px))"
     }
   ],
   "css-values-calc-infinity-nan-serialize-number": [
@@ -4200,6 +4200,20 @@
     {
       "input": "1s * clamp(-inFinity, infinity, 10)",
       "expected": "calc(10s)"
+    }
+  ],
+  "css-values-calc-serialize": [
+    {
+      "expected": "min(180px, -24px + 80vw)"
+    },
+    {
+      "expected": "min(180px, 1em - 24px + 80vw)"
+    },
+    {
+      "expected": "max(10px, 1px + 1vw)"
+    },
+    {
+      "expected": "max(10px, -1em + 1px + 1vw)"
     }
   ]
 }

@@ -159,7 +159,7 @@ const MANUAL_OVERRIDES: Record<string, string> = {
   'padding-right': '<length-percentage>',
   'padding-top': '<length-percentage>',
   'pointer-events': 'bounding-box | visiblepainted | visiblefill | visiblestroke | visible | painted | fill | stroke | all | none',
-  'position-visibility': 'always | anchors-valid | anchors-visible | no-overflow',
+  'position-visibility': 'always | anchor-valid | anchor-visible | no-overflow',
   'position': 'static | relative | absolute | sticky | fixed',
   'resize': 'none | both | horizontal | vertical',
   'right': '<length-percentage> | auto',

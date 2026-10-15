@@ -361,6 +361,7 @@ export class CSSStyleProperties {
   declare fillRule: string;
   declare fillSize: string;
   declare filter: string;
+  declare fitTolerance: string;
   declare flex: string;
   declare flexBasis: string;
   declare flexDirection: string;
@@ -377,7 +378,6 @@ export class CSSStyleProperties {
   declare floodOpacity: string;
   declare flowFrom: string;
   declare flowInto: string;
-  declare flowTolerance: string;
   declare font: string;
   declare fontFamily: string;
   declare fontFeatureSettings: string;
@@ -785,6 +785,7 @@ export class CSSStyleProperties {
   declare timelineTriggerActiveRangeEnd: string;
   declare timelineTriggerActiveRangeStart: string;
   declare timelineTriggerName: string;
+  declare timelineTriggerRange: string;
   declare timelineTriggerSource: string;
   declare top: string;
   declare touchAction: string;

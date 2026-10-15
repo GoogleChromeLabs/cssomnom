@@ -111,6 +111,11 @@
       "expected": "--foo"
     },
     {
+      "property": "position-anchor",
+      "value": "match-parent",
+      "expected": "match-parent"
+    },
+    {
       "property": "position-area",
       "value": "none",
       "expected": "none"
@@ -532,13 +537,13 @@
     },
     {
       "property": "position-visibility",
-      "value": "anchors-valid",
-      "expected": "anchors-valid"
+      "value": "anchor-valid",
+      "expected": "anchor-valid"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-visible",
-      "expected": "anchors-visible"
+      "value": "anchor-visible",
+      "expected": "anchor-visible"
     },
     {
       "property": "position-visibility",
@@ -547,63 +552,63 @@
     },
     {
       "property": "position-visibility",
-      "value": "anchors-valid anchors-visible",
-      "expected": "anchors-valid anchors-visible"
+      "value": "anchor-valid anchor-visible",
+      "expected": "anchor-valid anchor-visible"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-valid no-overflow",
-      "expected": "anchors-valid no-overflow"
+      "value": "anchor-valid no-overflow",
+      "expected": "anchor-valid no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-visible anchors-valid",
-      "expected": "anchors-valid anchors-visible"
+      "value": "anchor-visible anchor-valid",
+      "expected": "anchor-valid anchor-visible"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-visible no-overflow",
-      "expected": "anchors-visible no-overflow"
+      "value": "anchor-visible no-overflow",
+      "expected": "anchor-visible no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "no-overflow anchors-valid",
-      "expected": "anchors-valid no-overflow"
+      "value": "no-overflow anchor-valid",
+      "expected": "anchor-valid no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "no-overflow anchors-visible",
-      "expected": "anchors-visible no-overflow"
+      "value": "no-overflow anchor-visible",
+      "expected": "anchor-visible no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-valid anchors-visible no-overflow",
-      "expected": "anchors-valid anchors-visible no-overflow"
+      "value": "anchor-valid anchor-visible no-overflow",
+      "expected": "anchor-valid anchor-visible no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-valid no-overflow anchors-visible",
-      "expected": "anchors-valid anchors-visible no-overflow"
+      "value": "anchor-valid no-overflow anchor-visible",
+      "expected": "anchor-valid anchor-visible no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-visible anchors-valid no-overflow",
-      "expected": "anchors-valid anchors-visible no-overflow"
+      "value": "anchor-visible anchor-valid no-overflow",
+      "expected": "anchor-valid anchor-visible no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "anchors-visible no-overflow anchors-valid",
-      "expected": "anchors-valid anchors-visible no-overflow"
+      "value": "anchor-visible no-overflow anchor-valid",
+      "expected": "anchor-valid anchor-visible no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "no-overflow anchors-valid anchors-visible",
-      "expected": "anchors-valid anchors-visible no-overflow"
+      "value": "no-overflow anchor-valid anchor-visible",
+      "expected": "anchor-valid anchor-visible no-overflow"
     },
     {
       "property": "position-visibility",
-      "value": "no-overflow anchors-visible anchors-valid",
-      "expected": "anchors-valid anchors-visible no-overflow"
+      "value": "no-overflow anchor-visible anchor-valid",
+      "expected": "anchor-valid anchor-visible no-overflow"
     }
   ],
   "view_transitions": [
@@ -836,8 +841,23 @@
     },
     {
       "property": "transition-property",
+      "value": "width, top, width",
+      "expected": "width, top, width"
+    },
+    {
+      "property": "transition-property",
+      "value": "all, top, all",
+      "expected": "all, top, all"
+    },
+    {
+      "property": "transition-property",
       "value": "ALL, INVALID, SYNTAX, SRC",
       "expected": "all, INVALID, SYNTAX, SRC"
+    },
+    {
+      "property": "transition-property",
+      "value": "left, top, right, bottom",
+      "expected": "left, top, right, bottom"
     },
     {
       "property": "transition-timing-function",
