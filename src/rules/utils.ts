@@ -22,10 +22,6 @@ export const FONT_FACE_DESCRIPTORS = new Set<string>([
   'font-family', 'src', 'font-display', 'unicode-range', 'font-weight', 'font-style', 'font-stretch', 'font-variant', 'font-feature-settings', 'font-variation-settings'
 ]);
 
-export const PAGE_DESCRIPTORS = new Set<string>([
-  'size', 'marks', 'bleed', 'page-orientation', 'page-margin-safety'
-]);
-
 export function isImportRule(r: Rule): boolean {
   return r.type === 3; // CSSRule.IMPORT_RULE
 }
@@ -43,10 +39,7 @@ export function serializeGroupingRule(atKeyword: string, condition: string, rule
   const cond = condition ? ' ' + condition : '';
   const ruleTexts = rules.map(r => r.cssText).filter(p => p !== '');
   if (ruleTexts.length === 0) {
-    if (atKeyword === 'keyframes') {
-      return `@${atKeyword}${cond} { }`;
-    }
-    return `@${atKeyword}${cond} {\n}`;
+    return atKeyword === 'keyframes' ? `@${atKeyword}${cond} { }` : `@${atKeyword}${cond} {\n}`;
   }
   const body = ruleTexts.map(t => '  ' + t).join('\n');
   return `@${atKeyword}${cond} {\n${body}\n}`;

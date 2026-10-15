@@ -243,18 +243,3 @@ export function resolveMediaEnvironment(element?: ElementLike | null): Partial<M
     orientation: width > height ? 'landscape' : 'portrait',
   };
 }
-
-/**
- * Compares two layer orders according to CSS Cascade 5 § 6.1 #cascade-layering and § 6.4.3 #layer-ordering.
- * In normal cascade: latest layer order wins (aLayer - bLayer).
- * In important cascade: earliest layer order wins (bLayer - aLayer).
- */
-export function compareLayerOrder(aLayer: number, bLayer: number, important: boolean): number {
-  if (aLayer === bLayer) return 0;
-  if (important) {
-    // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering: earliest layer wins
-    return bLayer - aLayer;
-  }
-  // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering: latest layer wins
-  return aLayer - bLayer;
-}

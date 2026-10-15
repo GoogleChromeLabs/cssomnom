@@ -699,16 +699,6 @@ function serializeMediaCondition(cond: MediaCondition | MediaFeature | GeneralEn
   return '';
 }
 
-export function hasUnknownFeature(query: MediaQuery): boolean {
-  return query.condition ? checkConditionForUnknown(query.condition) : false;
-}
-
-function checkConditionForUnknown(node: MediaCondition | MediaFeature | GeneralEnclosed): boolean {
-  if (node.type === 'media-condition') return node.children.some(child => checkConditionForUnknown(child));
-  if (node.type === 'media-feature') return isFeatureUnknown(node);
-  return node.type === 'general-enclosed';
-}
-
 function isFeatureUnknown(feature: MediaFeature): boolean {
   const name = feature.name.toLowerCase();
   if (name.startsWith('--')) return false;

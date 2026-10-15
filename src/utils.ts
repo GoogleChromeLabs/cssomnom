@@ -68,10 +68,6 @@ export function degToRad(deg: number): number {
   return deg * DEG_TO_RAD;
 }
 
-export function radToDeg(rad: number): number {
-  return rad * RAD_TO_DEG;
-}
-
 export function angleFromVector(x: number, y: number): number {
   if (x === 0 && y === 0) return 0;
   return Math.atan2(y, x) * RAD_TO_DEG;

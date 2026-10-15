@@ -248,4 +248,43 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
     assert.ok(withoutSupports.has('interpolate-size')); // because declared in .anim
     assert.equal(withoutSupports.has('backdrop-filter'), false); // only in @supports condition
   });
+
+  it('handles @scope nested inside style rule attributing :scope and parentAtRule to CSSNestedDeclarations', () => {
+    const css = '.card { @scope (.inner) { color: red; } }';
+    const sheet = parse(css);
+    const styleEntries = Array.from(walkStyleRules(sheet));
+    assert.equal(styleEntries.length, 2);
+
+    const [cardEntry, scopeNestedEntry] = styleEntries;
+    assert.equal(cardEntry.selectorText, '.card');
+
+    assert.ok(scopeNestedEntry.rule instanceof CSSNestedDeclarations);
+    assert.equal(scopeNestedEntry.selectorText, ':scope');
+    assert.equal(scopeNestedEntry.parentAtRule, '@scope (.inner)');
+    assert.equal(scopeNestedEntry.getPropertyValue('color'), 'red');
+  });
+
+  it('tokenizes @supports condition filtering selector() pseudo-functions and non-properties', () => {
+    const css = '@supports selector(div:hover) and (interpolate-size: allow-keywords) and (--custom: 1) { .a { opacity: 1; } }';
+    const sheet = parse(css);
+    const props = getDeclaredProperties(sheet);
+    assert.ok(props.has('interpolate-size'));
+    assert.ok(props.has('--custom'));
+    assert.ok(props.has('opacity'));
+    assert.equal(props.has('div'), false);
+    assert.equal(props.has('hover'), false);
+  });
+
+  it('computes exact line and column locations with CRLF (\\r\\n) newlines', () => {
+    const css = '/* header */\r\n.first {\r\n  color: red;\r\n}\r\n.second {\r\n  color: blue;\r\n}';
+    const sheet = parse(css);
+    const entries = Array.from(walkRules(sheet));
+    assert.equal(entries.length, 2);
+
+    const [first, second] = entries;
+    assert.equal(first.line, 2);
+    assert.equal(first.column, 1);
+    assert.equal(second.line, 5);
+    assert.equal(second.column, 1);
+  });
 });

@@ -17,20 +17,20 @@
 
 import { CSSRule, CSSGroupingRule } from './rules/base.ts';
 import {
-  CSSMediaRule,
   CSSSupportsRule,
-  CSSContainerRule,
-  CSSStartingStyleRule,
-  CSSKeyframesRule,
-  CSSKeyframeRule,
-  CSSLayerBlockRule,
   CSSScopeRule,
   CSSNestedDeclarations,
+  CSSKeyframesRule,
+  CSSKeyframeRule,
+  CSSPageRule,
+  CSSFontFaceRule,
+  CSSMarginRule,
 } from './rules/at-rules.ts';
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { LONGHAND_TO_SHORTHAND } from './shorthands.ts';
 import { resolveNestedSelector } from './cascade/rule-filter.ts';
+import { tokenize } from './tokenizer.ts';
 
 export interface RuleWalkEntry {
   readonly rule: CSSRule;
@@ -54,66 +54,46 @@ export interface StyleRuleWalkEntry extends RuleWalkEntry {
   readonly style: CSSStyleDeclaration;
 }
 
-function formatAtRule(rule: CSSRule): string | null {
-  if (rule instanceof CSSMediaRule) return `@media ${rule.conditionText}`;
-  if (rule instanceof CSSSupportsRule) return `@supports ${rule.conditionText}`;
-  if (rule instanceof CSSContainerRule) return `@container ${rule.conditionText}`;
-  if (rule instanceof CSSStartingStyleRule) return '@starting-style';
-  if (rule instanceof CSSKeyframesRule) return `@keyframes ${rule.name}`.trim();
-  if (rule instanceof CSSLayerBlockRule) return `@layer ${rule.name}`.trim();
-  if (rule instanceof CSSScopeRule) {
-    const s = rule.startSelector ? (rule.startSelector.startsWith('(') ? ` ${rule.startSelector}` : ` (${rule.startSelector})`) : '';
-    const e = rule.endSelector ? (rule.endSelector.startsWith('(') ? ` to ${rule.endSelector}` : ` to (${rule.endSelector})`) : '';
-    return `@scope${s}${e}`;
-  }
-  return null;
-}
-
-function findParentStyleSelector(ancestors: readonly CSSRule[], map: WeakMap<CSSRule, string>): string | null {
-  for (let i = ancestors.length - 1; i >= 0; i--) {
-    const a = ancestors[i];
-    if (a instanceof CSSStyleRule) return map.get(a) ?? a.selectorText;
-  }
-  return null;
+function getRuleStyle(rule: CSSRule): CSSStyleDeclaration | null {
+  return (
+    rule instanceof CSSStyleRule ||
+    rule instanceof CSSNestedDeclarations ||
+    rule instanceof CSSKeyframeRule ||
+    rule instanceof CSSPageRule ||
+    rule instanceof CSSFontFaceRule ||
+    rule instanceof CSSMarginRule
+  ) ? rule.style : null;
 }
 
 export function* walkRules(
   root: CSSStyleSheet | CSSGroupingRule | CSSKeyframesRule | Iterable<CSSRule>,
 ): Generator<RuleWalkEntry> {
-  const resolvedSelectorMap = new WeakMap<CSSRule, string>();
-
   function* walkItem(
     rule: CSSRule,
     ancestors: readonly CSSRule[],
     parentRule: CSSRule | null,
     parentAtRule: string | null,
+    parentSelector: string | null,
   ): Generator<RuleWalkEntry> {
-    let selectorText: string | null = null;
-    let rawSelectorText: string | null = null;
+    let selectorText: string | null = null, rawSelectorText: string | null = null, childSelector = parentSelector;
 
     if (rule instanceof CSSStyleRule) {
       rawSelectorText = rule.selectorText;
-      const parent = findParentStyleSelector(ancestors, resolvedSelectorMap);
-      selectorText = parent ? resolveNestedSelector(rule.selectorText, parent) : rule.selectorText;
-      resolvedSelectorMap.set(rule, selectorText);
+      selectorText = childSelector = parentSelector && parentSelector !== ':scope'
+        ? resolveNestedSelector(rule.selectorText, parentSelector)
+        : rule.selectorText;
+    } else if (rule instanceof CSSScopeRule) {
+      childSelector = ':scope';
     } else if (rule instanceof CSSNestedDeclarations) {
-      selectorText = findParentStyleSelector(ancestors, resolvedSelectorMap) ?? (ancestors.some(a => a instanceof CSSScopeRule) ? ':scope' : '');
-      rawSelectorText = selectorText;
+      selectorText = rawSelectorText = parentSelector ?? '';
     } else if (rule instanceof CSSKeyframeRule) {
-      selectorText = rule.keyText;
-      rawSelectorText = rule.keyText;
-    } else if ('selectorText' in rule && typeof (rule as { selectorText?: unknown }).selectorText === 'string') {
-      selectorText = (rule as { selectorText: string }).selectorText;
-      rawSelectorText = selectorText;
+      selectorText = rawSelectorText = rule.keyText;
+    } else if (rule instanceof CSSPageRule) {
+      selectorText = rawSelectorText = rule.selectorText;
     }
 
-    const style = 'style' in rule && (rule as { style?: unknown }).style instanceof CSSStyleDeclaration
-      ? ((rule as { style: CSSStyleDeclaration }).style)
-      : null;
-
-    const declarations = style
-      ? style._declarations.map(d => ({ property: d.name, value: style.getPropertyValue(d.name), important: d.important }))
-      : [];
+    const style = getRuleStyle(rule);
+    let cachedDecls: readonly { property: string; value: string; important: boolean }[] | null = null;
 
     yield {
       rule,
@@ -125,31 +105,34 @@ export function* walkRules(
       selectorText,
       rawSelectorText,
       style,
-      declarations,
-      getPropertyValue: (property: string) => style ? (style.getPropertyValue(property) || null) : null,
-      hasProperty: (property: string) => {
+      get declarations() {
+        return cachedDecls ??= style
+          ? style._declarations.map(d => ({ property: d.name, value: style.getPropertyValue(d.name), important: d.important }))
+          : [];
+      },
+      getPropertyValue: (p: string) => style ? (style.getPropertyValue(p) || null) : null,
+      hasProperty: (p: string) => {
         if (!style) return false;
-        const norm = property.startsWith('--') ? property : property.toLowerCase();
-        return style._declMap.has(norm) || style.getPropertyValue(norm) !== '';
+        const norm = p.startsWith('--') ? p : p.toLowerCase();
+        return style._declarations.some(d => d.name === norm) || style.getPropertyValue(norm) !== '';
       },
     };
 
     if (rule instanceof CSSGroupingRule || rule instanceof CSSKeyframesRule) {
-      const childAtRule = formatAtRule(rule) ?? parentAtRule;
+      const brace = rule.cssText.indexOf('{');
+      const childAt = !(rule instanceof CSSStyleRule) && brace !== -1 ? rule.cssText.slice(0, brace).trim() : parentAtRule;
       const nextAncestors = [...ancestors, rule];
       for (const child of rule.cssRules) {
-        if (child) yield* walkItem(child, nextAncestors, rule, childAtRule);
+        if (child) yield* walkItem(child, nextAncestors, rule, childAt, childSelector);
       }
     }
   }
 
   const items = root instanceof CSSStyleSheet || root instanceof CSSGroupingRule || root instanceof CSSKeyframesRule
     ? root.cssRules
-    : root instanceof CSSRule
-      ? [root]
-      : root;
+    : root instanceof CSSRule ? [root] : root;
   for (const rule of items) {
-    if (rule) yield* walkItem(rule, [], null, null);
+    if (rule) yield* walkItem(rule, [], null, null, null);
   }
 }
 
@@ -158,12 +141,8 @@ export function* walkStyleRules(
 ): Generator<StyleRuleWalkEntry> {
   for (const entry of walkRules(root)) {
     if (
-      (entry.rule instanceof CSSStyleRule ||
-       entry.rule instanceof CSSNestedDeclarations ||
-       entry.rule instanceof CSSKeyframeRule) &&
-      entry.style !== null &&
-      entry.selectorText !== null &&
-      entry.rawSelectorText !== null
+      (entry.rule instanceof CSSStyleRule || entry.rule instanceof CSSNestedDeclarations || entry.rule instanceof CSSKeyframeRule) &&
+      entry.style && entry.selectorText !== null && entry.rawSelectorText !== null
     ) {
       yield entry as StyleRuleWalkEntry;
     }
@@ -175,29 +154,43 @@ export function getDeclaredProperties(
   options?: { includeSupports?: boolean },
 ): Set<string> {
   const properties = new Set<string>();
-  const includeSupports = options?.includeSupports !== false;
-
-  for (const entry of walkRules(root)) {
-    const { rule, style } = entry;
+  for (const { rule, style } of walkRules(root)) {
     if (style) {
       for (const d of style._declarations) {
         const prop = d.name.startsWith('--') ? d.name : d.name.toLowerCase();
         properties.add(prop);
-        const parentShorthands = LONGHAND_TO_SHORTHAND[prop];
-        if (parentShorthands) {
-          for (const sh of parentShorthands) {
+        const shorthands = LONGHAND_TO_SHORTHAND[prop];
+        if (shorthands) {
+          for (const sh of shorthands) {
             if (style.getPropertyValue(sh) !== '') properties.add(sh.toLowerCase());
           }
         }
       }
     }
-    if (includeSupports && rule instanceof CSSSupportsRule && rule.conditionText) {
-      const matches = rule.conditionText.matchAll(/\(\s*([a-zA-Z-][a-zA-Z0-9-]*)\s*:/g);
-      for (const m of matches) {
-        if (m[1]) properties.add(m[1].toLowerCase());
+    if (options?.includeSupports !== false && rule instanceof CSSSupportsRule && rule.conditionText) {
+      const tokens = tokenize(rule.conditionText);
+      for (let i = 0; i < tokens.length; i++) {
+        const t = tokens[i];
+        if (t.type === 'function' && t.value.toLowerCase() === 'selector') {
+          let depth = 1;
+          while (++i < tokens.length && depth > 0) {
+            if (tokens[i].type === 'function' || tokens[i].type === '(') depth++;
+            else if (tokens[i].type === ')') depth--;
+          }
+        } else if (t.type === '(') {
+          let j = i + 1;
+          while (j < tokens.length && tokens[j].type === 'whitespace') j++;
+          if (j < tokens.length && tokens[j].type === 'ident') {
+            const identTok = tokens[j];
+            let k = j + 1;
+            while (k < tokens.length && tokens[k].type === 'whitespace') k++;
+            if (k < tokens.length && tokens[k].type === 'colon' && typeof identTok.value === 'string') {
+              properties.add(identTok.value.startsWith('--') ? identTok.value : identTok.value.toLowerCase());
+            }
+          }
+        }
       }
     }
   }
-
   return properties;
 }

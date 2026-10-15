@@ -198,7 +198,9 @@ export function getRuleHeader(rule: CSSRule, source?: string): string {
 }
 
 function getChildRules(rule: CSSRule): CSSRule[] {
-  return rule instanceof CSSGroupingRule ? Array.from(rule.cssRules).filter(r => Boolean(r.location)) : [];
+  return rule instanceof CSSGroupingRule
+    ? Array.from(rule.cssRules).filter(r => Boolean(r.location) && !(r instanceof CSSNestedDeclarations))
+    : [];
 }
 
 function isGroupingRule(rule: CSSRule): boolean {
@@ -338,13 +340,6 @@ export function pruneUnusedCss(
     const loc = rule.location;
     if (!loc) return false;
     const header = getRuleHeader(rule, css);
-
-    // 0. Declarations inside an active rule belong to their enclosing rule
-    if (rule instanceof CSSNestedDeclarations) {
-      retainedRules.push(header);
-      retainedSet.add(rule);
-      return true;
-    }
 
     // 1. TIER 2: Guaranteed Preserves - Structural at-rules
     if (

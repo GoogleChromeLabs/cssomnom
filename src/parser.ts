@@ -184,35 +184,20 @@ export class Parser {
   }
 
   public options: ParserOptions;
-  private rawTokens?: Token[];
   private lineStarts?: number[];
 
   constructor(tokens: TokenStream | Token[], options: ParserOptions = {}) {
     this.options = options;
-    if (Array.isArray(tokens)) {
-      this.rawTokens = tokens;
-      this.tokens = new ArrayTokenStream(tokens);
-    } else {
-      this.tokens = tokens;
-    }
+    this.tokens = Array.isArray(tokens) ? new ArrayTokenStream(tokens) : tokens;
   }
 
   private getLineStarts(): number[] {
     if (this.lineStarts) return this.lineStarts;
     const starts: number[] = [0];
     if (this.options.source) {
-      const s = this.options.source;
+      const s = this.options.source.replace(/\r\n|\r|\f/g, '\n');
       let pos = 0;
       while ((pos = s.indexOf('\n', pos)) !== -1) starts.push(++pos);
-    } else if (this.rawTokens) {
-      for (const t of this.rawTokens) {
-        const text = t.originalText ?? (typeof t.value === 'string' ? t.value : undefined);
-        if (text && text.includes('\n')) {
-          let pos = 0;
-          const base = t.startIndex ?? 0;
-          while ((pos = text.indexOf('\n', pos)) !== -1) starts.push(base + ++pos);
-        }
-      }
     }
     return (this.lineStarts = starts);
   }
@@ -235,8 +220,15 @@ export class Parser {
   }
 
   private makeLocation(start: number, end: number, bodyStart?: number, bodyEnd?: number): RuleSourceLocation {
-    const { line, column } = this.getLineColumn(start);
-    return { start, end, line, column, bodyStart, bodyEnd };
+    const parser = this;
+    return {
+      start,
+      end,
+      bodyStart,
+      bodyEnd,
+      get line(): number { return parser.getLineColumn(start).line; },
+      get column(): number { return parser.getLineColumn(start).column; },
+    };
   }
 
   private createBlockLocation(start: number, block: SimpleBlock): RuleSourceLocation {
@@ -1057,12 +1049,8 @@ export class Parser {
       return j;
     };
 
-    let endIndex = (firstValue as Token).endIndex;
-    const initialLastIdx = lastNonWsIndex(declValue.length - 1);
-    if (initialLastIdx >= 0) {
-      const lastTok = declValue[initialLastIdx];
-      endIndex = getComponentValueEndIndex(lastTok) ?? (lastTok as Token).endIndex ?? endIndex;
-    }
+    const lastNonWs = declValue[lastNonWsIndex(declValue.length - 1)];
+    const endIndex = (lastNonWs && (getComponentValueEndIndex(lastNonWs) ?? (lastNonWs as Token).endIndex)) ?? (firstValue as Token).endIndex;
 
     const i1 = lastNonWsIndex(declValue.length - 1);
     const t1 = declValue[i1];
@@ -1256,17 +1244,6 @@ export class Parser {
         return null;
       }
       selectorText = serialize(prelude).trim();
-    }
-
-    for (const item of nestedRules) {
-      if (item instanceof CSSNestedDeclarations && !item.location) {
-        const d = item.style._declarations;
-        if (d.length > 0 && d[0].startIndex !== undefined) {
-          const start = d[0].startIndex;
-          const end = d[d.length - 1].endIndex ?? start;
-          item._location = this.makeLocation(start, end, start, end);
-        }
-      }
     }
 
     const rule = new CSSStyleRule(selectorText, declarations, nestedRules, parseRuleInBlock, selectorAST);

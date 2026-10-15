@@ -113,8 +113,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   [index: number]: string;
   [property: string]: unknown;
   public _declarations: Declaration[];
-  /** @internal */
-  public _declMap: Map<string, Declaration>;
+  private _declMap: Map<string, Declaration>;
   /** @internal */
   _readonly: boolean;
   /** @internal */

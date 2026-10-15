@@ -403,12 +403,6 @@ export interface InternalRuleMetadata {
   _parentStyleSheet?: CSSStyleSheet | null;
 }
 
-export interface InternalStyleSheet {
-  _ownerRule?: CSSRule | null;
-  _parentStyleSheet?: CSSStyleSheet | null;
-  _href?: string | null;
-}
-
 export interface InternalStyleDeclaration {
   _readonly?: boolean;
   declarations?: Declaration[];
