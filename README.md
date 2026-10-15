@@ -65,6 +65,48 @@ const nestedBodyRule = mediaRule.cssRules[0] as CSSStyleRule;
 console.log(nestedBodyRule.style.getPropertyValue('margin')); // '0'
 ```
 
+### Static Analysis Traversal & Property Indexing (`walkStyleRules`, `walkRules`, `getDeclaredProperties`)
+
+Use `walkStyleRules`, `walkRules`, and `getDeclaredProperties` to inspect stylesheets without hand-rolling recursive visitors, selector resolution, or shorthand expansion maps:
+
+```typescript
+import { parse, walkStyleRules, walkRules, getDeclaredProperties } from 'cssomnom';
+
+const css = `
+  .card {
+    border: 1px solid red;
+    @media (min-width: 600px) {
+      color: blue;
+      & .title { font-weight: bold; }
+    }
+  }
+  @supports (interpolate-size: allow-keywords) {
+    :root { interpolate-size: allow-keywords; }
+  }
+`;
+
+const sheet = parse(css);
+
+// 1. Walk all style-bearing rules (CSSStyleRule, CSSNestedDeclarations, CSSKeyframeRule)
+for (const entry of walkStyleRules(sheet)) {
+  console.log({
+    selector: entry.selectorText,       // '.card', '.card' (inherited on CSSNestedDeclarations), ':is(.card) .title', ':root'
+    rawSelector: entry.rawSelectorText, // '.card', '.card', '& .title', ':root'
+    parentAtRule: entry.parentAtRule,   // null, '@media (min-width: 600px)', '@supports (interpolate-size: allow-keywords)'
+    line: entry.line,                   // 1-based line number from rule.location.line
+    column: entry.column,               // 1-based column number from rule.location.column
+    hasBorder: entry.hasProperty('border'),             // true on .card (shorthand-aware!)
+    borderColor: entry.getPropertyValue('border-color') // 'red' (contracts longhands!)
+  });
+}
+
+// 2. Collect every declared property across the stylesheet (longhands, parent shorthands, and @supports features)
+const props = getDeclaredProperties(sheet);
+console.log(props.has('border'));           // true (parent shorthand indexed alongside border-top-width, etc.)
+console.log(props.has('border-color'));     // true
+console.log(props.has('interpolate-size')); // true (from both style rules and @supports conditions)
+```
+
 ### CSS Typed OM
 
 Parse and manipulate CSS values directly as objects instead of strings using the CSS Typed OM API.
@@ -292,6 +334,9 @@ These APIs are custom utilities for static analysis, cascading, variable resolut
     - `Parser.isCustomPropertyDeclaration(decl)`: Checks whether a declaration represents a custom property.
 - **Standalone Top-Level Utilities**:
     - `parse(css)`: Direct parser returning a constructable `CSSStyleSheet`.
+    - `walkRules(root)`: Pre-order generator yielding [`RuleWalkEntry`](./src/walk.ts) (`rule`, `ancestors`, `parentRule`, `parentAtRule`, `line`, `column`, `selectorText`, `rawSelectorText`, `style`, `declarations`, `getPropertyValue()`, `hasProperty()`).
+    - `walkStyleRules(root)`: Filtered generator yielding [`StyleRuleWalkEntry`](./src/walk.ts) for style-bearing rules (`CSSStyleRule`, `CSSNestedDeclarations`, `CSSKeyframeRule`).
+    - `getDeclaredProperties(root, options?)`: Collects a `Set<string>` of all declared CSS property names across the stylesheet, including parent shorthands (`border`, `border-color`, `outline`, `overflow`, `padding`, `margin`, `line-clamp`, etc.) and `@supports` feature queries (`{ includeSupports?: boolean }`, default `true`).
     - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
     - `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
     - `getCascadedStyle(element, rules)`: Standalone cascading function.
