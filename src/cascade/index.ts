@@ -24,7 +24,8 @@ import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapp
 import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
 import { HTML_UA_STYLESHEET_TEXT } from '../data/gen/ua-stylesheet.ts';
 import { ParseHooks } from '../parse-hooks.ts';
-import type { Rule, CSSRuleList, Declaration, InternalStyleDeclaration, ElementLike } from '../types.ts';
+import type { Rule, Declaration, InternalStyleDeclaration, ElementLike } from '../types.ts';
+import type { CSSRuleList } from '../rules/collections.ts';
 import type { MatchedDeclaration } from './types.ts';
 
 // Domain Modules

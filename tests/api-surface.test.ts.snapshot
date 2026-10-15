@@ -92,6 +92,7 @@ exports[`API Surface Area 1`] = `
   "createCSSStyleValue",
   "escape",
   "getCascadedStyle",
+  "getDeclaredProperties",
   "matches",
   "parse",
   "parseCommaValueListSync",
@@ -113,7 +114,9 @@ exports[`API Surface Area 1`] = `
   "querySelectorAll",
   "serialize",
   "supports",
-  "tokenize"
+  "tokenize",
+  "walkRules",
+  "walkStyleRules"
 ]
 `;
 

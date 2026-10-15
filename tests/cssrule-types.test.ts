@@ -14,24 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { CSSRule, CSSRuleConstructor } from '../src/types.ts';
+import { CSSRule } from '../src/index.ts';
 
-// This should fail in Red phase because CSSRuleConstructor does not exist.
-const ctor: CSSRuleConstructor = {
-  prototype: {} as unknown as CSSRule,
-  STYLE_RULE: 1,
-  CHARSET_RULE: 2,
-  IMPORT_RULE: 3,
-  MEDIA_RULE: 4,
-  FONT_FACE_RULE: 5,
-  PAGE_RULE: 6,
-  KEYFRAMES_RULE: 7,
-  KEYFRAME_RULE: 8,
-  MARGIN_RULE: 9,
-  NAMESPACE_RULE: 10,
-  COUNTER_STYLE_RULE: 11,
-  SUPPORTS_RULE: 12,
-  FONT_FEATURE_VALUES_RULE: 14,
-};
-
+const ctor: typeof CSSRule = CSSRule;
 console.log(ctor);

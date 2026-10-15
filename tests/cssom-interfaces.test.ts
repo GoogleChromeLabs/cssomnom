@@ -31,7 +31,7 @@ import {
   StylePropertyMap
 } from '../src/index.ts';
 import { CSSStyleProperties } from '../src/data/gen/properties.ts';
-import type { StyleSheet } from '../src/types.ts';
+import type { StyleSheet } from '../src/index.ts';
 
 test('CSSRule interface and inheritance', () => {
   // https://drafts.csswg.org/cssom-1/#the-cssrule-interface

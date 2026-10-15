@@ -90,7 +90,7 @@ export class StyleSheet {
     return this._media;
   }
 
-  set media(value: string | import('./types.ts').MediaList | null) {
+  set media(value: string | MediaList | null) {
     if (value === null) {
       this._media.mediaText = '';
     } else if (typeof value === 'string') {

@@ -28,6 +28,7 @@ import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream }
 export interface ParserOptions {
   atRules?: Record<string, string>;
   allowVendorPseudos?: boolean;
+  source?: string;
 }
 import { SelectorParser } from './SelectorParser.ts';
 import { calculateSpecificity } from './specificity.ts';
@@ -49,12 +50,6 @@ function getComponentValueEndIndex(item?: ComponentValue): number | undefined {
     : ('endIndex' in item && typeof item.endIndex === 'number' ? item.endIndex : undefined);
 }
 
-function createBlockLocation(start: number, block: SimpleBlock): RuleSourceLocation {
-  const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
-  const bodyStart = block.associatedToken.endIndex;
-  const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
-  return { start, end, bodyStart, bodyEnd };
-}
 
 function trimComponentValues(values: ComponentValue[], trimEof = false): ComponentValue[] {
   let start = 0;
@@ -189,14 +184,66 @@ export class Parser {
   }
 
   public options: ParserOptions;
+  private rawTokens?: Token[];
+  private lineStarts?: number[];
 
   constructor(tokens: TokenStream | Token[], options: ParserOptions = {}) {
     this.options = options;
     if (Array.isArray(tokens)) {
+      this.rawTokens = tokens;
       this.tokens = new ArrayTokenStream(tokens);
     } else {
       this.tokens = tokens;
     }
+  }
+
+  private getLineStarts(): number[] {
+    if (this.lineStarts) return this.lineStarts;
+    const starts: number[] = [0];
+    if (this.options.source) {
+      const s = this.options.source;
+      let pos = 0;
+      while ((pos = s.indexOf('\n', pos)) !== -1) starts.push(++pos);
+    } else if (this.rawTokens) {
+      for (const t of this.rawTokens) {
+        const text = t.originalText ?? (typeof t.value === 'string' ? t.value : undefined);
+        if (text && text.includes('\n')) {
+          let pos = 0;
+          const base = t.startIndex ?? 0;
+          while ((pos = text.indexOf('\n', pos)) !== -1) starts.push(base + ++pos);
+        }
+      }
+    }
+    return (this.lineStarts = starts);
+  }
+
+  public getLineColumn(start: number): { line: number; column: number } {
+    if (start <= 0) return { line: 1, column: 1 };
+    const starts = this.getLineStarts();
+    let low = 0;
+    let high = starts.length - 1;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (starts[mid] <= start) {
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    const lineIdx = high >= 0 ? high : 0;
+    return { line: lineIdx + 1, column: (start - starts[lineIdx]) + 1 };
+  }
+
+  private makeLocation(start: number, end: number, bodyStart?: number, bodyEnd?: number): RuleSourceLocation {
+    const { line, column } = this.getLineColumn(start);
+    return { start, end, line, column, bodyStart, bodyEnd };
+  }
+
+  private createBlockLocation(start: number, block: SimpleBlock): RuleSourceLocation {
+    const end = block.endIndex ?? block.associatedToken.startIndex ?? start;
+    const bodyStart = block.associatedToken.endIndex;
+    const bodyEnd = block.endIndex !== undefined ? (block.isClosed ? block.endIndex - 1 : block.endIndex) : undefined;
+    return this.makeLocation(start, end, bodyStart, bodyEnd);
   }
 
   private reportError(message: string, token?: Token): void {
@@ -372,14 +419,14 @@ export class Parser {
       if (next.type === 'semicolon' || next.type === 'EOF') {
         const end = next.endIndex ?? next.startIndex ?? start;
         this.discardToken();
-        return this.finalizeAtRule(rule, undefined, nested, { start, end }, true);
+        return this.finalizeAtRule(rule, undefined, nested, this.makeLocation(start, end), true);
       } else if (next.type === '}') {
         if (nested) return null;
         this.consumeToken();
         rule.prelude.push(next);
       } else if (next.type === '{') {
         const block = this.consumeBlock(this.consumeToken());
-        return this.finalizeAtRule(rule, block, nested, createBlockLocation(start, block), true);
+        return this.finalizeAtRule(rule, block, nested, this.createBlockLocation(start, block), true);
       } else {
         rule.prelude.push(this.consumeComponentValue());
       }
@@ -567,7 +614,7 @@ export class Parser {
         const declarations = this.consumeDeclarationsFromBlockContents(blockVal.value);
         const keyframeRule = new CSSKeyframeRule(selectorText, declarations);
         const kfStart = getComponentValueStartIndex(prelude[0]) ?? blockVal.associatedToken.startIndex ?? 0;
-        keyframeRule._location = createBlockLocation(kfStart, blockVal);
+        keyframeRule._location = this.createBlockLocation(kfStart, blockVal);
         keyframeRules.push(keyframeRule);
       }
     }
@@ -852,7 +899,7 @@ export class Parser {
         }
         const bodyStart = blockToken.endIndex;
         const bodyEnd = term ? (term.startIndex ?? end) : end;
-        const location: RuleSourceLocation = { start, end, bodyStart, bodyEnd };
+        const location = this.makeLocation(start, end, bodyStart, bodyEnd);
         return this.createStyleRule(prelude, blockContents, nested, nested, location);
 
       } else {
@@ -900,7 +947,11 @@ export class Parser {
 
     const flushDecls = () => {
       if (decls.length > 0) {
-        rules.push(new CSSNestedDeclarations(decls));
+        const nestedDecl = new CSSNestedDeclarations(decls);
+        const start = decls[0].startIndex ?? 0;
+        const end = decls[decls.length - 1].endIndex ?? start;
+        nestedDecl._location = this.makeLocation(start, end, start, end);
+        rules.push(nestedDecl);
         decls = [];
       }
     };
@@ -922,7 +973,13 @@ export class Parser {
         const isDecl = nested && this.isNestedDeclarationAhead(stream);
         if (isDecl) {
           const decl = this.consumeDeclarationFromStream(stream);
-          if (decl) decls.push(decl);
+          if (decl) {
+            if (stream.peek().type === 'semicolon') {
+              const semi = stream.next() as Token;
+              if (semi.endIndex !== undefined) decl.endIndex = semi.endIndex;
+            }
+            decls.push(decl);
+          }
         } else {
           stream.position = pos;
           const rule = this.consumeNestedQualifiedRuleFromStream(stream, isNestedStyleRule, 'semicolon', allowRelative);
@@ -967,6 +1024,7 @@ export class Parser {
   private consumeDeclarationFromStream(stream: ComponentValueStream): Declaration | null {
     const firstValue = stream.peek();
     if (firstValue.type !== 'ident') return null;
+    const startIndex = getComponentValueStartIndex(firstValue) ?? (firstValue as Token).startIndex;
     stream.next();
     const name = firstValue.value;
     if (name === '--') return null;
@@ -998,6 +1056,13 @@ export class Parser {
       while (j >= 0 && declValue[j].type === 'whitespace') j--;
       return j;
     };
+
+    let endIndex = (firstValue as Token).endIndex;
+    const initialLastIdx = lastNonWsIndex(declValue.length - 1);
+    if (initialLastIdx >= 0) {
+      const lastTok = declValue[initialLastIdx];
+      endIndex = getComponentValueEndIndex(lastTok) ?? (lastTok as Token).endIndex ?? endIndex;
+    }
 
     const i1 = lastNonWsIndex(declValue.length - 1);
     const t1 = declValue[i1];
@@ -1042,6 +1107,8 @@ export class Parser {
       value: declValue,
       important,
       raw: name.startsWith('--') ? getOriginalText(declValue) : undefined,
+      startIndex,
+      endIndex,
     };
   }
 
@@ -1089,7 +1156,7 @@ export class Parser {
         const block = val as SimpleBlock;
         const blockContents = this.consumeBlockContents(new ArrayComponentValueStream(block.value), true);
         const start = getComponentValueStartIndex(prelude[0]) ?? block.associatedToken.startIndex ?? 0;
-        return this.createStyleRule(prelude, blockContents, nested, allowRelative, createBlockLocation(start, block));
+        return this.createStyleRule(prelude, blockContents, nested, allowRelative, this.createBlockLocation(start, block));
       }
       prelude.push(stream.next());
     }
@@ -1111,13 +1178,13 @@ export class Parser {
       if (val.type === 'semicolon') {
         const semiToken = stream.next() as Token;
         const end = semiToken.endIndex ?? semiToken.startIndex ?? start;
-        return this.finalizeAtRule(rule, undefined, nested, { start, end }, false);
+        return this.finalizeAtRule(rule, undefined, nested, this.makeLocation(start, end), false);
       } else if (val.type === 'EOF' || val.type === '}') {
         const end = (val as Token).startIndex ?? start;
-        return this.finalizeAtRule(rule, undefined, nested, { start, end }, false);
+        return this.finalizeAtRule(rule, undefined, nested, this.makeLocation(start, end), false);
       } else if (val.type === 'simple-block' && (val as SimpleBlock).associatedToken.type === '{') {
         const block = stream.next() as SimpleBlock;
-        return this.finalizeAtRule(rule, block, nested, createBlockLocation(start, block), false);
+        return this.finalizeAtRule(rule, block, nested, this.createBlockLocation(start, block), false);
       } else {
         rule.prelude.push(stream.next());
       }
@@ -1189,6 +1256,17 @@ export class Parser {
         return null;
       }
       selectorText = serialize(prelude).trim();
+    }
+
+    for (const item of nestedRules) {
+      if (item instanceof CSSNestedDeclarations && !item.location) {
+        const d = item.style._declarations;
+        if (d.length > 0 && d[0].startIndex !== undefined) {
+          const start = d[0].startIndex;
+          const end = d[d.length - 1].endIndex ?? start;
+          item._location = this.makeLocation(start, end, start, end);
+        }
+      }
     }
 
     const rule = new CSSStyleRule(selectorText, declarations, nestedRules, parseRuleInBlock, selectorAST);
@@ -1348,7 +1426,7 @@ export class Parser {
   }
 
   public static parseRuleText(text: string): Rule {
-    const parser = new Parser(tokenize(text));
+    const parser = new Parser(tokenize(text), { source: text });
     const rule = parser.consumeRule();
     if (!rule) throw new DOMException('Syntax error', 'SyntaxError');
     parser.ensureEOF();
@@ -1356,7 +1434,7 @@ export class Parser {
   }
 
   public static parseStyleSheetText(text: string): Rule[] {
-    return new Parser(tokenize(text)).consumeListOfRules(true);
+    return new Parser(tokenize(text), { source: text }).consumeListOfRules(true);
   }
 
   // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
@@ -1741,5 +1819,5 @@ ParseHooks.assembleUnicodeRanges = (values) => assembleUnicodeRanges(values);
 ParseHooks.isValidDashedIdent = (name) => Parser.isValidDashedIdent(name);
 
 export function parse(css: string, options?: ParserOptions): CSSStyleSheet {
-  return new Parser(tokenize(css), options).parseStyleSheet();
+  return new Parser(tokenize(css), { source: css, ...options }).parseStyleSheet();
 }

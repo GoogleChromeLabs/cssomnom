@@ -23,6 +23,7 @@ import {
   CSSMediaRule,
   CSSKeyframesRule,
   CSSFontFaceRule,
+  CSSNestedDeclarations,
 } from '../src/index.ts';
 
 describe('CSSRule.prototype.location: Source position tracking', () => {
@@ -208,5 +209,84 @@ describe('CSSRule.prototype.location: Source position tracking', () => {
     assert.equal(toRule.location.end, css4.length);
     assert.equal(toRule.location.bodyEnd, css4.length);
     assert.equal(css4.slice(toRule.location.bodyStart, toRule.location.bodyEnd), ' opacity: 1');
+  });
+
+  it('computes 1-based line and column on rules', () => {
+    const css = [
+      '/* line 1 */',
+      '/* line 2 */',
+      '.btn {',
+      '  color: red;',
+      '}',
+      '',
+      '@media (min-width: 600px) {',
+      '  .card {',
+      '    padding: 10px;',
+      '  }',
+      '}',
+    ].join('\n');
+
+    const sheet = parse(css);
+    assert.equal(sheet.cssRules.length, 2);
+
+    const btnRule = sheet.cssRules[0] as CSSStyleRule;
+    assert.ok(btnRule.location);
+    assert.equal(btnRule.location.line, 3);
+    assert.equal(btnRule.location.column, 1);
+
+    const mediaRule = sheet.cssRules[1] as CSSMediaRule;
+    assert.ok(mediaRule.location);
+    assert.equal(mediaRule.location.line, 7);
+    assert.equal(mediaRule.location.column, 1);
+
+    const cardRule = mediaRule.cssRules[0] as CSSStyleRule;
+    assert.ok(cardRule.location);
+    assert.equal(cardRule.location.line, 8);
+    assert.equal(cardRule.location.column, 3);
+  });
+
+  it('tracks location on CSSNestedDeclarations', () => {
+    const css = [
+      '.card {',
+      '  padding: 10px;',
+      '  @media (min-width: 600px) {',
+      '    color: red;',
+      '    background: blue;',
+      '  }',
+      '  & .title {',
+      '    font-size: 16px;',
+      '  }',
+      '  margin: 20px;',
+      '}',
+    ].join('\n');
+
+    const sheet = parse(css);
+    const cardRule = sheet.cssRules[0] as CSSStyleRule;
+    assert.ok(cardRule);
+
+    // cardRule.cssRules[0] is the nested @media rule
+    const mediaRule = cardRule.cssRules[0] as CSSMediaRule;
+    assert.ok(mediaRule);
+    assert.equal(mediaRule.cssRules.length, 1);
+
+    // Inside @media, the bare declarations produce a CSSNestedDeclarations rule
+    const nestedDecls1 = mediaRule.cssRules[0];
+    assert.ok(nestedDecls1 instanceof CSSNestedDeclarations);
+    assert.ok(nestedDecls1.location);
+    assert.equal(nestedDecls1.location.line, 4);
+    assert.equal(nestedDecls1.location.column, 5);
+    const slice1 = css.slice(nestedDecls1.location.start, nestedDecls1.location.end);
+    assert.ok(slice1.includes('color: red;'));
+    assert.ok(slice1.includes('background: blue;'));
+
+    // cardRule.cssRules[1] is & .title
+    // cardRule.cssRules[2] is trailing margin: 20px; (CSSNestedDeclarations)
+    const nestedDecls2 = cardRule.cssRules[2];
+    assert.ok(nestedDecls2 instanceof CSSNestedDeclarations);
+    assert.ok(nestedDecls2.location);
+    assert.equal(nestedDecls2.location.line, 10);
+    assert.equal(nestedDecls2.location.column, 3);
+    const slice2 = css.slice(nestedDecls2.location.start, nestedDecls2.location.end);
+    assert.ok(slice2.includes('margin: 20px;'));
   });
 });

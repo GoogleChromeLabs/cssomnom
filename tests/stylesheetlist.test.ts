@@ -17,7 +17,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import * as CSSOM from '../src/index.ts';
-import type { StyleSheetList } from '../src/types.ts';
+import type { StyleSheetList } from '../src/index.ts';
 
 test('StyleSheetList.item() returns CSSStyleSheet', () => {
   const sheetList = new CSSOM.StyleSheetList([new CSSOM.CSSStyleSheet()]) as unknown as StyleSheetList;

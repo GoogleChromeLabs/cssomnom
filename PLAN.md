@@ -657,8 +657,30 @@ Currently, `src/matcher.ts` uses basic prefix matching (`elementLang === clean |
 - [ ] **XML Document `xml:lang` Attribute Semantics**:
   - Support `xml:lang` lookup in XML documents while ignoring it in HTML documents per CSS Selectors 4 / HTML specification.
 
-## Phase 155: One CSSOM Type Per Interface — Reconcile `types.ts` Interfaces with Concrete Classes [ ]
-**Objective**: [types.ts](./src/types.ts) declares hand-written WebIDL-shaped interfaces (`CSSRule`, `CSSStyleSheet`, …) that diverge from the concrete classes ([rules/base.ts](./src/rules/base.ts), [CSSOM.ts](./src/CSSOM.ts)). With `Rule = CSSRule` (Phase 153) the two `CSSRule`s are not assignable to each other (found while fixing Phase 153; 18 errors in 7 files). Pick one source of truth (likely type-only re-exports of the classes), delete the redundant interfaces, and keep the ParseHooks rule. Needs a short design discussion first: public `.d.ts` shape and API snapshot impact.
+## Phase 155: One CSSOM Type Per Interface — Reconcile `types.ts` Interfaces with Concrete Classes [x]
+**Objective**: [types.ts](./src/types.ts) declares hand-written WebIDL-shaped interfaces (`CSSRule`, `CSSStyleSheet`, …) that diverge from the concrete classes ([rules/base.ts](./src/rules/base.ts), [CSSOM.ts](./src/CSSOM.ts)). With `Rule = CSSRule` (Phase 153) the two `CSSRule`s are not assignable to each other (found while fixing Phase 153; 18 errors in 7 files). Pick one source of truth (type-only re-exports of the concrete classes), delete the redundant interfaces (~205 lines in `src/types.ts`), and keep the ParseHooks rule.
+
+### Tasks
+- [x] Delete the redundant WebIDL-shaped CSSOM interfaces in `src/types.ts` (`StyleSheet`, `CSSStyleSheet`, `StyleSheetList`, `LinkStyle`, `CSSRuleList`, `CSSRuleConstants`, `CSSRule`, `CSSRuleConstructor`, `CSSGroupingRule`, `CSSConditionRule`, `CSSStyleRule`, `CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSStartingStyleRule`, `CSSScopeRule`, `CSSViewTransitionRule`, `CSSPropertyRule`, `MediaList`, `CSSCustomMediaRule`, `CSSImportRule`, `CSSNamespaceRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSNestedDeclarations`) and point internal type imports (`src/CSSStyleDeclaration.ts`, `src/cascade/index.ts`, `src/cascade/rule-filter.ts`, `src/types.ts`) directly to the concrete classes in `src/rules/base.ts` and `src/rules/collections.ts`.
+
+## Phase 156: Static Analysis Offering — Line/Column Locations, `walkRules` / `walkStyleRules`, and `getDeclaredProperties` [x]
+**Objective**: Provide first-class static analysis primitives so downstream scanners (`guidance`'s `css-scanner.ts`), graders (`guidance/guides/**/grader.ts`), and refactoring tools (`skills/bulk-css-operation/`) do not need to reinvent rule traversal, `indexOf`-based line/column lookup, nested `&` / `CSSNestedDeclarations` selector resolution, or shorthand-broken declaration maps. Achieve a net-negative `src/` line delta alongside Phase 155.
+
+### Tasks
+- [x] **1-Based `line` and `column` on `RuleSourceLocation` + `CSSNestedDeclarations` Locations (`src/types.ts`, `src/parser.ts`)**:
+  - Extend `RuleSourceLocation` with 1-based `line: number` and `column: number` corresponding to `start`.
+  - Compute `line` and `column` via a lazy binary-search newline offset table in `src/parser.ts` (avoiding per-token memory bloat).
+  - Attach `_location` to `CSSNestedDeclarations` in `Parser.consumeBlockContents` (`src/parser.ts`) so nested declaration blocks inside `@media` / style rules have accurate `start`, `end`, `line`, and `column`.
+- [x] **Static Analysis Rule Traversal & Property Queries (`src/walk.ts`, `src/index.ts`)**:
+  - Implement `walkRules(root)` and `walkStyleRules(root)` in `src/walk.ts` (re-exported from `src/index.ts`), descending into `CSSGroupingRule.cssRules` and `CSSKeyframesRule.cssRules`.
+  - Track `ancestors: readonly CSSRule[]`, `parentRule: CSSRule | null`, and `parentAtRule: string | null` (`@media ...`, `@supports ...`, `@container ...`, `@starting-style`, `@keyframes ...`, `@layer ...`, `@scope ...`).
+  - Resolve `selectorText` for nested `CSSStyleRule`s using `resolveNestedSelector` (`src/cascade/rule-filter.ts`), inherit `selectorText` for `CSSNestedDeclarations` from the enclosing `CSSStyleRule` (or `':scope'` inside `@scope`), and use `rule.keyText` for `CSSKeyframeRule`.
+  - Provide `getPropertyValue(prop)` (returning `string | null` with full shorthand contraction), `hasProperty(prop)` (supporting both direct `_declMap` lookup and contracted shorthands like `border`, `border-color`, `outline`, `overflow`), and `declarations` (`readonly { property: string; value: string; important: boolean }[]`) on walked entries so `StyleRuleWalkEntry` structurally satisfies `guidance`'s `CssRuleView`.
+  - Implement `getDeclaredProperties(root, options?: { includeSupports?: boolean }): Set<string>` collecting lowercase declared property names, their contracted parent shorthands via `LONGHAND_TO_SHORTHAND`, and (when `includeSupports !== false`) property names queried inside `@supports (...)` conditions.
+- [x] **Unit Tests, Documentation & Quality Loop (`tests/rule-location.test.ts`, `tests/walk.test.ts`, `ARCHITECTURE.md`, `README.md`)**:
+  - Add Red/Green unit tests in `tests/rule-location.test.ts` and `tests/walk.test.ts`.
+  - Update `ARCHITECTURE.md` and `README.md` to document `walkRules`, `walkStyleRules`, `getDeclaredProperties`, and `rule.location.{line,column}`.
+  - Verify `pnpm run preflight` passes and net `src/` line delta is negative.
 
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**

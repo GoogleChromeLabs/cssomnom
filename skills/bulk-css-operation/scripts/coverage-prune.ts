@@ -28,6 +28,7 @@ import {
   CSSImportRule,
   CSSNamespaceRule,
   CSSScopeRule,
+  CSSNestedDeclarations,
 } from '../../../src/index.ts';
 import { serializeSelectorList } from '../../../src/serializer.ts';
 import type {
@@ -337,6 +338,13 @@ export function pruneUnusedCss(
     const loc = rule.location;
     if (!loc) return false;
     const header = getRuleHeader(rule, css);
+
+    // 0. Declarations inside an active rule belong to their enclosing rule
+    if (rule instanceof CSSNestedDeclarations) {
+      retainedRules.push(header);
+      retainedSet.add(rule);
+      return true;
+    }
 
     // 1. TIER 2: Guaranteed Preserves - Structural at-rules
     if (

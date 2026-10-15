@@ -40,9 +40,9 @@ import { matches, isElement } from '../matcher.ts';
 import type { DOMElement } from '../matcher.ts';
 import { ParseHooks } from '../parse-hooks.ts';
 import { SVG_PRESENTATION_ATTRIBUTES } from '../data/gen/cascade-data.ts';
+import type { CSSRuleList } from '../rules/collections.ts';
 import type {
   Rule,
-  CSSRuleList,
   SelectorList,
   ComplexSelector,
   PseudoClassSelector,

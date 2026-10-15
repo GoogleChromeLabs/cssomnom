@@ -78,7 +78,7 @@ describe('Readonly properties', () => {
   });
 
   it('should make CSSKeyframesRule length readonly', () => {
-    const rule = new CSSKeyframesRule('name', []) as unknown as import('../src/types.ts').CSSKeyframesRule;
+    const rule = new CSSKeyframesRule('name', []);
     
     const _l = rule.length;
     
@@ -89,7 +89,7 @@ describe('Readonly properties', () => {
   });
 
   it('should make CSSLayerStatementRule nameList readonly', () => {
-    const rule = new CSSLayerStatementRule(['layer1']) as unknown as import('../src/types.ts').CSSLayerStatementRule;
+    const rule = new CSSLayerStatementRule(['layer1']);
     
     assert.throws(() => {
       // @ts-expect-error - nameList should be readonly

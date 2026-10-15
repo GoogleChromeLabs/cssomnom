@@ -17,7 +17,8 @@
 import { ParseHooks } from './parse-hooks.ts';
 import { serialize, serializeDeclarations, serializeFontFamily } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
-import type { Declaration, CSSRule, ComponentValue } from './types.ts';
+import type { Declaration, ComponentValue } from './types.ts';
+import type { CSSRule } from './rules/base.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
@@ -112,7 +113,8 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   [index: number]: string;
   [property: string]: unknown;
   public _declarations: Declaration[];
-  private _declMap: Map<string, Declaration>;
+  /** @internal */
+  public _declMap: Map<string, Declaration>;
   /** @internal */
   _readonly: boolean;
   /** @internal */

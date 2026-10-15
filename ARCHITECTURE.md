@@ -36,7 +36,7 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - [`src/tokenizer.ts`](./src/tokenizer.ts) & [`src/AbstractTokenizer.ts`](./src/AbstractTokenizer.ts): CSS Syntax 3 tokenization engine and character preprocessing.
 - [`src/streaming-tokenizer.ts`](./src/streaming-tokenizer.ts): Incremental streaming tokenizer emitting tokens chunk-by-chunk.
 - [`src/TokenStream.ts`](./src/TokenStream.ts): Cursor abstractions (`ArrayTokenStream`, `LazyComponentValueStream`) over token arrays.
-- [`src/types.ts`](./src/types.ts): Central TypeScript definitions for tokens, component values, AST nodes, and rules.
+- [`src/types.ts`](./src/types.ts): Central TypeScript definitions for tokens, component values, AST nodes, rules, and source locations (`RuleSourceLocation` with 1-based `line` and `column`).
 - [`src/parser.ts`](./src/parser.ts): Recursive descent parser for stylesheets, rules, declarations, and component values.
 - [`src/parse-hooks.ts`](./src/parse-hooks.ts): Dependency inversion interface breaking cycles between core parser, CSSOM, and Typed OM.
 - [`src/CSSOM.ts`](./src/CSSOM.ts): Standard CSSOM Level 1 tree objects (`StyleSheet`, `CSSStyleSheet`, `CSSRuleList`, `MediaList`).
@@ -62,6 +62,7 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - [`src/internal-token.ts`](./src/internal-token.ts): Internal symbol token guarding non-constructible CSSOM rule constructors per WebIDL § 3.6.3.
 - [`src/utils.ts`](./src/utils.ts): Common helper utilities (`camelToDashed`, `createIndexedProxy`, `deleteRuleFromArray`).
 - [`src/utils/format.ts`](./src/utils/format.ts): Number formatting utility using `Intl.NumberFormat` with spec float precision.
+- [`src/walk.ts`](./src/walk.ts): Static analysis traversal helpers (`walkRules`, `walkStyleRules`, `getDeclaredProperties`) providing ancestor hierarchy, resolved selectors, shorthand-aware property queries, and 1-based source lines.
 - [`src/cascade/`](./src/cascade/): Cascade resolution and computed style engine:
   - [`cascade/index.ts`](./src/cascade/index.ts): Main pipeline orchestration for `getCascadedStyle()`.
   - [`cascade/rule-filter.ts`](./src/cascade/rule-filter.ts): Rule harvesting, media query filtering, and selector matching.

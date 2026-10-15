@@ -14,9 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
-import type { StylePropertyMapReadOnly } from './typed-om.ts';
 import type { CSSRule as CSSRuleClass } from './rules/base.ts';
+import type { CSSRuleList, MediaList } from './rules/collections.ts';
+import type { CSSStyleSheet } from './CSSOM.ts';
 
 
 /**
@@ -55,6 +55,8 @@ export interface ParseError {
 export interface RuleSourceLocation {
   start: number;
   end: number;
+  line: number;
+  column: number;
   bodyStart?: number;
   bodyEnd?: number;
 }
@@ -195,6 +197,8 @@ export interface Declaration {
   value: ComponentValue[];
   important: boolean;
   raw?: string;
+  startIndex?: number;
+  endIndex?: number;
 }
 
 export interface ASTAtRule {
@@ -208,221 +212,7 @@ export interface ASTAtRule {
 
 export type Rule = CSSRuleClass;
 
-/**
- * CSSOM Interfaces according to CSSOM spec.
- * @see https://drafts.csswg.org/cssom-1/
- */
-
-export interface StyleSheet {
-  readonly type: string;
-  readonly href: string | null;
-  readonly ownerNode: NodeLike | null; // Element or ProcessingInstruction in DOM
-  readonly parentStyleSheet: StyleSheet | null;
-  readonly title: string | null;
-  media: MediaList;
-  disabled: boolean;
-}
-
-export interface CSSStyleSheet extends StyleSheet {
-  readonly ownerRule: CSSRule | null;
-  readonly cssRules: CSSRuleList;
-  insertRule(rule: string, index?: number): number;
-  deleteRule(index: number): void;
-  replace(text: string): Promise<CSSStyleSheet>;
-  replaceSync(text: string): void;
-  
-  // Legacy members
-  readonly rules: CSSRuleList;
-  addRule(selector?: string, style?: string, index?: number): number;
-  removeRule(index?: number): void;
-}
-
-export interface StyleSheetList {
-  readonly length: number;
-  item(index: number): CSSStyleSheet | null;
-  [index: number]: CSSStyleSheet;
-}
-
-export interface LinkStyle {
-  readonly sheet: StyleSheet | null;
-}
-
-export interface CSSRuleList {
-  readonly length: number;
-  item(index: number): CSSRule | null;
-  [index: number]: CSSRule;
-  [Symbol.iterator](): Iterator<CSSRule>;
-}
-
-export interface CSSRuleConstants {
-  readonly STYLE_RULE: number;
-  readonly CHARSET_RULE: number;
-  readonly IMPORT_RULE: number;
-  readonly MEDIA_RULE: number;
-  readonly FONT_FACE_RULE: number;
-  readonly PAGE_RULE: number;
-  readonly KEYFRAMES_RULE: number;
-  readonly KEYFRAME_RULE: number;
-  readonly MARGIN_RULE: number;
-  readonly NAMESPACE_RULE: number;
-  readonly COUNTER_STYLE_RULE: number;
-  readonly SUPPORTS_RULE: number;
-  readonly FONT_FEATURE_VALUES_RULE: number;
-}
-
-export interface CSSRule extends CSSRuleConstants {
-  cssText: string;
-  readonly parentRule: CSSRule | null;
-  readonly parentStyleSheet: CSSStyleSheet | null;
-  readonly type: number; // Historical
-}
-
-export interface CSSRuleConstructor extends CSSRuleConstants {
-  readonly prototype: CSSRule;
-}
-
-
-export interface CSSGroupingRule extends CSSRule {
-  readonly cssRules: CSSRuleList;
-  insertRule(rule: string, index?: number): number;
-  deleteRule(index: number): void;
-}
-
-export interface CSSConditionRule extends CSSGroupingRule {
-  readonly conditionText: string;
-}
-
-export interface CSSStyleRule extends CSSGroupingRule {
-  selectorText: string;
-  readonly style: CSSStyleDeclaration;
-  readonly styleMap: StylePropertyMapReadOnly;
-}
-
-export interface CSSMediaRule extends CSSConditionRule {
-  readonly media: MediaList;
-}
-
-export interface CSSSupportsRule extends CSSConditionRule {
-  readonly conditionText: string;
-}
-
-export interface CSSContainerRule extends CSSConditionRule {
-  readonly containerName: string;
-  readonly containerQuery: string;
-}
-
-export interface CSSLayerBlockRule extends CSSGroupingRule {
-  readonly name: string;
-}
-
-export interface CSSLayerStatementRule extends CSSRule {
-  readonly nameList: readonly string[];
-}
-
-export interface CSSStartingStyleRule extends CSSGroupingRule {}
-
-export interface CSSScopeRule extends CSSGroupingRule {
-  readonly startSelector: string | null;
-  readonly endSelector: string | null;
-}
-
-export interface CSSViewTransitionRule extends CSSRule {
-  readonly navigation: string;
-}
-
-export interface CSSPropertyRule extends CSSRule {
-  readonly name: string;
-  readonly syntax: string;
-  readonly inherits: boolean;
-  readonly initialValue: string | null;
-}
-
-export interface MediaList {
-  mediaText: string;
-  readonly length: number;
-  item(index: number): string | null;
-  appendMedium(medium: string): void;
-  deleteMedium(medium: string): void;
-  [index: number]: string;
-}
-
 export type CustomMediaQuery = MediaList | boolean;
-
-export interface CSSCustomMediaRule extends CSSRule {
-  readonly name: string;
-  readonly query: CustomMediaQuery;
-}
-
-export interface CSSImportRule extends CSSRule {
-  readonly href: string;
-  media: MediaList;
-  readonly styleSheet: CSSStyleSheet | null;
-  readonly layerName: string | null;
-  readonly supportsText: string | null;
-  readonly scopeStart?: string | null;
-  readonly scopeEnd?: string | null;
-  readonly isScoped?: boolean;
-}
-
-export interface CSSNamespaceRule extends CSSRule {
-  readonly namespaceURI: string;
-  readonly prefix: string;
-}
-
-export interface CSSKeyframesRule extends CSSRule {
-  name: string;
-  readonly cssRules: CSSRuleList;
-  readonly length: number;
-}
-
-export interface CSSKeyframeRule extends CSSRule {
-  keyText: string;
-  readonly style: CSSStyleDeclaration;
-}
-
-export interface CSSFontFaceDescriptors extends CSSStyleDeclaration {
-  src?: string;
-  fontDisplay?: string;
-  unicodeRange?: string;
-}
-
-export interface CSSPageDescriptors extends CSSStyleDeclaration {
-  margin: string;
-  marginTop: string;
-  marginRight: string;
-  marginBottom: string;
-  marginLeft: string;
-  'margin-top': string;
-  'margin-right': string;
-  'margin-bottom': string;
-  'margin-left': string;
-  size: string;
-  pageOrientation: string;
-  'page-orientation': string;
-  marks: string;
-  bleed: string;
-  pageMarginSafety?: string;
-}
-
-export interface CSSMarginDescriptors extends CSSStyleDeclaration {}
-
-export interface CSSFontFaceRule extends CSSRule {
-  readonly style: CSSFontFaceDescriptors;
-}
-
-export interface CSSPageRule extends CSSGroupingRule {
-  selectorText: string;
-  readonly style: CSSPageDescriptors;
-}
-
-export interface CSSMarginRule extends CSSRule {
-  readonly name: string;
-  readonly style: CSSMarginDescriptors;
-}
-
-export interface CSSNestedDeclarations extends CSSRule {
-  readonly style: CSSStyleDeclaration;
-}
 
 
 
@@ -610,12 +400,12 @@ export interface InternalRuleMetadata {
   scopeStart?: string | null;
   _scopeEnd?: string | null;
   scopeEnd?: string | null;
-  _parentStyleSheet?: StyleSheet | null;
+  _parentStyleSheet?: CSSStyleSheet | null;
 }
 
 export interface InternalStyleSheet {
   _ownerRule?: CSSRule | null;
-  _parentStyleSheet?: StyleSheet | null;
+  _parentStyleSheet?: CSSStyleSheet | null;
   _href?: string | null;
 }
 

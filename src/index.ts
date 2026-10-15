@@ -28,4 +28,6 @@ export { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 export { CSSStyleProperties } from './data/gen/properties.ts';
 export * from './typed-om.ts';
 export * from './parser-api.ts';
+export { walkRules, walkStyleRules, getDeclaredProperties } from './walk.ts';
+export type { RuleWalkEntry, StyleRuleWalkEntry } from './walk.ts';
 
