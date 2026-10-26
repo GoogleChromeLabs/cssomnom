@@ -74,6 +74,14 @@ export function isElement(node: unknown): node is DOMElement {
   );
 }
 
+function getEffectiveParent(element: DOMElement): DOMElement | null {
+  if (element.parentElement) return element.parentElement;
+  if (element.parentNode && (element.parentNode as { host?: unknown }).host && isElement((element.parentNode as { host?: unknown }).host)) {
+    return (element.parentNode as { host?: unknown }).host as DOMElement;
+  }
+  return null;
+}
+
 // selectors-4 § 17.1 #parse-selector
 function parseSelector(selector: string | ComplexSelector | SelectorList): SelectorList {
   if (typeof selector !== 'string') {
@@ -203,14 +211,6 @@ function matchComplexRecursive(
   if (itemIndex === 0) {
     return true;
   }
-
-function getEffectiveParent(element: DOMElement): DOMElement | null {
-  if (element.parentElement) return element.parentElement;
-  if (element.parentNode && (element.parentNode as { host?: unknown }).host && isElement((element.parentNode as { host?: unknown }).host)) {
-    return (element.parentNode as { host?: unknown }).host as DOMElement;
-  }
-  return null;
-}
 
   // Handle leading relative combinator inside :has() or relative selectors
   if (itemIndex === 1 && items[0].type === 'combinator') {
@@ -951,6 +951,11 @@ function getLangRanges(pseudo: PseudoClassSelector): string[] {
   return [];
 }
 
+function isValidSubtag(subtag: string, allowWildcard = false): boolean {
+  if (allowWildcard && subtag === '*') return true;
+  return subtag.length >= 1 && subtag.length <= 8 && /^[a-zA-Z0-9]+$/.test(subtag);
+}
+
 /**
  * RFC 4647 § 3.3.2 Extended Filtering & CSS Selectors 4 § 7.2 :lang()
  */
@@ -969,10 +974,7 @@ function matchLangRange(elementLang: string | null, range: string): boolean {
   // Check language tag well-formedness: 1..8 ASCII alphanumeric characters per subtag.
   const tagSubtags = elementLang.split('-');
   for (let i = 0; i < tagSubtags.length; i++) {
-    const s = tagSubtags[i];
-    if (s.length === 0 || s.length > 8 || !/^[a-zA-Z0-9]+$/.test(s)) {
-      return false;
-    }
+    if (!isValidSubtag(tagSubtags[i])) return false;
   }
 
   // Selectors 4 § 7.2:
@@ -984,10 +986,7 @@ function matchLangRange(elementLang: string | null, range: string): boolean {
   // Check language range well-formedness: each subtag must be '*' or 1..8 ASCII alphanum.
   const rangeSubtags = range.split('-');
   for (let i = 0; i < rangeSubtags.length; i++) {
-    const s = rangeSubtags[i];
-    if (s !== '*' && (s.length === 0 || s.length > 8 || !/^[a-zA-Z0-9]+$/.test(s))) {
-      return false;
-    }
+    if (!isValidSubtag(rangeSubtags[i], true)) return false;
   }
 
   const rangeLower = rangeSubtags.map(toAsciiLowerCase);
@@ -1038,6 +1037,8 @@ function matchLangRange(elementLang: string | null, range: string): boolean {
   return true;
 }
 
+const XML_LANG_NS = 'http://www.w3.org/XML/1998/namespace';
+
 function getElementLanguage(element: DOMElement): string | null {
   const isXml = element.ownerDocument?.contentType
     ? element.ownerDocument.contentType !== 'text/html'
@@ -1045,33 +1046,36 @@ function getElementLanguage(element: DOMElement): string | null {
 
   let curr: DOMElement | null = element;
   while (curr) {
-    if (isXml) {
-      if (curr.hasAttributeNS?.('http://www.w3.org/XML/1998/namespace', 'lang')) {
-        return curr.getAttributeNS?.('http://www.w3.org/XML/1998/namespace', 'lang') ?? '';
-      }
-      if (curr.hasAttribute?.('xml:lang')) {
-        return curr.getAttribute('xml:lang') ?? '';
-      }
-      if (curr.hasAttribute?.('lang')) {
-        return curr.getAttribute('lang') ?? '';
-      }
-    } else {
-      if (curr.hasAttribute?.('lang')) {
-        return curr.getAttribute('lang') ?? '';
-      }
+    // HTML Standard § 3.2.6.2 Step 1: attribute in XML namespace determines language across all documents
+    if (curr.hasAttributeNS?.(XML_LANG_NS, 'lang')) {
+      return curr.getAttributeNS?.(XML_LANG_NS, 'lang') ?? '';
     }
-    curr = curr.parentElement;
+    // Literal un-namespaced xml:lang applies only in XML/XHTML documents
+    if (isXml && curr.hasAttribute?.('xml:lang')) {
+      return curr.getAttribute?.('xml:lang') ?? '';
+    }
+    // HTML Standard § 3.2.6.2 Step 2: lang in no namespace
+    if (curr.hasAttribute?.('lang')) {
+      return curr.getAttribute?.('lang') ?? '';
+    }
+    // HTML Standard § 3.2.6.2 Step 3 & 4: shadow root host or parent element traversal
+    curr = getEffectiveParent(curr);
   }
 
-  // HTML Standard § 3.2.6.2 Language determination from meta http-equiv="content-language"
-  if (!isXml && element.ownerDocument && typeof element.ownerDocument.querySelector === 'function') {
-    const meta = element.ownerDocument.querySelector('meta[http-equiv="content-language" i]');
-    if (meta) {
-      const content = meta.getAttribute?.('content')?.trim();
-      if (content && !content.includes(',')) {
-        return content;
+  // HTML Standard § 3.2.6.2 Step 5 & § 4.2.5.3: pragma-set default language from meta http-equiv="content-language"
+  if (!isXml && element.ownerDocument && typeof element.ownerDocument.querySelectorAll === 'function') {
+    const metas = element.ownerDocument.querySelectorAll('meta[http-equiv="content-language" i]');
+    let pragmaLang: string | null = null;
+    for (const meta of metas) {
+      if (!meta.hasAttribute?.('content')) continue;
+      const content = meta.getAttribute?.('content');
+      if (!content || content.includes(',')) continue;
+      const match = /^[^\t\n\f\r ]+/.exec(content.trimStart());
+      if (match && match[0].length > 0) {
+        pragmaLang = match[0];
       }
     }
+    if (pragmaLang !== null) return pragmaLang;
   }
 
   return null;

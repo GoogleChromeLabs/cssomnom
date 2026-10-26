@@ -356,13 +356,38 @@ describe('CSS Selectors 4 - :lang() Matching & RFC 4647 (css3-selectors-lang-*.h
       const { document } = parseHTML(`
         <!DOCTYPE html>
         <html>
-        <head><meta http-equiv="content-language" content="fr"></head>
+        <head>
+          <meta http-equiv="content-language" content="invalid, en">
+          <meta http-equiv="content-language" content="  ja zh  ">
+        </head>
         <body><span id="fallback"></span></body>
         </html>
       `);
       const span = document.getElementById('fallback')!;
-      assert.equal(matches(span, ':lang(fr)'), true);
-      assert.equal(matches(span, ':lang(en)'), false);
+      // First meta contains comma so it is skipped; second meta extracts up to first whitespace ("ja")
+      assert.equal(matches(span, ':lang(ja)'), true);
+      assert.equal(matches(span, ':lang(zh)'), false);
+    });
+
+    it('HTML Standard Step 1: attribute in XML namespace applies in HTML and overrides lang in no namespace', () => {
+      const { document } = parseHTML('<div id="el" lang="en"></div>');
+      const el = document.getElementById('el')!;
+      // Linkedom lacks attribute namespace support; mock DOM Level 2 NS methods on the element
+      el.hasAttributeNS = (ns, localName) => ns === 'http://www.w3.org/XML/1998/namespace' && localName === 'lang';
+      el.getAttributeNS = (ns, localName) => (ns === 'http://www.w3.org/XML/1998/namespace' && localName === 'lang' ? 'es' : null);
+      assert.equal(matches(el, ':lang(es)'), true);
+      assert.equal(matches(el, ':lang(en)'), false);
+    });
+
+    it('HTML Standard Step 3: element inside shadow root inherits language from shadow host', () => {
+      const { document } = parseHTML('<div id="host" lang="de"></div>');
+      const host = document.getElementById('host')!;
+      const shadow = host.attachShadow({ mode: 'open' });
+      const inner = document.createElement('span');
+      shadow.appendChild(inner);
+
+      assert.equal(matches(inner, ':lang(de)'), true);
+      assert.equal(matches(inner, ':lang(en)'), false);
     });
   });
 });
