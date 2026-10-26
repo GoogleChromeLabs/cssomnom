@@ -654,12 +654,10 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   // selectors-4 § 7.2 #the-lang-pseudo
   // selectors-4 § 3.7 #case-sensitive
   if (name === 'lang') {
-    const langArgs = getPseudoArgumentString(pseudo).split(/\s*,\s*/);
-    const elementLang = toAsciiLowerCase(getElementLanguage(element));
-    return langArgs.some(arg => {
-      const clean = toAsciiLowerCase(arg.trim()).replace(/^["']|["']$/g, '');
-      return elementLang === clean || elementLang.startsWith(clean + '-');
-    });
+    const ranges = getLangRanges(pseudo);
+    if (ranges.length === 0) return false;
+    const elementLang = getElementLanguage(element);
+    return ranges.some(range => matchLangRange(elementLang, range));
   }
 
   // Form states and interactions
@@ -932,14 +930,151 @@ function getElementDirection(element: DOMElement): 'ltr' | 'rtl' {
   return 'ltr';
 }
 
-function getElementLanguage(element: DOMElement): string {
-  if (element.getAttribute?.('lang')) {
-    return element.getAttribute('lang') || '';
+function getLangRanges(pseudo: PseudoClassSelector): string[] {
+  if (!pseudo.argument) return [];
+  if (Array.isArray(pseudo.argument)) {
+    const ranges: string[] = [];
+    for (const token of pseudo.argument as ComponentValue[]) {
+      if (token.type === 'ident' || token.type === 'string') {
+        ranges.push(String(token.value));
+      }
+    }
+    return ranges;
   }
-  if (element.parentElement) {
-    return getElementLanguage(element.parentElement);
+  if (typeof pseudo.argument === 'string') {
+    const trimmed = (pseudo.argument as string).trim();
+    if (trimmed === '""' || trimmed === "''") return [''];
+    return trimmed
+      .split(/\s*,\s*/)
+      .map(s => s.replace(/^["']|["']$/g, ''));
   }
-  return '';
+  return [];
+}
+
+/**
+ * RFC 4647 § 3.3.2 Extended Filtering & CSS Selectors 4 § 7.2 :lang()
+ */
+function matchLangRange(elementLang: string | null, range: string): boolean {
+  // Selectors 4 § 7.2:
+  // A language range consisting of an empty string matches (only) elements whose language is not tagged.
+  if (range === '') {
+    return elementLang === null || elementLang === '';
+  }
+
+  // If the element has no language, it cannot match any non-empty range.
+  if (elementLang === null || elementLang === '') {
+    return false;
+  }
+
+  // Check language tag well-formedness: 1..8 ASCII alphanumeric characters per subtag.
+  const tagSubtags = elementLang.split('-');
+  for (let i = 0; i < tagSubtags.length; i++) {
+    const s = tagSubtags[i];
+    if (s.length === 0 || s.length > 8 || !/^[a-zA-Z0-9]+$/.test(s)) {
+      return false;
+    }
+  }
+
+  // Selectors 4 § 7.2:
+  // Wildcard language range ("*") matches any tagged element (provided well-formed).
+  if (range === '*') {
+    return true;
+  }
+
+  // Check language range well-formedness: each subtag must be '*' or 1..8 ASCII alphanum.
+  const rangeSubtags = range.split('-');
+  for (let i = 0; i < rangeSubtags.length; i++) {
+    const s = rangeSubtags[i];
+    if (s !== '*' && (s.length === 0 || s.length > 8 || !/^[a-zA-Z0-9]+$/.test(s))) {
+      return false;
+    }
+  }
+
+  const rangeLower = rangeSubtags.map(toAsciiLowerCase);
+  const tagLower = tagSubtags.map(toAsciiLowerCase);
+
+  // RFC 4647 § 3.3.2 Step 2:
+  // Begin with the first subtag in each list. If the first subtag in the range
+  // does not match the first subtag in the tag, the overall match fails.
+  if (rangeLower[0] !== '*' && rangeLower[0] !== tagLower[0]) {
+    return false;
+  }
+
+  let rIdx = 1;
+  let tIdx = 1;
+
+  // RFC 4647 § 3.3.2 Step 3:
+  // While there are more subtags left in the language range's list:
+  while (rIdx < rangeLower.length) {
+    // 3A. If the subtag in the range is '*', move to next subtag in range and continue.
+    if (rangeLower[rIdx] === '*') {
+      rIdx++;
+      continue;
+    }
+
+    // 3B. If there are no more subtags in the tag's list, match fails.
+    if (tIdx >= tagLower.length) {
+      return false;
+    }
+
+    // 3C. If range subtag matches tag subtag, move both and continue.
+    if (rangeLower[rIdx] === tagLower[tIdx]) {
+      rIdx++;
+      tIdx++;
+      continue;
+    }
+
+    // 3D. If tag subtag is a singleton (single letter/digit), match fails.
+    if (tagLower[tIdx].length === 1) {
+      return false;
+    }
+
+    // 3E. Move to next subtag in tag's list and continue.
+    tIdx++;
+  }
+
+  // RFC 4647 § 3.3.2 Step 4:
+  // When the language range's list has no more subtags, match succeeds.
+  return true;
+}
+
+function getElementLanguage(element: DOMElement): string | null {
+  const isXml = element.ownerDocument?.contentType
+    ? element.ownerDocument.contentType !== 'text/html'
+    : (element.ownerDocument as { constructor?: { name?: string } } | undefined)?.constructor?.name === 'XMLDocument';
+
+  let curr: DOMElement | null = element;
+  while (curr) {
+    if (isXml) {
+      if (curr.hasAttributeNS?.('http://www.w3.org/XML/1998/namespace', 'lang')) {
+        return curr.getAttributeNS?.('http://www.w3.org/XML/1998/namespace', 'lang') ?? '';
+      }
+      if (curr.hasAttribute?.('xml:lang')) {
+        return curr.getAttribute('xml:lang') ?? '';
+      }
+      if (curr.hasAttribute?.('lang')) {
+        return curr.getAttribute('lang') ?? '';
+      }
+    } else {
+      if (curr.hasAttribute?.('lang')) {
+        return curr.getAttribute('lang') ?? '';
+      }
+    }
+    curr = curr.parentElement;
+  }
+
+  // HTML Standard § 3.2.6.2 Language determination from meta http-equiv="content-language"
+  if (!isXml && element.ownerDocument && typeof element.ownerDocument.querySelector === 'function') {
+    const meta = element.ownerDocument.querySelector('meta[http-equiv="content-language" i]');
+    if (meta) {
+      const content = meta.getAttribute?.('content')?.trim();
+      if (content && !content.includes(',')) {
+        return content;
+      }
+    }
+  }
+
+  return null;
 }
 
 function isElementDisabled(element: DOMElement): boolean {

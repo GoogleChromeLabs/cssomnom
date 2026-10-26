@@ -594,14 +594,12 @@ Completed phases 1–125 live in [PLAN.archive.md](./PLAN.archive.md). Every ~20
 - [x] Delete `getUaTagStyles()` margin/em normalization and as much of `getUaDefault()` as the cascade now covers. Net-negative line count expected.
 - [x] Zero WPT regressions (`pnpm run wpt:verify`) and `pnpm run preflight` clean.
 
-## Phase 150 (Future): Parser Performance — Eliminate Re-tokenization & Operate on Token Stream [ ]
-**Gate**: Only start once Phase 148 benchmarks show where parser time goes; compare every change against that baseline.
-
+## Phase 150: Parser & Cascade — Eliminate Re-tokenization Round-Trips [ ]
 Moved from earlier deferred items (Phase 13 "Avoid Re-tokenization", and CSS Syntax findings "Operate on Token Stream").
 
 ### Tasks
-- [ ] **Avoid re-tokenization**: remove serialize→`tokenize()` round trips on already-parsed values. Known sites: shorthand expansion in [`CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts) (`tokenize(val)` for longhands), `parseStyleAttribute(tokenize(serialize(blockVal)))` in [`rule-filter.ts`](./src/cascade/rule-filter.ts), re-parsers in [`parser.ts`](./src/parser.ts) (`new Parser(tokenize(text, …))`, `` tokenize(`{ ${text} }`) ``), and name re-tokenization in [`variable-resolver.ts`](./src/cascade/variable-resolver.ts). Audit the 73 `tokenize(` call sites in `src/` and keep only true string entry points.
-- [ ] **Operate on token stream**: evaluate refactoring the parser to consume the token stream directly (css-syntax-3 § 5 parser algorithms) instead of pre-grouped component values. Large change; only pursue if benchmarks justify it.
+- [ ] **Phase 150.1 — Avoid re-tokenization**: remove serialize→`tokenize()` round trips on already-parsed values. Known sites: shorthand reading/contraction in [`CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts) (where `_declarations` already holds `ComponentValue[]`, yet `getPropertyValue()` serializes longhands to strings and immediately calls `tokenize(val)`), `parseStyleAttribute(tokenize(serialize(blockVal)))` in [`rule-filter.ts`](./src/cascade/rule-filter.ts), `value: tokenize(finalValue)` in [`cascade/index.ts`](./src/cascade/index.ts), `tokenize()` round-trips inside [`variable-resolver.ts`](./src/cascade/variable-resolver.ts) and [`computed-style.ts`](./src/cascade/computed-style.ts), and re-parsers in [`parser.ts`](./src/parser.ts). Audit all `tokenize(` call sites in `src/` and keep only true string entry points.
+- [ ] *(Parked — skip for now)* **Operate on token stream**: evaluate refactoring the parser to consume the token stream directly (css-syntax-3 § 5 parser algorithms) instead of pre-grouped component values. Large change; not pursuing unless benchmarks justify the churn.
 
 ## Phase 151 (Future): Benchmark Sensitivity [ ]
 **Status**: Parked (user deprioritized benchmark work after Phase 148). Pick up before Phase 150, since Phase 150 needs to detect small parser changes.
@@ -638,24 +636,24 @@ Follow-ups (not layout guessing, separate fixes): `rem` hardcoded to 16px in `co
 
 Result: public `Rule` is a type-only alias of the concrete `CSSRule` class; `toParserRule` dispatches by `instanceof` (qualified rules now include their declarations; `@keyframes` reports `keyframes`); `insertRule` nesting checks use `instanceof CSSGroupingRule` and WebIDL class strings; the cascade ignores foreign CSSOM from linkedom's `style.sheet` and re-parses `<style>` text. `src/` net −102 lines since `2fcab88`; WPT 21,184 / 0 regressions.
 
-## Phase 154: Fix :lang() Matching [ ]
-**Objective**: Implement spec-compliant CSS Selectors 4 § 7.2 `:lang()` pseudo-class matching using RFC 4647 extended language range filtering.
+## Phase 154: Fix :lang() Matching [x]
+**Objective**: Implement spec-compliant CSS Selectors 4 § 7.2 `:lang()` pseudo-class matching using RFC 4647 § 3.3.2 extended language range filtering (without `Intl.Locale`, which throws on wildcards/singletons and breaks grandfathered tags in WPT `lang-020..024.html`).
 
 Currently, `src/matcher.ts` uses basic prefix matching (`elementLang === clean || elementLang.startsWith(clean + '-')`), which fails RFC 4647 extended filtering, wildcard ranges, and XML document handling.
 
 ### Todo Cases Catalogued in `tests/selectors-lang.test.ts`
-- [ ] **RFC 4647 Extended Filtering (Script Subtags & Wildcards)**:
+- [x] **RFC 4647 Extended Filtering (Script Subtags & Wildcards)**:
   - Language range matching when tags contain intermediate script/region subtags (e.g., `:lang(cs-CZ)` matching `lang="cs-Latn-CZ"`, `:lang(fr-FR)` matching `lang="fr-Latn-FR"`).
   - Wildcard ranges in selector lists (e.g., `:lang(*-Latn)`, `:lang(*-CH)`, `:lang(*-FR)`, `:lang(*-x-foobar)`).
   - Escaped wildcard ranges (e.g., `:lang(\*-FR)`).
-- [ ] **Private-Use Subtag & Singleton Handling**:
-  - RFC 4647 step 3D singleton subtag handling (e.g., `:lang("fr-x-foobar")` matching `lang="fr-Latn-FR-x-foobar"` while singletons block skipping).
-- [ ] **Subtag Length Boundaries**:
-  - RFC 4647 8-character subtag limit enforcement (e.g., `:lang(fr)` must not match `lang="fr-ninechars"`).
-- [ ] **Argument Syntax Resilience & Whitespace**:
-  - Argument list parsing resilience for numbers/idents (e.g., `:lang(de, nl, 0, fr)`, `:lang(0)`).
-- [ ] **XML Document `xml:lang` Attribute Semantics**:
-  - Support `xml:lang` lookup in XML documents while ignoring it in HTML documents per CSS Selectors 4 / HTML specification.
+- [x] **Private-Use Subtag & Singleton Handling**:
+  - RFC 4647 step 3C/3D singleton subtag handling (e.g., `:lang("fr-x-foobar")` matching `lang="fr-Latn-FR-x-foobar"`, `:lang(fr-x)` matching `lang="fr-x"` and `lang="fr-x-standard"`, while singletons block skipping per `lang-singleton-subtag-matching.html`).
+- [x] **Subtag Length & Well-Formedness Boundaries**:
+  - RFC 4647 1..8 ASCII alphanumeric subtag enforcement (e.g., `:lang(fr)` must not match `lang="fr-ninechars"`, `:lang("*")` matches `lang="und"` but not untagged `lang=""`, `:lang("")` matches only untagged elements per Selectors 4 § 7.2).
+- [x] **Unforgiving `<ident> | <string>` Argument Grammar (`lang-013.html`, `lang-014.html`)**:
+  - Note: Upstream WPT `selectors-4/lang-013.html` and `lang-014.html` have `div.test { color: green; } :lang(de, nl, 0, fr) { color: red; }` — verifying that `:lang()` is **unforgiving** and rejects `<number-token>` `0` with `SyntaxError` (fix the inverted `todo` assertions in `tests/selectors-lang.test.ts` accordingly!).
+- [x] **XML Document `xml:lang` Attribute Semantics**:
+  - Support `xml:lang` lookup in XML documents (`document.contentType` XML/XHTML) while ignoring un-namespaced `xml:lang` in HTML documents per Selectors 4 § 7.2 / HTML Standard (`css3-selectors-lang-016.html`).
 
 ## Phase 155: One CSSOM Type Per Interface — Reconcile `types.ts` Interfaces with Concrete Classes [x]
 **Objective**: [types.ts](./src/types.ts) declares hand-written WebIDL-shaped interfaces (`CSSRule`, `CSSStyleSheet`, …) that diverge from the concrete classes ([rules/base.ts](./src/rules/base.ts), [CSSOM.ts](./src/CSSOM.ts)). With `Rule = CSSRule` (Phase 153) the two `CSSRule`s are not assignable to each other (found while fixing Phase 153; 18 errors in 7 files). Pick one source of truth (type-only re-exports of the concrete classes), delete the redundant interfaces (~205 lines in `src/types.ts`), and keep the ParseHooks rule.

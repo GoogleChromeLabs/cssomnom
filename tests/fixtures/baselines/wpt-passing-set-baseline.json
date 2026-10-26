@@ -23533,6 +23533,7 @@
     ":lang(cocoa-bar) does not match lang=\"cocoa-1-bar\" (cannot skip past singleton \"1\")",
     ":lang(en-private) does not match lang=\"en-x-private\" (cannot skip past singleton \"x\")",
     ":lang(en-x) matches lang=\"en-x-private\" (private-use singleton)",
+    ":lang(fr) does not match lang=\"fr-ninechars\" (subtag exceeds 8-char limit)",
     ":lang(fr-standard) only matches lang=\"fr-standard\" (not lang=\"fr-x-standard\")",
     ":lang(fr-x) matches lang=\"fr-x\" and lang=\"fr-x-standard\" (singleton \"x\" matches)",
     ":lang(fr-x) matches the correct elements",
