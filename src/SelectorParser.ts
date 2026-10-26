@@ -16,7 +16,7 @@
  */
 import type { 
   SelectorList, ComplexSelector, CompoundSelector, SimpleSelector, 
-  Combinator, ComponentValue, Token, SimpleBlock, CSSFunction,
+  Combinator, ComponentValue, SimpleBlock, CSSFunction,
   InvalidSelector, IdentToken, DelimToken, HashToken, StringToken,
   NumberToken, DimensionToken
 } from './types.ts';
@@ -26,43 +26,39 @@ import {
 } from './data/gen/selectors.ts';
 import { getOriginalText } from './serializer.ts';
 // Type guards for ComponentValue types
-export function isToken(val: ComponentValue | undefined): val is Token {
-  return val !== undefined && val.type !== 'simple-block' && val.type !== 'function';
-}
-
-export function isIdentToken(val: ComponentValue | undefined): val is IdentToken {
+function isIdentToken(val: ComponentValue | undefined): val is IdentToken {
   return val !== undefined && val.type === 'ident';
 }
 
-export function isDelimToken(val: ComponentValue | undefined, char?: string): val is DelimToken {
+function isDelimToken(val: ComponentValue | undefined, char?: string): val is DelimToken {
   return val !== undefined && val.type === 'delim' && (char === undefined || (val as DelimToken).value === char);
 }
 
-export function isHashToken(val: ComponentValue | undefined): val is HashToken {
+function isHashToken(val: ComponentValue | undefined): val is HashToken {
   return val !== undefined && val.type === 'hash';
 }
 
-export function isStringToken(val: ComponentValue | undefined): val is StringToken {
+function isStringToken(val: ComponentValue | undefined): val is StringToken {
   return val !== undefined && (val.type === 'string' || val.type === 'bad-string');
 }
 
-export function isNumberToken(val: ComponentValue | undefined): val is NumberToken {
+function isNumberToken(val: ComponentValue | undefined): val is NumberToken {
   return val !== undefined && val.type === 'number';
 }
 
-export function isDimensionToken(val: ComponentValue | undefined): val is DimensionToken {
+function isDimensionToken(val: ComponentValue | undefined): val is DimensionToken {
   return val !== undefined && val.type === 'dimension';
 }
 
-export function isSimpleBlock(val: ComponentValue | undefined, associatedType?: string): val is SimpleBlock {
+function isSimpleBlock(val: ComponentValue | undefined, associatedType?: string): val is SimpleBlock {
   return val !== undefined && val.type === 'simple-block' && (associatedType === undefined || (val as SimpleBlock).associatedToken.type === associatedType);
 }
 
-export function isCSSFunction(val: ComponentValue | undefined, name?: string): val is CSSFunction {
+function isCSSFunction(val: ComponentValue | undefined, name?: string): val is CSSFunction {
   return val !== undefined && val.type === 'function' && (name === undefined || (val as CSSFunction).name.toLowerCase() === name.toLowerCase());
 }
 
-export class ComponentValueCursor {
+class ComponentValueCursor {
   private values: ComponentValue[];
   private _i: number = 0;
 

@@ -52,36 +52,9 @@ import { resolveCustomProperties } from './variable-resolver.ts';
 import { normalizeComputedColor } from './color-resolver.ts';
 import { processStandardDeclarations, isSvgElement } from './value-processor.ts';
 import { CSSComputedStyleDeclaration } from './computed-style.ts';
+import { KNOWN_PSEUDO_ELEMENTS, KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS } from '../data/gen/selectors.ts';
 
-export const KNOWN_PSEUDO_ELEMENTS = new Set([
-  'before',
-  'after',
-  'marker',
-  'placeholder',
-  'file-selector-button',
-  'backdrop',
-  'first-line',
-  'first-letter',
-  'grammar-error',
-  'spelling-error',
-  'view-transition',
-  'cue',
-  'selection',
-  'target-text',
-  'checkmark',
-  'picker-icon',
-]);
-
-export const KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS = new Set([
-  'highlight',
-  'picker',
-  'view-transition-group',
-  'view-transition-image-pair',
-  'view-transition-old',
-  'view-transition-new',
-  'part',
-  'slotted',
-]);
+export { KNOWN_PSEUDO_ELEMENTS, KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS };
 
 export function normalizePseudoElement(pseudo: string): { valid: boolean; normalized: string; isKnown: boolean } | null {
   if (!pseudo.startsWith(':')) {

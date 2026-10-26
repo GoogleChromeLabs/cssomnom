@@ -71,7 +71,7 @@ export function formatAlpha(a: number): string {
   return parseFloat(a.toFixed(4)).toString();
 }
 
-export function parseRgbComponents(content: string): [number, number, number, number] | null {
+function parseRgbComponents(content: string): [number, number, number, number] | null {
   let parts: string[];
   if (content.includes(',')) {
     parts = content.split(',').map(s => s.trim());
@@ -121,7 +121,7 @@ export function parseRgbComponents(content: string): [number, number, number, nu
   return [r, g, b, a];
 }
 
-export function parseHslComponents(content: string): [number, number, number, number] | null {
+function parseHslComponents(content: string): [number, number, number, number] | null {
   let parts: string[];
   if (content.includes(',')) {
     parts = content.split(',').map(s => s.trim());

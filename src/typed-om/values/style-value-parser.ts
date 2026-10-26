@@ -424,7 +424,7 @@ CSSStyleValue.parse = parseStyleValue;
 // css-sizing-3 § 5.1 #propdef-width
 // css-box-3 § 4 #padding-physical
 // css-backgrounds-3 § 4.3 #border-width
-export function isNonNegativeProperty(prop: string): boolean {
+function isNonNegativeProperty(prop: string): boolean {
   if (
     prop === 'width' || prop.endsWith('-width') ||
     prop === 'height' || prop.endsWith('-height') ||

@@ -70,27 +70,4 @@ export const CascadeOrigin = {
 
 export type CascadeOrigin = typeof CascadeOrigin[keyof typeof CascadeOrigin];
 
-/**
- * Standard CSS properties that are inherited by default according to CSS specs.
- * css-cascade-5 § 7.2 #inheriting
- */
-export const INHERITED_PROPERTIES = new Set([
-  'color',
-  'font-size',
-  'font-family',
-  'font-weight',
-  'font-style',
-  'font-variant',
-  'font-stretch',
-  'line-height',
-  'letter-spacing',
-  'word-spacing',
-  'text-align',
-  'text-indent',
-  'text-transform',
-  'white-space',
-  'visibility',
-  'cursor',
-  'direction',
-  'writing-mode',
-]);
+export { INHERITED_PROPERTIES } from '../data/gen/cascade-data.ts';

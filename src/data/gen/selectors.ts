@@ -150,3 +150,47 @@ export const PSEUDO_ELEMENTS: Set<string> = new Set([
   'view-transition-new',
   'view-transition-old',
 ]);
+
+/**
+ * Known standard non-functional pseudo-elements recognized by the cascade.
+ * selectors-4 § 3.7 #pseudo-elements
+ */
+export const KNOWN_PSEUDO_ELEMENTS: ReadonlySet<string> = new Set([
+  'after',
+  'backdrop',
+  'before',
+  'checkmark',
+  'cue',
+  'cue-region',
+  'details-content',
+  'file-selector-button',
+  'first-letter',
+  'first-line',
+  'grammar-error',
+  'marker',
+  'picker-icon',
+  'placeholder',
+  'scroll-marker',
+  'scroll-marker-group',
+  'selection',
+  'spelling-error',
+  'target-text',
+  'view-transition',
+]);
+
+/**
+ * Known standard functional pseudo-elements recognized by the cascade.
+ * selectors-4 § 3.7 #pseudo-elements
+ */
+export const KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS: ReadonlySet<string> = new Set([
+  'cue',
+  'cue-region',
+  'highlight',
+  'part',
+  'picker',
+  'slotted',
+  'view-transition-group',
+  'view-transition-image-pair',
+  'view-transition-new',
+  'view-transition-old',
+]);

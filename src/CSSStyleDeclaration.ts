@@ -27,7 +27,7 @@ import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface } from './webidl.ts';
 
-export function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
+function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
   return new Proxy(target, {
     get(t, prop) {
       if (typeof prop === 'string') {

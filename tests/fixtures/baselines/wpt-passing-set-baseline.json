@@ -14499,6 +14499,7 @@
     "Testing 'opacity'.",
     "Testing 'overflow'.",
     "Testing 'stop-color'.",
+    "Testing 'stop-opacity'.",
     "Testing 'stroke-dasharray'.",
     "Testing 'stroke-linecap'.",
     "Testing 'stroke-linejoin'.",
@@ -15628,6 +15629,7 @@
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-pointerEvents.html": [
     "Body element has the initial value for pointerEvents",
+    "Child element inherits the pointerEvents value from its parent",
     "Parent element returns the directly specified value for pointerEvents"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-property-order.html": [

@@ -34,7 +34,7 @@ import { DOMMatrixReadOnly } from '../../DOMMatrix.ts';
 import { parseMathFunction, simplify } from '../../math-parser.ts';
 import { createCSSStyleValue } from '../values/style-value-factory.ts';
 
-export function parseNumeric(v: ComponentValue): CSSNumericValue {
+function parseNumeric(v: ComponentValue): CSSNumericValue {
   if (v.type === 'number' || v.type === 'percentage' || v.type === 'dimension') {
     const sv = createCSSStyleValue(v as Token);
     if (sv instanceof CSSNumericValue) return sv;

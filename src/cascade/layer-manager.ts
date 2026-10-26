@@ -26,7 +26,7 @@ import {
 import { MediaParser } from '../MediaParser.ts';
 import type { Rule, MediaEnvironment, ElementLike } from '../types.ts';
 
-export interface LayerState {
+interface LayerState {
   nextLayerIndex: number;
 }
 
@@ -35,7 +35,7 @@ export interface LayerState {
  * css-cascade-5 § 6.4.2 #layer-names
  * css-cascade-5 § 6.4.3 #layer-ordering
  */
-export class LayerTree {
+class LayerTree {
   public name: string;
   public fullPath: string;
   public children: Map<string, LayerTree> = new Map();
@@ -75,7 +75,7 @@ export class LayerTree {
  * with nested layers grouped within their parent layer.
  * Unlayered rules are sorted later than any layered rules within the same parent layer (if any)."
  */
-export function assignLayerOrders(
+function assignLayerOrders(
   root: LayerTree,
   layerDeclarationOrder: Map<string, number>
 ): void {
@@ -102,7 +102,7 @@ export function assignLayerOrders(
  * css-cascade-5 § 6.4.2 #layer-names
  * css-cascade-5 § 6.4.3 #layer-ordering
  */
-export function scanLayers(
+function scanLayers(
   list: Rule[],
   root: LayerTree,
   state: LayerState = { nextLayerIndex: 1 },

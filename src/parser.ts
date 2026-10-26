@@ -32,9 +32,9 @@ export interface ParserOptions {
 }
 import { SelectorParser } from './SelectorParser.ts';
 import { calculateSpecificity } from './specificity.ts';
-import { getCascadedStyle } from './cascade.ts';
+import { getCascadedStyle, resolveVariables } from './cascade.ts';
 import { ParseHooks } from './parse-hooks.ts';
-import { PropertyRegistry, matchesSyntax } from './PropertyRegistry.ts';
+import { PropertyRegistry } from './PropertyRegistry.ts';
 
 function getComponentValueStartIndex(item?: ComponentValue): number | undefined {
   if (!item) return undefined;
@@ -123,8 +123,6 @@ export class Parser {
   private tokens: TokenStream;
   public errors: ParseError[] = [];
   private declaredNamespaces = new Set<string>();
-  static readonly #customPropertyAstCache = new Map<string, ComponentValue[]>();
-  static readonly #MAX_CACHE_SIZE = 1000;
 
 
 
@@ -1445,142 +1443,8 @@ export class Parser {
     return getCascadedStyle(element, rules);
   }
 
-  static #parseValuesFromString(text: string): ComponentValue[] {
-    return new Parser(tokenize(text)).parseComponentValues();
-  }
-
   public static resolveVariables(style: CSSStyleDeclaration, property: string, envMap?: Record<string, string>): string {
-    const value = style.getPropertyValue(property);
-    if (!value) return '';
-    return Parser.#resolveVariablesInString(style, value, new Set([property]), envMap);
-  }
-
-  static #resolveVariablesInString(style: CSSStyleDeclaration, value: string, seen: Set<string>, envMap?: Record<string, string>): string {
-    const resolved = Parser.#resolveVariablesInComponentValues(style, Parser.#parseValuesFromString(value), seen, envMap);
-    if (resolved.some(v => v.type === 'ident' && typeof v.value === 'string' && (v.value === '\0guaranteed-invalid' || v.value.startsWith('\0cycle:')))) {
-      return '';
-    }
-    return serialize(resolved);
-  }
-
-  static #resolveVariablesInComponentValues(style: CSSStyleDeclaration, values: ComponentValue[], seen: Set<string>, envMap?: Record<string, string>): ComponentValue[] {
-    const result: ComponentValue[] = [];
-    for (const v of values) {
-      result.push(...Parser.#resolveOneVariable(style, v, seen, envMap));
-    }
-    return result;
-  }
-
-  static #resolveOneVariable(style: CSSStyleDeclaration, v: ComponentValue, seen: Set<string>, envMap?: Record<string, string>): ComponentValue[] {
-    if (v.type === 'function') {
-      const fn = v as CSSFunction;
-      if (fn.name === 'var') return Parser.#resolveVarFunction(style, fn, seen, envMap);
-      if (fn.name === 'env') return Parser.#resolveEnvFunction(style, fn, seen, envMap);
-      return [{ ...fn, value: Parser.#resolveVariablesInComponentValues(style, fn.value, seen, envMap) } as CSSFunction];
-    }
-    if (v.type === 'simple-block') {
-      const block = v as SimpleBlock;
-      return [{ ...block, value: Parser.#resolveVariablesInComponentValues(style, block.value, seen, envMap) } as SimpleBlock];
-    }
-    return [v];
-  }
-
-  // https://drafts.csswg.org/css-variables-1/#replace-a-var
-  static #resolveVarFunction(style: CSSStyleDeclaration, fn: CSSFunction, seen: Set<string>, envMap?: Record<string, string>): ComponentValue[] {
-    const commaIdx = fn.value.findIndex(v => v.type === 'comma');
-    const tokensBeforeComma = commaIdx === -1 ? fn.value : fn.value.slice(0, commaIdx);
-    const argsBeforeComma = tokensBeforeComma.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-    if (argsBeforeComma.length !== 1) return [];
-
-    const firstArg = argsBeforeComma[0];
-    if (firstArg.type !== 'ident' || !Parser.isValidDashedIdent(firstArg.value)) return [];
-
-    const varName = firstArg.value;
-    const hasFallback = commaIdx !== -1;
-    const fallback = hasFallback ? fn.value.slice(commaIdx + 1) : [];
-
-    if (seen.has(varName)) {
-      return [{ type: 'ident', value: '\0cycle:' + varName }];
-    }
-
-    const rawValue = style.getPropertyValue(varName);
-    if (rawValue && rawValue.trim() !== '') {
-      seen.add(varName);
-      let componentValues = Parser.#customPropertyAstCache.get(rawValue);
-      if (!componentValues) {
-        componentValues = Parser.#parseValuesFromString(rawValue);
-        if (Parser.#customPropertyAstCache.size >= Parser.#MAX_CACHE_SIZE) {
-          const firstKey = Parser.#customPropertyAstCache.keys().next().value;
-          if (firstKey !== undefined) Parser.#customPropertyAstCache.delete(firstKey);
-        }
-        Parser.#customPropertyAstCache.set(rawValue, componentValues);
-      }
-
-      const resolved = Parser.#resolveVariablesInComponentValues(style, componentValues, seen, envMap);
-      seen.delete(varName);
-
-      const cycleToken = resolved.find(t => t.type === 'ident' && typeof t.value === 'string' && t.value.startsWith('\0cycle:'));
-      if (cycleToken) {
-        if ((cycleToken.value as string).slice(7) === varName) {
-          return hasFallback
-            ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap)
-            : [{ type: 'ident', value: '\0guaranteed-invalid' }];
-        }
-        return resolved;
-      }
-
-      if (resolved.length === 1 && resolved[0].type === 'ident' && resolved[0].value === '\0guaranteed-invalid') {
-        return hasFallback ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap) : resolved;
-      }
-
-      const def = PropertyRegistry.get(varName);
-      if (def) {
-        const cleanResolved = resolved.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
-        const isCSSWideKeyword = cleanResolved.length === 1 && cleanResolved[0].type === 'ident' &&
-          ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(cleanResolved[0].value.toLowerCase());
-        if (!isCSSWideKeyword && !matchesSyntax(cleanResolved, def.syntax || '*')) {
-          return def.initialValue !== undefined
-            ? Parser.#parseValuesFromString(def.initialValue)
-            : [{ type: 'ident', value: '\0guaranteed-invalid' }];
-        }
-      }
-      return resolved;
-    }
-
-    const def = PropertyRegistry.get(varName);
-    if (def && def.initialValue !== undefined) {
-      return Parser.#parseValuesFromString(def.initialValue);
-    }
-
-    return hasFallback
-      ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap)
-      : [{ type: 'ident', value: '\0guaranteed-invalid' }];
-  }
-
-  // https://drafts.csswg.org/css-env-1/#env-function
-  static #resolveEnvFunction(style: CSSStyleDeclaration, fn: CSSFunction, seen: Set<string>, envMap?: Record<string, string>): ComponentValue[] {
-    const identIdx = fn.value.findIndex(v => v.type === 'ident');
-    if (identIdx === -1) return [fn];
-
-    const envName = (fn.value[identIdx] as Token).value;
-    const indices: string[] = [];
-    for (let i = identIdx + 1; i < fn.value.length; i++) {
-      const v = fn.value[i];
-      if (v.type === 'comma') break;
-      if (v.type === 'number') indices.push((v as Token).value.toString());
-    }
-
-    const fullKey = indices.length > 0 ? `${envName} ${indices.join(' ')}` : envName;
-    const rawValue = envMap?.[fullKey];
-    const commaIdx = fn.value.findIndex(v => v.type === 'comma');
-    const fallback = commaIdx !== -1 ? fn.value.slice(commaIdx + 1) : [];
-
-    if (rawValue !== undefined) {
-      return Parser.#resolveVariablesInComponentValues(style, Parser.#parseValuesFromString(rawValue), seen, envMap);
-    }
-    return fallback.length > 0
-      ? Parser.#resolveVariablesInComponentValues(style, fallback, seen, envMap)
-      : [];
+    return resolveVariables(style, property, envMap);
   }
 }
 

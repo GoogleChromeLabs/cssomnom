@@ -17,7 +17,7 @@
 import { AbstractTokenizer } from './AbstractTokenizer.ts';
 import type { Token } from './types.ts';
 
-export class NeedMoreDataError extends Error {
+class NeedMoreDataError extends Error {
   constructor() {
     super('Need more data');
     this.name = 'NeedMoreDataError';

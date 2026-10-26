@@ -682,13 +682,21 @@ Currently, `src/matcher.ts` uses basic prefix matching (`elementLang === clean |
   - Update `ARCHITECTURE.md` and `README.md` to document `walkRules`, `walkStyleRules`, `getDeclaredProperties`, and `rule.location.{line,column}`.
   - Verify `pnpm run preflight` passes and net `src/` line delta is negative.
 
+## Phase 157: Roadmap Quick Net-Negative Wins [/]
+**Objective**: Execute the three quick net-negative structural cleanups from the Potential Roadmap while maintaining 100% behavioral parity, clean preflight, and zero WPT regressions:
+1. Collapse duplicate variable substitution in [`Parser.resolveVariables`](./src/parser.ts) into a thin wrapper delegating to [`src/cascade/variable-resolver.ts`](./src/cascade/variable-resolver.ts).
+2. Prune dead internal exports across `src/` (preserving the public API surface in `src/index.ts` / `src/browser-entry.ts`) and delete unused `StreamingTokenizerStream` from [`src/TokenStream.ts`](./src/TokenStream.ts).
+3. Move remaining hand-maintained spec data lists (`INHERITED_PROPERTIES` in `src/cascade/types.ts`, `KNOWN_PSEUDO_ELEMENTS` / `KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS` in `src/cascade/index.ts`, and hand-maintained initial-value fallbacks in `src/cascade/value-processor.ts`) into `scripts/codegen/` (`generate_cascade_data.ts` / `generate_selectors.ts`) outputting to `src/data/gen/`.
+
+### Tasks
+- [x] **Collapse `Parser.resolveVariables` (`src/parser.ts`, `src/cascade/variable-resolver.ts`)**: Keep `Parser.resolveVariables(style, property, envMap?)` on the public `Parser` class (preserving `tests/api-surface.test.ts`, `tests/custom-properties.test.ts`, `tests/resolver.test.ts`, `tests/variables.test.ts`, `tests/dist.test.ts`), delegating to the canonical `src/cascade/variable-resolver.ts` engine and deleting the ~135-line duplicate `#resolveVariablesInString` / `#resolveVariablesInComponentValues` implementation in `src/parser.ts`.
+- [x] **Prune Dead Internal Exports & `StreamingTokenizerStream` (`src/`)**: Delete `StreamingTokenizerStream` from `src/TokenStream.ts` (and its sole test in `tests/streaming.test.ts`, keeping `StreamingTokenizer` tests intact). Audit non-entry `src/**/*.ts` modules for dead functions/constants and exports with zero external importers; delete dead code and drop `export` from file-local symbols without altering the public `src/index.ts` / `src/browser-entry.ts` API surface.
+- [x] **Codegen Hand-Maintained Property & Pseudo Lists (`scripts/codegen/`, `src/data/gen/`, `src/cascade/`)**: Extend `scripts/codegen/generate_cascade_data.ts` and `scripts/codegen/generate_selectors.ts` (deriving from `@webref/css` and `mdn-data`, with minimal documented spec supplements only if upstream lacks an entry) to generate `INHERITED_PROPERTIES`, cascade initial-value tables, and `KNOWN_PSEUDO_ELEMENTS` / `KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS`, deleting the hand-maintained sets from `src/cascade/types.ts`, `src/cascade/index.ts`, and `src/cascade/value-processor.ts`. Run `pnpm run codegen` and verify idempotence.
+- [ ] **Verification & Net-Negative Gate**: Verify `pnpm run preflight` and WPT conformance (`pnpm run wpt:verify`), report exact net `src/` line delta (`git diff --shortstat <base>..HEAD -- src ':!src/data/gen'`), and commit cleanly.
+
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
 
-- **Dead exports** (~60 lines): `compareLayerOrder`, `hasUnknownFeature`, `PAGE_DESCRIPTORS`, `isKeywordValue`, `radToDeg` etc. have no references outside their defining file.
-- **`Parser.resolveVariables`** (~140): a second variable-substitution engine in [parser.ts](./src/parser.ts) alongside [variable-resolver.ts](./src/cascade/variable-resolver.ts). Public API, so a thin wrapper would remain.
-- **`StreamingTokenizerStream`** (~50): only used by `tests/streaming.test.ts`.
-- **Codegen hand-maintained lists** (~70): `INHERITED_PROPERTIES`, extra initial values, known pseudo-element sets from `mdn-data` / `@webref/css`.
 - **Codegen box-shorthand tables and shorthand getters** (~580): `shorthands.ts`, `serializer.ts`, `computed-style.ts`.
 - **Unify math engines** (~250): unit tables and simplification duplicated between [math-parser.ts](./src/math-parser.ts) and Typed OM `CSSMathOperations.ts`.
 - **Unify color handling** (~110): [color-resolver.ts](./src/cascade/color-resolver.ts) vs Typed OM `color-spaces.ts`.

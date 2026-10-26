@@ -24,10 +24,23 @@ function main() {
     
     const pseudoClasses = new Set<string>();
     const pseudoElements = new Set<string>();
+    const knownPseudoElements = new Set<string>();
+    const knownFunctionalPseudoElements = new Set<string>();
 
     for (const [name] of Object.entries(selectors)) {
         if (name.startsWith('::')) {
-            pseudoElements.add(name.substring(2).replace('()', '').toLowerCase());
+            const raw = name.substring(2);
+            if (raw.endsWith('()')) {
+                const clean = raw.slice(0, -2).toLowerCase();
+                pseudoElements.add(clean);
+                knownFunctionalPseudoElements.add(clean);
+            } else {
+                const clean = raw.toLowerCase();
+                pseudoElements.add(clean);
+                if (!clean.startsWith('-')) {
+                    knownPseudoElements.add(clean);
+                }
+            }
         } else if (name.startsWith(':')) {
             pseudoClasses.add(name.substring(1).replace('()', '').toLowerCase());
         }
@@ -59,6 +72,26 @@ function main() {
 
     tsContent += `export const PSEUDO_ELEMENTS: Set<string> = new Set([\n`;
     for (const s of Array.from(pseudoElements).sort()) {
+        tsContent += `  '${s}',\n`;
+    }
+    tsContent += `]);\n\n`;
+
+    tsContent += `/**
+ * Known standard non-functional pseudo-elements recognized by the cascade.
+ * selectors-4 § 3.7 #pseudo-elements
+ */
+export const KNOWN_PSEUDO_ELEMENTS: ReadonlySet<string> = new Set([\n`;
+    for (const s of Array.from(knownPseudoElements).sort()) {
+        tsContent += `  '${s}',\n`;
+    }
+    tsContent += `]);\n\n`;
+
+    tsContent += `/**
+ * Known standard functional pseudo-elements recognized by the cascade.
+ * selectors-4 § 3.7 #pseudo-elements
+ */
+export const KNOWN_FUNCTIONAL_PSEUDO_ELEMENTS: ReadonlySet<string> = new Set([\n`;
+    for (const s of Array.from(knownFunctionalPseudoElements).sort()) {
         tsContent += `  '${s}',\n`;
     }
     tsContent += `]);\n`;

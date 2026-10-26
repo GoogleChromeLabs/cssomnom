@@ -29,6 +29,7 @@ interface WebrefProperty {
   appliesTo?: string;
   syntax?: string;
   computedValue?: string;
+  inherited?: boolean | string;
 }
 
 interface MdnProperty {
@@ -37,6 +38,7 @@ interface MdnProperty {
   groups?: string[];
   appliesto?: string;
   computed?: string;
+  inherited?: boolean | string;
 }
 
 // Standard cross-spec CSS styling properties that SVG 2 § 6.2 explicitly lists as presentation attributes
@@ -183,9 +185,42 @@ function main() {
   };
   Object.assign(defaultPropertyValues, computedFallbacks);
 
+  // Spec supplements and initial values needed for WPT and WebKit compatibility
+  const extraInitialValues: Record<string, string> = {
+    '-webkit-mask-box-image-outset': '0',
+    '-webkit-mask-box-image-repeat': 'stretch',
+    '-webkit-mask-box-image-slice': '0 fill',
+    '-webkit-mask-box-image-source': 'none',
+    '-webkit-mask-box-image-width': 'auto',
+    '-webkit-text-fill-color': 'currentcolor',
+    '-webkit-text-stroke-color': 'currentcolor',
+    '-webkit-text-stroke-width': '0px',
+    'background-tbd': 'none',
+    'font-presentation': 'auto',
+    'stop-opacity': '1',
+  };
+  Object.assign(defaultPropertyValues, extraInitialValues);
+
   const sortedDefaultKeys = Object.keys(defaultPropertyValues).sort();
 
-  // 4. Generate Output Code
+  // 4. Extract Inherited Properties dynamically from @webref/css and mdn-data
+  const inheritedPropertySet = new Set<string>();
+
+  for (const prop of webref.properties) {
+    if (prop.inherited === true || prop.inherited === 'yes') {
+      inheritedPropertySet.add(prop.name);
+    }
+  }
+
+  for (const [name, prop] of Object.entries(mdn)) {
+    if (prop.inherited === true) {
+      inheritedPropertySet.add(name);
+    }
+  }
+
+  const inheritedProperties = Array.from(inheritedPropertySet).sort();
+
+  // 5. Generate Output Code
   let code = `/**
  * @license
  * Copyright 2026 Google LLC
@@ -239,7 +274,18 @@ export const DEFAULT_PROPERTY_VALUES: Readonly<Record<string, string>> = {\n`;
   for (const key of sortedDefaultKeys) {
     code += `  '${key}': ${JSON.stringify(defaultPropertyValues[key])},\n`;
   }
-  code += `};\n`;
+  code += `};\n\n`;
+
+  code += `/**
+ * Standard CSS properties that are inherited by default according to CSS specs.
+ * css-cascade-5 § 7.2 #inheriting
+ */
+export const INHERITED_PROPERTIES: ReadonlySet<string> = new Set([\n`;
+
+  for (const prop of inheritedProperties) {
+    code += `  '${prop}',\n`;
+  }
+  code += `]);\n`;
 
   const outDir = path.dirname(OUTPUT_CASCADE_PATH);
   if (!fs.existsSync(outDir)) {

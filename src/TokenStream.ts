@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 import type { Token, TokenStream, ComponentValue, ComponentValueStream } from './types.ts';
-import type { StreamingTokenizer } from './streaming-tokenizer.ts';
 
 // css-syntax-3 § 5.3 Token Streams #parser-definitions
 export class ArrayTokenStream implements TokenStream {
@@ -78,32 +77,6 @@ export class ArrayComponentValueStream implements ComponentValueStream {
   }
 }
 
-// css-syntax-3 § 4 #tokenization & § 5.3 #parser-definitions (on-demand tokenization)
-export class StreamingTokenizerStream implements TokenStream {
-  private tokenizer: StreamingTokenizer;
-  private bufferedTokens: Token[] = [];
-
-  constructor(tokenizer: StreamingTokenizer) {
-    this.tokenizer = tokenizer;
-  }
-
-  // css-syntax-3 § 5.3 #parser-definitions (consume a token)
-  next(): Token {
-    const token = this.peek();
-    if (token.type !== 'EOF' && this.bufferedTokens.length > 0) {
-      this.bufferedTokens.shift();
-    }
-    return token;
-  }
-
-  // css-syntax-3 § 5.3 #parser-definitions (next token)
-  peek(): Token {
-    if (this.bufferedTokens.length === 0) {
-      this.bufferedTokens.push(...this.tokenizer.getTokens());
-    }
-    return this.bufferedTokens[0] || { type: 'EOF', value: '' };
-  }
-}
 
 // css-syntax-3 § 5.3 Token Streams #parser-definitions
 export class LazyComponentValueStream implements ComponentValueStream {

@@ -618,7 +618,7 @@ function parseBorderTriplet(
   return { widthVal, styleVal, colorVal };
 }
 
-export const BORDER_IMAGE_LONGHANDS = [
+const BORDER_IMAGE_LONGHANDS = [
   'border-image-source',
   'border-image-slice',
   'border-image-width',
@@ -626,7 +626,7 @@ export const BORDER_IMAGE_LONGHANDS = [
   'border-image-repeat',
 ] as const;
 
-export const BORDER_ALL_LONGHANDS = [
+const BORDER_ALL_LONGHANDS = [
   'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
   'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
   'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
@@ -819,7 +819,7 @@ function contractOutline(values: Record<string, ComponentValue[]>): string | nul
   return parts.length === 0 ? 'none' : parts.join(' ');
 }
 
-export const FONT_VARIANT_LONGHANDS = [
+const FONT_VARIANT_LONGHANDS = [
   'font-variant-ligatures',
   'font-variant-caps',
   'font-variant-alternates',
@@ -926,7 +926,7 @@ function contractFontVariant(values: Record<string, ComponentValue[]>): string |
   return nonNormal.length === 0 ? 'normal' : nonNormal.join(' ');
 }
 
-export const FONT_LONGHANDS = [
+const FONT_LONGHANDS = [
   'font-style',
   'font-variant-caps',
   'font-variant-ligatures',
@@ -1077,7 +1077,7 @@ function contractFont(values: Record<string, ComponentValue[]>): string | null {
   return parts.join(' ');
 }
 
-export const LIST_STYLE_LONGHANDS = ['list-style-type', 'list-style-position', 'list-style-image'] as const;
+const LIST_STYLE_LONGHANDS = ['list-style-type', 'list-style-position', 'list-style-image'] as const;
 
 function expandListStyle(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
   const filtered = filterSignificantTokens(values);
@@ -1154,7 +1154,7 @@ function contractListStyle(values: Record<string, ComponentValue[]>): string | n
   return parts.length === 0 ? 'disc' : parts.join(' ');
 }
 
-export const FLEX_LONGHANDS = ['flex-grow', 'flex-shrink', 'flex-basis'] as const;
+const FLEX_LONGHANDS = ['flex-grow', 'flex-shrink', 'flex-basis'] as const;
 const FLEX_BASIS_KEYWORDS = new Set(['auto', 'content', 'max-content', 'min-content', 'fit-content']);
 
 function expandFlex(values: ComponentValue[]): Record<string, ComponentValue[]> | null {

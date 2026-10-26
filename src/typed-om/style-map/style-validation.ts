@@ -173,7 +173,7 @@ export function getDummyStyle(): DummyStyle {
   return fallbackStyle;
 }
 
-export function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
+function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
   const propLower = property.toLowerCase();
   if (propLower.startsWith('--')) return false;
 
@@ -200,7 +200,7 @@ export function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
 
 // Spec: CSS Typed OM Level 1 § 3.2 #the-stylepropertymap
 // Spec: CSS Properties and Values API Level 1 § 3 #syntax-strings
-export function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propKey: string): boolean {
+function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propKey: string): boolean {
   const propLower = propKey.toLowerCase();
   if (value instanceof CSSUnparsedValue || value instanceof CSSVariableReferenceValue) {
     return true;

@@ -19,8 +19,6 @@ import assert from 'node:assert';
 import { tokenize } from '../src/tokenizer.ts';
 import { StreamingTokenizer } from '../src/streaming-tokenizer.ts';
 import type { Token } from '../src/types.ts';
-import { Parser } from '../src/parser.ts';
-import { StreamingTokenizerStream } from '../src/TokenStream.ts';
 
 function assertTokensEqual(actual: Token[], expected: Token[]) {
   assert.strictEqual(actual.length, expected.length, `Expected \${expected.length} tokens, got \${actual.length}`);
@@ -144,27 +142,4 @@ test('streaming: character by character', () => {
   const actualTokens = tokenizer.getTokens();
   
   assertTokensEqual(actualTokens, expectedTokens);
-});
-
-test('streaming: parser integration', () => {
-  const input = 'div { color: red; } @media (min-width: 600px) { .bar { color: green; } }';
-  
-  // Non-streaming baseline
-  const normalTokens = tokenize(input);
-  const normalParser = new Parser(normalTokens);
-  const normalSheet = normalParser.parseStyleSheet();
-  
-  // Streaming
-  const tokenizer = new StreamingTokenizer();
-  const stream = new StreamingTokenizerStream(tokenizer);
-  const streamingParser = new Parser(stream);
-  
-  tokenizer.appendChunk('div { color: red; } ');
-  tokenizer.appendChunk('@media (min-width: 600px) { .bar { color: green; } }');
-  tokenizer.close();
-  
-  const streamingSheet = streamingParser.parseStyleSheet();
-  
-  const getRulesText = (sheet: { cssRules: ArrayLike<{ cssText: string }> }) => Array.from(sheet.cssRules).map(r => r.cssText);
-  assert.deepStrictEqual(getRulesText(streamingSheet), getRulesText(normalSheet));
 });

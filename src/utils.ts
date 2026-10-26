@@ -61,8 +61,8 @@ export function deleteRuleFromArray(rules: Rule[], index: number): Rule {
   return oldRule;
 }
 
-export const DEG_TO_RAD = Math.PI / 180;
-export const RAD_TO_DEG = 180 / Math.PI;
+const DEG_TO_RAD = Math.PI / 180;
+const RAD_TO_DEG = 180 / Math.PI;
 
 export function degToRad(deg: number): number {
   return deg * DEG_TO_RAD;

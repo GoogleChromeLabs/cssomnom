@@ -16,13 +16,13 @@
  */
 
 import { tokenize } from '../tokenizer.ts';
-import { Parser } from '../parser.ts';
+import { ParseHooks } from '../parse-hooks.ts';
 import { serialize } from '../serializer.ts';
 import type { ComponentValue, SimpleBlock, Token, CSSFunction } from '../types.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import type { MatchedDeclaration } from './types.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
-import { PropertyRegistry } from '../PropertyRegistry.ts';
+import { PropertyRegistry, type PropertyDefinition, matchesSyntax } from '../PropertyRegistry.ts';
 import { parseMathFunction, simplify } from '../math-parser.ts';
 
 const STANDARD_ENV_VARS: Record<string, string> = {
@@ -48,6 +48,28 @@ const STANDARD_ENV_VARS: Record<string, string> = {
  * css-variables-1 § 4.4 #cycles
  * css-env-1 § 3.1 #syntax-of-env
  */
+function hasSubstitutionValue(tokens: ComponentValue[]): boolean {
+  for (const t of tokens) {
+    if (t.type === 'function' && 'name' in t && Array.isArray(t.value)) {
+      const fnName = (t as CSSFunction).name.toLowerCase();
+      if (
+        fnName === 'var' ||
+        fnName === 'env' ||
+        fnName === 'attr' ||
+        fnName === 'ident' ||
+        fnName === 'if' ||
+        fnName === 'random-item'
+      ) {
+        return true;
+      }
+      if (hasSubstitutionValue(t.value)) return true;
+    } else if (t.type === 'simple-block' && Array.isArray(t.value)) {
+      if (hasSubstitutionValue(t.value)) return true;
+    }
+  }
+  return false;
+}
+
 export function substituteVariables(
   valueText: string,
   customProps: Map<string, string>,
@@ -56,7 +78,9 @@ export function substituteVariables(
   element?: unknown,
   taintedProps: Set<string> = new Set(),
   isTaintedOut?: { tainted: boolean },
-  activeProperties?: Map<string, PropertyDefinition>
+  activeProperties?: Map<string, PropertyDefinition>,
+  envMap?: Record<string, string>,
+  preserveWhitespace: boolean = false
 ): string | null {
   if (
     !valueText ||
@@ -72,7 +96,7 @@ export function substituteVariables(
 
   let hasAttrTaint = false;
   const tokens = tokenize(valueText);
-  const componentValues = new Parser(tokens).parseComponentValues();
+  const componentValues = ParseHooks.parseComponentValues(tokens);
   const resolveNodes = (nodes: ComponentValue[], inVarContext = false): ComponentValue[] | null => {
     const result: ComponentValue[] = [];
     const pushTokens = (tokens: ComponentValue[]) => {
@@ -95,10 +119,25 @@ export function substituteVariables(
           const envIdent = nonWsNameTokens.find(t => t.type === 'ident' && typeof (t as Token).value === 'string');
           const envName = envIdent ? ((envIdent as Token).value as string).toLowerCase() : '';
 
-          if (envName && envName in STANDARD_ENV_VARS) {
-            const envVal = STANDARD_ENV_VARS[envName];
-            pushTokens(tokenize(envVal));
-            continue;
+          const indices: string[] = [];
+          if (envIdent) {
+            const identIdx = nonWsNameTokens.indexOf(envIdent);
+            for (let k = identIdx + 1; k < nonWsNameTokens.length; k++) {
+              const tok = nonWsNameTokens[k];
+              if (tok.type === 'number') indices.push(String((tok as Token).value));
+            }
+          }
+          const fullKey = indices.length > 0 ? `${envName} ${indices.join(' ')}` : envName;
+
+          const envVal = envMap?.[fullKey] ?? (envName in STANDARD_ENV_VARS ? STANDARD_ENV_VARS[envName] : undefined);
+          if (envVal !== undefined) {
+            const parsedEnv = ParseHooks.parseComponentValues(tokenize(envVal));
+            const resolvedEnv = resolveNodes(parsedEnv, inVarContext);
+            if (resolvedEnv !== null) {
+              pushTokens(resolvedEnv);
+              continue;
+            }
+            return null;
           }
 
           if (fallbackTokens) {
@@ -252,6 +291,8 @@ export function substituteVariables(
             nameTokens = (nonWsNameTokens[0] as SimpleBlock).value;
           }
 
+          const hasSubstInName = hasSubstitutionValue(nameTokens);
+
           // Evaluate nested substitution functions in name argument: css-variables-2 § 3 #replace-a-var-function
           let varName: string | undefined;
           let nameWasTainted = false;
@@ -279,7 +320,7 @@ export function substituteVariables(
           }
 
           if (!varName) {
-            if (fallbackTokens) {
+            if (hasSubstInName && fallbackTokens) {
               const resolvedFallback = resolveNodes(fallbackTokens, true);
               if (resolvedFallback === null) return null;
               if (nameWasTainted) hasAttrTaint = true;
@@ -329,6 +370,7 @@ export function substituteVariables(
               return null;
             }
 
+            let substitutedTokens: ComponentValue[];
             if (
               rawCustomVal.includes('var(') ||
               rawCustomVal.includes('env(') ||
@@ -340,7 +382,7 @@ export function substituteVariables(
               const nextStack = new Set(resolvingStack);
               nextStack.add(varName);
               const subTaint = { tainted: false };
-              const resolvedCustom = substituteVariables(rawCustomVal, customProps, nextStack, cyclicProps, element, taintedProps, subTaint, activeProperties);
+              const resolvedCustom = substituteVariables(rawCustomVal, customProps, nextStack, cyclicProps, element, taintedProps, subTaint, activeProperties, envMap, true);
               if (subTaint.tainted) hasAttrTaint = true;
               if (resolvedCustom === null || cyclicProps.has(varName)) {
                 cyclicProps.add(varName);
@@ -353,18 +395,39 @@ export function substituteVariables(
                 }
                 return null;
               }
-              const substitutedTokens = tokenize(resolvedCustom);
-              pushTokens(substitutedTokens);
+              substitutedTokens = ParseHooks.parseComponentValues(tokenize(resolvedCustom));
             } else {
-              const substitutedTokens = tokenize(rawCustomVal);
-              pushTokens(substitutedTokens);
+              substitutedTokens = ParseHooks.parseComponentValues(tokenize(rawCustomVal));
             }
+
+            const jsDef = PropertyRegistry.get(varName);
+            const def = (jsDef && jsDef.origin === 'js') ? jsDef : (activeProperties?.get(varName) ?? jsDef);
+            if (def) {
+              const cleanTokens = substitutedTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+              const isCSSWideKeyword = cleanTokens.length === 1 && cleanTokens[0].type === 'ident' &&
+                ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(String((cleanTokens[0] as Token).value).toLowerCase());
+              if (!isCSSWideKeyword && !matchesSyntax(cleanTokens, def.syntax || '*')) {
+                if (def.initialValue !== undefined) {
+                  substitutedTokens = ParseHooks.parseComponentValues(tokenize(def.initialValue));
+                } else if (fallbackTokens) {
+                  const resolvedFallback = resolveNodes(fallbackTokens);
+                  if (resolvedFallback === null) return null;
+                  if (nameWasTainted) hasAttrTaint = true;
+                  pushTokens(resolvedFallback);
+                  continue;
+                } else {
+                  return null;
+                }
+              }
+            }
+
+            pushTokens(substitutedTokens);
           } else {
             // css-properties-values-api-1 § 5
             const jsDef = PropertyRegistry.get(varName);
             const def = (jsDef && jsDef.origin === 'js') ? jsDef : (activeProperties?.get(varName) ?? jsDef);
             if (def?.initialValue !== undefined) {
-              const substitutedTokens = tokenize(def.initialValue);
+              const substitutedTokens = ParseHooks.parseComponentValues(tokenize(def.initialValue));
               pushTokens(substitutedTokens);
             } else if (fallbackTokens) {
               const resolvedFallback = resolveNodes(fallbackTokens);
@@ -397,7 +460,73 @@ export function substituteVariables(
   if (isTaintedOut) {
     isTaintedOut.tainted = hasAttrTaint;
   }
-  return serialize(resolved, true).trim();
+  const serialized = serialize(resolved, true);
+  return preserveWhitespace ? serialized : serialized.trim();
+}
+
+/**
+ * Resolves all CSS custom properties and environment variables on a style declaration for a property.
+ * css-variables-1 § 4 #resolving-var-functions
+ * css-env-1 § 3.1 #syntax-of-env
+ */
+export function resolveVariables(
+  style: CSSStyleDeclaration,
+  property: string,
+  envMap?: Record<string, string>
+): string {
+  const value = style.getPropertyValue(property);
+  if (!value) return '';
+
+  const customProps = new Map<string, string>();
+  for (let i = 0; i < style.length; i++) {
+    const propName = style[i];
+    if (propName && propName.startsWith('--')) {
+      customProps.set(propName, style.getPropertyValue(propName));
+    }
+  }
+
+  const stack = new Set<string>();
+  if (property.startsWith('--')) {
+    stack.add(property);
+  }
+
+  const cyclicProps = new Set<string>();
+  const res = substituteVariables(
+    value,
+    customProps,
+    stack,
+    cyclicProps,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    envMap,
+    true
+  );
+
+  if (res === null || cyclicProps.has(property)) {
+    return '';
+  }
+
+  if (property.startsWith('--')) {
+    const def = PropertyRegistry.get(property);
+    if (def) {
+      const tokens = ParseHooks.parseComponentValues(tokenize(res)).filter(
+        t => t.type !== 'whitespace' && t.type !== 'comment'
+      );
+      const isCSSWideKeyword =
+        tokens.length === 1 &&
+        tokens[0].type === 'ident' &&
+        ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(
+          String((tokens[0] as Token).value).toLowerCase()
+        );
+      if (!isCSSWideKeyword && !matchesSyntax(tokens, def.syntax || '*')) {
+        return def.initialValue ?? '';
+      }
+    }
+  }
+
+  return res;
 }
 
 /**

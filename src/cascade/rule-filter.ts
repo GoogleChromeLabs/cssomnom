@@ -17,6 +17,7 @@
 
 import { calculateSpecificity, compareSpecificity } from '../specificity.ts';
 import { resolveMediaEnvironment } from './layer-manager.ts';
+import { findParentStyleSheet } from '../rules/utils.ts';
 import {
   CSSRule,
   CSSStyleRule,
@@ -405,15 +406,6 @@ function normalizeScopeEndSelector(rawEnd: string): string {
     }
     return p;
   }).join(', ');
-}
-
-function findParentStyleSheet(rule: unknown): CSSStyleSheet | null {
-  let curr = rule as { parentRule?: unknown; parentStyleSheet?: CSSStyleSheet | null } | null;
-  while (curr) {
-    if (curr.parentStyleSheet) return curr.parentStyleSheet;
-    curr = curr.parentRule as typeof curr;
-  }
-  return null;
 }
 
 function getRuleBaseURL(rule: unknown, element?: unknown): string | null {
