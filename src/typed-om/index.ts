@@ -215,3 +215,8 @@ setParseTransformListHook((str) => {
   }
 });
 
+import { ParseHooks } from '../parse-hooks.ts';
+import type { StyleLike } from './style-map/StylePropertyMap.ts';
+ParseHooks.createStylePropertyMap = (style: unknown) => new StylePropertyMap(style as StyleLike);
+
+

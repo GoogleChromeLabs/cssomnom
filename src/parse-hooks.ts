@@ -56,8 +56,13 @@ export const ParseHooks = {
   ): SelectorList | null => {
     throw new Error('parseSelectorAST not injected');
   },
-  parseMediaQueryList: (_text: string): MediaQuery[] => {
-    throw new Error('parseMediaQueryList not injected');
+  parseMediaQueryList: (text: string): MediaQuery[] => {
+    return text.split(',').map(s => s.trim()).filter(Boolean).map(m => ({
+      type: 'media-query' as const,
+      mediaType: m,
+      tokens: [],
+      raw: m,
+    }));
   },
 
   validateCustomPropertyValue: (_values: ComponentValue[]): boolean => {
@@ -80,5 +85,11 @@ export const ParseHooks = {
   },
   supports: (_conditionText: string): boolean => {
     return false;
+  },
+  createStylePropertyMap: (_style: unknown): unknown => {
+    throw new Error('createStylePropertyMap not injected (import cssomnom/typed-om)');
+  },
+  serializeMediaQuery: (query: MediaQuery): string => {
+    return (query as { raw?: string }).raw ?? query.mediaType ?? '';
   }
 };

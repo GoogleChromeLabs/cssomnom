@@ -26,7 +26,6 @@ import { substituteVariables } from './variable-resolver.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
-import '../parser.ts';
 import type { PropertyDefinition } from '../PropertyRegistry.ts';
 
 export function isSvgElement(element: unknown): boolean {

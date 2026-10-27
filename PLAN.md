@@ -186,7 +186,7 @@ Completed phases 1–125 live in [PLAN.archive.md](./PLAN.archive.md). Every ~20
   - Added `interfaceName` option for clean error messages and `exclude` option for internal properties.
   - Added `rejectOperations` option supporting async operations (e.g. `CSSStyleSheet.prototype.replace`) to return rejected promises rather than throwing synchronously on brand/arity failure.
   - Added `applyWebIDLPrototypeDescriptors(ctor)` for light enumerability enforcement.
-  - Removed duplicate `applyWebIDLInterface` in `src/typed-om/utils/webidl.ts`, unifying logic in `src/webidl.ts`.
+  - Removed duplicate `applyWebIDLInterface` in Typed OM `webidl.ts`, unifying logic in `src/webidl.ts`.
   - Enforced API surface boundaries in `tests/api-surface.test.ts` ensuring WebIDL utility helpers are not exposed on the public package entry point.
 - [x] **Verification & Conformance**:
   - Conformance moved 19,638/22,517 (87.2%) -> 20,020/22,494 (89.0%) over this span.
@@ -714,21 +714,24 @@ Result (`3e68527`): `src/` (excluding `src/data/gen`) net **−110 lines** (`185
   - `@supports` & `CSS.supports`: discard grammatically invalid `@supports` preludes (`BC-38`), do not trim `property` in 2-arg `CSS.supports(property, value)` (`BC-39`), allow trailing `!important` in `<supports-decl>` (`BC-40`), reject non-parenthesized operands in `not`/`or` conditions (`BC-41`), implement normative 2-step `CSS.supports(conditionText)` parenthesization fallback (`BC-42`), pass empty `declaredNamespaces: new Set()` in `CSS.supports("selector(...)")` (`BC-43`), and add `CSSSupportsRule.prototype.matches` (`BC-44`).
   - Logical properties & shorthands: guard `'logical '` prefix against CSS-wide keywords and include `border-width`/`border-style`/`border-color` (`BC-45`), include flow-relative properties in `ALL_SHORTHAND_LONGHANDS` / `hasOverridingLonghand` / `LONGHAND_TO_SHORTHAND` (`BC-46`), and support `sideways-rl`/`sideways-lr` in `scripts/codegen/generate_logical_mappings.ts` (`BC-47`).
 
-## Phase 159: `linkedom` Integration & Tree-Shakeable Bundle Readiness [ ]
+## Phase 159: `linkedom` Integration & Tree-Shakeable Bundle Readiness [x]
 **Objective**: Make `cssomnom` a zero-friction, tree-shakeable drop-in replacement for `@acemir/cssom` and `uhyphen` in `WebReflection/linkedom` (addressing [`linkedom#352`](https://github.com/WebReflection/linkedom/issues/352), [`linkedom#348`](https://github.com/WebReflection/linkedom/issues/348), [`linkedom#327`](https://github.com/WebReflection/linkedom/issues/327), [`linkedom#201`](https://github.com/WebReflection/linkedom/issues/201), and [`linkedom#92`](https://github.com/WebReflection/linkedom/issues/92)).
 
 ### Tasks
-- [ ] **159.1 — Make `{ parse }` Tree-Shakeable (~50% Smaller Bundle for `linkedom/worker.js`)**:
+- [x] **159.1 — Make `{ parse }` Tree-Shakeable (~50% Smaller Bundle for `linkedom/worker.js`)**:
   - Decouple [`src/parser.ts`](./src/parser.ts) from [`src/cascade.ts`](./src/cascade.ts) (attach `Parser.getCascadedStyle` and `Parser.resolveVariables` from `src/cascade.ts` / `src/index.ts` instead of importing `cascade.ts` in `parser.ts`).
-  - Decouple [`src/rules/style.ts`](./src/rules/style.ts) from [`src/typed-om.ts`](./src/typed-om.ts) by wiring `CSSStyleRule.prototype.styleMap` (`StylePropertyMap` instantiation) through [`ParseHooks`](./src/parse-hooks.ts).
-  - Add `"sideEffects": false` to `package.json` and expose a `./parse` subpath export (and multi-entry / tree-shakeable ESM build) so bundling `{ parse, CSSStyleDeclaration, CSSStyleSheet }` excludes `cascade/`, `typed-om/`, `DOMMatrix.ts`, `matcher.ts`, and `MediaParser.ts`.
-- [ ] **159.2 — Public `CSSStyleDeclaration` `onChange` & Silent `Attr` Hydration API**:
-  - Promote `CSSStyleDeclaration._onChange` ([`src/CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts)) to a clean public API (supporting an `onChange` callback and a silent `cssText` hydration/reset method that updates declarations from an element's `style` `Attr` without firing `onChange`, while keeping `_onChange` as an alias for internal compatibility).
-  - Verify with unit tests modeling `linkedom`'s `esm/interface/css-style-declaration.js` (`MutationObserver`, custom element `attributeChangedCallback`, `el.style.color = ''` removal for `linkedom#327`, `;` in `url(data:...)`, `--customProp` case preservation, `cssFloat`).
-- [ ] **159.3 — Unify `XMLDocument` / `SVGDocument` Case-Sensitivity Detection in `src/matcher.ts`**:
-  - Extract a shared `isXmlDocument(element)` helper in [`src/matcher.ts`](./src/matcher.ts) (`doc.contentType ? doc.contentType !== 'text/html' : (doc.constructor?.name === 'XMLDocument' || doc.constructor?.name === 'SVGDocument')`) and use it at lines 315, 488, and 1043 so `linkedom`'s `XMLDocument` (where `contentType` is `undefined`) matches type and attribute selectors case-sensitively.
-- [ ] **159.4 — Bounded Selector AST Cache in `src/matcher.ts` (`linkedom#348`)**:
-  - Add a bounded Map/LRU cache in [`src/matcher.ts`](./src/matcher.ts) for parsed `SelectorList` ASTs when no `@namespace` rules exist on the owner document, avoiding repeated `tokenize()` + `SelectorParser` work on repeated `matches()`, `closest()`, `querySelector()`, and `querySelectorAll()` calls.
+  - Decouple [`src/CSSOM.ts`](./src/CSSOM.ts) from [`src/typed-om.ts`](./src/typed-om.ts) by wiring `CSSStyleRule.prototype.styleMap` (`StylePropertyMap` instantiation) through [`ParseHooks`](./src/parse-hooks.ts).
+  - Add targeted `sideEffects` array to `package.json` and expose a `./parse` subpath export (`dist/parse.js`, `dist/parse-entry.d.ts`) so bundling `{ parse, CSSStyleDeclaration, CSSStyleSheet }` excludes `cascade/`, `typed-om/`, `DOMMatrix.ts`, `matcher.ts`, and `MediaParser.ts` (bundle size reduced from 872.9 KB to 439.0 KB, a 49.7% reduction).
+- [x] **159.2 — Public `CSSStyleDeclaration` `onChange` & Silent `Attr` Hydration API**:
+  - Promote `CSSStyleDeclaration._onChange` ([`src/CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts)) to a clean public API supporting `onChange` getter/setter and `(parentRule?, onChange?)` constructor arguments.
+  - Implement `setCssTextSilent(value: string)` for non-notifying attribute hydration from element `style` attribute.
+  - Verified with unit tests: `onChange` callbacks on property assignment, `removeProperty`, `style.color = ''` removal (`linkedom#327`), `cssText = ...` notifying with `force: true`, `setCssTextSilent` updating without notifying, `--customProp` exact case preservation, and `cssFloat` alias.
+- [x] **159.3 — Unify `XMLDocument` / `SVGDocument` Case-Sensitivity Detection in `src/matcher.ts`**:
+  - Extract a shared `isXmlDocument(element)` helper in [`src/matcher.ts`](./src/matcher.ts) (`doc.contentType ? doc.contentType !== 'text/html' : (doc.constructor?.name === 'XMLDocument' || doc.constructor?.name === 'SVGDocument')`) and use it in `matchSimpleSelector` (type selectors), `isHTMLCaseInsensitiveAttribute`, and `getElementLanguage` so `linkedom`'s `XMLDocument` and `SVGDocument` (where `contentType` is `undefined`) match type and attribute selectors case-sensitively.
+- [x] **159.4 — Bounded Selector AST Cache in `src/matcher.ts` (`linkedom#348`)**:
+  - Implement bounded LRU `selectorCache` (`SELECTOR_CACHE_MAX_SIZE = 1000`) in `parseSelector` within [`src/matcher.ts`](./src/matcher.ts), avoiding repeated tokenization and AST parsing on repeated selector queries. Export `selectorCache`, `clearSelectorCache()`, and `SELECTOR_CACHE_MAX_SIZE` for test inspection.
+
+Result: Tree-shakeable `cssomnom/parse` subpath export reduces standalone parsing bundle size from 872.9 KB to 439.0 KB (49.7% reduction) for `linkedom/worker.js`. Public `CSSStyleDeclaration.onChange` and `setCssTextSilent` enable seamless DOM mutation tracking without infinite cycles. `isXmlDocument` and bounded LRU `selectorCache` (1,000 entries) in `matcher.ts` resolve `linkedom#352`, `#348`, and `#327`.
 
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**

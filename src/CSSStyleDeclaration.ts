@@ -128,11 +128,37 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return this._parentRule;
   }
 
-  constructor(declarations: Declaration[] = [], readonlyFlag: boolean = false) {
+  get onChange(): ((force?: boolean) => void) | null {
+    return this._onChange ?? null;
+  }
+
+  set onChange(fn: ((force?: boolean) => void) | null) {
+    this._onChange = fn ?? null;
+  }
+
+  constructor(
+    parentRuleOrDeclarations?: CSSRule | Declaration[] | null,
+    onChangeOrReadonly?: ((force?: boolean) => void) | boolean | null
+  ) {
     super();
     this._declarations = [];
     this._declMap = new Map();
-    this._readonly = readonlyFlag;
+
+    let declarations: Declaration[] = [];
+    if (Array.isArray(parentRuleOrDeclarations)) {
+      declarations = parentRuleOrDeclarations;
+      this._readonly = typeof onChangeOrReadonly === 'boolean' ? onChangeOrReadonly : false;
+      if (typeof onChangeOrReadonly === 'function') {
+        this._onChange = onChangeOrReadonly;
+      }
+    } else {
+      this._parentRule = parentRuleOrDeclarations ?? null;
+      this._readonly = typeof onChangeOrReadonly === 'boolean' ? onChangeOrReadonly : false;
+      if (typeof onChangeOrReadonly === 'function') {
+        this._onChange = onChangeOrReadonly;
+      }
+    }
+
     const addDeclarationRecursive = (decl: Declaration) => {
       if (decl.name === '--') return;
       const normalizedName = decl.name.startsWith('--') ? decl.name : decl.name.toLowerCase();
@@ -715,18 +741,15 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return serializeDeclarations(this._declarations);
   }
 
-  set cssText(value: string) {
-    if (this._readonly) {
-      throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
-    }
+  private _applyCssText(value: string): boolean {
     const tokens = tokenize(value);
     let newStyle;
     try {
       newStyle = ParseHooks.parseStyleAttribute(tokens);
     } catch {
-      return;
+      return false;
     }
-    if (!newStyle) return;
+    if (!newStyle) return false;
 
     this._declarations.length = 0;
     this._declMap.clear();
@@ -759,8 +782,23 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       }
       this._addDeclaration(d);
     }
+    return true;
+  }
 
-    this._onChange?.(true);
+  set cssText(value: string) {
+    if (this._readonly) {
+      throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
+    }
+    if (this._applyCssText(value)) {
+      this._onChange?.(true);
+    }
+  }
+
+  setCssTextSilent(value: string): void {
+    if (this._readonly) {
+      throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
+    }
+    this._applyCssText(value);
   }
 
 

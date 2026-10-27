@@ -73,7 +73,9 @@ function isTemplatePlaceholder(pathStr: string): boolean {
   return (
     pathStr.includes('/path/to/') ||
     pathStr.includes('filename.ext') ||
-    pathStr.includes('example.com')
+    pathStr.includes('example.com') ||
+    pathStr.includes('<') ||
+    pathStr.includes('>')
   );
 }
 

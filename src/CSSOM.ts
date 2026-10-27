@@ -17,7 +17,7 @@
 import { ParseHooks } from './parse-hooks.ts';
 import { serializeDeclarations, serializeSelectorList } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
-import { StylePropertyMap } from './typed-om.ts';
+import type { StylePropertyMap } from './typed-om.ts';
 import type { Declaration, Rule, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { deleteRuleFromArray } from './utils.ts';
@@ -468,9 +468,9 @@ export class CSSStyleRule extends CSSGroupingRule {
       throw new TypeError("Value of 'this' is not a CSSStyleRule");
     }
     if (!this._styleMap) {
-      this._styleMap = new StylePropertyMap(this._style);
+      this._styleMap = ParseHooks.createStylePropertyMap(this._style) as StylePropertyMap;
     }
-    return this._styleMap;
+    return this._styleMap!;
   }
 
   get style(): CSSStyleDeclaration {

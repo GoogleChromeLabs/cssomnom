@@ -82,18 +82,49 @@ function getEffectiveParent(element: DOMElement): DOMElement | null {
   return null;
 }
 
+export const SELECTOR_CACHE_MAX_SIZE = 1000;
+export const selectorCache = new Map<string, SelectorList>();
+
+export function clearSelectorCache(): void {
+  selectorCache.clear();
+}
+
+/**
+ * Determines whether an element belongs to an XML/SVG document.
+ * In linkedom, XMLDocument and SVGDocument can have undefined contentType.
+ */
+export function isXmlDocument(element: DOMElement): boolean {
+  const doc = element.ownerDocument;
+  if (!doc) return false;
+  if (doc.contentType) return doc.contentType !== 'text/html';
+  const ctorName = (doc as { constructor?: { name?: string } }).constructor?.name;
+  return ctorName === 'XMLDocument' || ctorName === 'SVGDocument';
+}
+
 // selectors-4 #parse-selector
 function parseSelector(selector: string | ComplexSelector | SelectorList): SelectorList {
   if (typeof selector !== 'string') {
     if (selector.type === 'selector-list') return selector;
     if (selector.type === 'complex-selector') return { type: 'selector-list', selectors: [selector] };
   }
+  const cached = selectorCache.get(selector);
+  if (cached) {
+    selectorCache.delete(selector);
+    selectorCache.set(selector, cached);
+    return cached;
+  }
   try {
     const tokens = tokenize(selector);
     const parser = new Parser(tokens);
     const componentValues = parser.parseComponentValues();
     const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false });
-    return selectorParser.parse();
+    const result = selectorParser.parse();
+    if (selectorCache.size >= SELECTOR_CACHE_MAX_SIZE) {
+      const oldestKey = selectorCache.keys().next().value;
+      if (oldestKey !== undefined) selectorCache.delete(oldestKey);
+    }
+    selectorCache.set(selector, result);
+    return result;
   } catch {
     return { type: 'selector-list', selectors: [] };
   }
@@ -308,7 +339,7 @@ function matchCompoundSelector(element: DOMElement, compound: CompoundSelector, 
 function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?: DOMElement): boolean {
   switch (simple.type) {
     case 'type-selector': {
-      const isXml = element.ownerDocument?.contentType === 'application/xhtml+xml';
+      const isXml = isXmlDocument(element);
       const elLocal = isXml ? (element.localName || element.tagName || '') : toAsciiLowerCase(element.localName || element.tagName || '');
       const selName = isXml ? simple.name : toAsciiLowerCase(simple.name);
       if (selName !== '*' && elLocal !== selName) return false;
@@ -479,7 +510,7 @@ const HTML_CASE_INSENSITIVE_ATTRIBUTES = new Set([
 function isHTMLCaseInsensitiveAttribute(element: DOMElement, attrName: string): boolean {
   // selectors-4 #case-sensitive
   // html #case-sensitivity-of-selectors
-  if (element.ownerDocument?.contentType === 'application/xhtml+xml') {
+  if (isXmlDocument(element)) {
     return false;
   }
   return HTML_CASE_INSENSITIVE_ATTRIBUTES.has(toAsciiLowerCase(attrName));
@@ -1035,9 +1066,7 @@ const XML_LANG_NS = 'http://www.w3.org/XML/1998/namespace';
 
 // html #the-lang-and-xml:lang-attributes: determine element language with xml:lang namespace precedence
 export function getElementLanguage(element: DOMElement): string | null {
-  const isXml = element.ownerDocument?.contentType
-    ? element.ownerDocument.contentType !== 'text/html'
-    : (element.ownerDocument as { constructor?: { name?: string } } | undefined)?.constructor?.name === 'XMLDocument';
+  const isXml = isXmlDocument(element);
 
   let curr: DOMElement | null = element;
   while (curr) {

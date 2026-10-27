@@ -29,7 +29,7 @@ import {
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { LONGHAND_TO_SHORTHAND } from './shorthands.ts';
-import { resolveNestedSelector } from './cascade/rule-filter.ts';
+import { resolveNestedSelector } from './nesting.ts';
 import { tokenize } from './tokenizer.ts';
 
 export interface RuleWalkEntry {

@@ -33,7 +33,6 @@ export interface ParserOptions {
 }
 import { SelectorParser } from './SelectorParser.ts';
 import { calculateSpecificity } from './specificity.ts';
-import { getCascadedStyle, resolveVariables } from './cascade.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { PropertyRegistry } from './PropertyRegistry.ts';
 
@@ -1440,13 +1439,13 @@ export class Parser {
     return calculateSpecificity(selector);
   }
 
-  public static getCascadedStyle(element?: ElementLike | null, rules?: Rule[]): CSSStyleDeclaration {
-    return getCascadedStyle(element, rules);
-  }
+  public static getCascadedStyle: (element?: ElementLike | null, rules?: Rule[]) => CSSStyleDeclaration = () => {
+    throw new Error('Parser.getCascadedStyle requires importing cssomnom/cascade');
+  };
 
-  public static resolveVariables(style: CSSStyleDeclaration, property: string, envMap?: Record<string, string>): string {
-    return resolveVariables(style, property, envMap);
-  }
+  public static resolveVariables: (style: CSSStyleDeclaration, property: string, envMap?: Record<string, string>) => string = () => {
+    throw new Error('Parser.resolveVariables requires importing cssomnom/cascade');
+  };
 }
 
 // css-variables-1 #using-variables

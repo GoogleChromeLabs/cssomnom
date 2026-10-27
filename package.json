@@ -21,7 +21,11 @@
     "w3c"
   ],
   "type": "module",
-  "sideEffects": false,
+  "sideEffects": [
+    "src/cascade.ts",
+    "src/MediaParser.ts",
+    "src/typed-om/**"
+  ],
   "publishConfig": {
     "access": "public"
   },
@@ -36,6 +40,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./parse": {
+      "types": "./dist/parse-entry.d.ts",
+      "import": "./dist/parse.js",
+      "default": "./dist/parse.js"
     },
     "./ts": {
       "types": "./src/index.ts",

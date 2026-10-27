@@ -16,7 +16,7 @@
  */
 
 import type { MediaQuery } from '../types.ts';
-import { MediaParser, serializeMediaQuery } from '../MediaParser.ts';
+import { ParseHooks } from '../parse-hooks.ts';
 import { createIndexedProxy } from '../utils.ts';
 import type { CSSStyleSheet, CSSRule } from '../CSSOM.ts';
 
@@ -58,7 +58,7 @@ export class MediaList {
 
   constructor(mediaText: string = '') {
     this.mediaText = mediaText;
-    return createIndexedProxy(this, (t) => t._mediaQueries.map(q => serializeMediaQuery(q)));
+    return createIndexedProxy(this, (t) => t._mediaQueries.map(q => ParseHooks.serializeMediaQuery(q)));
   }
 
   get [Symbol.toStringTag](): string {
@@ -66,7 +66,7 @@ export class MediaList {
   }
 
   get mediaText(): string {
-    return this._mediaQueries.map(q => serializeMediaQuery(q)).join(', ');
+    return this._mediaQueries.map(q => ParseHooks.serializeMediaQuery(q)).join(', ');
   }
 
   set mediaText(value: string) {
@@ -74,7 +74,7 @@ export class MediaList {
       this._mediaQueries = [];
       return;
     }
-    this._mediaQueries = MediaParser.parse(value);
+    this._mediaQueries = ParseHooks.parseMediaQueryList(value);
   }
 
   get length(): number {
@@ -83,7 +83,7 @@ export class MediaList {
 
   item(index: number): string | null {
     const q = this._mediaQueries[index];
-    return q ? serializeMediaQuery(q) : null;
+    return q ? ParseHooks.serializeMediaQuery(q) : null;
   }
 
   toString(): string {
@@ -96,13 +96,13 @@ export class MediaList {
 
   // cssom-1 #dom-medialist-appendmedium
   appendMedium(medium: string): void {
-    const parsed = MediaParser.parse(medium);
+    const parsed = ParseHooks.parseMediaQueryList(medium);
     if (parsed.length !== 1) {
       return;
     }
     const m = parsed[0];
-    const mText = serializeMediaQuery(m);
-    if (this._mediaQueries.some(q => serializeMediaQuery(q) === mText)) {
+    const mText = ParseHooks.serializeMediaQuery(m);
+    if (this._mediaQueries.some(q => ParseHooks.serializeMediaQuery(q) === mText)) {
       return;
     }
     this._mediaQueries.push(m);
@@ -110,15 +110,15 @@ export class MediaList {
 
   // cssom-1 #dom-medialist-deletemedium
   deleteMedium(medium: string): void {
-    const parsed = MediaParser.parse(medium);
+    const parsed = ParseHooks.parseMediaQueryList(medium);
     if (parsed.length !== 1) {
       return;
     }
-    const mText = serializeMediaQuery(parsed[0]);
+    const mText = ParseHooks.serializeMediaQuery(parsed[0]);
     let i = this._mediaQueries.length;
     let found = false;
     while (i--) {
-      if (serializeMediaQuery(this._mediaQueries[i]) === mText) {
+      if (ParseHooks.serializeMediaQuery(this._mediaQueries[i]) === mText) {
         this._mediaQueries.splice(i, 1);
         found = true;
       }
@@ -130,7 +130,7 @@ export class MediaList {
 
   *[Symbol.iterator](): Iterator<string> {
     for (let i = 0; i < this.length; i++) {
-      yield serializeMediaQuery(this._mediaQueries[i]);
+      yield ParseHooks.serializeMediaQuery(this._mediaQueries[i]);
     }
   }
 }

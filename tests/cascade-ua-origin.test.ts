@@ -19,6 +19,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
 import { Parser, parseStyleSheet } from '../src/parser.ts';
+import '../src/cascade.ts';
 
 describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
   it('applies UA stylesheet defaults to elements in the cascade without author rules', () => {

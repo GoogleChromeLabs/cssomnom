@@ -1128,5 +1128,6 @@ export function evaluateMediaQueries(queries: MediaQuery[], env: MediaEnvironmen
 
 // Inject into ParseHooks to break circular dependencies
 ParseHooks.parseMediaQueryList = (text: string) => MediaParser.parse(text);
+ParseHooks.serializeMediaQuery = (query: MediaQuery) => serializeMediaQuery(query);
 
 
