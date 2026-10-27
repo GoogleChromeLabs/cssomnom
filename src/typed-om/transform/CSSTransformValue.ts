@@ -66,7 +66,7 @@ export class CSSTransformValue extends CSSStyleValue {
   }
 
   get length(): number { return this.components.length; }
-  [Symbol.iterator]() { return this.components[Symbol.iterator](); }
+  [Symbol.iterator](): IterableIterator<CSSTransformComponent> { return this.components[Symbol.iterator](); }
   entries(): IterableIterator<[number, CSSTransformComponent]> { return this.components.entries(); }
   keys(): IterableIterator<number> { return this.components.keys(); }
   values(): IterableIterator<CSSTransformComponent> { return this.components.values(); }

@@ -37,7 +37,7 @@ export class CSSNumericArray {
   }
 
   get length(): number { return this._values.length; }
-  [Symbol.iterator]() { return this._values[Symbol.iterator](); }
+  [Symbol.iterator](): IterableIterator<CSSNumericValue> { return this._values[Symbol.iterator](); }
   entries(): IterableIterator<[number, CSSNumericValue]> { return this._values.entries(); }
   keys(): IterableIterator<number> { return this._values.keys(); }
   values(): IterableIterator<CSSNumericValue> { return this._values.values(); }

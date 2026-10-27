@@ -57,7 +57,7 @@ export class CSSUnparsedValue extends CSSStyleValue {
   }
 
   get length(): number { return this._values.length; }
-  [Symbol.iterator]() { return this._values[Symbol.iterator](); }
+  [Symbol.iterator](): IterableIterator<string | CSSVariableReferenceValue> { return this._values[Symbol.iterator](); }
   entries(): IterableIterator<[number, string | CSSVariableReferenceValue]> { return this._values.entries(); }
   keys(): IterableIterator<number> { return this._values.keys(); }
   values(): IterableIterator<string | CSSVariableReferenceValue> { return this._values.values(); }
