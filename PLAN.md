@@ -694,6 +694,26 @@ Currently, `src/matcher.ts` uses basic prefix matching (`elementLang === clean |
 
 Result (`3e68527`): `src/` (excluding `src/data/gen`) net **−110 lines** (`185 insertions, 295 deletions` across 17 files), also removing a lingering direct `Parser` import in `variable-resolver.ts` in favor of `ParseHooks`. WPT **21,639 / 23,157** (**+2** genuine passes on `stop-opacity` and `pointer-events` inheritance from spec-derived `INHERITED_PROPERTIES`, **0** regressions).
 
+## Phase 158: High-Scrutiny Spec Compliance & Citation Hygiene Audit [ ]
+**Objective**: Address the 37 `Scrutineer`-validated behavioral compliance gaps (`BC-*`) and high-bar citation hygiene improvements (`CH-*`) across all 10 CSS specification domains documented in [`docs/reports/spec_compliance_audit_report.md`](./docs/reports/spec_compliance_audit_report.md) (after pruning 10 false-positive claims against WPT / specs).
+
+### Tasks
+- [ ] **Phase 158.1 — Citation Hygiene & CI Guard Tightening (`CH-R01`–`CH-R28`, `CH-P01`–`CH-P09`, `CH-A01`–`CH-A15`)**:
+  - Retarget all 28 mismatched/bare-section/URL comments (`CH-R01`–`CH-R28`), prune the 9 ceremonial getter/predicate comment groups (`CH-P01`–`CH-P09`), and add the 14 high-bar algorithm entry points & cross-spec/linkedom notes (`CH-A01`–`CH-A15`).
+  - Tighten `scripts/ci/check-spec-anchors.ts` to also reject bare leading section numbers (e.g. `// 5.4.9 ...`, `// 6.14 The CSS...`, `// 10.1 ...`) and raw `drafts.csswg.org` / `drafts.css-houdini.org` URLs in `src/`.
+- [ ] **Phase 158.2 — CSSOM, Syntax & Selectors Compliance (`BC-01`, `BC-02`, `BC-04`, `BC-05`, `BC-07`–`BC-10`, `BC-12`)**:
+  - `MediaList.deleteMedium` early return on `null`/multi-query (`BC-01`), `CSSStyleDeclaration.setProperty` `undefined` value coercion (`BC-02`), `CSSPropertyRule.prototype.type === 0` (`BC-04`), and `removeProperty` canonical `getPropertyValue` return (`BC-05`).
+  - `consumeUnicodeRangeToken` empty range tokenization vs descriptor validation (`BC-07`), `validateDeclarationValue` rejecting unmatched `)`, `]`, `}` and top-level `;`/`!` (`BC-08`), `parseDeclaration` trailing EOF check (`BC-09`), and `serializeToken` `delim('\\')` -> `'\\\n'` (`BC-10`).
+  - XML document no-namespace `lang` attribute restricted to HTML/SVG elements (`BC-12`).
+- [ ] **Phase 158.3 — Properties/Variables, Nesting & Cascade Compliance (`BC-21`–`BC-33`)**:
+  - `PropertyRegistry.ts`: reject whitespace before `+`/`#` multipliers and reject `?`/`*`/`{...}` (`BC-21`), remove `<flex>` from `VALID_COMPONENTS` (`BC-22`), support `+`/`#` multipliers on `<custom-ident>` literals in `matchesSyntax` (`BC-23`), validate declared custom property values against registered syntax and reset invalid/cyclic registered values to inherited/initial value in `variable-resolver.ts` (`BC-24`, `BC-25`, `BC-26`).
+  - `CSSNestedDeclarations`: split comma-separated parent selectors for element/pseudo-element matching (`BC-27`), preserve nested style rule specificity inside `@scope` (`BC-28`), and allow top-level at-rules inside nested conditional group rules that have no `CSSStyleRule` ancestor (`BC-29`).
+  - Cascade: fix `revert-layer` rollback on `!important` layered rules and inline styles (`BC-30`), gate `scanLayers` on `@supports` conditions (`BC-31`), check `rule.supportsText` on `@import` in `rule-filter.ts` and `layer-manager.ts` (`BC-32`), and resolve unset `border-*-color`/`outline-color` to `this.getPropertyValue('color')` (`currentcolor`, `BC-33`).
+- [ ] **Phase 158.4 — Media Queries, Conditional Rules & Logical Shorthands Compliance (`BC-34`–`BC-47`)**:
+  - `MediaParser.ts`: fix `<mf-range>` operator inversion on `(resolution < infinite)` (`BC-34`), validate syntax before stripping `all and` (`BC-35`), match `dynamic-range: standard` when environment is `'high'` (`BC-36`), and return `false` for `'none'` in boolean context on `update`/`color-gamut`/`video-color-gamut` (`BC-37`).
+  - `@supports` & `CSS.supports`: discard grammatically invalid `@supports` preludes (`BC-38`), do not trim `property` in 2-arg `CSS.supports(property, value)` (`BC-39`), allow trailing `!important` in `<supports-decl>` (`BC-40`), reject non-parenthesized operands in `not`/`or` conditions (`BC-41`), implement normative 2-step `CSS.supports(conditionText)` parenthesization fallback (`BC-42`), pass empty `declaredNamespaces: new Set()` in `CSS.supports("selector(...)")` (`BC-43`), and add `CSSSupportsRule.prototype.matches` (`BC-44`).
+  - Logical properties & shorthands: guard `'logical '` prefix against CSS-wide keywords and include `border-width`/`border-style`/`border-color` (`BC-45`), include flow-relative properties in `ALL_SHORTHAND_LONGHANDS` / `hasOverridingLonghand` / `LONGHAND_TO_SHORTHAND` (`BC-46`), and support `sideways-rl`/`sideways-lr` in `scripts/codegen/generate_logical_mappings.ts` (`BC-47`).
+
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
 
