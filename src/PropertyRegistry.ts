@@ -318,8 +318,14 @@ export const PropertyRegistry = {
     }
 
     if (definition.initialValue !== undefined) {
-      const tokens = tokenize(definition.initialValue).filter(t => t.type !== 'whitespace');
-      const parser = new Parser(tokens);
+      const allTokens = tokenize(definition.initialValue);
+      let start = 0;
+      while (start < allTokens.length && allTokens[start].type === 'whitespace') start++;
+      let end = allTokens.length;
+      while (end > start && allTokens[end - 1].type === 'whitespace') end--;
+      const trimmedTokens = allTokens.slice(start, end);
+
+      const parser = new Parser(trimmedTokens);
       const values = parser.parseComponentValues();
       definition.parsedInitialValue = values;
       
@@ -332,11 +338,12 @@ export const PropertyRegistry = {
           throw new DOMException(`initialValue "${definition.initialValue}" is not a valid declaration value`, 'SyntaxError');
         }
       } else {
-        if (!isComputationallyIndependent(values)) {
+        const nonWsValues = values.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+        if (!isComputationallyIndependent(nonWsValues)) {
           throw new DOMException(`initialValue is not computationally independent: ${definition.initialValue}`, 'SyntaxError');
         }
         
-        if (!matchesSyntax(values, syntax)) {
+        if (!matchesSyntax(nonWsValues, syntax)) {
           throw new DOMException(`initialValue "${definition.initialValue}" does not match syntax "${syntax}"`, 'SyntaxError');
         }
       }

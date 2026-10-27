@@ -212,6 +212,14 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return this._declarations[index]?.name || '';
   }
 
+  protected _getLonghandForContraction(lh: string): { value: ComponentValue[]; important: boolean } | null {
+    const decl = this._getWinningDeclaration(lh);
+    if (decl && decl.value.length > 0) {
+      return { value: decl.value, important: decl.important };
+    }
+    return null;
+  }
+
   // cssom-1 § 6.6.2 #dom-cssstyledeclaration-getpropertyvalue
   getPropertyValue(property: string): string {
     if (!property.startsWith('--')) property = property.toLowerCase();
@@ -265,11 +273,11 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       ];
       
       for (const lh of allLonghandsToCheck) {
-        const decl = this._getWinningDeclaration(lh);
-        if (decl && decl.value.length > 0) {
+        const item = this._getLonghandForContraction(lh);
+        if (item && item.value.length > 0) {
           anySet = true;
-          longhandValues[lh] = decl.value;
-          const isImp = decl.important;
+          longhandValues[lh] = item.value;
+          const isImp = item.important;
           if (important === null) important = isImp;
           else if (important !== isImp) {
             consistentImportant = false;
@@ -429,10 +437,10 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         let importantCount = 0;
         const values: Record<string, ComponentValue[]> = {};
         for (const lh of longhands) {
-          const decl = this._getWinningDeclaration(lh);
-          if (decl && decl.value.length > 0) {
-            values[lh] = decl.value;
-            if (decl.important) importantCount++;
+          const item = this._getLonghandForContraction(lh);
+          if (item && item.value.length > 0) {
+            values[lh] = item.value;
+            if (item.important) importantCount++;
           }
         }
         return { importantCount, values };

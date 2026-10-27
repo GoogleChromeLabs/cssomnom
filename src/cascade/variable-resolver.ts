@@ -42,6 +42,21 @@ const STANDARD_ENV_VARS: Record<string, string> = {
   'keyboard-inset-height': '0px',
 };
 
+function cloneComponentValues(values: ComponentValue[]): ComponentValue[] {
+  return values.map(v => {
+    if (typeof v === 'object' && v !== null) {
+      if (v.type === 'function' && Array.isArray((v as CSSFunction).value)) {
+        return { ...v, value: cloneComponentValues((v as CSSFunction).value) } as ComponentValue;
+      }
+      if (v.type === 'simple-block' && Array.isArray((v as SimpleBlock).value)) {
+        return { ...v, value: cloneComponentValues((v as SimpleBlock).value) } as ComponentValue;
+      }
+      return { ...v };
+    }
+    return v;
+  });
+}
+
 /**
  * Recursively resolves var() and env() references with fallback substitution and circular reference detection.
  * css-variables-1 § 4 #resolving-var-functions
@@ -419,7 +434,7 @@ export function substituteVariables(
                 ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(String((cleanTokens[0] as Token).value).toLowerCase());
               if (!isCSSWideKeyword && !matchesSyntax(cleanTokens, def.syntax || '*')) {
                 if (def.initialValue !== undefined) {
-                  substitutedTokens = def.parsedInitialValue ?? ParseHooks.parseComponentValues(tokenize(def.initialValue));
+                  substitutedTokens = def.parsedInitialValue ? cloneComponentValues(def.parsedInitialValue) : ParseHooks.parseComponentValues(tokenize(def.initialValue));
                 } else if (fallbackTokens) {
                   const resolvedFallback = resolveNodes(fallbackTokens);
                   if (resolvedFallback === null) return null;
@@ -438,7 +453,7 @@ export function substituteVariables(
             const jsDef = PropertyRegistry.get(varName);
             const def = (jsDef && jsDef.origin === 'js') ? jsDef : (activeProperties?.get(varName) ?? jsDef);
             if (def?.initialValue !== undefined) {
-              const substitutedTokens = def.parsedInitialValue ?? ParseHooks.parseComponentValues(tokenize(def.initialValue));
+              const substitutedTokens = def.parsedInitialValue ? cloneComponentValues(def.parsedInitialValue) : ParseHooks.parseComponentValues(tokenize(def.initialValue));
               pushTokens(substitutedTokens);
             } else if (fallbackTokens) {
               const resolvedFallback = resolveNodes(fallbackTokens);

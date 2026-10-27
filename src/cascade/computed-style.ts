@@ -27,7 +27,7 @@ import {
 } from '../data/gen/cascade-data.ts';
 import { NAMED_COLORS } from '../data/gen/colors.ts';
 import { camelToDashed } from '../utils.ts';
-import type { Declaration, CSSFunction } from '../types.ts';
+import type { Declaration, CSSFunction, ComponentValue } from '../types.ts';
 import { INHERITED_PROPERTIES } from './types.ts';
 import {
   SYSTEM_COLORS,
@@ -79,6 +79,19 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
 
   override removeProperty(_property: string): string {
     throw new DOMException('Computed style declarations are read-only', 'NoModificationAllowedError');
+  }
+
+  protected override _getLonghandForContraction(lh: string): { value: ComponentValue[]; important: boolean } | null {
+    const computedVal = this.getPropertyValue(lh);
+    if (!computedVal) return null;
+    const decl = this._getWinningDeclaration(lh);
+    if (decl && decl.value.length > 0 && serialize(decl.value).trim() === computedVal.trim()) {
+      return { value: decl.value, important: decl.important };
+    }
+    return {
+      value: ParseHooks.parseComponentValues(tokenize(computedVal)),
+      important: decl?.important ?? false,
+    };
   }
 
   override getPropertyValue(property: string): string {

@@ -33,7 +33,7 @@ import {
 } from '../CSSOM.ts';
 import { supports } from '../parser-api.ts';
 import { tokenize } from '../tokenizer.ts';
-import { Parser, parseStyleSheet } from '../parser.ts';
+import { parseStyleSheet } from '../parser.ts';
 import { MediaParser } from '../MediaParser.ts';
 import { SelectorParser } from '../SelectorParser.ts';
 import { serialize, serializeSelectorList } from '../serializer.ts';
@@ -970,16 +970,14 @@ export function resolveNestedSelector(selector: string, parentSelector: string):
   if (!parentSelector && !selector.includes('&')) return selector;
 
   const tokens = tokenize(selector);
-  const parser = new Parser(tokens);
-  const componentValues = parser.parseComponentValues();
+  const componentValues = ParseHooks.parseComponentValues(tokens);
   const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: true });
   const list = selectorParser.parse();
 
   let parentList: SelectorList | null = null;
   if (parentSelector) {
     const parentTokens = tokenize(parentSelector);
-    const parentParser = new Parser(parentTokens);
-    const parentComp = parentParser.parseComponentValues();
+    const parentComp = ParseHooks.parseComponentValues(parentTokens);
     const parentSelectorParser = new SelectorParser(parentComp, { allowRelative: true, forgiving: true });
     parentList = parentSelectorParser.parse();
   }
@@ -1104,8 +1102,7 @@ export function resolveNestedSelector(selector: string, parentSelector: string):
  */
 export function getMatchingSpecificity(element: ElementLike, selectorText: string, scope?: DOMElement): Specificity {
   const tokens = tokenize(selectorText);
-  const parser = new Parser(tokens);
-  const componentValues = parser.parseComponentValues();
+  const componentValues = ParseHooks.parseComponentValues(tokens);
   const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: true });
   const list = selectorParser.parse();
 
