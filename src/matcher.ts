@@ -1034,7 +1034,7 @@ function matchLangRange(elementLang: string | null, range: string): boolean {
 const XML_LANG_NS = 'http://www.w3.org/XML/1998/namespace';
 
 // html #the-lang-and-xml:lang-attributes: determine element language with xml:lang namespace precedence
-function getElementLanguage(element: DOMElement): string | null {
+export function getElementLanguage(element: DOMElement): string | null {
   const isXml = element.ownerDocument?.contentType
     ? element.ownerDocument.contentType !== 'text/html'
     : (element.ownerDocument as { constructor?: { name?: string } } | undefined)?.constructor?.name === 'XMLDocument';
@@ -1050,7 +1050,7 @@ function getElementLanguage(element: DOMElement): string | null {
       return curr.getAttribute?.('xml:lang') ?? '';
     }
     // html #the-lang-and-xml:lang-attributes: Step 2: lang in no namespace
-    if (curr.hasAttribute?.('lang')) {
+    if ((!isXml || curr.namespaceURI === 'http://www.w3.org/1999/xhtml' || curr.namespaceURI === 'http://www.w3.org/2000/svg') && curr.hasAttribute?.('lang')) {
       return curr.getAttribute?.('lang') ?? '';
     }
     // html #the-lang-and-xml:lang-attributes: Steps 3 & 4: shadow root host or parent element traversal

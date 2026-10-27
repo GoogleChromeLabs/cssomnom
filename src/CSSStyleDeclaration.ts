@@ -23,6 +23,7 @@ import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
 import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface } from './webidl.ts';
@@ -504,8 +505,12 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const isImportant = normalizedPriority === 'important';
 
     // 3. If value is the empty string (or null), invoke removeProperty(property) and return.
-    if (value === null || value === '' || value === undefined) {
+    if (value === null || value === '') {
       this.removeProperty(property);
+      return;
+    }
+
+    if (value === undefined && !property.startsWith('--') && !STANDARD_PROPERTIES_SYNTAX[property]?.includes('<custom-ident>')) {
       return;
     }
 
@@ -682,17 +687,13 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       return value;
     }
 
+    const value = this.getPropertyValue(property);
     const index = this._declarations.findIndex(d => d.name === property);
     if (index !== -1) {
-      const decl = this._declarations[index];
       this._declarations.splice(index, 1);
       this._declMap.delete(property);
-      let val = serialize(decl.value, property.startsWith('--'));
-      if (property.startsWith('--') && decl.value.length === 0) {
-        val = ' ';
-      }
       this._onChange?.();
-      return val;
+      return value;
     }
     return '';
   }

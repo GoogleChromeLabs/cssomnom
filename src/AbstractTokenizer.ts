@@ -532,12 +532,6 @@ export abstract class AbstractTokenizer {
       const endStr = hex + questionMarks.replace(/\?/g, 'F');
       const start = parseInt(startStr, 16);
       const end = parseInt(endStr, 16);
-      if (start > 0x10FFFF || end > 0x10FFFF) {
-        return {
-          type: 'delim',
-          value: 'U'
-        };
-      }
       const startTrimmed = start.toString(16).toUpperCase();
       const endTrimmed = end.toString(16).toUpperCase();
       return { 
@@ -549,12 +543,6 @@ export abstract class AbstractTokenizer {
     }
 
     const start = parseInt(hex, 16);
-    if (start > 0x10FFFF) {
-      return {
-        type: 'delim',
-        value: 'U'
-      };
-    }
 
     if (this.cp === 0x002D && this.isHexDigit(this.peek(1))) { // -
       this.consume(); // -
@@ -563,12 +551,6 @@ export abstract class AbstractTokenizer {
         endHex += String.fromCodePoint(this.consume());
       }
       const end = parseInt(endHex, 16);
-      if (end > 0x10FFFF || end < start) {
-        return {
-          type: 'delim',
-          value: 'U'
-        };
-      }
       const startTrimmed = start.toString(16).toUpperCase();
       const endTrimmed = end.toString(16).toUpperCase();
       return { 

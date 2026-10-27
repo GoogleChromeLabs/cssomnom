@@ -461,6 +461,14 @@ ParseHooks.validatePropertyValue = (property: string, value: string): boolean =>
   const tokens = tokenize(value).filter(t => t.type !== 'whitespace' && t.type !== 'EOF');
   if (tokens.length === 0 || tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) return false;
 
+  // Validate <color> syntax for standard color properties (excluding SVG <paint> properties)
+  if (lowerProp !== 'fill' && lowerProp !== 'stroke' && STANDARD_PROPERTIES_SYNTAX[lowerProp] === '<color>') {
+    const compVals = ParseHooks.parseComponentValues(tokens).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+    if (!matchesSyntax(compVals, '<color>')) {
+      return false;
+    }
+  }
+
   // Reject unitless non-zero numbers on length properties (e.g. width: -100 or width: 100)
   if (tokens.length === 1 && tokens[0].type === 'number' && tokens[0].value !== 0) {
     const syntax = STANDARD_PROPERTIES_SYNTAX[lowerProp] || '';

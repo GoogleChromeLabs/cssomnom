@@ -160,7 +160,7 @@ test('@property rule: validation', async () => {
   // Valid @property
   const sheet1 = parse('@property --foo { syntax: "<length>"; inherits: false; initial-value: 10px; }');
   assert.strictEqual(sheet1.cssRules.length, 1);
-  assert.strictEqual(sheet1.cssRules[0].type, 18); // PROPERTY_RULE
+  assert.strictEqual(sheet1.cssRules[0].type, 0);
 
   // Invalid: missing syntax
   const sheet2 = parse('@property --foo { inherits: false; initial-value: 10px; }');

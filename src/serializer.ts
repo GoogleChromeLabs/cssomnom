@@ -220,7 +220,7 @@ function serializeNode(node: ComponentValue, preserveCase: boolean): string {
   return serializeToken(node as Token, preserveCase);
 }
 
-function serializeToken(token: Token, preserveCase: boolean): string {
+export function serializeToken(token: Token, preserveCase: boolean = false): string {
   switch (token.type) {
     case 'ident':
       return serializeIdentifier(token.value);
@@ -233,7 +233,7 @@ function serializeToken(token: Token, preserveCase: boolean): string {
     case 'url':
       return preserveCase ? serializeUrlToken(token.value, token.originalText) : serializeUrl(token.value);
     case 'delim':
-      return token.value;
+      return token.value === '\\' ? '\\\n' : token.value;
     case 'number':
       return formatNumber(token.value);
     case 'percentage':

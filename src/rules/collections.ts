@@ -112,7 +112,7 @@ export class MediaList {
   deleteMedium(medium: string): void {
     const parsed = MediaParser.parse(medium);
     if (parsed.length !== 1) {
-      throw new DOMException(`The medium '${medium}' does not exist in the MediaList.`, 'NotFoundError');
+      return;
     }
     const mText = serializeMediaQuery(parsed[0]);
     let i = this._mediaQueries.length;

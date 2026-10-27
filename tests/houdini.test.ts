@@ -54,7 +54,7 @@ describe('Houdini Properties and Values API (WPT)', () => {
         } else {
           assert.strictEqual(sheet.cssRules.length, 1, `Expected one rule for: ${test.input}`);
           const rule = sheet.cssRules[0] as CSSPropertyRule;
-          assert.strictEqual(rule.type, 18);
+          assert.strictEqual(rule.type, 0);
           
           if (test.expected.name) {
              assert.strictEqual(rule.name, test.expected.name);

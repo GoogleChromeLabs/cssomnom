@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, UrlToken, FunctionToken, CustomMediaQuery, RuleSourceLocation, ElementLike } from './types.ts';
+import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, UrlToken, FunctionToken, UnicodeRangeToken, CustomMediaQuery, RuleSourceLocation, ElementLike } from './types.ts';
 
 
 import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
@@ -311,7 +311,10 @@ export class Parser {
     this.skipWhitespace();
     if (this.nextToken.type !== 'ident') return null;
     const stream = new LazyComponentValueStream(() => this.consumeComponentValue(), 'EOF');
-    return this.consumeDeclarationFromStream(stream);
+    const decl = this.consumeDeclarationFromStream(stream);
+    if (!decl) return null;
+    this.skipWhitespace();
+    return (this.nextToken as Token).type === 'EOF' ? decl : null;
   }
 
   // css-syntax-3 #parse-component-value
@@ -1444,7 +1447,9 @@ export class Parser {
 
 // css-variables-1 #using-variables
 function validateVarFunction(func: CSSFunction): boolean {
-  if (func.name.toLowerCase() !== 'var') return true;
+  const rawName = func.name || ('value' in func && typeof func.value === 'string' ? func.value : '');
+  const funcName = rawName.toLowerCase();
+  if (funcName !== 'var' || !Array.isArray(func.value)) return true;
   const args = func.value;
   const commaIndex = args.findIndex(t => t.type === 'comma');
   const nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
@@ -1471,15 +1476,19 @@ function validateVarFunction(func: CSSFunction): boolean {
 }
 
 // css-syntax-3 #consume-declaration
-export function validateDeclarationValue(values: ComponentValue[]): boolean {
+export function validateDeclarationValue(values: ComponentValue[], isTopLevel = true): boolean {
   for (const v of values) {
     if (v.type === 'bad-string' || v.type === 'bad-url') return false;
+    if (v.type === ')' || v.type === ']' || v.type === '}') return false;
+    if (isTopLevel && (v.type === 'semicolon' || (v.type === 'delim' && (v as Token).value === '!'))) {
+      return false;
+    }
     if (v.type === 'simple-block') {
-      if (!validateDeclarationValue((v as SimpleBlock).value)) return false;
+      if (!validateDeclarationValue((v as SimpleBlock).value, false)) return false;
     } else if (v.type === 'function') {
       const func = v as CSSFunction;
       if (!validateVarFunction(func)) return false;
-      if (!validateDeclarationValue(func.value)) return false;
+      if (Array.isArray(func.value) && !validateDeclarationValue(func.value, false)) return false;
     }
   }
   return true;
@@ -1524,6 +1533,12 @@ export function assembleUnicodeRanges(values: ComponentValue[]): ComponentValue[
     // Must start with <urange>
     const v = values[i];
     if (v.type === 'unicode-range') {
+      const tok = v as UnicodeRangeToken;
+      const start = tok.unicodeRangeStart ?? parseInt(tok.value.slice(2).split('-')[0], 16);
+      const end = tok.unicodeRangeEnd ?? (tok.value.includes('-') ? parseInt(tok.value.split('-')[1], 16) : start);
+      if (start > 0x10FFFF || end > 0x10FFFF || start > end) {
+        return null;
+      }
       result.push(v);
       i++;
     } else if (v.type === 'ident' && (v.value.toLowerCase() === 'u' || v.value.toLowerCase().startsWith('u+'))) {
@@ -1615,7 +1630,7 @@ export function assembleUnicodeRanges(values: ComponentValue[]): ComponentValue[
     }
 
     while (i < values.length && (values[i].type === 'whitespace' || values[i].type === 'comment')) i++;
-    if (i >= values.length) break;
+    if (i >= values.length || values[i].type === 'EOF') break;
     if (values[i].type === 'comma' || (values[i].type === 'delim' && (values[i] as Token).value === ',')) {
       result.push({ type: 'comma', value: ',' } as Token);
       i++;

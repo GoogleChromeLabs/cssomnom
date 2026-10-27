@@ -912,8 +912,6 @@ export class CSSPropertyRule extends CSSRule {
     this.initialValue = initialValue;
   }
 
-  get type() { return 18; }
-
   get cssText() {
     let body = `syntax: ${serializeString(this.syntax)}; inherits: ${this.inherits};`;
     if (this.initialValue !== null) body += `initial-value: ${this.initialValue};`;

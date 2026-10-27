@@ -15198,6 +15198,7 @@
     "cssText on computed style declaration returns the empty string",
     "cssText order",
     "invalid property does not appear",
+    "overwriting with invalid value",
     "uppercase property",
     "uppercase value",
     "use rgb",
@@ -17306,7 +17307,8 @@
   "submodules/web-platform-tests/css/cssom/setproperty-null-undefined.html": [
     "Verify that setting a CSS property priority to null is treated like empty string.",
     "Verify that setting a CSS property priority to undefined is accepted.",
-    "Verify that setting a CSS property to null is treated like empty string."
+    "Verify that setting a CSS property to null is treated like empty string.",
+    "Verify that setting a CSS property to undefined has no effect."
   ],
   "submodules/web-platform-tests/css/cssom/shadow-dom-style-sheet.html": [
     "Style element in shadow root has a CSSStyleSheet",
@@ -17406,7 +17408,9 @@
     "anonymous-test-0"
   ],
   "submodules/web-platform-tests/css/cssom/style-set-cssText.html": [
-    "initial value of cssRule.style.cssText"
+    "initial value of cssRule.style.cssText",
+    "sets empty string for invalid cssText",
+    "sets only the valid properties for partially valid cssText"
   ],
   "submodules/web-platform-tests/css/cssom/style-set-custom-property-priority.html": [
     "Sanity check",
@@ -17431,7 +17435,11 @@
     "set null for div.style.setProperty",
     "set null for div.style[property]",
     "set toString() returning null for div.style.setProperty custom property",
-    "set true for div.style.setProperty custom property"
+    "set true for div.style.setProperty custom property",
+    "set undefined for cssRule.style.setProperty",
+    "set undefined for div.style.setProperty",
+    "set undefined for div.style.setProperty custom property",
+    "set undefined for div.style[property]"
   ],
   "submodules/web-platform-tests/css/cssom/style-sheet-interfaces-001.html": [
     "CSSStyleSheet_properties",

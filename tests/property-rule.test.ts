@@ -34,7 +34,7 @@ describe('CSSPropertyRule', () => {
     const sheet = parser.parseStyleSheet();
     assert.strictEqual(sheet.cssRules.length, 1);
     const rule = sheet.cssRules[0] as CSSPropertyRule;
-    assert.strictEqual(rule.type, 18); // CSSRule.PROPERTY_RULE
+    assert.strictEqual(rule.type, 0);
     assert.strictEqual(rule.name, '--my-color');
     assert.strictEqual(rule.syntax, '<color>');
     assert.strictEqual(rule.inherits, false);
