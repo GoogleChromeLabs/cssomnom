@@ -23,15 +23,19 @@ It is uniquely suited for **static analysis** and **automated grading** where yo
 
 ## API Documentation & Quickstarts
 
-### Dual-Path Imports & Node 24+ Erasable TS
+### Subpath Exports & Import Options
 
-`cssomnom` provides two import paths. You can use the standard pre-bundled ESM package, or import the raw TypeScript source directly (perfect for Node 24.11.0+ with erasable syntax or modern bundlers).
+`cssomnom` provides dedicated subpath exports to fit different deployment constraints:
 
 ```typescript
-// Standard bundle import
-import { parse } from 'cssomnom';
+// 1. Full Package Import (complete CSSOM, Cascade engine, Typed OM, Selectors)
+import { parse, getCascadedStyle, CSSNumericValue } from 'cssomnom';
 
-// Pure TypeScript import (Node 24+ or bundlers)
+// 2. Parse-Only Lightweight Import (439 KB — ~50% smaller bundle!)
+// Excludes Cascade, UA Stylesheet, and Typed OM; ideal for workers, DOM shims (like LinkeDOM), or linters
+import { parse, CSSStyleSheet, CSSStyleDeclaration } from 'cssomnom/parse';
+
+// 3. Pure TypeScript Import (Node 24.11.0+ erasable syntax or modern TS bundlers)
 import { parse } from 'cssomnom/ts';
 ```
 
@@ -134,7 +138,7 @@ console.log(angle.toString()); // '135deg'
 // Note: Complex math functions (trigonometric, exponential, stepped) remain as
 // tree-structured CSSMathValue objects in the Typed OM specified style rather
 // than collapsing to a single scalar, preserving the calculation tree for
-// computed-value time resolution per CSS Values 4 §10.7.
+// computed-value time resolution per css-values-4 #calc-internal.
 ```
 
 ### CSS Custom Properties & Houdini
@@ -254,6 +258,8 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
 - **Source Location Tracking (`CSSRule.prototype.location`)**: Parsed CSS rules expose their source offsets (`{ start: number, end: number, line: number, column: number, bodyStart?: number, bodyEnd?: number }`) relative to the original source text via a non-enumerable `location` property on `CSSRule.prototype` (with 1-based `line` and `column` numbers), enabling source maps, DevTools coverage pruning, and refactoring tools without breaking standard IDL enumeration or serialization.
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
+- **CSSStyleDeclaration Host Integration**: `CSSStyleDeclaration` supports a `(parentRule?, onChange?)` constructor signature and public `onChange` callback hook, plus `decl.setCssTextSilent(value)` for hydrating from host DOM `style` attributes without triggering recursive mutation notifications. It also provides a full Proxy supporting camelCase (`style.fontSize`), kebab-case (`style['font-size']`), `style.cssFloat`, `webkit*` prefixes, and exact case preservation on `--customProperties`.
+- **CSSSupportsRule Feature Evaluation**: `CSSSupportsRule.prototype.matches` returns a boolean evaluating the condition text via the conditional rules engine per CSS Conditional 4/5.
 - **Single Rule Model (`CSSRule`)**: The public `Rule` type is an alias for `CSSRule`. The parser-private `ASTAtRule` scratch type is internal and not exported. Custom at-rules parsed via the `atRules` option with `parse()` produce standard `CSSAtRule` instances exposing `.declarations` (for declaration blocks) or `.childRules` (for rule blocks) and standard `.cssText`.
 
 ---
@@ -310,8 +316,8 @@ These APIs expose low-level parsing, property registration, and typed values def
 - **CSS Values 4 Math Functions (`CSSMathFunction`)**: New math functions (`sin()`, `cos()`, `abs()`, etc.) are represented by `CSSMathFunction`. Its `operator` getter returns the function's identifier name (e.g. `'sin'`).
 - **WebIDL Dictionary Bindings**: Dictionary constraints and computationally independent initial value validations for `CSS.registerProperty()` are enforced natively in JavaScript.
 - **`CSSTransformComponent` Inheritance**: `CSSTransformComponent` inherits from `CSSStyleValue`, aligning with browser implementations (Blink, WebKit) and enabling reification from `CSSStyleValue.parseAll()` and `StylePropertyMap.get()`.
-- **Math Simplification & Calculation Tree Preservation**: Calculation trees from `CSSNumericValue.parse()` and `StylePropertyMap` preserve `CSSMathValue` tree structures per CSS Values 4 §10.7 rather than performing eager unit reduction at parse time.
-- **Typed OM Color Property Reification**: Per CSS Typed OM Level 1 § 7.2 (`#reify-property`), W3C Houdini Issue [#689](https://github.com/w3c/css-houdini-drafts/issues/689), and WPT conformance tests, color properties accessed via `StylePropertyMap` (`styleMap.get('color')`, etc.) reify as generic base `CSSStyleValue` objects (with `currentcolor` and grammar keywords like `auto` on `caret-color` reifying as `CSSKeywordValue`). `CSSColorValue` subclasses (`CSSRGB`, `CSSHSL`, etc.) are exposed via `CSSColorValue.parse()` per § 6.1, deferring property-level color reification to Level 2 in alignment with browser engines.
+- **Math Simplification & Calculation Tree Preservation**: Calculation trees from `CSSNumericValue.parse()` and `StylePropertyMap` preserve `CSSMathValue` tree structures per `css-values-4 #calc-internal` rather than performing eager unit reduction at parse time.
+- **Typed OM Color Property Reification**: Per `css-typed-om #reify-property`, W3C Houdini Issue [#689](https://github.com/w3c/css-houdini-drafts/issues/689), and WPT conformance tests, color properties accessed via `StylePropertyMap` (`styleMap.get('color')`, etc.) reify as generic base `CSSStyleValue` objects (with `currentcolor` and grammar keywords like `auto` on `caret-color` reifying as `CSSKeywordValue`). `CSSColorValue` subclasses (`CSSRGB`, `CSSHSL`, etc.) are exposed via `CSSColorValue.parse()`, deferring property-level color reification to Level 2 in alignment with browser engines.
 
 ---
 
@@ -337,12 +343,13 @@ These APIs are custom utilities for static analysis, cascading, variable resolut
     - `walkRules(root)`: Pre-order generator yielding [`RuleWalkEntry`](./src/walk.ts) (`rule`, `ancestors`, `parentRule`, `parentAtRule`, `line`, `column`, `selectorText`, `rawSelectorText`, `style`, `declarations`, `getPropertyValue()`, `hasProperty()`).
     - `walkStyleRules(root)`: Filtered generator yielding [`StyleRuleWalkEntry`](./src/walk.ts) for style-bearing rules (`CSSStyleRule`, `CSSNestedDeclarations`, `CSSKeyframeRule`).
     - `getDeclaredProperties(root, options?)`: Collects a `Set<string>` of all declared CSS property names across the stylesheet, including parent shorthands (`border`, `border-color`, `outline`, `overflow`, `padding`, `margin`, `line-clamp`, etc.) and `@supports` feature queries (`{ includeSupports?: boolean }`, default `true`).
+    - `resolveNestedSelector(parentSelector, nestedSelector)`: Resolves CSS Nesting `&` combinators and relative selectors into canonical compound/complex selector strings.
     - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
     - `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
     - `getCascadedStyle(element, rules)`: Standalone cascading function.
-    - `matches(element, selector)`: Static selector matcher against DOM elements.
+    - `matches(element, selector)`: Static selector matcher against DOM elements (features a 1,000-entry bounded LRU selector AST cache and RFC 4647 `:lang()` extended language range matching).
     - `querySelectorAll(root, selector)` / `querySelector(root, selector)`: Static DOM query utilities.
-    - `escape(ident)`: Top-level string identifier escaping utility (CSSOM § 3).
+    - `escape(ident)`: Top-level string identifier escaping utility (`cssom-1 #serialize-an-identifier`).
     - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
     - Standalone Parser API exports for tree-shaking (`parseStylesheet`, `parseStylesheetSync`, `parseRule`, `parseRuleSync`, `parseDeclaration`, `parseDeclarationSync`, `supports`, etc.).
 
