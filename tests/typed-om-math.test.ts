@@ -20,6 +20,7 @@ import { CSSStyleValue, CSSUnitValue, CSSNumericValue, StylePropertyMap, CSS, CS
 import type { CSSUnit } from '../src/data/gen/units.ts';
 import { CSSStyleDeclaration } from '../src/index.ts';
 import { simplify } from '../src/math-parser.ts';
+import { parseValue } from '../src/parser-api.ts';
 
 test('CSSNumericValue arithmetic methods', () => {
   const px = new CSSUnitValue(10, 'px');
@@ -83,9 +84,9 @@ test('CSSNumericValue equality', () => {
 });
 
 test('Modern math functions parsing', async () => {
-  const val = await CSS.parseValue('calc(sin(45deg) * 100px)');
-  console.log('Parsed val:', val.toString());
-  assert.ok(val.toString().includes('sin(45deg)'));
+  const val = parseValue('calc(sin(45deg) * 100px)');
+  console.log('Parsed val:', val?.toString());
+  assert.ok(val?.toString().includes('sin(45deg)'));
 });
 
 test('StylePropertyMap set/get', () => {

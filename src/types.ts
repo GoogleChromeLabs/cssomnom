@@ -393,19 +393,21 @@ export interface MediaEnvironment {
   customMedia?: Record<string, boolean | string | unknown> | Map<string, boolean | string | unknown>;
 }
 
+/** @internal */
 export interface InternalRuleMetadata {
-  _assignedLayerName?: string;
-  _isScoped?: boolean;
+  /** @internal */ _assignedLayerName?: string;
+  /** @internal */ _isScoped?: boolean;
   isScoped?: boolean;
-  _scopeStart?: string | null;
+  /** @internal */ _scopeStart?: string | null;
   scopeStart?: string | null;
-  _scopeEnd?: string | null;
+  /** @internal */ _scopeEnd?: string | null;
   scopeEnd?: string | null;
-  _parentStyleSheet?: CSSStyleSheet | null;
+  /** @internal */ _parentStyleSheet?: CSSStyleSheet | null;
 }
 
+/** @internal */
 export interface InternalStyleDeclaration {
-  _readonly?: boolean;
+  /** @internal */ _readonly?: boolean;
   declarations?: Declaration[];
 }
 

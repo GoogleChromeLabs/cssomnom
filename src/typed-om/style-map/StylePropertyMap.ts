@@ -42,12 +42,14 @@ export interface StyleLike extends StyleReadOnlyLike {
 
 // css-typed-om #the-stylepropertymap
 export class StylePropertyMap extends StylePropertyMapReadOnly {
+  /** @internal */
   declare protected _style: StyleLike;
 
   constructor(style: StyleLike, element?: ElementLike) {
     super(style, element);
   }
 
+  /** @internal */
   protected override _getDeclarations(): Declaration[] {
     return this._style._declarations || this._style.declarations || [];
   }
@@ -73,6 +75,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     return undefined;
   }
 
+  /** @internal */
   protected override _getRaw(property: string): CSSStyleValue | null {
     return this._getAllRaw(property)[0] ?? null;
   }
@@ -87,6 +90,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     return res;
   }
 
+  /** @internal */
   protected override _getAllRaw(property: string): CSSStyleValue[] {
     const value = getPropertyValueSafe(this._style, property);
     const propKey = property.startsWith('--') ? property : property.toLowerCase();

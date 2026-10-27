@@ -19,7 +19,7 @@ import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import { CSSStyleRule, CSSMediaRule } from '../src/CSSOM.ts';
-import { CSS } from '../src/parser-api.ts';
+import { CSS } from '../src/index.ts';
 import type { ComplexSelector, CompoundSelector, PseudoClassSelector } from '../src/types.ts';
 
 test('Phase 81 - Forgiving selector parsing (:is, :where)', () => {

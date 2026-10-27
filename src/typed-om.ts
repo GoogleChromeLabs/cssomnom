@@ -16,6 +16,8 @@
  */
 
 // Barrel export for backwards compatibility
+import { Parser } from './parser.ts';
+void Parser;
 export * from './typed-om/index.ts';
 export type { CSSUnit } from './data/gen/units.ts';
 export type { CSSNumericType } from './typed-om/numeric/CSSNumericType.ts';

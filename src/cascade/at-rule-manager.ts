@@ -19,7 +19,7 @@ import { CSSPropertyRule, CSSKeyframesRule, CSSLayerBlockRule, CSSGroupingRule, 
 import type { Rule, Declaration, MediaEnvironment } from '../types.ts';
 import { PropertyRegistry, type PropertyDefinition } from '../PropertyRegistry.ts';
 import { MediaParser } from '../MediaParser.ts';
-import { supports } from '../parser-api.ts';
+import { supports } from '../css-namespace.ts';
 
 /**
  * Discovers and resolves active @property and @keyframes definitions across stylesheets and layers.

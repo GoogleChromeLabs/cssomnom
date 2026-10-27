@@ -23,8 +23,7 @@ import { CSSRuleList } from './collections.ts';
 import { isImportRule, isNamespaceRule } from './utils.ts';
 import type { CSSStyleSheet } from '../CSSOM.ts';
 import type { CSSNestedDeclarations } from './at-rules.ts';
-import { applyWebIDLConstants } from '../webidl.ts';
-export type { InternalRuleMetadata } from '../types.ts';
+import { applyWebIDLConstants, hideInternalFields } from '../webidl.ts';
 
 const RULE_CONSTANTS = {
   STYLE_RULE: 1,
@@ -52,7 +51,12 @@ export class CSSRule {
   _parentStyleSheet: CSSStyleSheet | null = null;
   /** @internal */
   _location?: RuleSourceLocation;
-  _assignedLayerName?: string | null;
+  /** @internal */
+  _assignedLayerName?: string | null = null;
+
+  constructor() {
+    hideInternalFields(this);
+  }
 
   // Tooling extension: original character offsets from source CSS
   get location(): RuleSourceLocation | undefined {
@@ -117,9 +121,10 @@ export class CSSRule {
 applyWebIDLConstants(CSSRule, RULE_CONSTANTS);
 
 export class CSSGroupingRule extends CSSRule {
-  private _cssRules!: CSSRuleList;
-  protected _rules: CSSRule[];
-  private _parseRuleInBlock: (text: string, nested?: boolean) => Rule;
+  /** @internal */
+  _cssRules!: CSSRuleList;
+  /** @internal */
+  _rules: CSSRule[];
 
   get cssRules(): CSSRuleList {
     if (!this._cssRules) {
@@ -128,16 +133,16 @@ export class CSSGroupingRule extends CSSRule {
     return this._cssRules;
   }
 
-  constructor(rules: CSSRule[], parseRuleInBlock: (text: string, nested?: boolean) => Rule) {
+  constructor(rules: CSSRule[], _parseRuleInBlock?: (text: string, nested?: boolean) => Rule) {
     super();
     this._rules = rules;
     this._cssRules = new CSSRuleList(() => this._rules);
-    this._parseRuleInBlock = parseRuleInBlock;
     for (const rule of rules) {
       if (rule instanceof CSSRule) {
         rule._parentRule = this;
       }
     }
+    hideInternalFields(this);
   }
 
   // cssom-1 #dom-cssgroupingrule-insertrule: step 4 wraps declarations in CSSNestedDeclarations
@@ -195,7 +200,7 @@ export class CSSGroupingRule extends CSSRule {
 
     const parsedRule = isDirectlyInScope
       ? ParseHooks.parseRuleInScopeBlock(rule)
-      : this._parseRuleInBlock(rule, isNested);
+      : ParseHooks.parseRuleInBlock(rule, isNested);
     if (!parsedRule) {
       // 5. If new rule is a syntax error, throw a SyntaxError exception.
       throw new DOMException('Syntax error', 'SyntaxError');

@@ -28,37 +28,25 @@
 
 import { Parser } from './parser.ts';
 import { tokenize } from './tokenizer.ts';
-import type { ComponentValue, SimpleBlock, CSSFunction, Declaration, Token } from './types.ts';
+import type { ComponentValue, SimpleBlock, CSSFunction, Declaration } from './types.ts';
 import { serialize } from './serializer.ts';
-import { PropertyRegistry, type PropertyDefinition, matchesSyntax } from './PropertyRegistry.ts';
-import { CSSFactories } from './data/gen/css-factories.ts';
-import { resolveNestedSelector } from './cascade.ts';
-import { ParseHooks } from './parse-hooks.ts';
-import { SHORTHANDS } from './shorthands.ts';
-import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
-import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
-import { SelectorParser } from './SelectorParser.ts';
 import { CSSAtRule, CSSGroupingRule, CSSImportRule, CSSKeyframesRule, CSSMediaRule, CSSRule, CSSStyleRule } from './CSSOM.ts';
-import { isGrammaticallyValidSupportsCondition } from './rules/utils.ts';
 
 export abstract class CSSParserValue {
   abstract toString(): string;
 }
 
 export class CSSParserToken extends CSSParserValue {
-  public value: string;
-  constructor(value: string) { 
-    super(); 
-    this.value = value;
-  }
+  value: string;
+  constructor(value: string) { super(); this.value = value; }
   toString(): string { return this.value; }
 }
 
 export type CSSToken = CSSParserValue;
 
 export class CSSParserBlock extends CSSParserValue {
-  public name: string;
-  public body: CSSParserValue[];
+  name: string;
+  body: CSSParserValue[];
   constructor(name: string, body: CSSParserValue[]) {
     super();
     this.name = name;
@@ -72,8 +60,8 @@ export class CSSParserBlock extends CSSParserValue {
 }
 
 export class CSSParserFunction extends CSSParserValue {
-  public name: string;
-  public args: CSSParserValue[][];
+  name: string;
+  args: CSSParserValue[][];
   constructor(name: string, args: CSSParserValue[][]) {
     super();
     this.name = name;
@@ -89,14 +77,10 @@ export abstract class CSSParserRule {
 }
 
 export class CSSParserAtRule extends CSSParserRule {
-  public name: string;
-  public prelude: CSSToken[];
-  public body: CSSParserRule[] | null;
-  constructor(
-    name: string,
-    prelude: CSSToken[],
-    body: CSSParserRule[] | null = null
-  ) {
+  name: string;
+  prelude: CSSToken[];
+  body: CSSParserRule[] | null;
+  constructor(name: string, prelude: CSSToken[], body: CSSParserRule[] | null = null) {
     super();
     this.name = name;
     this.prelude = prelude;
@@ -104,20 +88,14 @@ export class CSSParserAtRule extends CSSParserRule {
   }
   toString(): string {
     const preludeStr = this.prelude.map(t => t.toString()).join('');
-    if (this.body === null) {
-      return `@${this.name}${preludeStr};`;
-    }
-    return `@${this.name}${preludeStr}{${this.body.map(r => r.toString()).join('')}}`;
+    return this.body === null ? `@${this.name}${preludeStr};` : `@${this.name}${preludeStr}{${this.body.map(r => r.toString()).join('')}}`;
   }
 }
 
 export class CSSParserQualifiedRule extends CSSParserRule {
-  public prelude: CSSToken[];
-  public body: CSSParserRule[];
-  constructor(
-    prelude: CSSToken[],
-    body: CSSParserRule[]
-  ) {
+  prelude: CSSToken[];
+  body: CSSParserRule[];
+  constructor(prelude: CSSToken[], body: CSSParserRule[]) {
     super();
     this.prelude = prelude;
     this.body = body;
@@ -128,12 +106,9 @@ export class CSSParserQualifiedRule extends CSSParserRule {
 }
 
 export class CSSParserDeclaration extends CSSParserRule {
-  public name: string;
-  public body: CSSParserValue[];
-  constructor(
-    name: string,
-    body: CSSParserValue[]
-  ) {
+  name: string;
+  body: CSSParserValue[];
+  constructor(name: string, body: CSSParserValue[]) {
     super();
     this.name = name;
     this.body = body;
@@ -172,7 +147,7 @@ function toParserValue(val: ComponentValue): CSSParserValue | string {
     }
     return new CSSParserFunction(fn.name, args);
   }
-  // For tokens, we return the serialized string or a CSSStyleValue if it's a number/dimension
+  // For tokens, we return the serialized string
   return serialize([val]);
 }
 
@@ -246,32 +221,23 @@ export interface CSSParserOptions {
  * Parser API Implementation
  */
 
-export function parseStylesheetSync(css: string, options: CSSParserOptions = {}): CSSParserRule[] {
-  const tokens = tokenize(css);
-  const parser = new Parser(tokens, options);
-  // Using private method access for implementation
-  const rules = parser.consumeListOfRules(true);
-  return rules.map(toParserRule);
-}
-
 export async function parseStylesheet(css: CSSStringSource, options: CSSParserOptions = {}): Promise<CSSParserRule[]> {
   const source = await sourceToString(css);
-  return parseStylesheetSync(source, options);
-}
-
-export function parseRuleListSync(css: string, options: CSSParserOptions = {}): CSSParserRule[] {
-  const tokens = tokenize(css);
+  const tokens = tokenize(source);
   const parser = new Parser(tokens, options);
-  const rules = parser.consumeListOfRules(false);
+  const rules = parser.consumeListOfRules(true);
   return rules.map(toParserRule);
 }
 
 export async function parseRuleList(css: CSSStringSource, options: CSSParserOptions = {}): Promise<CSSParserRule[]> {
   const source = await sourceToString(css);
-  return parseRuleListSync(source, options);
+  const tokens = tokenize(source);
+  const parser = new Parser(tokens, options);
+  const rules = parser.consumeListOfRules(false);
+  return rules.map(toParserRule);
 }
 
-export function parseRuleSync(css: string, options: CSSParserOptions = {}): CSSParserRule | null {
+export function parseRule(css: string, options: CSSParserOptions = {}): CSSParserRule | null {
   const tokens = tokenize(css);
   const parser = new Parser(tokens, options);
   const rule = parser.consumeRule();
@@ -282,11 +248,7 @@ export function parseRuleSync(css: string, options: CSSParserOptions = {}): CSSP
   return toParserRule(rule);
 }
 
-export function parseRule(css: string, options: CSSParserOptions = {}): CSSParserRule | null {
-  return parseRuleSync(css, options);
-}
-
-export function parseDeclarationListSync(css: string, options: CSSParserOptions = {}): CSSParserRule[] {
+export function parseDeclarationList(css: string, options: CSSParserOptions = {}): CSSParserRule[] {
   const tokens = tokenize(css);
   const parser = new Parser(tokens, options);
   const values = parser.parseComponentValues();
@@ -294,309 +256,51 @@ export function parseDeclarationListSync(css: string, options: CSSParserOptions 
   return declarations.map(toParserRule);
 }
 
-export function parseDeclarationList(css: string, options: CSSParserOptions = {}): CSSParserRule[] {
-  return parseDeclarationListSync(css, options);
-}
-
-export function parseDeclarationSync(css: string, _options: CSSParserOptions = {}): CSSParserDeclaration | null {
-    const list = parseDeclarationListSync(css, _options);
-    return list.length > 0 ? list[0] as CSSParserDeclaration : null;
-}
-
 export function parseDeclaration(css: string, options: CSSParserOptions = {}): CSSParserDeclaration | null {
-  return parseDeclarationSync(css, options);
-}
-
-export function parseValueSync(css: string): CSSToken {
-    const tokens = tokenize(css);
-    const parser = new Parser(tokens);
-    const value = parser.consumeComponentValue();
-    return toParserToken(value);
-}
-
-export function parseValueListSync(css: string): CSSToken[] {
-    const tokens = tokenize(css);
-    const parser = new Parser(tokens);
-    const values = parser.parseComponentValues();
-    return values.map(toParserToken);
-}
-
-export function parseCommaValueListSync(css: string): CSSToken[][] {
-    const tokens = tokenize(css);
-    const parser = new Parser(tokens);
-    const list = parser.parseCommaSeparatedListOfComponentValues();
-    return list.map(subList => {
-        let start = 0;
-        while (start < subList.length && subList[start].type === 'whitespace') start++;
-        let end = subList.length - 1;
-        while (end >= start && subList[end].type === 'whitespace') end--;
-        return subList.slice(start, end + 1).map(toParserToken);
-    });
-}
-
-export function parseComponentValueSync(css: string, options: CSSParserOptions = {}): CSSParserValue | null {
-    const tokens = tokenize(css);
-    const parser = new Parser(tokens, options);
-    const values = parser.parseComponentValues();
-    
-    const nonWsValues = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-    
-    if (nonWsValues.length === 0) {
-        return null;
-    }
-    if (nonWsValues.length > 1) {
-        throw new DOMException('Syntax error', 'SyntaxError');
-    }
-    
-    return toParserToken(nonWsValues[0]);
+  const list = parseDeclarationList(css, options);
+  return list.length > 0 ? (list[0] as CSSParserDeclaration) : null;
 }
 
 export function parseComponentValue(css: string, options: CSSParserOptions = {}): CSSParserValue | null {
-  return parseComponentValueSync(css, options);
+  const tokens = tokenize(css);
+  const parser = new Parser(tokens, options);
+  const values = parser.parseComponentValues();
+
+  const nonWsValues = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+
+  if (nonWsValues.length === 0) {
+    return null;
+  }
+  if (nonWsValues.length > 1) {
+    throw new DOMException('Syntax error', 'SyntaxError');
+  }
+
+  return toParserToken(nonWsValues[0]);
 }
 
-function hasVarFunction(values: ComponentValue[]): boolean {
-  for (const v of values) {
-    if (v.type === 'function') {
-      if ((v as CSSFunction).name.toLowerCase() === 'var') {
-        return true;
-      }
-      if (hasVarFunction((v as CSSFunction).value)) {
-        return true;
-      }
-    }
-    if (v.type === 'simple-block' && hasVarFunction((v as SimpleBlock).value)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function evaluateSupportsDeclaration(property: string, value: string, isTwoArg = false): boolean {
-  if (isTwoArg) {
-    // 2-arg CSS.supports(property, value): do NOT trim property
-    // css-conditional-3 #the-css-namespace
-    if (property !== property.trim() || property === '' || property === '--') return false;
-    const nameTokens = tokenize(property);
-    if (nameTokens.length !== 2 || nameTokens[0].type !== 'ident' || nameTokens[1].type !== 'EOF') return false;
-  } else {
-    property = property.trim();
-    if (property === '' || property === '--') return false;
-  }
-
-  value = value.trim();
-  // Strip trailing !important per css-conditional-3 #at-supports & #the-css-namespace
-  const importantMatch = value.match(/^(.*?)!\s*important\s*$/i);
-  if (importantMatch) {
-    value = importantMatch[1].trim();
-  }
-
-  if (property.startsWith('--')) {
-    if (!Parser.isValidDashedIdent(property)) return false;
-    const tokens = tokenize(value);
-    const componentValues = ParseHooks.parseComponentValues(tokens);
-    return ParseHooks.validateCustomPropertyValue(componentValues);
-  }
-
-  const prop = property.toLowerCase();
-  if (prop === 'unicode-range') return false;
-
-  const isSupported = SUPPORTED_PROPERTIES.has(prop) || SHORTHANDS[prop] !== undefined;
-  if (!isSupported) return false;
-
-  const tokens = tokenize(value);
-  if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) return false;
-
-  const componentValues = ParseHooks.parseComponentValues(tokens);
-  const nonWs = componentValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (nonWs.length === 0) return false;
-
-  if (hasVarFunction(componentValues)) {
-    return true;
-  }
-
-  if (nonWs.length === 1 && nonWs[0].type === 'ident') {
-    const valStr = String((nonWs[0] as Token).value).toLowerCase();
-    if (['inherit', 'initial', 'unset', 'revert', 'revert-layer', 'revert-rule'].includes(valStr)) {
-      return true;
-    }
-  }
-
-  const shorthand = SHORTHANDS[prop];
-  if (shorthand) {
-    return shorthand.expand(componentValues) !== null;
-  }
-
-  const syntax = STANDARD_PROPERTIES_SYNTAX[prop];
-  if (syntax) {
-    return matchesSyntax(componentValues, syntax);
-  }
-
-  return true;
-}
-
-function evalSupportsInParens(item: ComponentValue): boolean {
-  if (item.type === 'function' && (item as CSSFunction).name.toLowerCase() === 'selector') {
-    const selValues = (item as CSSFunction).value;
-    const nonWsSel = selValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-    if (nonWsSel.length === 0) return false;
-    if (selValues.some(v => v.type === 'comma')) return false;
-    try {
-      const selParser = new SelectorParser(selValues, { strictSupports: true, declaredNamespaces: new Set() });
-      const list = selParser.parse();
-      if (list.selectors.length !== 1 || list.selectors[0].type === 'invalid-selector') return false;
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  if (item.type === 'simple-block' && (item as SimpleBlock).associatedToken.value === '(') {
-    const blockValues = (item as SimpleBlock).value;
-    const nonWsBlock = blockValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-    if (nonWsBlock.length === 0) return false;
-
-    const hasTopLevelOp = nonWsBlock.some(v => v.type === 'ident' && ['and', 'or', 'not'].includes(String((v as Token).value).toLowerCase()));
-    const isNestedParenBlock = nonWsBlock.length === 1 &&
-      nonWsBlock[0].type === 'simple-block' &&
-      (nonWsBlock[0] as SimpleBlock).associatedToken.value === '(';
-    if (hasTopLevelOp || isNestedParenBlock) {
-      return evalSupportsConditionValues(nonWsBlock);
-    }
-
-    const colonIdx = blockValues.findIndex(v => v.type === 'colon');
-    if (colonIdx > 0) {
-      const propValues = blockValues.slice(0, colonIdx).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-      if (propValues.length === 1 && propValues[0].type === 'ident') {
-        const propName = String((propValues[0] as Token).value);
-        const valTokens = blockValues.slice(colonIdx + 1);
-        const valStr = serialize(valTokens);
-        return evaluateSupportsDeclaration(propName, valStr, false);
-      }
-    }
-    return false;
-  }
-
-  return false;
-}
-
-function evalSupportsConditionValues(values: ComponentValue[]): boolean {
-  const items = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (items.length === 0) return false;
-
-  const evalResults: boolean[] = [];
-  const operators: string[] = [];
-
-  let i = 0;
-  while (i < items.length) {
-    if (items[i].type === 'ident' && String((items[i] as Token).value).toLowerCase() === 'not') {
-      if (i + 1 >= items.length) return false;
-      const next = items[i + 1];
-      if (next.type !== 'function' && !(next.type === 'simple-block' && (next as SimpleBlock).associatedToken.value === '(')) {
-        return false;
-      }
-      evalResults.push(!evalSupportsInParens(next));
-      i += 2;
-    } else {
-      const item = items[i];
-      if (item.type !== 'function' && !(item.type === 'simple-block' && (item as SimpleBlock).associatedToken.value === '(')) {
-        return false;
-      }
-      evalResults.push(evalSupportsInParens(item));
-      i += 1;
-    }
-
-    if (i < items.length) {
-      if (items[i].type !== 'ident') return false;
-      const op = String((items[i] as Token).value).toLowerCase();
-      if (op !== 'and' && op !== 'or') return false;
-      if (operators.length > 0 && operators[0] !== op) return false;
-      operators.push(op);
-      i += 1;
-      if (i >= items.length) return false;
-    }
-  }
-
-  if (evalResults.length === 0) return false;
-  if (evalResults.length === 1) {
-    return evalResults[0];
-  }
-
-  const op = operators[0];
-  if (op === 'and') {
-    return evalResults.every(Boolean);
-  } else {
-    return evalResults.some(Boolean);
-  }
-}
-
-// css-conditional-3 #the-css-namespace
-export function supports(propertyOrCondition: string, value?: string): boolean {
-  if (typeof value === 'string') {
-    return evaluateSupportsDeclaration(propertyOrCondition, value, true);
-  }
-  const condition = propertyOrCondition.trim();
-  if (condition === '') return false;
-
-  // Step 1: If conditionText parses as a <supports-condition>, evaluate it
-  const tokens = tokenize(condition);
+export function parseValue(css: string): CSSToken {
+  const tokens = tokenize(css);
   const parser = new Parser(tokens);
-  const componentValues = parser.parseComponentValues();
-  if (isGrammaticallyValidSupportsCondition(componentValues)) {
-    return evalSupportsConditionValues(componentValues);
-  }
-
-  // Step 2: If (${conditionText}) parses as a <supports-condition>, evaluate it
-  const wrappedTokens = tokenize(`(${condition})`);
-  const wrappedParser = new Parser(wrappedTokens);
-  const wrappedValues = wrappedParser.parseComponentValues();
-  if (isGrammaticallyValidSupportsCondition(wrappedValues)) {
-    return evalSupportsConditionValues(wrappedValues);
-  }
-
-  // Step 3: Return false
-  return false;
+  const value = parser.consumeComponentValue();
+  return toParserToken(value);
 }
 
-ParseHooks.supports = supports;
+export function parseValueList(css: string): CSSToken[] {
+  const tokens = tokenize(css);
+  const parser = new Parser(tokens);
+  const values = parser.parseComponentValues();
+  return values.map(toParserToken);
+}
 
-import { escape as cssEscape } from './css-escape.ts';
-
-export const CSS = {
-    // Typed OM Factories
-    ...CSSFactories,
-
-    // Utility APIs (cssom-1 #the-css.escape()-method)
-    escape: cssEscape,
-
-    // Tooling Extensions
-    resolveNestedSelector,
-
-    // Feature Detection
-    supports,
-
-    // Parser API
-    parseStylesheet,
-    parseStylesheetSync,
-    parseRuleList,
-    parseRule,
-    parseDeclarationList,
-    parseDeclaration,
-    parseValue: parseValueSync,
-    parseValueList: parseValueListSync,
-    parseCommaValueList: parseCommaValueListSync,
-    parseComponentValue,
-    registerProperty: (definition: PropertyDefinition) => PropertyRegistry.register(definition),
-};
-
-// WebIDL namespace @@toStringTag definition (webidl #namespacedef-css)
-Object.defineProperty(CSS, Symbol.toStringTag, {
-  value: 'CSS',
-  writable: false,
-  enumerable: false,
-  configurable: true,
-});
-
-
-
-
+export function parseCommaValueList(css: string): CSSToken[][] {
+  const tokens = tokenize(css);
+  const parser = new Parser(tokens);
+  const list = parser.parseCommaSeparatedListOfComponentValues();
+  return list.map(subList => {
+    let start = 0;
+    while (start < subList.length && subList[start].type === 'whitespace') start++;
+    let end = subList.length - 1;
+    while (end >= start && subList[end].type === 'whitespace') end--;
+    return subList.slice(start, end + 1).map(toParserToken);
+  });
+}

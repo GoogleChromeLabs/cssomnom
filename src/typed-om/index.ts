@@ -81,7 +81,7 @@ export { type StyleLike, StylePropertyMap } from './style-map/StylePropertyMap.t
 
 // 7. Geometry & Parser API
 export { DOMMatrixReadOnly, DOMMatrix } from '../DOMMatrix.ts';
-export { CSS } from '../parser-api.ts';
+export { CSS } from '../css-namespace.ts';
 
 // 8. Module Initializations & Hooks
 import './values/style-value-parser.ts';

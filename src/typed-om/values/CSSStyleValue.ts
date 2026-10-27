@@ -23,6 +23,7 @@ export class CSSStyleValue {
     return this.constructor.name;
   }
   private _cssText?: string;
+  /** @internal */
   _associatedProperty: string | null = null;
 
   constructor(cssText?: string, token?: unknown) {

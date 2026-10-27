@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { Parser, tokenize, CSSStyleDeclaration, CSSStyleRule } from '../src/index.ts';
+import { parse, CSSStyleDeclaration, CSSStyleRule } from '../src/index.ts';
 import type { CSSStyleProperties } from '../src/index.ts';
 
 test('CSSStyleDeclaration should extend CSSStyleProperties', () => {
@@ -36,7 +36,7 @@ test('CSSStyleProperties should have properties from GeneratedProperties', () =>
 
 test('style on a parsed CSSStyleRule is an instance of CSSStyleDeclaration', () => {
   const css = 'div { color: red; }';
-  const sheet = new Parser(tokenize(css)).parseStyleSheet();
+  const sheet = parse(css);
   const rule = sheet.cssRules[0] as CSSStyleRule;
   assert.ok(rule.style instanceof CSSStyleDeclaration);
 });

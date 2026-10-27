@@ -3,7 +3,8 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import { PropertyRegistry, type PropertyDefinition } from '../src/PropertyRegistry.ts';
-import { Parser } from '../src/parser.ts';
+import { ParseHooks } from '../src/parse-hooks.ts';
+import '../src/parser.ts';
 
 const fixturesPath = new URL('./fixtures/wpt/wpt-properties-values.json', import.meta.url);
 const fixtures = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));
@@ -94,7 +95,7 @@ describe('WPT Houdini Property Validation', () => {
       }
     }
 
-    if (name && !Parser.isValidDashedIdent(name.toString())) {
+    if (name && !ParseHooks.isValidDashedIdent(name.toString())) {
       expectedValid = false;
     }
 

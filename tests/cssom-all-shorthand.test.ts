@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { CSSStyleDeclaration } from '../src/CSSStyleDeclaration.ts';
 import { CSSStyleSheet, CSSStyleRule } from '../src/CSSOM.ts';
 import { SHORTHANDS } from '../src/shorthands.ts';
+import '../src/parser.ts';
 
 describe('CSSOM: all Shorthand Property Expansion & Contraction (CSSOM § 6.4.3 & CSS Cascading 5 § 6.2)', () => {
   it('SHORTHANDS definition contains all with all longhands', () => {

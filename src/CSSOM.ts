@@ -21,7 +21,6 @@ import type { StylePropertyMap } from './typed-om.ts';
 import type { Declaration, Rule, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { deleteRuleFromArray } from './utils.ts';
-import { PropertyRegistry } from './PropertyRegistry.ts';
 
 
 
@@ -41,17 +40,24 @@ import { CSSRule, CSSGroupingRule } from './rules/base.ts';
 import { CSSPropertyRule, type CSSNamespaceRule } from './rules/at-rules.ts';
 import * as AtRules from './rules/at-rules.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
-import { applyWebIDLInterface } from './webidl.ts';
+import { applyWebIDLInterface, hideInternalFields } from './webidl.ts';
 export { StyleSheetList, type LinkStyle, MediaList, CSSRuleList, CSSRule, CSSGroupingRule, CSSStyleProperties };
 
 export class StyleSheet {
-  protected _type: string = 'text/css';
-  protected _href: string | null = null;
-  protected _ownerNode: import('./types.ts').NodeLike | null = null;
-  protected _parentStyleSheet: StyleSheet | null = null;
-  protected _titleVal: string | null = null;
-  private _media: MediaList;
-  private _disabledFlag = false;
+  /** @internal */
+  _type: string = 'text/css';
+  /** @internal */
+  _href: string | null = null;
+  /** @internal */
+  _ownerNode: import('./types.ts').NodeLike | null = null;
+  /** @internal */
+  _parentStyleSheet: StyleSheet | null = null;
+  /** @internal */
+  _titleVal: string | null = null;
+  /** @internal */
+  _media: MediaList;
+  /** @internal */
+  _disabledFlag = false;
 
   // cssom-1 #the-stylesheet-interface
   get [Symbol.toStringTag](): string {
@@ -84,6 +90,7 @@ export class StyleSheet {
 
   constructor(mediaText = '') {
     this._media = new MediaList(mediaText);
+    hideInternalFields(this);
   }
 
   get media(): MediaList {
@@ -110,12 +117,26 @@ export class StyleSheet {
 }
 
 export class CSSStyleSheet extends StyleSheet {
-  protected override _parentStyleSheet: CSSStyleSheet | null = null;
-  protected _ownerRule: CSSRule | null = null;
-  private _cssRules: CSSRuleList;
-  private _rules: CSSRule[];
-  private _parseRule: (text: string) => Rule | null;
-  private _registeredProperties: string[] = [];
+  /** @internal */
+  _ownerRule: CSSRule | null = null;
+  /** @internal */
+  _cssRules!: CSSRuleList;
+  /** @internal */
+  _rules: CSSRule[] = [];
+  /** @internal */
+  _registeredProperties: string[] = [];
+  /** @internal */
+  _originCleanFlag = true;
+  /** @internal */
+  _constructed = false;
+  /** @internal */
+  get _constructedFlag(): boolean { return this._constructed; }
+  /** @internal */
+  set _constructedFlag(val: boolean) { this._constructed = val; }
+  /** @internal */
+  _disallowModificationFlag = false;
+  /** @internal */
+  _baseURL: string | null = null;
 
   get ownerRule(): CSSRule | null {
     return this._ownerRule;
@@ -124,7 +145,7 @@ export class CSSStyleSheet extends StyleSheet {
   /** @internal */
   _initImportedSheet(ownerRule: CSSRule | null, parentStyleSheet: StyleSheet | null, href: string | null): void {
     this._ownerRule = ownerRule;
-    this._parentStyleSheet = parentStyleSheet as CSSStyleSheet | null;
+    this._parentStyleSheet = parentStyleSheet;
     this._href = href;
   }
 
@@ -133,7 +154,7 @@ export class CSSStyleSheet extends StyleSheet {
     if (this._ownerRule) {
       return this._ownerRule.parentStyleSheet;
     }
-    return this._parentStyleSheet;
+    return super.parentStyleSheet as CSSStyleSheet | null;
   }
 
   get [Symbol.toStringTag](): string {
@@ -149,16 +170,13 @@ export class CSSStyleSheet extends StyleSheet {
 
   private _registerRuleProperties(rule: Rule) {
     if (rule instanceof CSSPropertyRule) {
-      try {
-        PropertyRegistry.register({
-          name: rule.name,
-          syntax: rule.syntax,
-          inherits: rule.inherits,
-          initialValue: rule.initialValue ?? undefined
-        }, 'css');
+      if (ParseHooks.registerPropertyRule({
+        name: rule.name,
+        syntax: rule.syntax,
+        inherits: rule.inherits,
+        initialValue: rule.initialValue ?? undefined
+      })) {
         this._registeredProperties.push(rule.name);
-      } catch (e) {
-        console.warn(`CSS @property warning: Invalid descriptor values for ${rule.name}. Rule was ignored.`, e);
       }
     } else if (rule instanceof CSSGroupingRule || (rule && typeof rule === 'object' && 'cssRules' in rule)) {
       const childRules = (rule as { cssRules: CSSRuleList }).cssRules;
@@ -172,68 +190,39 @@ export class CSSStyleSheet extends StyleSheet {
 
   private _unregisterProperties() {
     for (const name of this._registeredProperties) {
-      PropertyRegistry.unregister(name, 'css');
+      ParseHooks.unregisterPropertyRule(name);
     }
     this._registeredProperties = [];
-  }
-
-  // Internal flags (cssom-1 #the-cssstylesheet-interface)
-  private _alternateFlag = false;
-  private _originCleanFlag = true;
-  private _constructedFlag = false;
-  private _disallowModificationFlag = false;
-  private _constructorDocument: unknown = null;
-  private _baseURLVal: string | null = null;
-
-  get _baseURL(): string | null {
-    return this._baseURLVal;
-  }
-
-  get _constructed(): boolean {
-    return this._constructedFlag;
-  }
-
-  get _isConstructed(): boolean {
-    return this._constructedFlag;
-  }
-
-  get isConstructed(): boolean {
-    return this._constructedFlag;
   }
 
   constructor(options: CSSStyleSheetInit = {}) {
     const mediaText = options.media instanceof MediaList ? options.media.mediaText : (options.media || '');
     super(mediaText);
     this._rules = [];
-    this._constructedFlag = true;
+    this._constructed = true;
     this._originCleanFlag = true;
     this.disabled = !!options.disabled;
     if (options.baseURL !== undefined && options.baseURL !== null) {
       const baseURI = (typeof globalThis.document !== 'undefined' && globalThis.document.baseURI) || (typeof globalThis.location !== 'undefined' && globalThis.location.href) || 'about:blank';
       try {
         const url = new URL(options.baseURL, baseURI);
-        this._baseURLVal = url.href;
+        this._baseURL = url.href;
       } catch {
         throw new DOMException("Invalid baseURL", "NotAllowedError");
       }
     } else {
-      this._baseURLVal = null;
+      this._baseURL = null;
     }
 
-    // Default parseRule for constructed stylesheets
-    this._parseRule = (text: string) => {
-      const tokens = tokenize(text);
-      return ParseHooks.consumeRule(tokens);
-    };
     this._cssRules = new CSSRuleList(() => this._rules);
+    hideInternalFields(this);
   }
 
   /** @internal */
-  static createInternal(rules: CSSRule[], parseRule: (text: string) => Rule | null, originClean: boolean = true): CSSStyleSheet {
+  static createInternal(rules: CSSRule[], _parseRule?: unknown, originClean: boolean = true): CSSStyleSheet {
     const sheet = new CSSStyleSheet();
     sheet._rules.push(...rules);
-    sheet._parseRule = parseRule;
-    sheet._constructedFlag = false;
+    sheet._constructed = false;
     sheet._originCleanFlag = originClean;
     for (const rule of rules) {
       if (rule instanceof CSSRule) {
@@ -276,7 +265,7 @@ export class CSSStyleSheet extends StyleSheet {
 
   // cssom-1 #dom-cssstylesheet-replace
   replace(text: string): Promise<CSSStyleSheet> {
-    if (!this._constructedFlag || this._disallowModificationFlag) {
+    if (!this._constructed || this._disallowModificationFlag) {
       return Promise.reject(new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError"));
     }
     this._disallowModificationFlag = true;
@@ -298,7 +287,7 @@ export class CSSStyleSheet extends StyleSheet {
   // cssom-1 #dom-cssstylesheet-replacesync
   // cssom-1 #synchronously-replace-the-rules-of-a-cssstylesheet
   replaceSync(text: string): void {
-    if (!this._constructedFlag) {
+    if (!this._constructed) {
       throw new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError");
     }
     if (this._disallowModificationFlag) {
@@ -326,7 +315,7 @@ export class CSSStyleSheet extends StyleSheet {
     }
 
     // 3. Set new rule to the results of performing parse a CSS rule on argument rule.
-    const parsedRule = this._parseRule(rule);
+    const parsedRule = ParseHooks.parseRule(rule);
     // 5. If new rule is a syntax error, throw a SyntaxError exception.
     if (!parsedRule) {
       throw new DOMException('Syntax error', 'SyntaxError');
@@ -337,7 +326,7 @@ export class CSSStyleSheet extends StyleSheet {
 
     // cssom-1 #dom-cssstylesheet-insertrule step 5:
     // If parsed rule is an @import rule, and the constructed flag is set, throw a SyntaxError DOMException.
-    if (isImport && this._constructedFlag) {
+    if (isImport && this._constructed) {
       throw new DOMException('HierarchyRequestError: @import rules are not allowed in constructed stylesheets', 'SyntaxError');
     }
 
@@ -411,7 +400,7 @@ export class CSSStyleSheet extends StyleSheet {
     deleteRuleFromArray(this._rules, index);
 
     if (rule instanceof CSSPropertyRule) {
-      PropertyRegistry.unregister(rule.name, 'css');
+      ParseHooks.unregisterPropertyRule(rule.name);
       const idx = this._registeredProperties.indexOf(rule.name);
       if (idx !== -1) {
         this._registeredProperties.splice(idx, 1);
@@ -448,17 +437,18 @@ export class CSSStyleSheet extends StyleSheet {
 }
 
 export class CSSStyleRule extends CSSGroupingRule {
-  private _selectorText: string;
-  private _selectorAST: import('./types.ts').SelectorList | null = null;
-  private _style: CSSStyleDeclaration;
-  private _styleMap: StylePropertyMap | null = null;
+  /** @internal */ _selectorText: string;
+  /** @internal */ _selectorAST: import('./types.ts').SelectorList | null = null;
+  /** @internal */ _style: CSSStyleDeclaration;
+  /** @internal */ _styleMap: StylePropertyMap | null = null;
 
-  constructor(selectorText: string, styleDeclarations: Declaration[], rules: Rule[], parseRuleInBlock: (text: string) => Rule, selectorAST: import('./types.ts').SelectorList | null = null) {
+  constructor(selectorText: string, styleDeclarations: Declaration[], rules: Rule[], parseRuleInBlock?: (text: string) => Rule, selectorAST: import('./types.ts').SelectorList | null = null) {
     super(rules, parseRuleInBlock);
     this._selectorText = selectorText;
     this._selectorAST = selectorAST;
     this._style = new CSSStyleDeclaration(styleDeclarations);
     this._style._parentRule = this;
+    hideInternalFields(this);
   }
 
   // css-typed-om #declared-stylepropertymap-objects
@@ -490,24 +480,12 @@ export class CSSStyleRule extends CSSGroupingRule {
     const defaultNamespacePrefixes = new Set<string>();
     const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
     if (sheet) {
-      let defaultUri: string | null = null;
-      for (const rule of sheet.cssRules) {
-        if (rule.type === 10) {
-          const ns = rule as CSSNamespaceRule;
-          if (ns.prefix === '') {
-            hasDefaultNamespace = true;
-            defaultUri = ns.namespaceURI;
-          }
-        }
-      }
-      if (defaultUri !== null) {
-        for (const rule of sheet.cssRules) {
-          if (rule.type === 10) {
-            const ns = rule as CSSNamespaceRule;
-            if (ns.namespaceURI === defaultUri && ns.prefix !== '') {
-              defaultNamespacePrefixes.add(ns.prefix);
-            }
-          }
+      const nsRules = (Array.from(sheet.cssRules) as CSSRule[]).filter(r => r.type === 10) as CSSNamespaceRule[];
+      const defaultNs = nsRules.find(ns => ns.prefix === '');
+      if (defaultNs) {
+        hasDefaultNamespace = true;
+        for (const ns of nsRules) {
+          if (ns.namespaceURI === defaultNs.namespaceURI && ns.prefix !== '') defaultNamespacePrefixes.add(ns.prefix);
         }
       }
     }
@@ -523,16 +501,10 @@ export class CSSStyleRule extends CSSGroupingRule {
   }
 
   set selectorText(value: string) {
-    const declaredNamespaces = new Set<string>();
     const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
-    if (sheet) {
-      for (const rule of sheet.cssRules) {
-        if (rule.type === 10) {
-          const prefix = (rule as CSSNamespaceRule).prefix;
-          declaredNamespaces.add(prefix);
-        }
-      }
-    }
+    const declaredNamespaces = new Set<string>(
+      sheet ? (Array.from(sheet.cssRules) as CSSRule[]).filter(r => r.type === 10).map(r => (r as CSSNamespaceRule).prefix) : []
+    );
     const nsContext = this._getNamespaceContext();
     let isNested = false;
     let allowRelative = false;
@@ -541,7 +513,6 @@ export class CSSStyleRule extends CSSGroupingRule {
       if (currParent.type === 1 || currParent[Symbol.toStringTag] === 'CSSStyleRule') {
         isNested = true;
         allowRelative = true;
-        break;
       }
       if (currParent[Symbol.toStringTag] === 'CSSScopeRule') {
         allowRelative = true;

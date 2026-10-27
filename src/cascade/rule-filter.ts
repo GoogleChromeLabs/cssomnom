@@ -31,7 +31,7 @@ import {
   CSSSupportsRule,
   CSSImportRule,
 } from '../CSSOM.ts';
-import { supports } from '../parser-api.ts';
+import { supports } from '../css-namespace.ts';
 import { tokenize } from '../tokenizer.ts';
 import { resolveNestedSelector } from '../nesting.ts';
 import { parseStyleSheet } from '../parser.ts';
@@ -52,6 +52,12 @@ import type {
   DocumentLike,
 } from '../types.ts';
 import type { MatchedDeclaration, Specificity } from './types.ts';
+
+function getEffectiveParent(node: unknown): unknown {
+  if (!node || typeof node !== 'object') return null;
+  const n = node as { parentElement?: unknown; parentNode?: { host?: unknown }; host?: unknown };
+  return n.parentElement || (n.parentNode && n.parentNode.host) || n.host || null;
+}
 
 /**
  * Harvests all applicable stylesheets and rule lists for an element across document and shadow contexts.
@@ -773,10 +779,7 @@ export function collectMatchedDeclarations(
               if (scopeNode && curr === scopeNode) {
                 break;
               }
-              const parent: unknown = (curr as { parentElement?: unknown }).parentElement ||
-                ((curr as { parentNode?: { host?: unknown } }).parentNode && (curr as { parentNode?: { host?: unknown } }).parentNode!.host) ||
-                (curr as { host?: unknown }).host;
-              curr = parent;
+              curr = getEffectiveParent(curr);
             }
           }
         } else {
@@ -819,10 +822,7 @@ export function collectMatchedDeclarations(
               if (scopeNode && curr === scopeNode) {
                 break;
               }
-              const parent: unknown = (curr as { parentElement?: unknown }).parentElement ||
-                ((curr as { parentNode?: { host?: unknown } }).parentNode && (curr as { parentNode?: { host?: unknown } }).parentNode!.host) ||
-                (curr as { host?: unknown }).host;
-              curr = parent;
+              curr = getEffectiveParent(curr);
             }
           }
         }
@@ -846,10 +846,7 @@ export function collectMatchedDeclarations(
               if (curr === candRoot) {
                 break;
               }
-              const parent: unknown = (curr as { parentElement?: unknown }).parentElement ||
-                ((curr as { parentNode?: { host?: unknown } }).parentNode && (curr as { parentNode?: { host?: unknown } }).parentNode!.host) ||
-                (curr as { host?: unknown }).host;
-              curr = parent;
+              curr = getEffectiveParent(curr);
             }
           }
 
@@ -858,10 +855,7 @@ export function collectMatchedDeclarations(
             let curr: unknown = element;
             while (curr && curr !== candRoot) {
               hops++;
-              const parent: unknown = (curr as { parentElement?: unknown }).parentElement ||
-                ((curr as { parentNode?: { host?: unknown } }).parentNode && (curr as { parentNode?: { host?: unknown } }).parentNode!.host) ||
-                (curr as { host?: unknown }).host;
-              curr = parent;
+              curr = getEffectiveParent(curr);
             }
             walkRules(childRules, '', currentLayer, candRoot, hops);
           }

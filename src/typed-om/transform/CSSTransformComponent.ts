@@ -54,6 +54,7 @@ export abstract class CSSTransformComponent extends CSSStyleValue {
       throw new TypeError("CSSTransformComponent cannot be directly constructed");
     }
   }
+  /** @internal */
   protected _is2D: boolean = true;
   get is2D(): boolean {
     return this._is2D;

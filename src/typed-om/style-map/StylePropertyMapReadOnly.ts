@@ -30,6 +30,7 @@ export interface StyleReadOnlyLike {
   [index: number]: string;
   getPropertyValue(property: string): string;
   item(index: number): string;
+  /** @internal */
   _declarations?: Declaration[];
   declarations?: Declaration[];
   [property: string]: unknown;
@@ -37,7 +38,9 @@ export interface StyleReadOnlyLike {
 
 // css-typed-om #the-stylepropertymap
 export class StylePropertyMapReadOnly {
+  /** @internal */
   protected _style: StyleReadOnlyLike;
+  /** @internal */
   protected _element?: ElementLike;
 
   constructor(styleOrDecls: StyleReadOnlyLike | Declaration[], element?: ElementLike) {
@@ -59,6 +62,7 @@ export class StylePropertyMapReadOnly {
     this._element = element;
   }
 
+  /** @internal */
   protected _getDeclarations(): Declaration[] {
     return this._style._declarations || this._style.declarations || [];
   }
@@ -146,6 +150,7 @@ export class StylePropertyMapReadOnly {
     return undefined;
   }
 
+  /** @internal */
   protected _getRaw(property: string): CSSStyleValue | null {
     return this._getAllRaw(property)[0] ?? null;
   }
@@ -181,6 +186,7 @@ export class StylePropertyMapReadOnly {
     return res;
   }
 
+  /** @internal */
   protected _getAllRaw(property: string): CSSStyleValue[] {
     const propKey = property.startsWith('--') ? property : property.toLowerCase();
     const declarations = this._getDeclarations();

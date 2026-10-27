@@ -596,62 +596,40 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
     return true;
   }
 
-  // Siblings list calculation for child-indexed pseudo-classes
-  const siblings = getElementSiblings(element);
-  const elIndex1Based = siblings.indexOf(element) + 1;
-  if (elIndex1Based === 0) return false;
+  // selectors-4 child-indexed pseudo-classes
+  if (name === 'first-child' || name === 'last-child' || name === 'only-child' || name === 'nth-child' || name === 'nth-last-child') {
+    const siblings = getElementSiblings(element);
+    const elIndex1Based = siblings.indexOf(element) + 1;
+    if (elIndex1Based === 0) return false;
+    if (name === 'first-child') return elIndex1Based === 1;
+    if (name === 'last-child') return elIndex1Based === siblings.length;
+    if (name === 'only-child') return siblings.length === 1;
 
-  // selectors-4 #the-first-child-pseudo
-  if (name === 'first-child') {
-    return elIndex1Based === 1;
-  }
-  // selectors-4 #the-last-child-pseudo
-  if (name === 'last-child') {
-    return elIndex1Based === siblings.length;
-  }
-  // selectors-4 #the-only-child-pseudo
-  if (name === 'only-child') {
-    return siblings.length === 1;
-  }
-
-  // Type-based siblings
-  const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
-  const typeSiblings = siblings.filter(s => toAsciiLowerCase(s.localName || s.tagName || '') === elLocal);
-  const typeIndex1Based = typeSiblings.indexOf(element) + 1;
-
-  // selectors-4 #the-first-of-type-pseudo
-  if (name === 'first-of-type') {
-    return typeIndex1Based === 1;
-  }
-  // selectors-4 #the-last-of-type-pseudo
-  if (name === 'last-of-type') {
-    return typeIndex1Based === typeSiblings.length;
-  }
-  // selectors-4 #the-only-of-type-pseudo
-  if (name === 'only-of-type') {
-    return typeSiblings.length === 1;
-  }
-
-  // selectors-4 #the-nth-child-pseudo, #the-nth-last-child-pseudo
-  if (name === 'nth-child' || name === 'nth-last-child') {
     const anb = getAnPlusB(pseudo);
     if (!anb) return false;
-
     let targetList = siblings;
     if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
       const selectorList = pseudo.argument;
       if (!matches(element, selectorList, scope)) return false;
       targetList = siblings.filter(s => matches(s, selectorList, scope));
     }
-
     const idx = targetList.indexOf(element) + 1;
     if (idx === 0) return false;
     const pos = name === 'nth-child' ? idx : targetList.length - idx + 1;
     return matchAnPlusB(pos, anb.a, anb.b);
   }
 
-  // selectors-4 #the-nth-of-type-pseudo, #the-nth-last-of-type-pseudo
-  if (name === 'nth-of-type' || name === 'nth-last-of-type') {
+  // selectors-4 type-indexed pseudo-classes
+  if (name === 'first-of-type' || name === 'last-of-type' || name === 'only-of-type' || name === 'nth-of-type' || name === 'nth-last-of-type') {
+    const siblings = getElementSiblings(element);
+    const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
+    const typeSiblings = siblings.filter(s => toAsciiLowerCase(s.localName || s.tagName || '') === elLocal);
+    const typeIndex1Based = typeSiblings.indexOf(element) + 1;
+    if (typeIndex1Based === 0) return false;
+    if (name === 'first-of-type') return typeIndex1Based === 1;
+    if (name === 'last-of-type') return typeIndex1Based === typeSiblings.length;
+    if (name === 'only-of-type') return typeSiblings.length === 1;
+
     const anb = getAnPlusB(pseudo);
     if (!anb) return false;
     const pos = name === 'nth-of-type' ? typeIndex1Based : typeSiblings.length - typeIndex1Based + 1;

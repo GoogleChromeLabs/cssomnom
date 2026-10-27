@@ -19,10 +19,4 @@
 // css-cascade-5 #cascade-sort
 // css-cascade-5 #layering
 // Spec-Aligned Cascade Pipeline Architecture (css-cascade-5, css-variables-1, CSS Env 1, css-color-4)
-import { Parser } from './parser.ts';
-import { getCascadedStyle, resolveVariables } from './cascade/index.ts';
-
-Parser.getCascadedStyle = getCascadedStyle;
-Parser.resolveVariables = resolveVariables;
-
 export * from './cascade/index.ts';

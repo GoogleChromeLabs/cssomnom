@@ -23,6 +23,14 @@
 // WebIDL #constants-on-interface-prototype-object
 // WebIDL #es-operations
 
+export function hideInternalFields(instance: object): void {
+  for (const key of Object.getOwnPropertyNames(instance)) {
+    if (key.startsWith('_')) {
+      Object.defineProperty(instance, key, { enumerable: false });
+    }
+  }
+}
+
 const appliedCtors = new WeakSet<Function>();
 
 export interface WebIDLOptions {

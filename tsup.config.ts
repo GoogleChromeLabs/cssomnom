@@ -20,6 +20,7 @@ export default defineConfig({
   entry: {
     index: 'src/index.ts',
     parse: 'src/parse-entry.ts',
+    'parser-api': 'src/parser-api.ts',
   },
   format: ['esm'],
   dts: false,

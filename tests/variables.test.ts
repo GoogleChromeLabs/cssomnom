@@ -16,27 +16,26 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration, Parser } from '../src/index.ts';
-import { CSS } from '../src/parser-api.ts';
+import { CSSStyleDeclaration, CSS, resolveVariables } from '../src/index.ts';
 
 describe('Properties & Variables', () => {
     test('harden var() validation', () => {
         const style = new CSSStyleDeclaration();
         style.setProperty('--foo', 'red');
         style.setProperty('color', 'var(red, blue)'); // Invalid first arg
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), '');
+        assert.strictEqual(resolveVariables(style, 'color'), '');
         
         style.setProperty('color', 'var(--, blue)'); // Invalid first arg (not a dashed-ident)
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), '', 'var(--) should be invalid');
+        assert.strictEqual(resolveVariables(style, 'color'), '', 'var(--) should be invalid');
 
         style.setProperty('color', 'var(--foo, blue)'); // Valid
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), 'red');
+        assert.strictEqual(resolveVariables(style, 'color'), 'red');
 
         style.setProperty('color', 'var(--foo --bar, blue)'); // Invalid multiple tokens before comma
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), '', 'var() with multiple tokens before comma should be invalid');
+        assert.strictEqual(resolveVariables(style, 'color'), '', 'var() with multiple tokens before comma should be invalid');
 
         style.setProperty('color', 'var(--foo --bar)'); // Invalid multiple tokens
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), '', 'var() with multiple tokens should be invalid');
+        assert.strictEqual(resolveVariables(style, 'color'), '', 'var() with multiple tokens should be invalid');
     });
 
     test('CSS.registerProperty', () => {
@@ -52,10 +51,10 @@ describe('Properties & Variables', () => {
     test('var() fallback behavior', () => {
         const style = new CSSStyleDeclaration();
         style.setProperty('color', 'var(--missing) red');
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), '', 'var() without fallback should make property invalid');
+        assert.strictEqual(resolveVariables(style, 'color'), '', 'var() without fallback should make property invalid');
         
         style.setProperty('color', 'var(--missing,) red');
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), ' red', 'var() with empty fallback should substitute to empty');
+        assert.strictEqual(resolveVariables(style, 'color'), ' red', 'var() with empty fallback should substitute to empty');
     });
 
     test('var() fallback constraints should be lenient at parse time', () => {
@@ -76,11 +75,11 @@ describe('Properties & Variables', () => {
         const style = new CSSStyleDeclaration();
         style.setProperty('--a', 'var(--a)');
         style.setProperty('color', 'var(--a) green');
-        assert.strictEqual(Parser.resolveVariables(style, 'color'), '', 'Cycle should make the whole property invalid');
+        assert.strictEqual(resolveVariables(style, 'color'), '', 'Cycle should make the whole property invalid');
         
         style.setProperty('--b', 'var(--c)');
         style.setProperty('--c', 'var(--b)');
         style.setProperty('background', 'var(--b) blue');
-        assert.strictEqual(Parser.resolveVariables(style, 'background'), '', 'Indirect cycle should make the whole property invalid');
+        assert.strictEqual(resolveVariables(style, 'background'), '', 'Indirect cycle should make the whole property invalid');
     });
 });

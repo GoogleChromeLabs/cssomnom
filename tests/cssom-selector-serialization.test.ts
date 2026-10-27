@@ -12,7 +12,7 @@ import { parseStyleSheet } from '../src/parser.ts';
 describe('CSSOM: Namespaced Type Selector Serialization (CSSOM § 6.4.3 #serialize-a-simple-selector)', () => {
   function getSelector(cssText: string): string {
     const parsed = parseStyleSheet(cssText);
-    const sheet = CSSStyleSheet.createInternal(parsed, (text) => parseStyleSheet(text)[0]);
+    const sheet = CSSStyleSheet.createInternal(parsed, (text: string) => parseStyleSheet(text)[0]);
     const lastRule = sheet.cssRules[sheet.cssRules.length - 1];
     if (lastRule instanceof CSSStyleRule) {
       return lastRule.selectorText;

@@ -25,6 +25,7 @@ import { CSSStyleSheet } from '../CSSOM.ts';
 import { MediaList, CSSRuleList } from './collections.ts';
 import { serializeGroupingRule, FONT_FACE_DESCRIPTORS } from './utils.ts';
 import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
+import { hideInternalFields } from '../webidl.ts';
 
 // css-conditional-3 #the-cssconditionrule-interface
 export class CSSConditionRule extends CSSGroupingRule {
@@ -36,11 +37,12 @@ export class CSSConditionRule extends CSSGroupingRule {
 // css-conditional-3 #the-cssmediarule-interface
 // cssom-1 #the-cssmediarule-interface
 export class CSSMediaRule extends CSSConditionRule {
-  private _media: MediaList;
+  /** @internal */ _media: MediaList;
 
-  constructor(mediaText: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(mediaText: string, rules: Rule[], parseRuleInBlock?: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
     this._media = new MediaList(mediaText);
+    hideInternalFields(this);
   }
 
   get media(): MediaList {
@@ -73,52 +75,43 @@ export class CSSMediaRule extends CSSConditionRule {
 
 // mediaqueries-5 #custom-mq
 export class CSSCustomMediaRule extends CSSRule {
-  readonly name: string;
-  readonly query: CustomMediaQuery;
+  /** @internal */ _name: string;
+  /** @internal */ _query: CustomMediaQuery;
 
   constructor(name: string, query: CustomMediaQuery) {
     super();
-    this.name = name;
-    this.query = query;
+    this._name = name;
+    this._query = query;
+    hideInternalFields(this);
   }
+
+  get name(): string { return this._name; }
+  get query(): CustomMediaQuery { return this._query; }
+  get [Symbol.toStringTag](): string { return 'CSSCustomMediaRule'; }
 
   get cssText(): string {
-    const queryStr = typeof this.query === 'boolean' ? String(this.query) : this.query.mediaText;
-    return `@custom-media ${this.name}${queryStr ? ' ' + queryStr : ''};`;
+    const queryStr = typeof this._query === 'boolean' ? String(this._query) : this._query.mediaText;
+    return `@custom-media ${this._name}${queryStr ? ' ' + queryStr : ''};`;
   }
 
-  set cssText(_value: string) {
-    // Do nothing as per spec
-  }
+  set cssText(_value: string) {}
 }
 
 // css-conditional-3 #the-csssupportsrule-interface
 export class CSSSupportsRule extends CSSConditionRule {
-  private _conditionText: string;
+  /** @internal */ _conditionText: string;
 
-  constructor(conditionText: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(conditionText: string, rules: Rule[], parseRuleInBlock?: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
     this._conditionText = conditionText;
+    hideInternalFields(this);
   }
 
-  override get conditionText(): string {
-    return this._conditionText;
-  }
-
-  get matches(): boolean {
-    return ParseHooks.supports(this._conditionText);
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSSupportsRule';
-  }
-
+  override get conditionText(): string { return this._conditionText; }
+  get matches(): boolean { return ParseHooks.supports(this._conditionText); }
+  get [Symbol.toStringTag](): string { return 'CSSSupportsRule'; }
   get type() { return 12; }
-
-  get cssText() {
-    return serializeGroupingRule('supports', this._conditionText, this._rules);
-  }
-
+  get cssText() { return serializeGroupingRule('supports', this._conditionText, this._rules); }
   set cssText(_value: string) {}
 }
 
@@ -143,21 +136,29 @@ function parseContainerPrelude(containerQuery: string, containerName: string): {
 
 // css-conditional-5 #the-csscontainerrule-interface
 export class CSSContainerRule extends CSSConditionRule {
-  readonly containerName: string;
-  readonly containerQuery: string;
+  /** @internal */ _containerName: string;
+  /** @internal */ _containerQuery: string;
 
-  constructor(containerQuery: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule, containerName: string = '') {
+  constructor(containerQuery: string, rules: Rule[], parseRuleInBlock?: (text: string) => Rule, containerName: string = '') {
     super(rules, parseRuleInBlock);
     const parsed = parseContainerPrelude(containerQuery, containerName);
-    this.containerName = parsed.name;
-    this.containerQuery = parsed.query;
+    this._containerName = parsed.name;
+    this._containerQuery = parsed.query;
+    hideInternalFields(this);
   }
 
+  get containerName(): string { return this._containerName; }
+  get containerQuery(): string { return this._containerQuery; }
+
   override get conditionText(): string {
-    if (this.containerName) {
-      return this.containerQuery ? `${this.containerName} ${this.containerQuery}` : this.containerName;
+    if (this._containerName) {
+      return this._containerQuery ? `${this._containerName} ${this._containerQuery}` : this._containerName;
     }
-    return this.containerQuery;
+    return this._containerQuery;
+  }
+
+  get [Symbol.toStringTag]() {
+    return 'CSSContainerRule';
   }
 
   get cssText() {
@@ -178,31 +179,23 @@ function formatInlineStyleBlock(prefix: string, style: CSSStyleDeclaration): str
 
 // css-cascade-5 #the-csslayerblockrule-interface
 export class CSSLayerBlockRule extends CSSGroupingRule {
-  private _name: string;
+  /** @internal */ _name: string;
 
-  constructor(name: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(name: string, rules: Rule[], parseRuleInBlock?: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
     this._name = name;
+    hideInternalFields(this);
   }
 
-  get name(): string {
-    return this._name;
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'CSSLayerBlockRule';
-  }
-
-  get cssText() {
-    return serializeGroupingRule('layer', serializeLayerName(this._name), this._rules);
-  }
-
+  get name(): string { return this._name; }
+  get [Symbol.toStringTag]() { return 'CSSLayerBlockRule'; }
+  get cssText() { return serializeGroupingRule('layer', serializeLayerName(this._name), this._rules); }
   set cssText(_value: string) {}
 }
 
 // css-cascade-5 #the-csslayerstatementrule-interface
 export class CSSLayerStatementRule extends CSSRule {
-  private _nameList: readonly string[];
+  /** @internal */ _nameList: readonly string[];
 
   constructor(nameList?: string[]) {
     if (!nameList || arguments.length === 0) {
@@ -210,62 +203,52 @@ export class CSSLayerStatementRule extends CSSRule {
     }
     super();
     this._nameList = Object.freeze([...nameList]);
+    hideInternalFields(this);
   }
 
-  get nameList(): readonly string[] {
-    return this._nameList;
-  }
-
-  get [Symbol.toStringTag]() {
-    return 'CSSLayerStatementRule';
-  }
-
-  get cssText() {
-    return `@layer ${this._nameList.map(serializeLayerName).join(', ')};`;
-  }
-
+  get nameList(): readonly string[] { return this._nameList; }
+  get [Symbol.toStringTag]() { return 'CSSLayerStatementRule'; }
+  get cssText() { return `@layer ${this._nameList.map(serializeLayerName).join(', ')};`; }
   set cssText(_value: string) {}
 }
 
 export class CSSStartingStyleRule extends CSSGroupingRule {
-  constructor(_prelude: string, rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(_prelude: string, rules: Rule[], parseRuleInBlock?: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
   }
 
-  get cssText() {
-    return serializeGroupingRule('starting-style', '', this._rules);
-  }
-
+  get cssText() { return serializeGroupingRule('starting-style', '', this._rules); }
   set cssText(_value: string) {}
 }
 
 // css-cascade-6 #the-cssscoperule-interface
 export class CSSScopeRule extends CSSGroupingRule {
-  readonly startSelector: string | null;
-  readonly endSelector: string | null;
+  /** @internal */ _startSelector: string | null;
+  /** @internal */ _endSelector: string | null;
 
-  constructor(startSelector: string | null, endSelector: string | null, rules: CSSRule[], parseRuleInBlock: (text: string) => Rule) {
+  constructor(startSelector: string | null, endSelector: string | null, rules: CSSRule[], parseRuleInBlock?: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
-    this.startSelector = startSelector;
-    this.endSelector = endSelector;
+    this._startSelector = startSelector;
+    this._endSelector = endSelector;
+    hideInternalFields(this);
   }
 
-  get [Symbol.toStringTag]() {
-    return 'CSSScopeRule';
-  }
+  get startSelector(): string | null { return this._startSelector; }
+  get endSelector(): string | null { return this._endSelector; }
+  get [Symbol.toStringTag]() { return 'CSSScopeRule'; }
 
   get start(): string | null {
-    return this.startSelector ? (this.startSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
+    return this._startSelector ? (this._startSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
   }
 
   get end(): string | null {
-    return this.endSelector ? (this.endSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
+    return this._endSelector ? (this._endSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
   }
 
   get cssText() {
-    let prelude = this.startSelector || '';
-    if (this.endSelector) {
-      prelude += `${prelude ? ' ' : ''}to ${this.endSelector}`;
+    let prelude = this._startSelector || '';
+    if (this._endSelector) {
+      prelude += `${prelude ? ' ' : ''}to ${this._endSelector}`;
     }
     return serializeGroupingRule('scope', prelude, this._rules);
   }
@@ -274,18 +257,18 @@ export class CSSScopeRule extends CSSGroupingRule {
 }
 
 export class CSSViewTransitionRule extends CSSRule {
-  readonly navigation: string;
+  /** @internal */ _navigation: string;
 
   constructor(declarations: Declaration[]) {
     super();
     const navDecl = declarations.findLast(d => d.name === 'navigation');
-    this.navigation = navDecl ? serialize(navDecl.value).trim() : 'none';
+    this._navigation = navDecl ? serialize(navDecl.value).trim() : 'none';
+    hideInternalFields(this);
   }
 
-  get cssText() {
-    return `@view-transition { navigation: ${this.navigation}; }`;
-  }
-
+  get navigation(): string { return this._navigation; }
+  get [Symbol.toStringTag]() { return 'CSSViewTransitionRule'; }
+  get cssText() { return `@view-transition { navigation: ${this._navigation}; }`; }
   set cssText(_value: string) {}
 }
 
@@ -319,28 +302,46 @@ const DISALLOWED_KEYFRAME_NAMES = new Set(['none', 'initial', 'inherit', 'unset'
 
 export class CSSKeyframesRule extends CSSRule {
   [index: number]: CSSKeyframeRule;
-  name: string;
-  readonly cssRules: CSSRuleList;
-  private _rules: CSSKeyframeRule[];
+  /** @internal */ _name: string;
+  /** @internal */ _rules: CSSKeyframeRule[];
+  /** @internal */ _cssRules: CSSRuleList;
 
   constructor(name: string, rules: CSSKeyframeRule[]) {
     super();
-    this.name = name;
+    this._name = name;
     this._rules = rules;
-    this.cssRules = new CSSRuleList(() => this._rules);
+    this._cssRules = new CSSRuleList(() => this._rules);
+    hideInternalFields(this);
 
     return new Proxy(this, {
-      get(target, prop, receiver) {
+      get(target, prop) {
         if (typeof prop === 'string') {
           const index = Number(prop);
           if (Number.isInteger(index) && index >= 0) {
             return target._rules[index];
           }
         }
-        return Reflect.get(target, prop, receiver);
+        const val = Reflect.get(target, prop, target);
+        if (typeof val === 'function') {
+          return val.bind(target);
+        }
+        return val;
       },
+      set(target, prop, value) {
+        return Reflect.set(target, prop, value, target);
+      },
+      ownKeys() {
+        return [];
+      },
+      getOwnPropertyDescriptor() {
+        return undefined;
+      }
     });
   }
+
+  get name(): string { return this._name; }
+  set name(val: string) { this._name = val; }
+  get cssRules(): CSSRuleList { return this._cssRules; }
 
   get type() { return 7; }
 
@@ -354,9 +355,9 @@ export class CSSKeyframesRule extends CSSRule {
   }
 
   get cssText() {
-    const serializedName = DISALLOWED_KEYFRAME_NAMES.has(this.name.toLowerCase())
-      ? JSON.stringify(this.name)
-      : serializeIdentifier(this.name);
+    const serializedName = DISALLOWED_KEYFRAME_NAMES.has(this._name.toLowerCase())
+      ? JSON.stringify(this._name)
+      : serializeIdentifier(this._name);
     return serializeGroupingRule('keyframes', serializedName, this._rules);
   }
 
@@ -381,17 +382,36 @@ export class CSSKeyframesRule extends CSSRule {
   }
 
   appendRule(ruleText: string): void {
-    const openBrace = ruleText.indexOf('{');
-    const closeBrace = ruleText.lastIndexOf('}');
-    if (openBrace === -1 || closeBrace < openBrace) return;
+    const tokens = tokenize(ruleText);
+    let openIdx = -1;
+    let closeIdx = -1;
+    let depth = 0;
+    for (let i = 0; i < tokens.length; i++) {
+      const tok = tokens[i];
+      if (tok.type === '{') {
+        if (openIdx === -1) {
+          openIdx = i;
+        }
+        depth++;
+      } else if (tok.type === '}') {
+        depth--;
+        if (depth === 0 && openIdx !== -1) {
+          closeIdx = i;
+          break;
+        }
+      }
+    }
+    if (openIdx === -1 || closeIdx === -1) return;
+    const preludeTokens = tokens.slice(0, openIdx);
+    const preludeText = serialize(preludeTokens).trim();
     let keyText: string;
     try {
-      keyText = normalizeKeyframeSelector(ruleText.slice(0, openBrace).trim());
+      keyText = normalizeKeyframeSelector(preludeText);
     } catch {
       return;
     }
-    const body = ruleText.slice(openBrace + 1, closeBrace);
-    const styleDecl = ParseHooks.parseStyleAttribute(tokenize(body));
+    const bodyTokens = tokens.slice(openIdx + 1, closeIdx);
+    const styleDecl = ParseHooks.parseStyleAttribute(bodyTokens);
     const keyframe = new CSSKeyframeRule(keyText, styleDecl._declarations);
     keyframe._parentRule = this;
     this._rules.push(keyframe);
@@ -405,6 +425,7 @@ export class CSSKeyframesRule extends CSSRule {
 
 // css-animations-1 #keyframes
 class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
+  /** @internal */
   protected override get _filterDeclarationsInConstructor(): boolean {
     return true;
   }
@@ -415,31 +436,22 @@ class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
 }
 
 export class CSSKeyframeRule extends CSSRule {
-  private _keyText!: string;
-  private _style: CSSStyleDeclaration;
+  /** @internal */ _keyText!: string;
+  /** @internal */ _style: CSSStyleDeclaration;
 
   constructor(keyText: string, styleDeclarations: Declaration[]) {
     super();
     this.keyText = keyText;
     this._style = new CSSKeyframeStyleDeclaration(styleDeclarations);
     this._style._parentRule = this;
+    hideInternalFields(this);
   }
 
-  get keyText(): string {
-    return this._keyText;
-  }
+  get keyText(): string { return this._keyText; }
+  set keyText(value: string) { this._keyText = normalizeKeyframeSelector(value); }
 
-  set keyText(value: string) {
-    this._keyText = normalizeKeyframeSelector(value);
-  }
-
-  get style(): CSSStyleDeclaration {
-    return this._style;
-  }
-
-  set style(value: string) {
-    this._style.cssText = value;
-  }
+  get style(): CSSStyleDeclaration { return this._style; }
+  set style(value: string) { this._style.cssText = value; }
 
   get type() { return 8; }
 
@@ -457,7 +469,7 @@ export class CSSKeyframeRule extends CSSRule {
 
 // css-nesting-1 #the-cssnestrule
 export class CSSNestedDeclarations extends CSSRule {
-  private _style: CSSStyleDeclaration;
+  /** @internal */ _style: CSSStyleDeclaration;
 
   get [Symbol.toStringTag](): string {
     return 'CSSNestedDeclarations';
@@ -467,15 +479,11 @@ export class CSSNestedDeclarations extends CSSRule {
     super();
     this._style = new CSSStyleDeclaration(styleDeclarations);
     this._style._parentRule = this;
+    hideInternalFields(this);
   }
 
-  get style(): CSSStyleDeclaration {
-    return this._style;
-  }
-
-  set style(value: string) {
-    this._style.cssText = value;
-  }
+  get style(): CSSStyleDeclaration { return this._style; }
+  set style(value: string) { this._style.cssText = value; }
 
   get cssText() {
     return this._style.cssText;
@@ -495,6 +503,7 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
     return 'CSSFontFaceDescriptors';
   }
 
+  /** @internal */
   override _isPropertySupported(property: string): boolean {
     return super._isPropertySupported(property) || FONT_FACE_DESCRIPTORS.has(property);
   }
@@ -502,22 +511,18 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
 
 // css-fonts-4 #om-fontface
 export class CSSFontFaceRule extends CSSRule {
-  private _style: CSSFontFaceDescriptors;
+  /** @internal */ _style: CSSFontFaceDescriptors;
 
   constructor(styleDeclarations: Declaration[]) {
     super();
     this._style = new CSSFontFaceDescriptors(styleDeclarations);
     this._style._parentRule = this;
+    hideInternalFields(this);
   }
 
   // css-fonts-4 #dom-cssfontfacerule-style
-  get style(): CSSStyleDeclaration {
-    return this._style;
-  }
-
-  set style(value: string) {
-    this._style.cssText = value;
-  }
+  get style(): CSSStyleDeclaration { return this._style; }
+  set style(value: string) { this._style.cssText = value; }
 
   get [Symbol.toStringTag](): string {
     return 'CSSFontFaceRule';
@@ -573,6 +578,7 @@ const PAGE_ALLOWED_PROPERTIES = new Set<string>([
 const PAGE_DESCRIPTORS_INTERNAL = Symbol('CSSPageDescriptors.internal');
 
 export class CSSPageDescriptors extends CSSStyleDeclaration {
+  /** @internal */
   protected override get _filterDeclarationsInConstructor(): boolean {
     return true;
   }
@@ -601,6 +607,7 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
   declare pageMarginSafety?: string;
 
   // css-page-3 #page-properties
+  /** @internal */
   override _isPropertySupported(property: string): boolean {
     return PAGE_ALLOWED_PROPERTIES.has(property);
   }
@@ -646,8 +653,8 @@ export class CSSMarginDescriptors extends CSSStyleDeclaration {
 }
 
 export class CSSMarginRule extends CSSRule {
-  private _name: string;
-  private _style: CSSMarginDescriptors;
+  /** @internal */ _name: string;
+  /** @internal */ _style: CSSMarginDescriptors;
 
   constructor(name: string, declarations: Declaration[], internalToken?: symbol) {
     // cssom-1 #the-cssmarginrule-interface
@@ -659,19 +666,12 @@ export class CSSMarginRule extends CSSRule {
     this._name = name;
     this._style = new CSSMarginDescriptors(declarations);
     this._style._parentRule = this;
+    hideInternalFields(this);
   }
 
-  get name(): string {
-    return this._name;
-  }
-
-  get style(): CSSMarginDescriptors {
-    return this._style;
-  }
-
-  set style(value: string) {
-    this._style.cssText = value;
-  }
+  get name(): string { return this._name; }
+  get style(): CSSMarginDescriptors { return this._style; }
+  set style(value: string) { this._style.cssText = value; }
 
   get [Symbol.toStringTag](): string {
     return 'CSSMarginRule';
@@ -703,14 +703,14 @@ function parseDataUrlRules(href: string): Rule[] {
 }
 
 export class CSSImportRule extends CSSRule {
-  private _href: string;
-  private _media: MediaList;
-  private _styleSheet: CSSStyleSheet | null = null;
-  private _layerName: string | null;
-  private _supportsText: string | null;
-  private _scopeStart: string | null;
-  private _scopeEnd: string | null;
-  private _isScoped: boolean;
+  /** @internal */ _href: string;
+  /** @internal */ _media: MediaList;
+  /** @internal */ _styleSheet: CSSStyleSheet | null = null;
+  /** @internal */ _layerName: string | null;
+  /** @internal */ _supportsText: string | null;
+  /** @internal */ _scopeStart: string | null;
+  /** @internal */ _scopeEnd: string | null;
+  /** @internal */ _isScoped: boolean;
 
   constructor(
     href: string,
@@ -734,6 +734,7 @@ export class CSSImportRule extends CSSRule {
     this._scopeStart = scopeStart;
     this._scopeEnd = scopeEnd;
     this._isScoped = isScoped || Boolean(scopeStart || scopeEnd);
+    hideInternalFields(this);
   }
 
   get href(): string { return this._href; }
@@ -788,8 +789,8 @@ export class CSSImportRule extends CSSRule {
 }
 
 export class CSSNamespaceRule extends CSSRule {
-  private _namespaceURI: string;
-  private _prefix: string;
+  /** @internal */ _namespaceURI: string;
+  /** @internal */ _prefix: string;
 
   constructor(prefix: string, namespaceURI: string, internalToken?: symbol) {
     // cssom-1 #the-cssnamespacerule-interface
@@ -799,6 +800,7 @@ export class CSSNamespaceRule extends CSSRule {
     super();
     this._prefix = prefix;
     this._namespaceURI = namespaceURI;
+    hideInternalFields(this);
   }
 
   get namespaceURI(): string { return this._namespaceURI; }
@@ -866,14 +868,15 @@ function formatPageSelectorText(text: string): string | null {
 }
 
 export class CSSPageRule extends CSSGroupingRule {
-  private _selectorText: string;
-  private _style: CSSPageDescriptors;
+  /** @internal */ _selectorText: string;
+  /** @internal */ _style: CSSPageDescriptors;
 
   constructor(selectorText: string, declarations: Declaration[], rules: Rule[], parseRuleInBlock: (text: string) => Rule) {
     super(rules, parseRuleInBlock);
     this._selectorText = formatPageSelectorText(selectorText) ?? selectorText;
     this._style = new CSSPageDescriptors(declarations, PAGE_DESCRIPTORS_INTERNAL);
     this._style._parentRule = this;
+    hideInternalFields(this);
   }
 
   get selectorText(): string { return this._selectorText; }
@@ -903,23 +906,33 @@ export class CSSPageRule extends CSSGroupingRule {
 }
 
 export class CSSPropertyRule extends CSSRule {
-  readonly name: string;
-  readonly syntax: string;
-  readonly inherits: boolean;
-  readonly initialValue: string | null;
+  /** @internal */ _name: string;
+  /** @internal */ _syntax: string;
+  /** @internal */ _inherits: boolean;
+  /** @internal */ _initialValue: string | null;
 
   constructor(name: string, syntax: string, inherits: boolean, initialValue: string | null) {
     super();
-    this.name = name;
-    this.syntax = syntax;
-    this.inherits = inherits;
-    this.initialValue = initialValue;
+    this._name = name;
+    this._syntax = syntax;
+    this._inherits = inherits;
+    this._initialValue = initialValue;
+    hideInternalFields(this);
+  }
+
+  get name(): string { return this._name; }
+  get syntax(): string { return this._syntax; }
+  get inherits(): boolean { return this._inherits; }
+  get initialValue(): string | null { return this._initialValue; }
+
+  get [Symbol.toStringTag](): string {
+    return 'CSSPropertyRule';
   }
 
   get cssText() {
-    let body = `syntax: ${serializeString(this.syntax)}; inherits: ${this.inherits};`;
-    if (this.initialValue !== null) body += `initial-value: ${this.initialValue};`;
-    return `@property ${serializeIdentifier(this.name)} {${body}}`;
+    let body = `syntax: ${serializeString(this._syntax)}; inherits: ${this._inherits};`;
+    if (this._initialValue !== null) body += `initial-value: ${this._initialValue};`;
+    return `@property ${serializeIdentifier(this._name)} {${body}}`;
   }
 
   set cssText(_value: string) {}
@@ -935,11 +948,11 @@ const AT_RULE_TYPE_MAP: Record<string, number> = {
 };
 
 export class CSSAtRule extends CSSRule {
-  public name: string;
-  public prelude: ComponentValue[];
-  public block?: SimpleBlock | null;
-  public childRules?: CSSRule[];
-  public declarations?: Declaration[];
+  /** @internal */ _name: string;
+  /** @internal */ _prelude: ComponentValue[];
+  /** @internal */ _block?: SimpleBlock | null;
+  /** @internal */ _childRules?: CSSRule[];
+  /** @internal */ _declarations?: Declaration[];
 
   constructor(
     name: string,
@@ -949,32 +962,44 @@ export class CSSAtRule extends CSSRule {
     declarations?: Declaration[]
   ) {
     super();
-    this.name = name;
-    this.prelude = prelude;
-    this.block = block;
-    this.childRules = childRules;
-    this.declarations = declarations;
+    this._name = name;
+    this._prelude = prelude;
+    this._block = block;
+    this._childRules = childRules;
+    this._declarations = declarations;
+    hideInternalFields(this);
   }
 
+  get name(): string { return this._name; }
+  set name(val: string) { this._name = val; }
+  get prelude(): ComponentValue[] { return this._prelude; }
+  set prelude(val: ComponentValue[]) { this._prelude = val; }
+  get block(): SimpleBlock | null | undefined { return this._block; }
+  set block(val: SimpleBlock | null | undefined) { this._block = val; }
+  get childRules(): CSSRule[] | undefined { return this._childRules; }
+  set childRules(val: CSSRule[] | undefined) { this._childRules = val; }
+  get declarations(): Declaration[] | undefined { return this._declarations; }
+  set declarations(val: Declaration[] | undefined) { this._declarations = val; }
+
   override get type(): number {
-    return AT_RULE_TYPE_MAP[this.name] ?? 0;
+    return AT_RULE_TYPE_MAP[this._name] ?? 0;
   }
 
   get cssText(): string {
-    const serializedPrelude = serialize(this.prelude).trim();
+    const serializedPrelude = serialize(this._prelude).trim();
     const cond = serializedPrelude.length > 0 ? ' ' + serializedPrelude : '';
-    if (!this.block) return `@${this.name}${cond};`;
+    if (!this._block) return `@${this._name}${cond};`;
 
-    const childRules = this.childRules || [];
+    const childRules = this._childRules || [];
     if (childRules.length > 0) {
-      return serializeGroupingRule(this.name, cond.trim(), childRules);
+      return serializeGroupingRule(this._name, cond.trim(), childRules);
     }
 
-    const blockContentText = serialize(this.block.value).trim();
-    if (!blockContentText) return `@${this.name}${cond} { }`;
+    const blockContentText = serialize(this._block.value).trim();
+    if (!blockContentText) return `@${this._name}${cond} { }`;
 
     const indentedBody = blockContentText.split('\n').map(line => '  ' + line).join('\n');
-    return `@${this.name}${cond} {\n${indentedBody}\n}`;
+    return `@${this._name}${cond} {\n${indentedBody}\n}`;
   }
 }
 
@@ -995,9 +1020,9 @@ const COUNTER_STYLE_PROP_BY_DESCRIPTOR = new Map<string, string>(COUNTER_STYLE_D
 
 // css-counter-styles-3 #the-csscounterstylerule-interface
 export class CSSCounterStyleRule extends CSSRule {
-  private _name: string;
-  private _declarations: Declaration[] = [];
-  readonly _descriptors: Record<string, string> = {
+  /** @internal */ _name: string;
+  /** @internal */ _declarations: Declaration[] = [];
+  /** @internal */ _descriptors: Record<string, string> = {
     system: '',
     symbols: '',
     additiveSymbols: '',
@@ -1033,6 +1058,7 @@ export class CSSCounterStyleRule extends CSSRule {
           : (typeof d.value === 'string' ? d.value : '');
       }
     }
+    hideInternalFields(this);
   }
 
   // css-counter-styles-3 #dom-csscounterstylerule-name
@@ -1093,18 +1119,23 @@ const FONT_FEATURE_VALUE_MAP_DEFS = [
 
 // css-fonts-4 #om-fontfeaturevalues
 export class CSSFontFeatureValuesRule extends CSSRule {
-  private _fontFamily: string;
-  readonly annotation = new CSSFontFeatureValuesMap();
-  readonly ornaments = new CSSFontFeatureValuesMap();
-  readonly stylistic = new CSSFontFeatureValuesMap();
-  readonly swash = new CSSFontFeatureValuesMap();
-  readonly characterVariant = new CSSFontFeatureValuesMap();
-  readonly styleset = new CSSFontFeatureValuesMap();
-  readonly historicalForms = new CSSFontFeatureValuesMap();
+  [key: string]: unknown;
+  /** @internal */ _fontFamily: string;
+  declare readonly annotation: CSSFontFeatureValuesMap;
+  declare readonly ornaments: CSSFontFeatureValuesMap;
+  declare readonly stylistic: CSSFontFeatureValuesMap;
+  declare readonly swash: CSSFontFeatureValuesMap;
+  declare readonly characterVariant: CSSFontFeatureValuesMap;
+  declare readonly styleset: CSSFontFeatureValuesMap;
+  declare readonly historicalForms: CSSFontFeatureValuesMap;
 
   constructor(fontFamily: string) {
     super();
     this._fontFamily = fontFamily;
+    for (const [, prop] of FONT_FEATURE_VALUE_MAP_DEFS) {
+      (this as Record<string, CSSFontFeatureValuesMap>)[`_${prop}`] = new CSSFontFeatureValuesMap();
+    }
+    hideInternalFields(this);
   }
 
   get fontFamily(): string { return this._fontFamily; }
@@ -1115,8 +1146,8 @@ export class CSSFontFeatureValuesRule extends CSSRule {
   get cssText(): string {
     const blocks: string[] = [];
     for (const [atName, prop] of FONT_FEATURE_VALUE_MAP_DEFS) {
-      const map = this[prop];
-      if (map.size > 0) {
+      const map = (this as Record<string, CSSFontFeatureValuesMap>)[prop];
+      if (map && map.size > 0) {
         const entries = Array.from(map.entries(), ([k, v]) => `${k}: ${v.join(' ')};`).join(' ');
         blocks.push(`@${atName} { ${entries} }`);
       }
@@ -1125,5 +1156,13 @@ export class CSSFontFeatureValuesRule extends CSSRule {
     return `@font-feature-values ${this._fontFamily}${body}`;
   }
   set cssText(_value: string) {}
+}
+
+for (const [, prop] of FONT_FEATURE_VALUE_MAP_DEFS) {
+  Object.defineProperty(CSSFontFeatureValuesRule.prototype, prop, {
+    get(this: Record<string, CSSFontFeatureValuesMap>) { return this[`_${prop}`]; },
+    enumerable: true,
+    configurable: true,
+  });
 }
 

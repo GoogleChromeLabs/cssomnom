@@ -18,8 +18,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
-import { Parser, parseStyleSheet } from '../src/parser.ts';
-import '../src/cascade.ts';
+import { parseStyleSheet } from '../src/parser.ts';
+import { getCascadedStyle } from '../src/cascade.ts';
 
 describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
   it('applies UA stylesheet defaults to elements in the cascade without author rules', () => {
@@ -27,11 +27,11 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const p = document.getElementById('p');
     const b = document.getElementById('b');
 
-    const pStyle = Parser.getCascadedStyle(p);
+    const pStyle = getCascadedStyle(p);
     assert.equal(pStyle.getPropertyValue('display'), 'block');
     assert.equal(pStyle.getPropertyValue('margin-block'), '1em');
 
-    const bStyle = Parser.getCascadedStyle(b);
+    const bStyle = getCascadedStyle(b);
     assert.equal(bStyle.getPropertyValue('font-weight'), 'bolder');
   });
 
@@ -43,7 +43,7 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const { document } = parseHTML('<html><body><p id="p">Hello</p></body></html>');
     const p = document.getElementById('p');
 
-    const style = Parser.getCascadedStyle(p, rules);
+    const style = getCascadedStyle(p, rules);
     assert.equal(style.getPropertyValue('display'), 'inline');
   });
 
@@ -56,7 +56,7 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const { document } = parseHTML('<html><body><p id="p" class="reverted">Hello</p></body></html>');
     const p = document.getElementById('p');
 
-    const style = Parser.getCascadedStyle(p, rules);
+    const style = getCascadedStyle(p, rules);
     assert.equal(style.getPropertyValue('display'), 'block');
   });
 
@@ -73,7 +73,7 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const { document } = parseHTML('<html><body><p id="p">Hello</p></body></html>');
     const p = document.getElementById('p');
 
-    const style = Parser.getCascadedStyle(p, rules);
+    const style = getCascadedStyle(p, rules);
     // Overrides reverts to layer base, which is inline
     assert.equal(style.getPropertyValue('display'), 'inline');
   });
@@ -88,7 +88,7 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const { document } = parseHTML('<html><body><p id="p">Hello</p></body></html>');
     const p = document.getElementById('p');
 
-    const style = Parser.getCascadedStyle(p, rules);
+    const style = getCascadedStyle(p, rules);
     // With no earlier author layers, revert-layer falls back to the UA origin (block)
     assert.equal(style.getPropertyValue('display'), 'block');
   });
@@ -103,7 +103,7 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const { document } = parseHTML('<html><body><marquee id="m">Scrolling</marquee></body></html>');
     const m = document.getElementById('m');
 
-    const style = Parser.getCascadedStyle(m, rules);
+    const style = getCascadedStyle(m, rules);
     assert.equal(style.getPropertyValue('overflow-x'), 'hidden');
   });
 
@@ -124,7 +124,7 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const { document } = parseHTML('<html><body><h1 id="h" class="test">Title</h1></body></html>');
     const h = document.getElementById('h');
 
-    const style = Parser.getCascadedStyle(h, rules);
+    const style = getCascadedStyle(h, rules);
     assert.equal(style.getPropertyValue('margin-top'), '0.67em');
   });
 
@@ -145,7 +145,7 @@ describe('Phase 149: HTML UA Stylesheet as a Real Cascade Origin', () => {
     const { document } = parseHTML('<html><body><div id="parent" style="color: red;"><div id="child" class="child">Text</div></div></body></html>');
     const child = document.getElementById('child');
 
-    const style = Parser.getCascadedStyle(child, rules);
+    const style = getCascadedStyle(child, rules);
     assert.equal(style.getPropertyValue('color'), 'rgb(255, 0, 0)');
   });
 });

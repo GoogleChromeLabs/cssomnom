@@ -18,7 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule } from '../src/index.ts';
+import { CSSStyleRule, resolveVariables } from '../src/index.ts';
 
 
 test('resolveValue with var() fallbacks', () => {
@@ -36,10 +36,10 @@ test('resolveValue with var() fallbacks', () => {
   const rule = stylesheet.cssRules[0] as CSSStyleRule;
   const style = rule.style;
   
-  assert.strictEqual(Parser.resolveVariables(style, 'background').trim(), 'green');
-  assert.strictEqual(Parser.resolveVariables(style, 'color').trim(), 'white');
-  assert.strictEqual(Parser.resolveVariables(style, 'border-color').trim(), 'red');
-  assert.strictEqual(Parser.resolveVariables(style, 'outline-color').trim(), ''); // or 'unset'/'initial'?
+  assert.strictEqual(resolveVariables(style, 'background').trim(), 'green');
+  assert.strictEqual(resolveVariables(style, 'color').trim(), 'white');
+  assert.strictEqual(resolveVariables(style, 'border-color').trim(), 'red');
+  assert.strictEqual(resolveVariables(style, 'outline-color').trim(), ''); // or 'unset'/'initial'?
 });
 
 test('resolveValue nested var()', () => {
@@ -54,7 +54,7 @@ test('resolveValue nested var()', () => {
   const rule = stylesheet.cssRules[0] as CSSStyleRule;
   const style = rule.style;
   
-  assert.strictEqual(Parser.resolveVariables(style, 'color').trim(), 'blue');
+  assert.strictEqual(resolveVariables(style, 'color').trim(), 'blue');
 });
 
 test('resolveVariables with env()', () => {
@@ -76,10 +76,10 @@ test('resolveVariables with env()', () => {
     'viewport-segment-width 0 0': '300px'
   };
 
-  assert.strictEqual(Parser.resolveVariables(style, 'margin-top', envMap).trim(), '10px');
-  assert.strictEqual(Parser.resolveVariables(style, 'margin-bottom', envMap).trim(), '15px');
-  assert.strictEqual(Parser.resolveVariables(style, 'padding', envMap).trim(), '10px');
-  assert.strictEqual(Parser.resolveVariables(style, 'width', envMap).trim(), '300px');
+  assert.strictEqual(resolveVariables(style, 'margin-top', envMap).trim(), '10px');
+  assert.strictEqual(resolveVariables(style, 'margin-bottom', envMap).trim(), '15px');
+  assert.strictEqual(resolveVariables(style, 'padding', envMap).trim(), '10px');
+  assert.strictEqual(resolveVariables(style, 'width', envMap).trim(), '300px');
 });
 
 test('resolveVariables with mixed var() and env()', () => {
@@ -97,7 +97,7 @@ test('resolveVariables with mixed var() and env()', () => {
     'safe-area-inset-top': '12px'
   };
 
-  assert.strictEqual(Parser.resolveVariables(style, 'margin', envMap).trim(), '12px');
+  assert.strictEqual(resolveVariables(style, 'margin', envMap).trim(), '12px');
 });
 
 test('resolveVariables with cached custom properties', () => {
@@ -112,8 +112,8 @@ test('resolveVariables with cached custom properties', () => {
   const rule = stylesheet.cssRules[0] as CSSStyleRule;
   const style = rule.style;
 
-  assert.strictEqual(Parser.resolveVariables(style, 'color').trim(), 'blue');
-  assert.strictEqual(Parser.resolveVariables(style, 'background-color').trim(), 'blue');
+  assert.strictEqual(resolveVariables(style, 'color').trim(), 'blue');
+  assert.strictEqual(resolveVariables(style, 'background-color').trim(), 'blue');
 });
 
 test('resolveValue with var() cyclic dependencies and fallbacks', () => {
@@ -128,7 +128,7 @@ test('resolveValue with var() cyclic dependencies and fallbacks', () => {
   const rule = stylesheet.cssRules[0] as CSSStyleRule;
   const style = rule.style;
   
-  assert.strictEqual(Parser.resolveVariables(style, 'color').trim(), '');
+  assert.strictEqual(resolveVariables(style, 'color').trim(), '');
 });
 
 

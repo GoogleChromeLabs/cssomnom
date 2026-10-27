@@ -22,8 +22,7 @@ import type { CSSRule } from './rules/base.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
-import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
-import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
+import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES } from './data/gen/property-list.ts';
 import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface } from './webidl.ts';
@@ -106,34 +105,37 @@ function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
         }
       }
       return Reflect.has(t, prop);
-    }
+    },
+    ownKeys(t) {
+      return Array.from({ length: t.length }, (_, i) => String(i));
+    },
+    getOwnPropertyDescriptor(t, prop) {
+      const i = typeof prop === 'string' ? Number(prop) : NaN;
+      if (Number.isInteger(i) && i >= 0 && i < t.length && String(i) === prop) {
+        return { value: t.item(i), writable: false, enumerable: true, configurable: true };
+      }
+      const desc = Reflect.getOwnPropertyDescriptor(t, prop);
+      return desc ? { ...desc, enumerable: false } : undefined;
+    },
   }) as T;
 }
 
 export class CSSStyleDeclaration extends CSSStyleProperties {
   [index: number]: string;
   [property: string]: unknown;
-  public _declarations: Declaration[];
-  private _declMap: Map<string, Declaration>;
+  /** @internal */ _declarations: Declaration[];
+  /** @internal */ _declMap: Map<string, Declaration>;
+  /** @internal */ _readonly: boolean = false;
+  /** @internal */ _parentRule: CSSRule | null = null;
+  /** @internal */ _onChange: ((force?: boolean) => void) | null = null;
+
+  get parentRule(): CSSRule | null { return this._parentRule; }
+  get onChange(): ((force?: boolean) => void) | null { return this._onChange; }
+  set onChange(fn: ((force?: boolean) => void) | null) { this._onChange = fn ?? null; }
+
   /** @internal */
-  _readonly: boolean;
-  /** @internal */
-  _parentRule: CSSRule | null = null;
-  public _onChange: ((force?: boolean) => void) | null = null;
   protected get _filterDeclarationsInConstructor(): boolean {
     return false;
-  }
-
-  get parentRule(): CSSRule | null {
-    return this._parentRule;
-  }
-
-  get onChange(): ((force?: boolean) => void) | null {
-    return this._onChange ?? null;
-  }
-
-  set onChange(fn: ((force?: boolean) => void) | null) {
-    this._onChange = fn ?? null;
   }
 
   constructor(
@@ -239,6 +241,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return this._declarations[index]?.name || '';
   }
 
+  /** @internal */
   protected _getLonghandForContraction(lh: string): { value: ComponentValue[]; important: boolean } | null {
     const decl = this._getWinningDeclaration(lh);
     if (decl && decl.value.length > 0) {
@@ -418,6 +421,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return '';
   }
 
+  /** @internal */
   protected _getExactWinningDeclaration(property: string): Declaration | null {
     if (!property.startsWith('--')) property = property.toLowerCase();
     const isCustom = property.startsWith('--');
@@ -440,6 +444,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return winner;
   }
 
+  /** @internal */
   protected _getWinningDeclaration(property: string): Declaration | null {
     const exact = this._getExactWinningDeclaration(property);
     const shorthands = LONGHAND_TO_SHORTHAND[property];
@@ -521,7 +526,12 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   }
 
   // cssom-1 #dom-cssstyledeclaration-setproperty
-  setProperty(property: string, value: string | null, priority: string = '', notify: boolean = true, fromAll: boolean = false) {
+  setProperty(property: string, value: string | null, priority: string = ''): void {
+    this._setPropertyInternal(property, value, priority, true, false);
+  }
+
+  /** @internal */
+  _setPropertyInternal(property: string, value: string | null, priority: string = '', notify: boolean = true, fromAll: boolean = false): void {
     // 1. If the readonly flag is set, then throw a NoModificationAllowedError exception.
     if (this._readonly) {
       throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
@@ -546,7 +556,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       return;
     }
 
-    if (value === undefined && !property.startsWith('--') && !STANDARD_PROPERTIES_SYNTAX[property]?.includes('<custom-ident>')) {
+    if (value === undefined && !property.startsWith('--') && !CUSTOM_IDENT_PROPERTIES.has(property)) {
       return;
     }
 
@@ -583,7 +593,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       if (ParseHooks.validateDeclarationValue && !ParseHooks.validateDeclarationValue(compVals)) {
         return;
       }
-      if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, valueStr)) {
+      if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, valueStr, value)) {
         return;
       }
     }
@@ -596,13 +606,13 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         if (expanded) {
           if (ParseHooks.validatePropertyValue) {
             for (const [lh, val] of Object.entries(expanded)) {
-              if (!ParseHooks.validatePropertyValue(lh, serialize(val))) {
+              if (!ParseHooks.validatePropertyValue(lh, serialize(val), val)) {
                 return;
               }
             }
           }
           for (const [lh, val] of Object.entries(expanded)) {
-            this.setProperty(lh, serialize(val), normalizedPriority, false, property === 'all' || fromAll);
+            this._setPropertyInternal(lh, serialize(val), normalizedPriority, false, property === 'all' || fromAll);
           }
           if (notify) {
             this._onChange?.();
@@ -794,14 +804,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     }
   }
 
-  setCssTextSilent(value: string): void {
-    if (this._readonly) {
-      throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
-    }
-    this._applyCssText(value);
-  }
-
-
+  /** @internal */
   _isPropertySupported(property: string): boolean {
     return SUPPORTED_PROPERTIES.has(property);
   }

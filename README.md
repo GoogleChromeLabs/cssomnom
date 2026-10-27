@@ -25,17 +25,20 @@ It is uniquely suited for **static analysis** and **automated grading** where yo
 
 ### Subpath Exports & Import Options
 
-`cssomnom` provides dedicated subpath exports to fit different deployment constraints:
+`cssomnom` organizes its public API into three distinct cupboards plus a direct TypeScript entrypoint:
 
 ```typescript
-// 1. Full Package Import (complete CSSOM, Cascade engine, Typed OM, Selectors)
-import { parse, getCascadedStyle, CSSNumericValue } from 'cssomnom';
+// 1. Full Package ("cssomnom"): Browser CSSOM, Typed OM, W3C CSS namespace, Cascade & Node AST tools
+import { parse, getCascadedStyle, CSSNumericValue, CSS } from 'cssomnom';
 
-// 2. Parse-Only Lightweight Import (439 KB — ~50% smaller bundle!)
-// Excludes Cascade, UA Stylesheet, and Typed OM; ideal for workers, DOM shims (like LinkeDOM), or linters
-import { parse, CSSStyleSheet, CSSStyleDeclaration } from 'cssomnom/parse';
+// 2. Lightweight Parser & AST Subset ("cssomnom/parse" — ~340 KB, >60% smaller bundle!)
+// Strict subset of "cssomnom" excluding Cascade, UA Stylesheet, and Typed OM; ideal for workers, DOM shims (LinkeDOM), and linters
+import { parse, CSSStyleSheet, CSSStyleDeclaration, walkStyleRules } from 'cssomnom/parse';
 
-// 3. Pure TypeScript Import (Node 24.11.0+ erasable syntax or modern TS bundlers)
+// 3. WICG CSS Parser API Draft ("cssomnom/parser-api")
+import { parseStylesheet, parseRule, CSSParserAtRule, CSSParserQualifiedRule } from 'cssomnom/parser-api';
+
+// 4. Direct TypeScript Source ("cssomnom/ts" — Node 24.11.0+ erasable syntax)
 import { parse } from 'cssomnom/ts';
 ```
 
@@ -221,21 +224,17 @@ This library implements standard W3C CSSOM interfaces (refer to [MDN Web Docs on
 
 Below are the primary entry points and custom utilities:
 
-*   **`parse(css: string): CSSStyleSheet`** — Parses a CSS string directly into a `CSSStyleSheet`.
+*   **`parse(css: string, options?: ParserOptions): CSSStyleSheet`** — Parses a CSS string directly into a `CSSStyleSheet`.
 *   **`tokenize(css: string): Token[]`** — Synchronous low-level tokenizer.
 *   **`serialize(nodes: ComponentValue[] | Token[]): string`** — Serializes component values or tokens back to CSS text.
 *   **`new StreamingTokenizer()`** — Class for processing chunked CSS streams.
 *   **`walkRules(root)`** — Recursively traverses CSS rules yielding depth-first pre-order entries with ancestor hierarchy, resolved selectors, 1-based source lines, and shorthand-aware property queries.
 *   **`walkStyleRules(root)`** — Filtered traversal yielding only style-bearing rules (`CSSStyleRule`, `CSSNestedDeclarations`, `CSSKeyframeRule`) with resolved selectors and declaration maps.
 *   **`getDeclaredProperties(root, options?)`** — Collects all declared CSS property names across the rule tree, including parent shorthands and `@supports` feature queries.
-*   **`getCascadedStyle(element: MatchableElement, rules: Rule[]): CSSStyleDeclaration`** — Computes cascaded styles against a mock/linkedom element.
-*   **`Parser` static methods**:
-    *   `Parser.parseRuleText(css: string): Rule` — Parses a single CSS rule string.
-    *   `Parser.parseStyleSheetText(css: string): Rule[]` — Parses a stylesheet string into an array of rules.
-    *   `Parser.parseSelector(css: string): string | null` — Parses and validates a selector string.
-    *   `Parser.parseSelectorAST(css: string): SelectorList | null` — Parses a selector string into structured `SelectorList` nodes.
-    *   `Parser.calculateSpecificity(selector: string | SelectorList)` — Calculates specificity tuple `[a, b, c]`.
-    *   `Parser.resolveVariables(style: CSSStyleDeclaration, property: string)` — Resolves `var()` and `env()` functions.
+*   **`resolveNestedSelector(parentSelector, nestedSelector)`** — Resolves CSS Nesting `&` combinators and relative selectors into canonical selector strings.
+*   **`calculateSpecificity(selector: string | SelectorList)`** — Calculates selector specificity tuple `[a, b, c]`.
+*   **`getCascadedStyle(element: MatchableElement, rules: Rule[]): CSSStyleDeclaration`** — Computes cascaded styles against a DOM/linkedom element.
+*   **`resolveVariables(style: CSSStyleDeclaration, property: string, envMap?)`** — Resolves `var()` and `env()` substitutions on a `CSSStyleDeclaration`.
 
 ## Architecture & Spec Boundaries
 
@@ -258,37 +257,27 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
 - **Source Location Tracking (`CSSRule.prototype.location`)**: Parsed CSS rules expose their source offsets (`{ start: number, end: number, line: number, column: number, bodyStart?: number, bodyEnd?: number }`) relative to the original source text via a non-enumerable `location` property on `CSSRule.prototype` (with 1-based `line` and `column` numbers), enabling source maps, DevTools coverage pruning, and refactoring tools without breaking standard IDL enumeration or serialization.
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
-- **CSSStyleDeclaration Host Integration**: `CSSStyleDeclaration` supports a `(parentRule?, onChange?)` constructor signature and public `onChange` callback hook, plus `decl.setCssTextSilent(value)` for hydrating from host DOM `style` attributes without triggering recursive mutation notifications. It also provides a full Proxy supporting camelCase (`style.fontSize`), kebab-case (`style['font-size']`), `style.cssFloat`, `webkit*` prefixes, and exact case preservation on `--customProperties`.
+- **CSSStyleDeclaration Host Integration**: `CSSStyleDeclaration` supports a `(parentRule?, onChange?)` constructor signature and public `onChange` callback hook (temporarily setting `decl.onChange = null` suppresses callbacks when hydrating from host DOM `style` attributes). It also provides a full Proxy supporting camelCase (`style.fontSize`), kebab-case (`style['font-size']`), `style.cssFloat`, `webkit*` prefixes, exact case preservation on `--customProperties`, and WebIDL-compliant `Object.keys(style)` returning only indexed property names `0..length-1`.
 - **CSSSupportsRule Feature Evaluation**: `CSSSupportsRule.prototype.matches` returns a boolean evaluating the condition text via the conditional rules engine per CSS Conditional 4/5.
 - **Single Rule Model (`CSSRule`)**: The public `Rule` type is an alias for `CSSRule`. The parser-private `ASTAtRule` scratch type is internal and not exported. Custom at-rules parsed via the `atRules` option with `parse()` produce standard `CSSAtRule` instances exposing `.declarations` (for declaration blocks) or `.childRules` (for rule blocks) and standard `.cssText`.
 
 ---
 
-### 2. Houdini Layer (Modern & Experimental)
+### 2. Houdini & WICG Parser API Layer (Modern & Experimental)
 These APIs expose low-level parsing, property registration, and typed values defined in Houdini and CSS Values specifications.
 
 **Specifications Followed**
 - **CSS Typed OM Level 1**: `submodules/css-houdini-drafts/css-typed-om/Overview.bs`
 - **CSS Typed OM Level 2 / CSS Color API**: `submodules/css-houdini-drafts/css-typed-om-2/Overview.bs`
 - **CSS Properties and Values API Level 1**: `submodules/css-houdini-drafts/css-properties-values-api/Overview.bs`
-- **CSS Parser API**: Based on the [WICG CSS Parser API](https://github.com/WICG/css-parser-api) draft.
+- **CSS Parser API (`cssomnom/parser-api`)**: Based on the [WICG CSS Parser API](https://github.com/WICG/css-parser-api) draft.
 - **CSS Values and Units Level 4**: `submodules/csswg-drafts/css-values-4/Overview.bs` (Calculation trees, math functions, color models).
 
 **Interfaces & Methods**
-- **Parser API Methods (`CSS.*` and standalone)**:
-    - `CSS.parseStylesheet()`, `CSS.parseStylesheetSync()`
-    - `CSS.parseRuleList()`, `CSS.parseRuleListSync()`
-    - `CSS.parseRule()`, `CSS.parseRuleSync()`
-    - `CSS.parseDeclarationList()`, `CSS.parseDeclarationListSync()`
-    - `CSS.parseDeclaration()`, `CSS.parseDeclarationSync()`
-    - `CSS.parseValue()` (alias for `parseValueSync`)
-    - `CSS.parseValueList()` (alias for `parseValueListSync`)
-    - `CSS.parseCommaValueList()` (alias for `parseCommaValueListSync`)
-    - `CSS.parseComponentValue()`, `CSS.parseComponentValueSync()`
-- **Parser API Structure Classes**:
-    - `CSSParserValue`, `CSSParserToken`, `CSSParserBlock`, `CSSParserFunction`
-    - `CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`, `CSSParserDeclaration`
-- **Typed OM Values & Math**:
+- **WICG Parser API (`import { ... } from 'cssomnom/parser-api'`)**:
+    - `parseStylesheet()`, `parseRuleList()`, `parseRule()`, `parseDeclarationList()`, `parseDeclaration()`, `parseComponentValue()`, `parseValue()`, `parseValueList()`, `parseCommaValueList()`
+    - Structure classes: `CSSParserValue`, `CSSParserToken`, `CSSParserBlock`, `CSSParserFunction`, `CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`, `CSSParserDeclaration`
+- **Typed OM Values & Math (`import { ... } from 'cssomnom'`)**:
     - `CSSStyleValue` (base class, `CSSStyleValue.parse()`, `CSSStyleValue.parseAll()`)
     - `CSSKeywordValue`, `CSSUnparsedValue`, `CSSVariableReferenceValue`, `CSSPositionValue`, `CSSImageValue`, `CSSNumericArray`, `createCSSStyleValue`
     - `CSSNumericValue`, `CSSUnitValue`, `CSSMathValue`
@@ -303,14 +292,14 @@ These APIs expose low-level parsing, property registration, and typed values def
     - `DOMMatrix`, `DOMMatrixReadOnly`
 - **Style Property Maps**:
     - `StylePropertyMap`, `StylePropertyMapReadOnly`
-- **Custom Properties & Feature Detection**:
+- **Custom Properties & Feature Detection (`CSS`)**:
     - `CSS.registerProperty()` (CSS Properties and Values API)
     - `CSS.supports()` (CSS Conditional Rules Level 3 & 4)
-    - `CSS.resolveNestedSelector()` (Tooling extension)
+    - `CSS.escape()` (CSSOM Level 1)
 
 **Deviations & Extensions**
 - **String Boxing**: The spec defines `CSSToken` as `typedef (DOMString or CSSStyleValue or CSSParserValue) CSSToken;`. We box raw strings in `CSSParserToken` instead of using raw string primitives.
-- **Synchronous Execution & Sync Variants**: `parseRule`, `parseDeclarationList`, `parseDeclaration`, and `parseComponentValue` are executed synchronously. In addition, explicit `*Sync` variants (`parseStylesheetSync`, `parseRuleListSync`) are provided for asynchronous methods.
+- **Synchronous Execution**: `parseRule`, `parseDeclarationList`, `parseDeclaration`, `parseComponentValue`, `parseValue`, `parseValueList`, and `parseCommaValueList` execute synchronously; `parseStylesheet` and `parseRuleList` accept strings or `ReadableStream`s and return a `Promise`.
 - **Immutability**: Parser rule and block properties (`prelude`, `body`, `args`) are mutable TypeScript arrays rather than `FrozenArray`.
 - **Constructor Arguments**: `body` is mandatory in `CSSParserQualifiedRule` constructor (`constructor(prelude, body)`).
 - **CSS Values 4 Math Functions (`CSSMathFunction`)**: New math functions (`sin()`, `cos()`, `abs()`, etc.) are represented by `CSSMathFunction`. Its `operator` getter returns the function's identifier name (e.g. `'sin'`).
@@ -321,33 +310,21 @@ These APIs expose low-level parsing, property registration, and typed values def
 
 ---
 
-### 3. Custom Bridge & Utility Layer
-These APIs are custom utilities for static analysis, cascading, variable resolution, and headless manipulation.
+### 3. Node Static Analysis, Cascade & Tooling Layer
+These standalone tree-shakeable functions are exported from `cssomnom` (and the non-cascade subset from `cssomnom/parse`):
 
-**Interfaces & Methods**
-- **`Parser` Static Utilities**:
-    - `Parser.parseRuleText(css)`: Parses a single CSS rule string into a `Rule` object.
-    - `Parser.parseStyleSheetText(css)`: Parses a stylesheet string into `Rule[]`.
-    - `Parser.parseRuleInBlockText(css, nested?)`: Parses a rule within a nested/block context.
-    - `Parser.parseRuleInScopeBlockText(css)`: Parses a rule within a `@scope` block context.
-    - `Parser.parseSelector(css)`: Validates and serializes a selector string.
-    - `Parser.parseSelectorAST(css)`: Parses a selector string into structured `SelectorList` nodes.
-    - `Parser.calculateSpecificity(selector)`: Calculates selector specificity `[a, b, c]`.
-    - `Parser.getCascadedStyle(element, rules)`: Computes cascaded styles against a DOM element.
-    - `Parser.resolveVariables(style, property, envMap?)`: Resolves `var()` and `env()` substitutions with fallback handling.
-    - `Parser.validateCustomPropertyValue(values)`: Validates component values for custom property declarations.
-    - `Parser.isValidDashedIdent(name)`: Validates custom property `--*` identifiers.
-    - `Parser.isCustomPropertyDeclaration(decl)`: Checks whether a declaration represents a custom property.
-- **Standalone Top-Level Utilities**:
-    - `parse(css)`: Direct parser returning a constructable `CSSStyleSheet`.
-    - `walkRules(root)`: Pre-order generator yielding [`RuleWalkEntry`](./src/walk.ts) (`rule`, `ancestors`, `parentRule`, `parentAtRule`, `line`, `column`, `selectorText`, `rawSelectorText`, `style`, `declarations`, `getPropertyValue()`, `hasProperty()`).
-    - `walkStyleRules(root)`: Filtered generator yielding [`StyleRuleWalkEntry`](./src/walk.ts) for style-bearing rules (`CSSStyleRule`, `CSSNestedDeclarations`, `CSSKeyframeRule`).
-    - `getDeclaredProperties(root, options?)`: Collects a `Set<string>` of all declared CSS property names across the stylesheet, including parent shorthands (`border`, `border-color`, `outline`, `overflow`, `padding`, `margin`, `line-clamp`, etc.) and `@supports` feature queries (`{ includeSupports?: boolean }`, default `true`).
-    - `resolveNestedSelector(parentSelector, nestedSelector)`: Resolves CSS Nesting `&` combinators and relative selectors into canonical compound/complex selector strings.
-    - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
-    - `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
-    - `getCascadedStyle(element, rules)`: Standalone cascading function.
-    - `matches(element, selector)`: Static selector matcher against DOM elements (features a 1,000-entry bounded LRU selector AST cache and RFC 4647 `:lang()` extended language range matching).
+**Functions**
+- `parse(css, options?)`: Direct parser returning a constructable `CSSStyleSheet`.
+- `walkRules(root)`: Pre-order generator yielding [`RuleWalkEntry`](./src/walk.ts) (`rule`, `ancestors`, `parentRule`, `parentAtRule`, `line`, `column`, `selectorText`, `rawSelectorText`, `style`, `declarations`, `getPropertyValue()`, `hasProperty()`).
+- `walkStyleRules(root)`: Filtered generator yielding [`StyleRuleWalkEntry`](./src/walk.ts) for style-bearing rules (`CSSStyleRule`, `CSSNestedDeclarations`, `CSSKeyframeRule`).
+- `getDeclaredProperties(root, options?)`: Collects a `Set<string>` of all declared CSS property names across the stylesheet, including parent shorthands (`border`, `border-color`, `outline`, `overflow`, `padding`, `margin`, `line-clamp`, etc.) and `@supports` feature queries (`{ includeSupports?: boolean }`, default `true`).
+- `resolveNestedSelector(parentSelector, nestedSelector)`: Resolves CSS Nesting `&` combinators and relative selectors into canonical compound/complex selector strings.
+- `calculateSpecificity(selector)`: Calculates selector specificity tuple `[a, b, c]`.
+- `tokenize(text)`: Low-level tokenizer returning `Token[]`.
+- `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
+- `getCascadedStyle(element, rules, pseudoElement?, options?)`: Computes cascaded styles against a DOM element.
+- `resolveVariables(style, property, envMap?)`: Resolves `var()` and `env()` substitutions with fallback handling.
+- `matches(element, selector)` / `querySelector(root, selector)` / `querySelectorAll(root, selector)`: Static selector matchers against DOM elements (featuring a 1,000-entry bounded LRU selector AST cache and RFC 4647 `:lang()` extended language range matching).
     - `querySelectorAll(root, selector)` / `querySelector(root, selector)`: Static DOM query utilities.
     - `escape(ident)`: Top-level string identifier escaping utility (`cssom-1 #serialize-an-identifier`).
     - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
@@ -380,20 +357,20 @@ To preserve clean architectural separation and prevent circular import cycles be
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **93.5%** (21,651 / 23,157 passed assertions across 1,882 test files).
+* **W3C Standards Conformance**: **93.5%** (21,652 / 23,157 passed assertions across 1,882 test files).
 * **Chrome 154 Parity**: **93.5%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
 | **`Typed OM`** | 12,768 | 12,187 | **95.4%** | 🟢 **+1.9%** (ahead of Chrome) |
-| **`CSSOM`** | 2,527 | 2,344 | **92.8%** | -4.4% |
+| **`CSSOM`** | 2,527 | 2,345 | **92.8%** | -4.3% |
 | **`Nesting`** | 126 | 126 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 418 | 412 | **98.6%** | 🟢 **+0.2%** (ahead of Chrome) |
 | **`Cascade`** | 556 | 528 | **95.0%** | -4.9% |
 | **`Variables`** | 501 | 466 | **93.0%** | 🟢 **+2.5%** (ahead of Chrome) |
 | **`Selectors`** | 5,842 | 5,178 | **88.6%** | 🟢 **+2.7%** (ahead of Chrome) |
 | **`Media Queries`** | 419 | 410 | **97.9%** | -0.7% |
-| **OVERALL** | **23,157** | **21,651** | **93.5%** | 🟢 **+0.4%** |
+| **OVERALL** | **23,157** | **21,652** | **93.5%** | 🟢 **+0.4%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

@@ -287,7 +287,9 @@ export class DOMMatrixReadOnly {
   get [Symbol.toStringTag]() {
     return this.constructor.name;
   }
+  /** @internal */
   protected _values: Float64Array;
+  /** @internal */
   protected _is2D: boolean;
 
   constructor(init?: string | number[] | DOMMatrixReadOnly | Float64Array | Float32Array | unknown) {

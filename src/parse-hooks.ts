@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, Rule, ComponentValue, SelectorList, MediaQuery } from './types.ts';
+import type { Token, Rule, ComponentValue, SelectorList, MediaQuery, ParseError } from './types.ts';
 import type { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 
 export type SelectorASTOptions = {
@@ -42,7 +42,7 @@ export const ParseHooks = {
   parseRuleInScopeBlock: (_text: string): Rule => {
     throw new Error('parseRuleInScopeBlock not injected');
   },
-  parseComponentValues: (_tokens: Token[]): ComponentValue[] => {
+  parseComponentValues: (_tokens: Token[], _errors?: ParseError[]): ComponentValue[] => {
     throw new Error('parseComponentValues not injected');
   },
   parseSelector: (_text: string): string | null => {
@@ -77,10 +77,10 @@ export const ParseHooks = {
   assembleUnicodeRanges: (_values: ComponentValue[]): ComponentValue[] | null => {
     throw new Error('assembleUnicodeRanges not injected');
   },
-  isValidDashedIdent: (_name: string): boolean => {
-    throw new Error('isValidDashedIdent not injected');
+  isValidDashedIdent: (name: string): boolean => {
+    return typeof name === 'string' && name.startsWith('--') && name !== '--' && !/\s/.test(name);
   },
-  validatePropertyValue: (_property: string, _value: string): boolean => {
+  validatePropertyValue: (_property: string, _value: string, _rawValue?: unknown): boolean => {
     return true;
   },
   supports: (_conditionText: string): boolean => {
@@ -91,5 +91,12 @@ export const ParseHooks = {
   },
   serializeMediaQuery: (query: MediaQuery): string => {
     return (query as { raw?: string }).raw ?? query.mediaType ?? '';
-  }
+  },
+  validatePropertyRuleDescriptor: (_def: { name: string; syntax: string; inherits: boolean; initialValue?: string }): boolean => {
+    return true;
+  },
+  registerPropertyRule: (_def: { name: string; syntax: string; inherits: boolean; initialValue?: string }): boolean => {
+    return false;
+  },
+  unregisterPropertyRule: (_name: string): void => {},
 };

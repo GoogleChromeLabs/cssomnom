@@ -15213,7 +15213,8 @@
     "indexed access on empty style returns undefined",
     "indexed access returns property names in insertion order",
     "indexed access updates after removeProperty",
-    "indexed access works after setting cssText"
+    "indexed access works after setting cssText",
+    "indexed properties are enumerable"
   ],
   "submodules/web-platform-tests/css/cssom/CSSStyleDeclaration-iterator.html": [
     "anonymous-test-0"

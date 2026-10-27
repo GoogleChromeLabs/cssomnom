@@ -25,7 +25,7 @@ import {
   CSSStyleRule,
 } from '../CSSOM.ts';
 import { MediaParser } from '../MediaParser.ts';
-import { supports } from '../parser-api.ts';
+import { supports } from '../css-namespace.ts';
 import type { Rule, MediaEnvironment, ElementLike } from '../types.ts';
 
 interface LayerState {

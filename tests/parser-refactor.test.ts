@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { Parser } from '../src/parser.ts';
+import { Parser, parseRuleInBlock, isCustomPropertyDeclaration } from '../src/parser.ts';
 import { CSSStyleRule, CSSMediaRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations } from '../src/index.ts';
 import { tokenize } from '../src/tokenizer.ts';
 
@@ -47,8 +47,8 @@ test('Parser.parseStyleSheetText', () => {
 });
 
 // https://drafts.csswg.org/css-syntax-3/#consume-block-contents
-test('Parser.parseRuleInBlockText', () => {
-  const rule = Parser.parseRuleInBlockText('color: red;');
+test('parseRuleInBlock', () => {
+  const rule = parseRuleInBlock('color: red;');
   assert.ok(rule instanceof CSSNestedDeclarations, 'Should be CSSNestedDeclarations');
   assert.strictEqual(rule.style.getPropertyValue('color').trim(), 'red');
 });
@@ -85,8 +85,8 @@ test('Detailed @keyframes parsing', () => {
 });
 
 // https://drafts.csswg.org/css-syntax-3/#consume-declaration
-test('Parser.consumeDeclarationFromValues (implicit via block)', () => {
-  const rule = Parser.parseRuleInBlockText('margin: 0 auto !important;');
+test('consumeDeclarationFromValues (implicit via block)', () => {
+  const rule = parseRuleInBlock('margin: 0 auto !important;');
   assert.ok(rule instanceof CSSNestedDeclarations);
   assert.strictEqual(rule.style.getPropertyValue('margin').trim(), '0 auto');
   assert.strictEqual(rule.style.getPropertyPriority('margin'), 'important');
@@ -117,13 +117,13 @@ test('consumeQualifiedRule rejects declaration-like prelude', () => {
   assert.strictEqual(rules.length, 0, 'Should reject declaration-like prelude with no value');
 });
 
-test('Parser.isCustomPropertyDeclaration', () => {
+test('isCustomPropertyDeclaration', () => {
   const check = (css: string) => {
     const tokens = tokenize(css);
     if (tokens.length > 0 && tokens[tokens.length - 1].type === 'EOF') {
       tokens.pop();
     }
-    return Parser.isCustomPropertyDeclaration(tokens);
+    return isCustomPropertyDeclaration(tokens);
   };
 
   assert.strictEqual(check('--foo: bar'), true, '--foo: bar should be custom property declaration');

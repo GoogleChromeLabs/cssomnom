@@ -17,12 +17,26 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { CSS, parse, CSSAtRule, CSSStyleRule } from '../src/index.ts';
-import { CSSParserAtRule, CSSParserDeclaration, CSSParserQualifiedRule, CSSParserFunction, CSSParserToken } from '../src/parser-api.ts';
+import {
+  parseStylesheet,
+  parseRuleList,
+  parseRule,
+  parseDeclaration,
+  parseComponentValue,
+  parseValue,
+  parseValueList,
+  parseCommaValueList,
+  CSSParserAtRule,
+  CSSParserDeclaration,
+  CSSParserQualifiedRule,
+  CSSParserFunction,
+  CSSParserToken,
+} from '../src/parser-api.ts';
 
 describe('CSS Parser API', () => {
-    test('CSS.parseStylesheet', async () => {
+    test('parseStylesheet', async () => {
         const css = '@media all { div { color: red; } }';
-        const rules = await CSS.parseStylesheet(css);
+        const rules = await parseStylesheet(css);
         
         assert.strictEqual(rules.length, 1);
         assert.ok(rules[0] instanceof CSSParserAtRule);
@@ -33,156 +47,153 @@ describe('CSS Parser API', () => {
         assert.ok(atRule.body?.[0] instanceof CSSParserQualifiedRule);
     });
 
-    test('CSS.parseStylesheet (Async)', async () => {
+    test('parseStylesheet (Async)', async () => {
         const css = 'div { color: blue; }';
-        const rules = await CSS.parseStylesheet(css);
+        const rules = await parseStylesheet(css);
         assert.strictEqual(rules.length, 1);
         assert.ok(rules[0] instanceof CSSParserQualifiedRule);
         const decl = (rules[0] as CSSParserQualifiedRule).body[0];
         assert.ok(decl instanceof CSSParserDeclaration);
         assert.strictEqual(decl.name, 'color');
-        const [kf] = await CSS.parseStylesheet('@keyframes spin { to { opacity: 0; } }');
+        const [kf] = await parseStylesheet('@keyframes spin { to { opacity: 0; } }');
         assert.strictEqual((kf as CSSParserAtRule).name, 'keyframes');
     });
 
-    test('CSS.parseRule', () => {
+    test('parseRule', () => {
         const css = 'div { color: green; }';
-        const rule = CSS.parseRule(css);
+        const rule = parseRule(css);
         assert.ok(rule instanceof CSSParserQualifiedRule);
     });
 
-    test('CSS.parseRule with leading whitespace', () => {
+    test('parseRule with leading whitespace', () => {
         const css = '  div { color: green; }';
-        const rule = CSS.parseRule(css);
+        const rule = parseRule(css);
         assert.ok(rule instanceof CSSParserQualifiedRule);
     });
 
-    test('CSS.parseRule with leading whitespace and at-rule', () => {
+    test('parseRule with leading whitespace and at-rule', () => {
         const css = '  @media all { div { color: red; } }';
-        const rule = CSS.parseRule(css);
+        const rule = parseRule(css);
         assert.ok(rule instanceof CSSParserAtRule);
         assert.strictEqual((rule as CSSParserAtRule).name, 'media');
     });
 
-    test('CSS.parseRule with trailing garbage throws SyntaxError', () => {
+    test('parseRule with trailing garbage throws SyntaxError', () => {
         const css = 'div { color: green; } trailing garbage';
         assert.throws(() => {
-            CSS.parseRule(css);
+            parseRule(css);
         }, (err: unknown) => err instanceof Error && err.name === 'SyntaxError');
     });
 
-
-
-    test('CSS.parseDeclaration', () => {
+    test('parseDeclaration', () => {
         const css = 'color: red';
-        const decl = CSS.parseDeclaration(css);
+        const decl = parseDeclaration(css);
         assert.ok(decl instanceof CSSParserDeclaration);
         assert.strictEqual(decl?.name, 'color');
     });
 
-    test('CSS.parseValue', () => {
+    test('parseValue', () => {
         const css = 'red';
-        const value = CSS.parseValue(css);
+        const value = parseValue(css);
         assert.strictEqual(value.toString(), 'red');
     });
 
-    test('CSS.parseValue with function', () => {
+    test('parseValue with function', () => {
         const css = 'calc(10px + 20px)';
-        const value = CSS.parseValue(css);
+        const value = parseValue(css);
         assert.ok(value instanceof CSSParserFunction);
         const fn = value as CSSParserFunction;
         assert.strictEqual(fn.name, 'calc');
     });
 
-    test('CSS.parseComponentValue', () => {
+    test('parseComponentValue', () => {
         const css = 'red';
-        const value = CSS.parseComponentValue(css);
+        const value = parseComponentValue(css);
         assert.ok(value);
         assert.strictEqual(value.toString(), 'red');
     });
 
-    test('CSS.parseComponentValue with function', () => {
+    test('parseComponentValue with function', () => {
         const css = 'calc(10px + 20px)';
-        const value = CSS.parseComponentValue(css);
+        const value = parseComponentValue(css);
         assert.ok(value);
         assert.ok(value instanceof CSSParserFunction);
         const fn = value as CSSParserFunction;
         assert.strictEqual(fn.name, 'calc');
     });
 
-    test('CSS.parseComponentValue with extra tokens throws SyntaxError', () => {
+    test('parseComponentValue with extra tokens throws SyntaxError', () => {
         const css = 'red blue';
         assert.throws(() => {
-            CSS.parseComponentValue(css);
+            parseComponentValue(css);
         }, (err: unknown) => err instanceof Error && err.name === 'SyntaxError');
     });
 
-
-    test('CSS.parseCommaValueList', () => {
+    test('parseCommaValueList', () => {
         const css = 'red, green, blue';
-        const list = CSS.parseCommaValueList(css);
+        const list = parseCommaValueList(css);
         assert.strictEqual(list.length, 3);
         assert.strictEqual(list[0][0].toString(), 'red');
         assert.strictEqual(list[1][0].toString(), 'green');
         assert.strictEqual(list[2][0].toString(), 'blue');
     });
     
-    test('CSS unit factories are still available', () => {
+    test('CSS unit factories are still available on W3C CSS', () => {
         const px = CSS.px(10);
         assert.strictEqual(px.value, 10);
         assert.strictEqual(px.unit, 'px');
         assert.strictEqual(px.toString(), '10px');
     });
 
+    test('WICG Parser methods are not on W3C CSS namespace', () => {
+        assert.strictEqual('parseStylesheet' in CSS, false);
+        assert.strictEqual('parseRule' in CSS, false);
+        assert.strictEqual('parseDeclaration' in CSS, false);
+        assert.strictEqual('parseValue' in CSS, false);
+        assert.strictEqual('parseComponentValue' in CSS, false);
+        assert.strictEqual('parseCommaValueList' in CSS, false);
+    });
+
     test('parseRule is synchronous', () => {
         const css = 'div { color: green; }';
-        const rule = CSS.parseRule(css);
+        const rule = parseRule(css);
         assert.ok(rule instanceof CSSParserQualifiedRule);
     });
 
     test('parseDeclaration is synchronous', () => {
         const css = 'color: red';
-        const decl = CSS.parseDeclaration(css);
+        const decl = parseDeclaration(css);
         assert.ok(decl instanceof CSSParserDeclaration);
     });
 
     test('parseValue is synchronous', () => {
         const css = 'red';
-        const value = CSS.parseValue(css);
+        const value = parseValue(css);
         assert.ok(value instanceof CSSParserToken);
         assert.strictEqual(value.toString(), 'red');
     });
 
     test('parseValueList is synchronous', () => {
         const css = 'red blue';
-        const list = CSS.parseValueList(css);
+        const list = parseValueList(css);
         assert.strictEqual(list.length, 3);
     });
 
     test('parseCommaValueList is synchronous', () => {
         const css = 'red, blue';
-        const list = CSS.parseCommaValueList(css);
+        const list = parseCommaValueList(css);
         assert.strictEqual(list.length, 2);
-    });
-
-    test('Extra proprietary *Sync methods are removed from CSS object', () => {
-        // @ts-expect-error - testing removal of proprietary API
-        assert.strictEqual(CSS.parseRuleSync, undefined);
-        // @ts-expect-error
-        assert.strictEqual(CSS.parseDeclarationSync, undefined);
-        // @ts-expect-error
-        assert.strictEqual(CSS.parseValueSync, undefined);
     });
 
     test('parseStylesheet still returns a Promise', () => {
         const css = 'div { color: blue; }';
-        const result = CSS.parseStylesheet(css);
+        const result = parseStylesheet(css);
         assert.ok(result instanceof Promise);
     });
 
     test('parseRuleList still returns a Promise', () => {
         const css = 'div { color: blue; }';
-        const result = CSS.parseRuleList(css);
+        const result = parseRuleList(css);
         assert.ok(result instanceof Promise);
     });
 
@@ -194,13 +205,13 @@ describe('CSS Parser API', () => {
                 controller.close();
             }
         });
-        const rules = await CSS.parseStylesheet(stream);
+        const rules = await parseStylesheet(stream);
         assert.strictEqual(rules.length, 1);
     });
 
     test('atRules option works for declaration block', async () => {
         const css = '@foo { color: red; }';
-        const rules = await CSS.parseStylesheet(css, {
+        const rules = await parseStylesheet(css, {
             atRules: { 'foo': 'declaration' }
         });
         assert.strictEqual(rules.length, 1);
@@ -211,7 +222,7 @@ describe('CSS Parser API', () => {
 
     test('atRules option works for rule block', async () => {
         const css = '@foo { div { color: red; } }';
-        const rules = await CSS.parseStylesheet(css, {
+        const rules = await parseStylesheet(css, {
             atRules: { 'foo': 'rule' }
         });
         assert.strictEqual(rules.length, 1);

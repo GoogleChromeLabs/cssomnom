@@ -17,6 +17,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as CSSOM from '../src/index.ts';
+import { Parser } from '../src/parser.ts';
 
 test('API Surface Area', (t) => {
   const exports = Object.keys(CSSOM).filter(k => k !== 'default').sort();
@@ -24,8 +25,8 @@ test('API Surface Area', (t) => {
 });
 
 test('Parser static methods', (t) => {
-  const methods = Object.getOwnPropertyNames(CSSOM.Parser)
-    .filter(k => typeof (CSSOM.Parser as unknown as Record<string, unknown>)[k] === 'function')
+  const methods = Object.getOwnPropertyNames(Parser)
+    .filter(k => typeof (Parser as unknown as Record<string, unknown>)[k] === 'function')
     .sort();
   t.assert.snapshot(methods);
 });

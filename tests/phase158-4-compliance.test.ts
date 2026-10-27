@@ -21,7 +21,7 @@ import { MediaParser } from '../src/MediaParser.ts';
 import type { MediaEnvironment, MediaFeature } from '../src/types.ts';
 import { CSSStyleDeclaration } from '../src/index.ts';
 import { parseStyleSheet } from '../src/parser.ts';
-import { CSS } from '../src/parser-api.ts';
+import { CSS } from '../src/index.ts';
 import { CSSSupportsRule } from '../src/rules/at-rules.ts';
 import { ALL_SHORTHAND_LONGHANDS, LONGHAND_TO_SHORTHAND } from '../src/shorthands.ts';
 import { resolveLogicalProperty } from '../src/data/gen/LogicalMapping.ts';

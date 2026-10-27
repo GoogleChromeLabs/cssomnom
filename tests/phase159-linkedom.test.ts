@@ -29,16 +29,14 @@ import {
 } from '../src/matcher.ts';
 
 import {
-  Parser as ParseOnlyParser,
   parse,
-  parseRule,
-  parseStyleSheet,
   walkRules,
   resolveNestedSelector,
   CSSStyleDeclaration,
   CSSStyleSheet,
   CSSStyleRule,
 } from '../src/parse-entry.ts';
+import { parseRule, parseStyleSheet } from '../src/parser.ts';
 
 import * as DistParse from '../dist/parse.js';
 
@@ -67,11 +65,8 @@ describe('Phase 159: linkedom Integration & Tree-Shakeable Bundle Readiness', ()
       assert.equal(rule.style.fontWeight, 'bold');
     });
 
-    it('throws informative error when calling Parser.getCascadedStyle without cascade module', () => {
-      assert.throws(
-        () => ParseOnlyParser.getCascadedStyle({} as unknown as DOMElement),
-        /Parser\.getCascadedStyle requires importing cssomnom\/cascade/
-      );
+    it('parse-entry does not leak cascade module', () => {
+      assert.equal('getCascadedStyle' in DistParse, false);
     });
 
     it('throws informative error when accessing CSSStyleRule.styleMap without typed-om module', () => {
@@ -197,12 +192,15 @@ describe('Phase 159: linkedom Integration & Tree-Shakeable Bundle Readiness', ()
       assert.equal(style.marginTop, '20px');
     });
 
-    it('setCssTextSilent hydrates declarations without calling onChange', () => {
+    it('suppressing onChange hydrates declarations without invoking callback', () => {
       let callCount = 0;
-      const style = new CSSStyleDeclaration(null, () => { callCount++; });
+      const cb = () => { callCount++; };
+      const style = new CSSStyleDeclaration(null, cb);
 
-      style.setCssTextSilent('border: 1px solid black; opacity: 0.5;');
-      assert.equal(callCount, 0, 'onChange must not be called by setCssTextSilent');
+      style.onChange = null;
+      style.cssText = 'border: 1px solid black; opacity: 0.5;';
+      style.onChange = cb;
+      assert.equal(callCount, 0, 'onChange must not be called when suppressed');
       assert.equal(style.borderTopWidth, '1px');
       assert.equal(style.borderTopStyle, 'solid');
       assert.equal(style.borderTopColor, 'black');

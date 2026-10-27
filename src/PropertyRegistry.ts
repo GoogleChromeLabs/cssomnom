@@ -17,8 +17,8 @@
 import { unitToBase, unitToPixels } from './data/gen/units.ts';
 import { NAMED_COLORS } from './data/gen/colors.ts';
 import { tokenize } from './tokenizer.ts';
-import { Parser } from './parser.ts';
-import type { ComponentValue, Token, SimpleBlock, CSSFunction } from './types.ts';
+import { ParseHooks } from './parse-hooks.ts';
+import type { ComponentValue, Token, SimpleBlock, CSSFunction, ParseError } from './types.ts';
 import { ArrayTokenStream } from './TokenStream.ts';
 
 export interface PropertyDefinition {
@@ -354,16 +354,16 @@ export const PropertyRegistry = {
       while (end > start && allTokens[end - 1].type === 'whitespace') end--;
       const trimmedTokens = allTokens.slice(start, end);
 
-      const parser = new Parser(trimmedTokens);
-      const values = parser.parseComponentValues();
+      const errors: ParseError[] = [];
+      const values = ParseHooks.parseComponentValues(trimmedTokens, errors);
       definition.parsedInitialValue = values;
       
-      if (parser.errors.length > 0) {
+      if (errors.length > 0) {
         throw new DOMException(`initialValue "${definition.initialValue}" has parse errors`, 'SyntaxError');
       }
       
       if (syntax === '*') {
-        if (!Parser.validateCustomPropertyValue(values)) {
+        if (!ParseHooks.validateCustomPropertyValue(values)) {
           throw new DOMException(`initialValue "${definition.initialValue}" is not a valid declaration value`, 'SyntaxError');
         }
       } else {
@@ -407,4 +407,27 @@ export const PropertyRegistry = {
   clear() {
     registry.clear();
   }
+};
+
+ParseHooks.validatePropertyRuleDescriptor = (def) => {
+  try {
+    PropertyRegistry.validate(def);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+ParseHooks.registerPropertyRule = (def) => {
+  try {
+    PropertyRegistry.register(def, 'css');
+    return true;
+  } catch (e) {
+    console.warn(`CSS @property warning: Invalid descriptor values for ${def.name}. Rule was ignored.`, e);
+    return false;
+  }
+};
+
+ParseHooks.unregisterPropertyRule = (name) => {
+  PropertyRegistry.unregister(name, 'css');
 };

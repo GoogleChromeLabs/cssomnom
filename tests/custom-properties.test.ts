@@ -16,9 +16,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration, CSSPropertyRule, CSSStyleSheet, CSSStyleRule } from '../src/index.ts';
+import { CSSStyleDeclaration, CSSPropertyRule, CSSStyleSheet, CSSStyleRule, resolveVariables } from '../src/index.ts';
 import { CSSStyleValue, CSSUnparsedValue, CSSVariableReferenceValue } from '../src/typed-om.ts';
-import { Parser } from '../src/parser.ts';
 import { PropertyRegistry } from '../src/PropertyRegistry.ts';
 
 test('CSSOM: Custom property empty serialization', () => {
@@ -312,19 +311,19 @@ test('CSSOM: Registered property resolution and syntax validation', () => {
   const styleRule = sheet.cssRules[1] as unknown as CSSStyleRule;
 
   // 1. No local value: resolves to initial-value 'blue'
-  assert.strictEqual(Parser.resolveVariables(styleRule.style, 'color'), 'blue');
+  assert.strictEqual(resolveVariables(styleRule.style, 'color'), 'blue');
 
   // 2. Valid local value 'red': resolves to 'red'
   styleRule.style.setProperty('--my-color', 'red');
-  assert.strictEqual(Parser.resolveVariables(styleRule.style, 'color'), 'red');
+  assert.strictEqual(resolveVariables(styleRule.style, 'color'), 'red');
 
   // 3. Invalid local value '20px' (violates <color>): resolves to initial-value 'blue'
   styleRule.style.setProperty('--my-color', '20px');
-  assert.strictEqual(Parser.resolveVariables(styleRule.style, 'color'), 'blue');
+  assert.strictEqual(resolveVariables(styleRule.style, 'color'), 'blue');
 
   // 4. Invalid local value with var() fallback: resolves to initial-value, NOT var() fallback
   styleRule.style.setProperty('color', 'var(--my-color, green)');
-  assert.strictEqual(Parser.resolveVariables(styleRule.style, 'color'), 'blue');
+  assert.strictEqual(resolveVariables(styleRule.style, 'color'), 'blue');
 });
 
 test('CSSOM: Cycle tracking and boundary fallback logic', () => {
@@ -335,20 +334,20 @@ test('CSSOM: Cycle tracking and boundary fallback logic', () => {
 
   // Case A: Simple self-reference (--a: var(--a, 10px)) -> invalid, NOT 10px
   rule.style.setProperty('--a', 'var(--a, 10px)');
-  assert.strictEqual(Parser.resolveVariables(rule.style, '--a'), '');
+  assert.strictEqual(resolveVariables(rule.style, '--a'), '');
 
   // Case B: Direct cycle (--a: var(--b, 10px); --b: var(--a)) -> invalid, NOT 10px
   rule.style.setProperty('--a', 'var(--b, 10px)');
   rule.style.setProperty('--b', 'var(--a)');
-  assert.strictEqual(Parser.resolveVariables(rule.style, '--a'), '');
-  assert.strictEqual(Parser.resolveVariables(rule.style, '--b'), '');
+  assert.strictEqual(resolveVariables(rule.style, '--a'), '');
+  assert.strictEqual(resolveVariables(rule.style, '--b'), '');
 
   // Case C: Cycle outside reference (--a: var(--b, 10px); --b: var(--c); --c: var(--b))
   // --b and --c are cyclic (invalid), but --a is outside, so it should use fallback 10px!
   rule.style.setProperty('--a', 'var(--b, 10px)');
   rule.style.setProperty('--b', 'var(--c)');
   rule.style.setProperty('--c', 'var(--b)');
-  assert.strictEqual(Parser.resolveVariables(rule.style, '--a').trim(), '10px');
+  assert.strictEqual(resolveVariables(rule.style, '--a').trim(), '10px');
 });
 
 test('CSSOM: Custom property resolved to CSS-wide keyword', () => {
@@ -361,7 +360,7 @@ test('CSSOM: Custom property resolved to CSS-wide keyword', () => {
 
   // Resolving color should substitute var(--my-color) which resolves to 'initial'.
   // Even though 'initial' is not a <color>, it is a CSS-wide keyword and should not trigger fallback/invalid.
-  assert.strictEqual(Parser.resolveVariables(styleRule.style, 'color').trim(), 'initial');
+  assert.strictEqual(resolveVariables(styleRule.style, 'color').trim(), 'initial');
 });
 
 

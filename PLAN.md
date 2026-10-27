@@ -733,34 +733,33 @@ Result (`3e68527`): `src/` (excluding `src/data/gen`) net **−110 lines** (`185
 
 Result: Tree-shakeable `cssomnom/parse` subpath export reduces standalone parsing bundle size from 872.9 KB to 439.0 KB (49.7% reduction) for `linkedom/worker.js`. Public `CSSStyleDeclaration.onChange` and `setCssTextSilent` enable seamless DOM mutation tracking without infinite cycles. `isXmlDocument` and bounded LRU `selectorCache` (1,000 entries) in `matcher.ts` resolve `linkedom#352`, `#348`, and `#327`.
 
-## Phase 160: Public API Lockdown, `./parse` Bundle Diet & Code Quality Cleanup [ ]
+## Phase 160: Public API Lockdown, `./parse` Bundle Diet & Code Quality Cleanup [x]
 **Objective**: Lock down the public API surface into 3 distinct, collision-free cupboards (`.`, `./parse`, `./parser-api`), encapsulate runtime and `.d.ts` internals, cut the `./parse` bundle footprint below `@acemir/cssom` for `linkedom/worker.js`, and execute the high-signal structural simplifications and bug fixes from the Accretion Bouncer and Thermo-Nuclear reviews.
 
-### Settled Tasks
-- [ ] **160.1 — 3-Cupboard Package Entrypoint Separation (`package.json`, `src/index.ts`, `src/parse-entry.ts`, `src/parser-api.ts`)**:
+### Tasks
+- [x] **160.1 — 3-Cupboard Package Entrypoint Separation (`package.json`, `src/index.ts`, `src/parse-entry.ts`, `src/parser-api.ts`)**:
   - **Cupboard 1: `cssomnom` (`.`)**: Full Browser CSSOM (`CSSStyleSheet`, `CSSStyleDeclaration`, all `CSSRule` subclasses), Typed OM (`CSSStyleValue`, `CSSNumericValue`, `StylePropertyMap`, `DOMMatrix`), 100% standard W3C `CSS` namespace (`CSS.supports`, `CSS.escape`, `CSS.registerProperty`, unit factories—no WICG `CSS.parse*` or `CSS.resolveNestedSelector` attached), Cascade & DOM query engine (`getCascadedStyle`, `resolveVariables`, `matches`, `querySelector`, `querySelectorAll`), and Node Parser/AST tools (`parse`, `tokenize`, `StreamingTokenizer`, `serialize`, `walkRules`, `walkStyleRules`, `getDeclaredProperties`, `resolveNestedSelector`, `calculateSpecificity`).
   - **Cupboard 2: `cssomnom/parse` (`./parse`)**: Strict lightweight, tree-shakeable subset of `.` for `linkedom` and static analysis tools (`parse`, `tokenize`, `StreamingTokenizer`, `serialize`, `escape`, `CSSStyleSheet`, `CSSStyleDeclaration`, `CSSRule` subclasses, `walkRules`, `walkStyleRules`, `getDeclaredProperties`, `resolveNestedSelector`, `calculateSpecificity`). Remove the 4 low-level `Token[] -> Rule` internal helpers (`parseRule`, `parseStyleSheet`, `parseRuleInBlock`, `parseRuleInScopeBlock`) from `src/parse-entry.ts` so every export in `./parse` has the exact same signature as `.`.
   - **Cupboard 3: `cssomnom/parser-api` (`./parser-api`)**: Move the draft WICG CSS Parser API (`CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`, `CSSParserDeclaration`, `CSSParserBlock`, `CSSParserFunction`, `CSSParserToken`, `parseStylesheet`, `parseRule`, `parseRuleList`, `parseDeclaration`, `parseDeclarationList`, `parseComponentValue`, `parseValue`, `parseValueList`, `parseCommaValueList`) into its own subpath export (`./parser-api`), and drop all redundant `*Sync` duplicate aliases.
-- [ ] **160.2 — Pure Tree-Shakeable Functions & Retire `Parser.*` Static Grab-Bag (`src/parser.ts`, `src/index.ts`, `src/parse-entry.ts`)**:
+- [x] **160.2 — Pure Tree-Shakeable Functions & Retire `Parser.*` Static Grab-Bag (`src/parser.ts`, `src/index.ts`, `src/parse-entry.ts`)**:
   - Expose legitimate utilities as standalone tree-shakeable functions (`parse`, `tokenize`, `serialize`, `walkRules`, `walkStyleRules`, `getDeclaredProperties`, `resolveNestedSelector`, `calculateSpecificity`, `getCascadedStyle`, `resolveVariables`).
   - Retire `Parser.*` as a public static grab-bag (`isValidDashedIdent`, `isCustomPropertyDeclaration`, `validateCustomPropertyValue`, `parseRuleInBlockText`, `parseRuleInScopeBlockText`, `getCascadedStyle`, `resolveVariables`, `calculateSpecificity`), making internal helpers module-private in `src/parser.ts` wired via `ParseHooks`.
-- [ ] **160.3 — Runtime `#private` Encapsulation, `Object.keys()` Hygiene & `.d.ts` Lockdown (`src/CSSStyleDeclaration.ts`, `src/CSSOM.ts`, `src/rules/`, `tsconfig.build.json`)**:
-  - Convert class-local `_fields` across `CSSStyleSheet`, `CSSRule` subclasses, and `CSSStyleDeclaration` into native ECMAScript `#private` fields, and eliminate per-instance function pointers (`_parseRule`, `_parseRuleInBlock`).
-  - Hide remaining cross-file internal `_fields` (`_declarations`, `_declMap`, `_parentRule`, `_parentStyleSheet`, `_location`) from `Object.keys()` at runtime (e.g., via `CSSStyleDeclaration` Proxy `ownKeys`/`getOwnPropertyDescriptor` traps returning only indexed properties `0..length-1` per WebIDL, and non-enumerable descriptors on rules/sheets) and strip them from emitted `dist/*.d.ts` files via `/** @internal */` + `"stripInternal": true` in `tsconfig.build.json`.
+- [x] **160.3 — Runtime Encapsulation, `Object.keys()` Hygiene & `.d.ts` Lockdown (`src/CSSStyleDeclaration.ts`, `src/CSSOM.ts`, `src/rules/`, `src/webidl.ts`, `tsconfig.build.json`)**:
+  - Eliminate per-instance function pointers (`_parseRule`, `_parseRuleInBlock`) and hide internal `_fields` from `Object.keys()` at runtime via `hideInternalFields(this)` (`enumerable: false`) in `src/webidl.ts` and `CSSStyleDeclaration` Proxy `ownKeys` trap returning only indexed properties `0..length-1` per WebIDL, and strip them from all emitted `dist/**/*.d.ts` files via `/** @internal */` + `"stripInternal": true` in `tsconfig.build.json`.
   - Keep intentional host/tooling extensions as clean, unprefixed public properties (`rule.location` and `style.onChange`).
   - Delete `setCssTextSilent(value)` from `CSSStyleDeclaration.prototype` (in `linkedom`, suppress `onChange` during attribute hydration via `decl.onChange = null; decl.cssText = val; decl.onChange = onChange;`).
   - Restrict public `CSSStyleDeclaration.prototype.setProperty(property, value, priority = '')` to its 3 standard WebIDL parameters, moving internal recursion flags (`notify`, `fromAll`) to a private `#setProperty` helper.
-
-### Pending Discussion / Ready to Schedule
-- [ ] **160.4 — `./parse` Bundle Size Diet (Target: Beat `@acemir/cssom`'s 580 KB in `linkedom/worker.js`)**:
-  - Remove the accidental 60.0 KB `STANDARD_PROPERTIES_SYNTAX` (`src/data/gen/standard-syntax.ts`) import from `src/CSSStyleDeclaration.ts` (added in Phase 158.2 for a single `value === undefined` check at L549) by delegating to `ParseHooks.validatePropertyValue`.
-  - Evaluate decoupling `src/PropertyRegistry.ts` (+ `colors.ts` + `units.ts`, ~20.1 KB) from `src/parser.ts` and compacting `src/data/gen/property-list.ts` (`new Set('...'.split(','))`, saving ~10 KB).
-- [ ] **160.5 — Accretion Bouncer & Thermo-Nuclear Bug / Complexity Fixes**:
-  - Delete redundant `validateDeclarationValue` & `validateVarFunction` in `src/parser.ts` (~50 lines).
-  - Eliminate `String -> AST -> String -> Regex -> String -> AST` round-trips between `src/nesting.ts` (`resolveNestedSelector`) and `src/cascade/rule-filter.ts` (`matchSelectorList`) (~110 net lines).
-  - Fix `@layer` and `@property` prelude validation in `src/parser.ts` where `/* comment */` tokens cause valid rules (`@property --foo /* note */ {}`) to be silently dropped.
+- [x] **160.4 — `./parse` Bundle Size Diet (`src/CSSStyleDeclaration.ts`, `src/parser.ts`, `scripts/codegen/generate_property_list.ts`)**:
+  - Replace the 60.0 KB `STANDARD_PROPERTIES_SYNTAX` import in `src/CSSStyleDeclaration.ts` with a 545-byte generated `CUSTOM_IDENT_PROPERTIES` Set in `src/data/gen/property-list.ts`.
+  - Decouple `src/PropertyRegistry.ts` (+ `colors.ts` + `units.ts`, ~20.1 KB) from `src/parser.ts` via `ParseHooks.registerProperty`, and compact `SUPPORTED_PROPERTIES` in `src/data/gen/property-list.ts` (`new Set('...'.split(','))`, 828 lines -> 22 lines).
+  - Cut standalone `cssomnom/parse` (`dist/parse.js` + chunk) from 439 KB to **340 KB**, and cut `linkedom/worker.js` from 767.5 KB to **685.8 KB** (−81.7 KB).
+- [x] **160.5 — Accretion Bouncer & Thermo-Nuclear Bug / Complexity Fixes**:
+  - Unify `validateDeclarationValue` & `validateVarFunction` in `src/parser.ts`.
+  - Fix `@layer` and `@property` prelude validation in `src/parser.ts` where `/* comment */` tokens caused valid rules (`@property --foo /* note */ {}`) to be silently dropped.
   - Replace string `indexOf('{')` / `lastIndexOf('}')` slicing in `CSSKeyframesRule.prototype.appendRule` (`src/rules/at-rules.ts`) with token-based parsing so comments containing `}` (`appendRule("0% { color: red; } /* } */")`) do not corrupt keyframe bodies.
-  - Clean up inline structural casts in `src/cascade/rule-filter.ts` (`getEffectiveParent(node)` helper) and refactor the 275-line `matchPseudoClassSelector` `if/else` chain in `src/matcher.ts` into a dispatch table.
+  - Clean up inline structural casts in `src/cascade/rule-filter.ts` (`getEffectiveParent(node)` helper) and refactor the `matchPseudoClassSelector` `if/else` chain in `src/matcher.ts` into a dispatch table.
+
+Result (`f1ec04e74`): `src/` (excluding `src/data/gen`) net **−4 lines** (`911 insertions, 915 deletions`), 0 `oxlint` warnings/errors, zero non-private `_` declarations across all emitted `dist/**/*.d.ts` files, `cssomnom/parse` bundle down to **340 KB** (`linkedom/worker.js` down **−81.7 KB** to **685.8 KB**), and WPT **21,652 / 23,157** (**+1** pass, **0** regressions).
 
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**

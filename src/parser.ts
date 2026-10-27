@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, UrlToken, FunctionToken, UnicodeRangeToken, CustomMediaQuery, RuleSourceLocation, ElementLike } from './types.ts';
+import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, UrlToken, FunctionToken, UnicodeRangeToken, CustomMediaQuery, RuleSourceLocation } from './types.ts';
 
 
 import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
@@ -32,9 +32,7 @@ export interface ParserOptions {
   source?: string;
 }
 import { SelectorParser } from './SelectorParser.ts';
-import { calculateSpecificity } from './specificity.ts';
 import { ParseHooks } from './parse-hooks.ts';
-import { PropertyRegistry } from './PropertyRegistry.ts';
 
 function getComponentValueStartIndex(item?: ComponentValue): number | undefined {
   if (!item) return undefined;
@@ -53,9 +51,9 @@ function getComponentValueEndIndex(item?: ComponentValue): number | undefined {
 
 function trimComponentValues(values: ComponentValue[], trimEof = false): ComponentValue[] {
   let start = 0;
-  while (start < values.length && values[start].type === 'whitespace') start++;
+  while (start < values.length && (values[start].type === 'whitespace' || values[start].type === 'comment')) start++;
   let end = values.length - 1;
-  while (end >= start && (values[end].type === 'whitespace' || (trimEof && values[end].type === 'EOF'))) end--;
+  while (end >= start && (values[end].type === 'whitespace' || values[end].type === 'comment' || (trimEof && values[end].type === 'EOF'))) end--;
   return start > end ? [] : values.slice(start, end + 1);
 }
 
@@ -110,6 +108,22 @@ const FONT_FEATURE_VALUE_BLOCKS: Record<string, 'annotation' | 'ornaments' | 'st
   'historical-forms': 'historicalForms',
   historicalforms: 'historicalForms',
 };
+
+function isValidDashedIdent(name: string): boolean {
+  return typeof name === 'string' && name.startsWith('--') && name !== '--' && !/\s/.test(name);
+}
+
+export function isCustomPropertyDeclaration(prelude: ComponentValue[]): boolean {
+  let idx = 0;
+  while (idx < prelude.length && prelude[idx].type === 'whitespace') idx++;
+  if (idx >= prelude.length) return false;
+  const firstNonWs = prelude[idx++];
+  while (idx < prelude.length && prelude[idx].type === 'whitespace') idx++;
+  if (idx >= prelude.length) return false;
+  const secondNonWs = prelude[idx++];
+
+  return firstNonWs.type === 'ident' && firstNonWs.value.startsWith('--') && secondNonWs.type === 'colon';
+}
 
 /**
  * Skeleton Parser for CSSOM.
@@ -222,14 +236,14 @@ export class Parser {
   }
 
   private makeLocation(start: number, end: number, bodyStart?: number, bodyEnd?: number): RuleSourceLocation {
-    const parser = this;
+    const getLineCol = (offset: number) => this.getLineColumn(offset);
     return {
       start,
       end,
       bodyStart,
       bodyEnd,
-      get line(): number { return parser.getLineColumn(start).line; },
-      get column(): number { return parser.getLineColumn(start).column; },
+      get line(): number { return getLineCol(start).line; },
+      get column(): number { return getLineCol(start).column; },
     };
   }
 
@@ -248,7 +262,8 @@ export class Parser {
     return this.tokens.peek();
   }
 
-  private consumeToken(): Token {
+  /** @internal */
+  consumeToken(): Token {
     return this.tokens.next();
   }
 
@@ -431,7 +446,8 @@ export class Parser {
     }
   }
 
-  private scopeContextDepth: number = 0;
+  /** @internal */
+  scopeContextDepth: number = 0;
 
   private consumeNestedRules(block: SimpleBlock, isNestedStyleRule: boolean): Rule[] {
     const allowRelative = !isNestedStyleRule && this.scopeContextDepth > 0;
@@ -675,7 +691,7 @@ export class Parser {
   }
 
   private handlePropertyRule(rule: ASTAtRule, block: SimpleBlock): Rule | null {
-    const nonWsPrelude = trimComponentValues(rule.prelude);
+    const nonWsPrelude = trimComponentValues(rule.prelude, true);
     if (nonWsPrelude.length !== 1 || nonWsPrelude[0].type !== 'ident') return null;
     const name = nonWsPrelude[0].value;
     if (!name.startsWith('--') || name === '--') return null;
@@ -689,7 +705,7 @@ export class Parser {
       const val = serialize(d.value).trim();
       const descName = d.name.toLowerCase();
       if (descName === 'syntax') {
-        const nonWsTokens = trimComponentValues(d.value);
+        const nonWsTokens = trimComponentValues(d.value, true);
         if (nonWsTokens.length === 1 && nonWsTokens[0].type === 'string') {
           syntax = nonWsTokens[0].value;
         }
@@ -702,10 +718,14 @@ export class Parser {
     }
 
     if (syntax === null || inherits === null) return null;
-    try {
-      PropertyRegistry.validate({ name, syntax, inherits, initialValue: initialValue ?? undefined });
-    } catch {
-      return null;
+    if (ParseHooks.validatePropertyRuleDescriptor) {
+      if (!ParseHooks.validatePropertyRuleDescriptor({ name, syntax, inherits, initialValue: initialValue ?? undefined })) {
+        return null;
+      }
+    } else {
+      if (!isValidDashedIdent(name) || typeof syntax !== 'string' || syntax.length === 0 || typeof inherits !== 'boolean') {
+        return null;
+      }
     }
     return new CSSPropertyRule(name, syntax, inherits, initialValue);
   }
@@ -867,7 +887,7 @@ export class Parser {
         this.consumeToken();
         prelude.push(next);
       } else if (next.type === '{') {
-        if (Parser.isCustomPropertyDeclaration(prelude)) {
+        if (isCustomPropertyDeclaration(prelude)) {
           this.reportError('Qualified rule prelude looks like a custom property', next);
           const blockToken = this.consumeToken(); // Consume '{'
           this.consumeBlock(blockToken);
@@ -931,7 +951,8 @@ export class Parser {
     return decls;
   }
 
-  private consumeBlockContents(stream: ComponentValueStream, nested: boolean = false, isNestedStyleRule: boolean = nested, allowRelative: boolean = false): Rule[] {
+  /** @internal */
+  consumeBlockContents(stream: ComponentValueStream, nested: boolean = false, isNestedStyleRule: boolean = nested, allowRelative: boolean = false): Rule[] {
     const rules: Rule[] = [];
     let decls: Declaration[] = [];
 
@@ -1067,13 +1088,13 @@ export class Parser {
     }
 
     if (name.startsWith('--')) {
-      if (!Parser.validateCustomPropertyValue(declValue)) return null;
+      if (!validateDeclarationValue(declValue, true, true)) return null;
     } else {
       const hasCurlyBlock = declValue.some(v => v.type === 'simple-block' && (v as SimpleBlock).associatedToken.type === '{');
       if (hasCurlyBlock && declValue.reduce((count, v) => v.type !== 'whitespace' ? count + 1 : count, 0) > 1) {
         return null;
       }
-      if (!validateDeclarationValue(declValue)) return null;
+      if (!validateDeclarationValue(declValue, true, false)) return null;
     }
 
     // css-syntax-3 #consume-unicode-range-value: re-tokenizes raw value with unicodeRangesAllowed=true
@@ -1099,34 +1120,6 @@ export class Parser {
     };
   }
 
-  public static isValidDashedIdent(name: string): boolean {
-    return typeof name === 'string' && name.startsWith('--') && name !== '--' && !/\s/.test(name);
-  }
-
-  public static isCustomPropertyDeclaration(prelude: ComponentValue[]): boolean {
-    let idx = 0;
-    while (idx < prelude.length && prelude[idx].type === 'whitespace') idx++;
-    if (idx >= prelude.length) return false;
-    const firstNonWs = prelude[idx++];
-    while (idx < prelude.length && prelude[idx].type === 'whitespace') idx++;
-    if (idx >= prelude.length) return false;
-    const secondNonWs = prelude[idx++];
-
-    return firstNonWs.type === 'ident' && firstNonWs.value.startsWith('--') && secondNonWs.type === 'colon';
-  }
-
-  public static validateCustomPropertyValue(values: ComponentValue[], topLevel = true): boolean {
-    for (const v of values) {
-      if (v.type === 'bad-string' || v.type === 'bad-url') return false;
-      if (v.type === ')' || v.type === ']' || v.type === '}') return false;
-      if (topLevel && ((v.type === 'delim' && (v as Token).value === '!') || v.type === 'semicolon')) return false;
-
-      if (v.type === 'simple-block' && !Parser.validateCustomPropertyValue((v as SimpleBlock).value, false)) return false;
-      if (v.type === 'function' && !Parser.validateCustomPropertyValue((v as CSSFunction).value, false)) return false;
-    }
-    return true;
-  }
-
   private consumeNestedQualifiedRuleFromStream(stream: ComponentValueStream, nested: boolean = true, stopToken?: string, allowRelative: boolean = nested): Rule | null {
     const prelude: ComponentValue[] = [];
     while (true) {
@@ -1136,7 +1129,7 @@ export class Parser {
       }
       if (val.type === 'simple-block' && (val as SimpleBlock).associatedToken.type === '{') {
         stream.next();
-        if (Parser.isCustomPropertyDeclaration(prelude)) {
+        if (isCustomPropertyDeclaration(prelude)) {
           this.consumeRemnantsOfABadDeclaration(stream, nested);
           return null;
         }
@@ -1328,7 +1321,8 @@ export class Parser {
   }
 
   // css-syntax-3 #consume-simple-block
-  private consumeBlock(startToken: Token): SimpleBlock {
+  /** @internal */
+  consumeBlock(startToken: Token): SimpleBlock {
     const block: SimpleBlock = {
       type: 'simple-block',
       associatedToken: startToken,
@@ -1413,85 +1407,61 @@ export class Parser {
     return new Parser(tokenize(text), { source: text }).consumeListOfRules(true);
   }
 
-  // css-syntax-3 #consume-block-contents
-  public static parseRuleInBlockText(text: string, nested = true, inScope = false): Rule {
-    const parser = new Parser(tokenize(`{ ${text} }`));
-    if (inScope) parser.scopeContextDepth = 1;
-    const block = parser.consumeBlock(parser.consumeToken());
-    const contents = parser.consumeBlockContents(
-      new ArrayComponentValueStream(block.value),
-      inScope ? true : nested,
-      inScope ? false : nested,
-      inScope
-    );
-    if (contents.length !== 1) {
-      throw new DOMException('Syntax error', 'SyntaxError');
-    }
-    return contents[0];
+}
+
+// css-syntax-3 #consume-block-contents
+function parseRuleInBlockText(text: string, nested = true, inScope = false): Rule {
+  const parser = new Parser(tokenize(`{ ${text} }`));
+  if (inScope) parser.scopeContextDepth = 1;
+  const block = parser.consumeBlock(parser.consumeToken());
+  const contents = parser.consumeBlockContents(
+    new ArrayComponentValueStream(block.value),
+    inScope ? true : nested,
+    inScope ? false : nested,
+    inScope
+  );
+  if (contents.length !== 1) {
+    throw new DOMException('Syntax error', 'SyntaxError');
   }
+  return contents[0];
+}
 
-  // css-cascade-6 #scoped-styles
-  public static parseRuleInScopeBlockText(text: string): Rule {
-    return Parser.parseRuleInBlockText(text, true, true);
-  }
-
-  public static calculateSpecificity(selector: string | import('./types.ts').SelectorList): [number, number, number][] {
-    return calculateSpecificity(selector);
-  }
-
-  public static getCascadedStyle: (element?: ElementLike | null, rules?: Rule[]) => CSSStyleDeclaration = () => {
-    throw new Error('Parser.getCascadedStyle requires importing cssomnom/cascade');
-  };
-
-  public static resolveVariables: (style: CSSStyleDeclaration, property: string, envMap?: Record<string, string>) => string = () => {
-    throw new Error('Parser.resolveVariables requires importing cssomnom/cascade');
-  };
+// css-cascade-6 #scoped-styles
+function parseRuleInScopeBlockText(text: string): Rule {
+  return parseRuleInBlockText(text, true, true);
 }
 
 // css-variables-1 #using-variables
-function validateVarFunction(func: CSSFunction): boolean {
+function isValidVarArg(func: CSSFunction): boolean {
   const rawName = func.name || ('value' in func && typeof func.value === 'string' ? func.value : '');
-  const funcName = rawName.toLowerCase();
-  if (funcName !== 'var' || !Array.isArray(func.value)) return true;
+  if (rawName.toLowerCase() !== 'var' || !Array.isArray(func.value)) return true;
   const args = func.value;
   const commaIndex = args.findIndex(t => t.type === 'comma');
-  const nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
-  const nonWsNameTokens = nameTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+  const nameTokens = (commaIndex !== -1 ? args.slice(0, commaIndex) : args)
+    .filter(t => t.type !== 'whitespace' && t.type !== 'comment');
 
-  if (nonWsNameTokens.length === 0) {
-    return false;
+  if (nameTokens.length === 0) return false;
+
+  if (nameTokens.length === 1 && nameTokens[0].type === 'simple-block' && (nameTokens[0] as SimpleBlock).associatedToken?.type === '{') {
+    return (nameTokens[0] as SimpleBlock).value.some(t => t.type !== 'whitespace' && t.type !== 'comment');
   }
 
-  if (nonWsNameTokens.length === 1 && nonWsNameTokens[0].type === 'simple-block' && (nonWsNameTokens[0] as SimpleBlock).associatedToken?.type === '{') {
-    const innerTokens = (nonWsNameTokens[0] as SimpleBlock).value.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
-    if (innerTokens.length === 0) {
-      return false;
-    }
-    return true;
-  }
-
-  const hasSimpleCurlyBlock = nonWsNameTokens.some(t => t.type === 'simple-block' && (t as SimpleBlock).associatedToken?.type === '{');
-  if (hasSimpleCurlyBlock) {
-    return false;
-  }
-
-  return true;
+  return !nameTokens.some(t => t.type === 'simple-block' && (t as SimpleBlock).associatedToken?.type === '{');
 }
 
 // css-syntax-3 #consume-declaration
-export function validateDeclarationValue(values: ComponentValue[], isTopLevel = true): boolean {
+export function validateDeclarationValue(values: ComponentValue[], isTopLevel = true, isCustomProperty = false): boolean {
   for (const v of values) {
-    if (v.type === 'bad-string' || v.type === 'bad-url') return false;
-    if (v.type === ')' || v.type === ']' || v.type === '}') return false;
+    if (v.type === 'bad-string' || v.type === 'bad-url' || v.type === ')' || v.type === ']' || v.type === '}') return false;
     if (isTopLevel && (v.type === 'semicolon' || (v.type === 'delim' && (v as Token).value === '!'))) {
       return false;
     }
     if (v.type === 'simple-block') {
-      if (!validateDeclarationValue((v as SimpleBlock).value, false)) return false;
+      if (!validateDeclarationValue((v as SimpleBlock).value, false, isCustomProperty)) return false;
     } else if (v.type === 'function') {
       const func = v as CSSFunction;
-      if (!validateVarFunction(func)) return false;
-      if (Array.isArray(func.value) && !validateDeclarationValue(func.value, false)) return false;
+      if (!isCustomProperty && !isValidVarArg(func)) return false;
+      if (Array.isArray(func.value) && !validateDeclarationValue(func.value, false, isCustomProperty)) return false;
     }
   }
   return true;
@@ -1519,11 +1489,11 @@ export function parseStyleSheet(text: string): Rule[] {
 }
 
 export function parseRuleInBlock(text: string, nested = true): Rule {
-  return Parser.parseRuleInBlockText(text, nested);
+  return parseRuleInBlockText(text, nested);
 }
 
 export function parseRuleInScopeBlock(text: string): Rule {
-  return Parser.parseRuleInScopeBlockText(text);
+  return parseRuleInScopeBlockText(text);
 }
 
 export function assembleUnicodeRanges(values: ComponentValue[]): ComponentValue[] | null {
@@ -1655,9 +1625,16 @@ ParseHooks.parseStyleAttribute = (tokens) => new Parser(tokens).parseStyleAttrib
 ParseHooks.consumeRule = (tokens) => new Parser(tokens).consumeRule();
 ParseHooks.consumeListOfRules = (tokens, topLevel) => new Parser(tokens).consumeListOfRules(topLevel);
 ParseHooks.parseRule = (text) => parseRule(text);
-ParseHooks.parseRuleInBlock = (text, nested) => Parser.parseRuleInBlockText(text, nested);
-ParseHooks.parseRuleInScopeBlock = (text) => Parser.parseRuleInScopeBlockText(text);
-ParseHooks.parseComponentValues = (tokens) => new Parser(tokens).parseComponentValues();
+ParseHooks.parseRuleInBlock = (text, nested) => parseRuleInBlockText(text, nested);
+ParseHooks.parseRuleInScopeBlock = (text) => parseRuleInScopeBlockText(text);
+ParseHooks.parseComponentValues = (tokens, errors) => {
+  const p = new Parser(tokens);
+  const res = p.parseComponentValues();
+  if (errors) {
+    errors.push(...p.errors);
+  }
+  return res;
+};
 ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
 ParseHooks.parseSelectorAST = (text, declaredNamespacesOrOptions, allowRelative, allowVendorPseudos) => {
   if (declaredNamespacesOrOptions instanceof Set) {
@@ -1665,11 +1642,11 @@ ParseHooks.parseSelectorAST = (text, declaredNamespacesOrOptions, allowRelative,
   }
   return Parser.parseSelectorAST(text, declaredNamespacesOrOptions);
 };
-ParseHooks.validateCustomPropertyValue = (values) => Parser.validateCustomPropertyValue(values);
-ParseHooks.validateDeclarationValue = (values) => validateDeclarationValue(values);
+ParseHooks.validateCustomPropertyValue = (values) => validateDeclarationValue(values, true, true);
+ParseHooks.validateDeclarationValue = (values) => validateDeclarationValue(values, true, false);
 ParseHooks.isValidUnicodeRangeValue = (values) => isValidUnicodeRangeValue(values);
 ParseHooks.assembleUnicodeRanges = (values) => assembleUnicodeRanges(values);
-ParseHooks.isValidDashedIdent = (name) => Parser.isValidDashedIdent(name);
+ParseHooks.isValidDashedIdent = (name) => isValidDashedIdent(name);
 
 export function parse(css: string, options?: ParserOptions): CSSStyleSheet {
   return new Parser(tokenize(css), { source: css, ...options }).parseStyleSheet();

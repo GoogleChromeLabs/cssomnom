@@ -81,6 +81,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     throw new DOMException('Computed style declarations are read-only', 'NoModificationAllowedError');
   }
 
+  /** @internal */
   protected override _getLonghandForContraction(lh: string): { value: ComponentValue[]; important: boolean } | null {
     const computedVal = this.getPropertyValue(lh);
     if (!computedVal) return null;

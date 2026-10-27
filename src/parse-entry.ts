@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-export { Parser, parse, parseRule, parseStyleSheet, parseRuleInBlock, parseRuleInScopeBlock } from './parser.ts';
+export { parse } from './parser.ts';
 export type { ParserOptions } from './parser.ts';
 export { tokenize } from './tokenizer.ts';
 export { serialize } from './serializer.ts';
@@ -41,3 +41,4 @@ export { CSSStyleProperties } from './data/gen/properties.ts';
 export { walkRules, walkStyleRules, getDeclaredProperties } from './walk.ts';
 export type { RuleWalkEntry, StyleRuleWalkEntry } from './walk.ts';
 export { resolveNestedSelector } from './nesting.ts';
+export { calculateSpecificity } from './specificity.ts';

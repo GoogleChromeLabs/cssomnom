@@ -16,10 +16,10 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { Parser } from '../src/parser.ts';
+import { calculateSpecificity } from '../src/index.ts';
 
 test('Top-level specificity should return an array of specificities', () => {
-  const spec = Parser.calculateSpecificity('a, .b, #c');
+  const spec = calculateSpecificity('a, .b, #c');
   // Currently this returns [1, 0, 0] (the max)
   // We want it to return [[0,0,1], [0,1,0], [1,0,0]]
   
@@ -28,7 +28,7 @@ test('Top-level specificity should return an array of specificities', () => {
 });
 
 test('Single selector should also return an array of specificities for consistency', () => {
-  const spec = Parser.calculateSpecificity('a');
+  const spec = calculateSpecificity('a');
   assert.ok(Array.isArray(spec), 'Should return an array');
   assert.ok(Array.isArray(spec[0]), 'First element should be an array (tuple)');
   assert.deepStrictEqual(spec, [[0, 0, 1]]);

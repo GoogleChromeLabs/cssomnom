@@ -133,8 +133,10 @@ describe('Readonly properties', () => {
 
   it('should make CSSContainerRule containerQuery readonly', () => {
     const rule = new CSSContainerRule('query', [], () => ({} as unknown as Rule));
-    // @ts-expect-error - containerQuery should be readonly
-    rule.containerQuery = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - containerQuery should be readonly
+      rule.containerQuery = 'foo';
+    }, TypeError);
     assert.ok(true);
   });
 
@@ -147,17 +149,12 @@ describe('Readonly properties', () => {
     assert.ok(true);
   });
 
-
-
-
-
-
-
-
   it('should make CSSViewTransitionRule navigation readonly', () => {
     const rule = new CSSViewTransitionRule([]);
-    // @ts-expect-error - navigation should be readonly
-    rule.navigation = 'foo';
+    assert.throws(() => {
+      // @ts-expect-error - navigation should be readonly
+      rule.navigation = 'foo';
+    }, TypeError);
     assert.ok(true);
   });
 });
