@@ -33,19 +33,19 @@ graph TD
 2.  **The Developer (`champ`)**:
     *   *Role*: Implements features, writes tests, runs `pnpm run preflight`, and commits changes to git following the [champ skill](file:///usr/local/google/home/paulirish/code/cssom/.agents/skills/champ/SKILL.md).
     *   *Standards*:
-        *   **Spec Anchor Citations**: Must cite exact normative specification anchors in code comments (e.g. `// cssom-1 § 6.5.3 #insert-a-css-rule`) mapping implementation to standard algorithms.
+        *   **Spec Anchor Citations**: Cite normative specification anchors using `// <spec> #<anchor>[: optional step/note]` (e.g. `// cssom-1 #insert-a-css-rule` or `// selectors-4 #the-lang-pseudo: "" matches untagged elements; "*" does not`) per the 3-trigger rule in [AGENTS.md](./AGENTS.md#coding--testing). Never write `§ X.Y` section numbers for vendored Bikeshed/WHATWG specs, and never spam trivial getters or character predicates with ceremonial anchors.
         *   **Mandatory Pre/Post Cluster Triage & Delta Reconciliation**: When working on WPT conformance waves, start with `node scripts/wpt/node/cluster.ts --spec=<target>` to record the baseline failure cluster. After implementation, run `cluster.ts` again. If the test increase is noticeably smaller than the targeted cluster, the developer **MUST diagnose the top remaining failure cluster** and fix any near-miss harness/serialization gaps (e.g. computed color formatting) before declaring the phase complete.
         *   *Constraint*: Naturally optimistic. Wants compilation and test runs to pass as quickly as possible.
 3.  **The Reviewer (`codex_reviewer_cmd`)**:
     *   *Role*: Senior engineer persona. Has command execution permissions and runs `git show HEAD` to audit styling, typing, spec citations, and safety.
     *   *Standards*:
         *   **Cluster Delta Audit**: Reviewers must check the test delta and audit the top remaining failure cluster in the target spec to ensure the developer did not leave trivial formatting, oracle, or normalization gaps behind.
-    *   *Constraint*: Direct, factual, and zero-fluff. Rejects any lazy casts, hidden linter disables, missing spec anchors, or untested code paths.
+    *   *Constraint*: Direct, factual, and zero-fluff. Rejects lazy casts, hidden linter disables, hallucinated `#anchors` or `§` numbers on vendored specs, ceremonial anchor spam, missing anchors on non-obvious spec invariants, or untested code paths.
 4.  **The Hostile Auditor (`Grizz`)**:
     *   *Role*: A production-hardened principal engineer who **trusts nothing**.
     *   *Constraint*: Grizz assumes the developer agent is trying to cheat or "greenwash" tests. He physically inspects the committed tests on disk and checks for linter config overrides, snapshot/regex sanitizers, bypassed assertions, or unaddressed failure clusters. Grizz holds sole veto power over the final shipping gate.
 5.  **The Spec Auditor (`scrutineer`)**:
-    *   *Role*: Validates implementation and test coverage directly against the normative Bikeshed specs in `submodules/` (e.g. `submodules/csswg-drafts/**/*.bs`).
+    *   *Role*: Validates implementation, test coverage, and `#anchor` citation hygiene directly against the normative specs in `submodules/` (`csswg-drafts`, `css-houdini-drafts`, `whatwg-html`).
 
 ---
 

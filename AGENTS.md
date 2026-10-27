@@ -27,7 +27,11 @@ Consult these Bikeshed (`.bs`) sources for normative algorithms and edge cases b
 
 ## Coding & Testing
 - **Execution**: Run TS directly with `node script.ts`. Do NOT use `npx tsx` or `ts-node`.
-- **Spec citations**: Cite the spec section in comments where code implements an algorithm (e.g. `// css-syntax-3 § 5.5.3 Consume a qualified rule`).
+- **Spec citations**: Use anchor-first format `// <spec> #<anchor>[: optional step/note]` (e.g. `// cssom-1 #insert-a-css-rule` or `// cssom-1 #insert-a-css-rule: step 2 bounds check precedes parsing`). Never write `§ X.Y` section numbers for specs vendored in `submodules/` (Bikeshed `.bs` files have no section numbers, and HTML/ED numbering shifts; external immutable RFCs like `// rfc4647 § 3.3.2` keep section numbers). Cite **only** when a smart engineer refactoring the file could break conformance without the pointer:
+  1. **Algorithm entry points** (one citation at the top of a function implementing a named spec algorithm, not per step).
+  2. **Non-obvious ordering or edge-case invariants** (anchor + brief `: why`).
+  3. **Intentional deviations or cross-spec conflicts** (cite both anchors).
+  - Never cite trivial WebIDL getters/setters, basic character predicates (`isDigit`), internal plumbing, or TypeScript type guards.
 - **Red/Green TDD**: For every bug or spec fix, first write a failing regression test, then make it pass.
 - **Pure unit tests**: `tests/**/*.test.ts` stay in-memory; no child processes. Background timers must call `timer.unref()`.
 - **Cyclic objects in asserts**: Never pass DOM nodes or cyclic objects to `assert.equal` / `assert.deepStrictEqual`; structural diffs explode the heap (>8GB). Compare scalars, booleans, or use `format_value(val)`.

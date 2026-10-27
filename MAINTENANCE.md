@@ -81,7 +81,7 @@ When specifications are updated in the submodules, we need to ensure our impleme
 
 ### Process for an Agent:
 1.  **Diff Specs**: Run `git diff` on the `submodules/csswg-drafts` directory to see what changed in the relevant specs (e.g., `css-syntax-3`, `css-nesting-1`, `cssom-1`) since the last update.
-2.  **Update Comments**: If section numbers or anchors changed, update the comments in `src/tokenizer.ts` and `src/parser.ts` to reflect the new spec locations.
+2.  **Update Comments**: If upstream `#anchors` were renamed, update `// <spec> #<anchor>` citations across `src/` (follow the 3-trigger policy in [`AGENTS.md`](./AGENTS.md#coding--testing); never use `§ X.Y` section numbers for vendored specs).
 3.  **Implement Changes**: If the spec introduced new parsing rules or modified existing ones, update the implementation accordingly.
 4.  **Verify**: Run tests to ensure no regressions.
 
