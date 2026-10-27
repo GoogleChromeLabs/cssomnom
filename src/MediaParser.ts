@@ -95,6 +95,15 @@ export class MediaParser {
       };
     }
 
+    const preValidator = new MediaQueryValidator(values);
+    if (!preValidator.validate()) {
+      return {
+        type: 'media-query',
+        invalid: true,
+        tokens: values
+      };
+    }
+
     const canonical = this.canonicalSerialize(values);
     const tokens = tokenize(canonical);
     const parser = new Parser(tokens);
@@ -483,11 +492,25 @@ export class MediaQueryValidator {
       const rightIsIdent = right.length === 1 && right[0].type === 'ident';
       if (!leftIsIdent && !rightIsIdent) return null;
 
-      const featureName = String((leftIsIdent ? left[0] : right[0] as Token).value).toLowerCase();
-      const valueTokens = normalizeAspectRatioTokens(featureName, leftIsIdent ? right : left);
-      const op = rightIsIdent ? (INVERT_COMPARISON_OP[ops[0].op] ?? ops[0].op) : ops[0].op;
+      let featureOnLeft = leftIsIdent;
+      if (leftIsIdent && rightIsIdent) {
+        const leftName = String((left[0] as Token).value).toLowerCase();
+        const rightName = String((right[0] as Token).value).toLowerCase();
+        const rangeFeatures = RANGE_FEATURES as Set<string>;
+        if (rangeFeatures.has(leftName) && !rangeFeatures.has(rightName)) {
+          featureOnLeft = true;
+        } else if (rangeFeatures.has(rightName) && !rangeFeatures.has(leftName)) {
+          featureOnLeft = false;
+        }
+      } else if (!leftIsIdent) {
+        featureOnLeft = false;
+      }
+
+      const featureName = String((featureOnLeft ? left[0] : right[0] as Token).value).toLowerCase();
+      const valueTokens = normalizeAspectRatioTokens(featureName, featureOnLeft ? right : left);
+      const op = !featureOnLeft ? (INVERT_COMPARISON_OP[ops[0].op] ?? ops[0].op) : ops[0].op;
       const opSlice = tokens.slice(ops[0].start, ops[0].end);
-      const rebuiltTokens = leftIsIdent
+      const rebuiltTokens = featureOnLeft
         ? [left[0], ...opSlice, ...valueTokens]
         : [...valueTokens, ...opSlice, right[0]];
       return {
@@ -930,6 +953,9 @@ function evaluateBooleanFeature(baseName: string, env: MediaEnvironment): boolea
     case 'forced-colors': return env.forcedColors !== 'none';
     case 'inverted-colors': return env.invertedColors !== 'none';
     case 'scripting': return env.scripting !== 'none';
+    case 'update': return env.update !== 'none';
+    case 'color-gamut': return (env.colorGamut as string) !== 'none';
+    case 'video-color-gamut': return (env.videoColorGamut as string) !== 'none';
     case 'dynamic-range': return Boolean(env.dynamicRange);
     case 'video-dynamic-range': return Boolean(env.videoDynamicRange);
     case 'overflow-block': return env.overflowBlock !== 'none';
@@ -1043,6 +1069,15 @@ export function evaluateMediaFeature(feature: MediaFeature, env: MediaEnvironmen
       if (parsedVal === 'srgb') return true;
       if (parsedVal === 'p3') return gamut === 'p3' || gamut === 'rec2020';
       if (parsedVal === 'rec2020') return gamut === 'rec2020';
+      return false;
+    }
+    if (baseName === 'dynamic-range' || baseName === 'video-dynamic-range') {
+      const actualRange = getEnvDiscreteIdent(baseName, env);
+      if (actualRange === null) return 'unknown';
+      const actual = actualRange.toLowerCase();
+      const target = parsedVal.toLowerCase();
+      if (target === 'standard') return actual === 'standard' || actual === 'high';
+      if (target === 'high') return actual === 'high';
       return false;
     }
     const actualIdent = getEnvDiscreteIdent(baseName, env);

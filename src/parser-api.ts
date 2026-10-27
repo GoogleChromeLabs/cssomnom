@@ -39,6 +39,7 @@ import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
 import { SelectorParser } from './SelectorParser.ts';
 import { CSSAtRule, CSSGroupingRule, CSSImportRule, CSSKeyframesRule, CSSMediaRule, CSSRule, CSSStyleRule } from './CSSOM.ts';
+import { isGrammaticallyValidSupportsCondition } from './rules/utils.ts';
 
 export abstract class CSSParserValue {
   abstract toString(): string;
@@ -371,10 +372,24 @@ function hasVarFunction(values: ComponentValue[]): boolean {
   return false;
 }
 
-function evaluateSupportsDeclaration(property: string, value: string): boolean {
-  property = property.trim();
+function evaluateSupportsDeclaration(property: string, value: string, isTwoArg = false): boolean {
+  if (isTwoArg) {
+    // 2-arg CSS.supports(property, value): do NOT trim property
+    // css-conditional-3 #the-css-namespace
+    if (property !== property.trim() || property === '' || property === '--') return false;
+    const nameTokens = tokenize(property);
+    if (nameTokens.length !== 2 || nameTokens[0].type !== 'ident' || nameTokens[1].type !== 'EOF') return false;
+  } else {
+    property = property.trim();
+    if (property === '' || property === '--') return false;
+  }
+
   value = value.trim();
-  if (property === '' || property === '--') return false;
+  // Strip trailing !important per css-conditional-3 #at-supports & #the-css-namespace
+  const importantMatch = value.match(/^(.*?)!\s*important\s*$/i);
+  if (importantMatch) {
+    value = importantMatch[1].trim();
+  }
 
   if (property.startsWith('--')) {
     if (!Parser.isValidDashedIdent(property)) return false;
@@ -427,7 +442,7 @@ function evalSupportsInParens(item: ComponentValue): boolean {
     if (nonWsSel.length === 0) return false;
     if (selValues.some(v => v.type === 'comma')) return false;
     try {
-      const selParser = new SelectorParser(selValues, { strictSupports: true });
+      const selParser = new SelectorParser(selValues, { strictSupports: true, declaredNamespaces: new Set() });
       const list = selParser.parse();
       if (list.selectors.length !== 1 || list.selectors[0].type === 'invalid-selector') return false;
       return true;
@@ -442,7 +457,10 @@ function evalSupportsInParens(item: ComponentValue): boolean {
     if (nonWsBlock.length === 0) return false;
 
     const hasTopLevelOp = nonWsBlock.some(v => v.type === 'ident' && ['and', 'or', 'not'].includes(String((v as Token).value).toLowerCase()));
-    if (hasTopLevelOp || (nonWsBlock.length === 1 && nonWsBlock[0].type === 'simple-block')) {
+    const isNestedParenBlock = nonWsBlock.length === 1 &&
+      nonWsBlock[0].type === 'simple-block' &&
+      (nonWsBlock[0] as SimpleBlock).associatedToken.value === '(';
+    if (hasTopLevelOp || isNestedParenBlock) {
       return evalSupportsConditionValues(nonWsBlock);
     }
 
@@ -453,7 +471,7 @@ function evalSupportsInParens(item: ComponentValue): boolean {
         const propName = String((propValues[0] as Token).value);
         const valTokens = blockValues.slice(colonIdx + 1);
         const valStr = serialize(valTokens);
-        return evaluateSupportsDeclaration(propName, valStr);
+        return evaluateSupportsDeclaration(propName, valStr, false);
       }
     }
     return false;
@@ -463,65 +481,70 @@ function evalSupportsInParens(item: ComponentValue): boolean {
 }
 
 function evalSupportsConditionValues(values: ComponentValue[]): boolean {
+  if (!isGrammaticallyValidSupportsCondition(values)) return false;
   const items = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
   if (items.length === 0) return false;
 
-  if (items[0].type === 'ident' && String((items[0] as Token).value).toLowerCase() === 'not') {
-    if (items.length === 2) {
-      return !evalSupportsInParens(items[1]);
+  const evalResults: boolean[] = [];
+  const operators: string[] = [];
+
+  let i = 0;
+  while (i < items.length) {
+    if (items[i].type === 'ident' && String((items[i] as Token).value).toLowerCase() === 'not') {
+      evalResults.push(!evalSupportsInParens(items[i + 1]));
+      i += 2;
+    } else {
+      evalResults.push(evalSupportsInParens(items[i]));
+      i += 1;
     }
-    return false;
+
+    if (i < items.length) {
+      operators.push(String((items[i] as Token).value).toLowerCase());
+      i += 1;
+    }
   }
 
-  if (items.length === 1) {
-    return evalSupportsInParens(items[0]);
+  if (evalResults.length === 1) {
+    return evalResults[0];
   }
 
-  if (items.length % 2 === 0) return false;
-
-  const firstOp = String((items[1] as Token).value || '').toLowerCase();
-  if (firstOp !== 'and' && firstOp !== 'or') return false;
-
-  for (let i = 1; i < items.length; i += 2) {
-    const op = String((items[i] as Token).value || '').toLowerCase();
-    if (op !== firstOp) return false;
-  }
-
-  const inParensItems: ComponentValue[] = [];
-  for (let i = 0; i < items.length; i += 2) {
-    inParensItems.push(items[i]);
-  }
-
-  if (firstOp === 'and') {
-    return inParensItems.every(item => evalSupportsInParens(item));
+  const op = operators[0];
+  if (op === 'and') {
+    return evalResults.every(Boolean);
   } else {
-    return inParensItems.some(item => evalSupportsInParens(item));
+    return evalResults.some(Boolean);
   }
 }
 
 // css-conditional-3 #the-css-namespace
 export function supports(propertyOrCondition: string, value?: string): boolean {
   if (typeof value === 'string') {
-    return evaluateSupportsDeclaration(propertyOrCondition, value);
+    return evaluateSupportsDeclaration(propertyOrCondition, value, true);
   }
   const condition = propertyOrCondition.trim();
   if (condition === '') return false;
 
-  const colonIdx = condition.indexOf(':');
-  if (!condition.startsWith('(') && colonIdx !== -1 && !/\b(and|or|not)\b/i.test(condition)) {
-    const prop = condition.slice(0, colonIdx).trim();
-    const val = condition.slice(colonIdx + 1).trim();
-    if (prop && val) {
-      const declRes = evaluateSupportsDeclaration(prop, val);
-      if (declRes) return true;
-    }
-  }
-
+  // Step 1: If conditionText parses as a <supports-condition>, evaluate it
   const tokens = tokenize(condition);
   const parser = new Parser(tokens);
   const componentValues = parser.parseComponentValues();
-  return evalSupportsConditionValues(componentValues);
+  if (isGrammaticallyValidSupportsCondition(componentValues)) {
+    return evalSupportsConditionValues(componentValues);
+  }
+
+  // Step 2: If (${conditionText}) parses as a <supports-condition>, evaluate it
+  const wrappedTokens = tokenize(`(${condition})`);
+  const wrappedParser = new Parser(wrappedTokens);
+  const wrappedValues = wrappedParser.parseComponentValues();
+  if (isGrammaticallyValidSupportsCondition(wrappedValues)) {
+    return evalSupportsConditionValues(wrappedValues);
+  }
+
+  // Step 3: Return false
+  return false;
 }
+
+ParseHooks.supports = supports;
 
 import { escape as cssEscape } from './css-escape.ts';
 

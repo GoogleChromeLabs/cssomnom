@@ -21,6 +21,7 @@ import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
 
 import { tokenize } from './tokenizer.ts';
 import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSRule, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule, MediaList } from './CSSOM.ts';
+import { isGrammaticallyValidSupportsCondition } from './rules/utils.ts';
 import { INTERNAL_RULE_TOKEN } from './internal-token.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
@@ -139,7 +140,10 @@ export class Parser {
     page: (parser, rule, block) => block ? parser.handlePageRule(rule, block) : null,
     property: (parser, rule, block) => block ? parser.handlePropertyRule(rule, block) : null,
     // css-conditional-3 #at-supports
-    supports: (parser, rule, block, nested) => parser.handleGroupingAtRule(rule, block, nested || false, CSSSupportsRule),
+    supports: (parser, rule, block, nested) => {
+      if (!isGrammaticallyValidSupportsCondition(rule.prelude)) return null;
+      return parser.handleGroupingAtRule(rule, block, nested || false, CSSSupportsRule);
+    },
     container: (parser, rule, block, nested) => parser.handleGroupingAtRule(rule, block, nested || false, CSSContainerRule),
     layer: (parser, rule, block, nested) => parser.handleLayerRule(rule, block, nested || false),
     'starting-style': (parser, rule, block, nested) => parser.handleGroupingAtRule(rule, block, nested || false, CSSStartingStyleRule),

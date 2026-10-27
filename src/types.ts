@@ -196,6 +196,7 @@ export interface Declaration {
   name: string;
   value: ComponentValue[];
   important: boolean;
+  fromAll?: boolean;
   raw?: string;
   startIndex?: number;
   endIndex?: number;
@@ -362,8 +363,8 @@ export interface MediaEnvironment {
   color: number;
   colorIndex: number;
   monochrome: number;
-  colorGamut: 'srgb' | 'p3' | 'rec2020';
-  videoColorGamut: 'srgb' | 'p3' | 'rec2020';
+  colorGamut: 'none' | 'srgb' | 'p3' | 'rec2020';
+  videoColorGamut: 'none' | 'srgb' | 'p3' | 'rec2020';
   pointer: 'none' | 'coarse' | 'fine';
   hover: 'none' | 'hover';
   anyPointer: 'none' | 'coarse' | 'fine';

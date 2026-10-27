@@ -151,7 +151,8 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
                 type: 'declaration',
                 name: lh,
                 value: val,
-                important: decl.important
+                important: decl.important,
+                fromAll: decl.name === 'all' || decl.fromAll,
               });
             }
             return;
@@ -298,13 +299,20 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           const decl = this._getWinningDeclaration(lh);
           if (physicalToLogicalSet.has(physicalProp)) {
             const other = physicalToLogicalSet.get(physicalProp)!;
-            const val1 = serialize(longhandValues[lh]).trim();
-            const val2 = serialize(longhandValues[other.lh]).trim();
-            if (val1 !== val2) {
-              return '';
+            const oneIsAll = decl?.name === 'all' || decl?.fromAll || other.decl?.name === 'all' || other.decl?.fromAll;
+            if (!oneIsAll) {
+              const val1 = serialize(longhandValues[lh]).trim();
+              const val2 = serialize(longhandValues[other.lh]).trim();
+              if (val1 !== val2) {
+                return '';
+              }
             }
           }
-          physicalToLogicalSet.set(physicalProp, { lh, decl });
+          if (decl && decl.name !== 'all' && !decl.fromAll) {
+            physicalToLogicalSet.set(physicalProp, { lh, decl });
+          } else if (!physicalToLogicalSet.has(physicalProp)) {
+            physicalToLogicalSet.set(physicalProp, { lh, decl });
+          }
         }
 
         const valuesForContractor: Record<string, ComponentValue[]> = {};
@@ -333,7 +341,12 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
         if (hasAllLogicals && anyLogical) {
           let res = shorthand.contract(valuesForContractor);
-          if (res && !res.startsWith('logical') && ['margin', 'padding', 'inset', 'scroll-margin', 'scroll-padding'].includes(property)) {
+          const CSS_WIDE_KEYWORDS = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer']);
+          const LOGICAL_SHORTHANDS = new Set([
+            'margin', 'padding', 'inset', 'scroll-margin', 'scroll-padding',
+            'border-width', 'border-style', 'border-color'
+          ]);
+          if (res && !res.startsWith('logical') && LOGICAL_SHORTHANDS.has(property) && !CSS_WIDE_KEYWORDS.has(res.trim().toLowerCase())) {
             res = 'logical ' + res;
           }
           return res || '';
@@ -343,8 +356,13 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       const directDecl = this._getWinningDeclaration(property);
       if (directDecl) {
         const directIdx = this._declarations.indexOf(directDecl);
+        const allLonghands = [
+          ...shorthand.longhands,
+          ...(shorthand.logicalLonghands || []),
+          ...(shorthand.physicalLonghands || [])
+        ];
         const hasOverridingLonghand = this._declarations.some((d, idx) => {
-          if (!shorthand.longhands.includes(d.name)) return false;
+          if (!allLonghands.includes(d.name)) return false;
           if (d.important && !directDecl.important) return true;
           if (d.important === directDecl.important && idx > directIdx) return true;
           return false;
@@ -485,7 +503,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   }
 
   // cssom-1 #dom-cssstyledeclaration-setproperty
-  setProperty(property: string, value: string | null, priority: string = '', notify: boolean = true) {
+  setProperty(property: string, value: string | null, priority: string = '', notify: boolean = true, fromAll: boolean = false) {
     // 1. If the readonly flag is set, then throw a NoModificationAllowedError exception.
     if (this._readonly) {
       throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
@@ -566,7 +584,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
             }
           }
           for (const [lh, val] of Object.entries(expanded)) {
-            this.setProperty(lh, serialize(val), normalizedPriority, false);
+            this.setProperty(lh, serialize(val), normalizedPriority, false, property === 'all' || fromAll);
           }
           if (notify) {
             this._onChange?.();
@@ -598,6 +616,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     if (existing) {
       existing.value = componentValues;
       existing.important = isImportant;
+      existing.fromAll = fromAll;
       if (property.startsWith('--')) {
         existing.raw = valueStr ?? undefined;
       }
@@ -623,6 +642,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         name: property,
         value: componentValues,
         important: isImportant,
+        fromAll: fromAll || undefined,
         raw: property.startsWith('--') ? (valueStr ?? undefined) : undefined,
       };
       this._declarations.push(decl);
@@ -737,7 +757,8 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
                 type: 'declaration',
                 name: lh,
                 value: val,
-                important: d.important
+                important: d.important,
+                fromAll: d.name === 'all' || d.fromAll,
               });
             }
             continue;

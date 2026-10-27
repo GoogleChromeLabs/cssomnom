@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import type { Rule } from '../types.ts';
+import type { Rule, ComponentValue, SimpleBlock, Token } from '../types.ts';
 import type { CSSRule, CSSStyleSheet } from '../CSSOM.ts';
 
 export const FONT_FACE_DESCRIPTORS = new Set<string>([
@@ -53,4 +53,66 @@ export function findParentStyleSheet(rule: CSSRule): CSSStyleSheet | null {
     curr = curr.parentRule;
   }
   return sheet;
+}
+
+/**
+ * Validates that component values match <supports-condition> grammar.
+ * css-conditional-3 #at-supports
+ */
+export function isGrammaticallyValidSupportsCondition(values: ComponentValue[]): boolean {
+  const items = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+  if (items.length === 0) return false;
+
+  const isSupportsInParens = (item: ComponentValue): boolean => {
+    if (item.type === 'function') return true;
+    if (item.type === 'simple-block' && (item as SimpleBlock).associatedToken.value === '(') {
+      const blockValues = (item as SimpleBlock).value.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+      if (blockValues.length === 0) return false;
+      const hasTopOp = blockValues.some(v => v.type === 'ident' && ['and', 'or', 'not'].includes(String((v as Token).value).toLowerCase()));
+      const isNestedParenBlock = blockValues.length === 1 &&
+        blockValues[0].type === 'simple-block' &&
+        (blockValues[0] as SimpleBlock).associatedToken.value === '(';
+      if (hasTopOp || isNestedParenBlock) {
+        return isGrammaticallyValidSupportsCondition((item as SimpleBlock).value);
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const operands: boolean[] = [];
+  const operators: string[] = [];
+
+  let i = 0;
+  while (i < items.length) {
+    if (items[i].type === 'ident' && String((items[i] as Token).value).toLowerCase() === 'not') {
+      if (i + 1 >= items.length) return false;
+      if (!isSupportsInParens(items[i + 1])) return false;
+      operands.push(true);
+      i += 2;
+    } else if (isSupportsInParens(items[i])) {
+      operands.push(true);
+      i += 1;
+    } else {
+      return false;
+    }
+
+    if (i < items.length) {
+      if (items[i].type !== 'ident') return false;
+      const op = String((items[i] as Token).value).toLowerCase();
+      if (op !== 'and' && op !== 'or') return false;
+      operators.push(op);
+      i += 1;
+    }
+  }
+
+  if (operands.length === 0) return false;
+  if (operands.length !== operators.length + 1) return false;
+
+  if (operators.length > 0) {
+    const firstOp = operators[0];
+    if (!operators.every(op => op === firstOp)) return false;
+  }
+
+  return true;
 }

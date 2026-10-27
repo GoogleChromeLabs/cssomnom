@@ -77,5 +77,8 @@ export const ParseHooks = {
   },
   validatePropertyValue: (_property: string, _value: string): boolean => {
     return true;
+  },
+  supports: (_conditionText: string): boolean => {
+    return false;
   }
 };

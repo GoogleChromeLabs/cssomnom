@@ -105,6 +105,10 @@ export class CSSSupportsRule extends CSSConditionRule {
     return this._conditionText;
   }
 
+  get matches(): boolean {
+    return ParseHooks.supports(this._conditionText);
+  }
+
   get [Symbol.toStringTag](): string {
     return 'CSSSupportsRule';
   }

@@ -14874,6 +14874,7 @@
     "CSS.supports(conditionText) with logical operators",
     "CSS.supports(conditionText) with parentheses",
     "CSS.supports(conditionText) without parentheses",
+    "CSS.supports(property, value) edge cases",
     "CSS.supports(property, value) with invalid inputs",
     "CSS.supports(property, value) with valid inputs"
   ],
@@ -15607,6 +15608,9 @@
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-live.html": [
     "anonymous-test-0"
+  ],
+  "submodules/web-platform-tests/css/cssom/getComputedStyle-logical-enumeration.html": [
+    "Logical properties in enumeration of computed style"
   ],
   "submodules/web-platform-tests/css/cssom/getComputedStyle-margins-roundtrip.html": [
     "Fixed-length margin-bottom property value should roundtrip",

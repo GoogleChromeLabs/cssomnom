@@ -246,7 +246,7 @@ export function resolveLogicalProperty(name: string, writingMode: string = 'hori
   let blockAxis = 'y';
   let inlineAxis = 'x';
 
-  if (writingMode === 'vertical-rl') {
+  if (writingMode === 'vertical-rl' || writingMode === 'sideways-rl') {
     blockStart = 'right';
     blockEnd = 'left';
     inlineStart = 'top';
@@ -258,6 +258,13 @@ export function resolveLogicalProperty(name: string, writingMode: string = 'hori
     blockEnd = 'right';
     inlineStart = 'top';
     inlineEnd = 'bottom';
+    blockAxis = 'x';
+    inlineAxis = 'y';
+  } else if (writingMode === 'sideways-lr') {
+    blockStart = 'left';
+    blockEnd = 'right';
+    inlineStart = 'bottom';
+    inlineEnd = 'top';
     blockAxis = 'x';
     inlineAxis = 'y';
   }
@@ -309,14 +316,15 @@ export function resolveLogicalProperty(name: string, writingMode: string = 'hori
     }
   }
 
-  if (resolved === 'block-size') return writingMode.startsWith('vertical') ? 'width' : 'height';
-  if (resolved === 'inline-size') return writingMode.startsWith('vertical') ? 'height' : 'width';
-  if (resolved === 'min-block-size') return writingMode.startsWith('vertical') ? 'min-width' : 'min-height';
-  if (resolved === 'min-inline-size') return writingMode.startsWith('vertical') ? 'min-height' : 'min-width';
-  if (resolved === 'max-block-size') return writingMode.startsWith('vertical') ? 'max-width' : 'max-height';
-  if (resolved === 'max-inline-size') return writingMode.startsWith('vertical') ? 'max-height' : 'max-width';
-  if (resolved === 'contain-intrinsic-block-size') return writingMode.startsWith('vertical') ? 'contain-intrinsic-width' : 'contain-intrinsic-height';
-  if (resolved === 'contain-intrinsic-inline-size') return writingMode.startsWith('vertical') ? 'contain-intrinsic-height' : 'contain-intrinsic-width';
+  const isVertical = writingMode.startsWith('vertical') || writingMode.startsWith('sideways');
+  if (resolved === 'block-size') return isVertical ? 'width' : 'height';
+  if (resolved === 'inline-size') return isVertical ? 'height' : 'width';
+  if (resolved === 'min-block-size') return isVertical ? 'min-width' : 'min-height';
+  if (resolved === 'min-inline-size') return isVertical ? 'min-height' : 'min-width';
+  if (resolved === 'max-block-size') return isVertical ? 'max-width' : 'max-height';
+  if (resolved === 'max-inline-size') return isVertical ? 'max-height' : 'max-width';
+  if (resolved === 'contain-intrinsic-block-size') return isVertical ? 'contain-intrinsic-width' : 'contain-intrinsic-height';
+  if (resolved === 'contain-intrinsic-inline-size') return isVertical ? 'contain-intrinsic-height' : 'contain-intrinsic-width';
 
   return resolved;
 }

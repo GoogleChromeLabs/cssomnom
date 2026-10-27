@@ -1351,16 +1351,28 @@ function contractBorderRadius(values: Record<string, ComponentValue[]>): string 
   return hStr === vStr ? hStr : `${hStr} / ${vStr}`;
 }
 
-export const ALL_SHORTHAND_LONGHANDS: readonly string[] = Object.freeze(
-  Array.from(SUPPORTED_PROPERTIES).filter(prop => (
-    prop !== 'all' &&
-    prop !== 'direction' &&
-    prop !== 'unicode-bidi' &&
-    !prop.startsWith('--') &&
-    !(prop in SHORTHANDS_DATA) &&
-    !(prop in LOGICAL_MAPPING)
-  ))
-);
+const logicalLonghands = Array.from(SUPPORTED_PROPERTIES).filter(prop => (
+  prop !== 'all' &&
+  prop !== 'direction' &&
+  prop !== 'unicode-bidi' &&
+  !prop.startsWith('--') &&
+  !(prop in SHORTHANDS_DATA) &&
+  prop in LOGICAL_MAPPING
+));
+
+const physicalLonghands = Array.from(SUPPORTED_PROPERTIES).filter(prop => (
+  prop !== 'all' &&
+  prop !== 'direction' &&
+  prop !== 'unicode-bidi' &&
+  !prop.startsWith('--') &&
+  !(prop in SHORTHANDS_DATA) &&
+  !(prop in LOGICAL_MAPPING)
+));
+
+export const ALL_SHORTHAND_LONGHANDS: readonly string[] = Object.freeze([
+  ...logicalLonghands,
+  ...physicalLonghands,
+]);
 
 function isCSSWideKeywordOrVar(tokens: ComponentValue[]): boolean {
   const nonWs = filterSignificantTokens(tokens);
@@ -1613,6 +1625,14 @@ for (const [shorthand, def] of Object.entries(SHORTHANDS)) {
     for (const longhand of def.logicalLonghands) {
       if (!LONGHAND_TO_SHORTHAND[longhand]) LONGHAND_TO_SHORTHAND[longhand] = [];
       LONGHAND_TO_SHORTHAND[longhand].push(shorthand);
+    }
+  }
+  if (def.physicalLonghands) {
+    for (const longhand of def.physicalLonghands) {
+      if (!LONGHAND_TO_SHORTHAND[longhand]) LONGHAND_TO_SHORTHAND[longhand] = [];
+      if (!LONGHAND_TO_SHORTHAND[longhand].includes(shorthand)) {
+        LONGHAND_TO_SHORTHAND[longhand].push(shorthand);
+      }
     }
   }
 }
