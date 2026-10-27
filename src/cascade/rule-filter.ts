@@ -465,6 +465,136 @@ function getDeclarationStringValue(d: Declaration): string {
   return rawValStr;
 }
 
+interface SelectorListMatchResult {
+  isMatching: boolean;
+  maxSpecificity: Specificity | null;
+  matchingTreeScope?: 'document' | 'part' | 'slotted' | 'shadow';
+}
+
+function matchSelectorList(
+  selectors: string[],
+  element: ElementLike,
+  pseudoElement: string | null | undefined,
+  scopeNode: DOMElement | undefined
+): SelectorListMatchResult {
+  const domEl = element as DOMElement;
+  let maxSpecificity: Specificity | null = null;
+  let isMatching = false;
+  let matchingTreeScope: 'document' | 'part' | 'slotted' | 'shadow' | undefined;
+
+  for (const sel of selectors) {
+    let matchesThisSel = false;
+    let selectorForMatching = sel;
+    let currentSelTreeScope: 'document' | 'part' | 'slotted' | 'shadow' | undefined;
+    let partOrSlottedSpec: Specificity | null = null;
+
+    if (pseudoElement) {
+      const normTarget = pseudoElement.toLowerCase().replace(/\s+/g, '');
+      const isLegacy = ['::before', '::after', '::first-line', '::first-letter'].includes(normTarget);
+      const legacySingleColon = isLegacy ? `:${normTarget.slice(2)}` : null;
+
+      const pseudoRegex = /(::?[a-zA-Z-]+(?:\([^)]*\))?)\s*$/;
+      const match = sel.match(pseudoRegex);
+      if (match) {
+        const rawMatchedPseudo = match[1].toLowerCase().replace(/\s+/g, '');
+        let isMatch = rawMatchedPseudo === normTarget;
+        if (!isMatch && legacySingleColon && rawMatchedPseudo === legacySingleColon) {
+          isMatch = true;
+        }
+        if (isMatch) {
+          selectorForMatching = sel.slice(0, match.index).trim() || ':scope';
+          if (scopeNode) {
+            const trimmed = selectorForMatching.trim();
+            const startsWithComb = /^([>+~]|\s)/.test(trimmed);
+            const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
+            if (startsWithComb || containsScopeOrNesting) {
+              matchesThisSel = matches(domEl, selectorForMatching, scopeNode);
+            } else {
+              matchesThisSel = matches(domEl, `:where(:scope) ${selectorForMatching}`, scopeNode);
+            }
+          } else {
+            matchesThisSel = matches(domEl, selectorForMatching, scopeNode);
+          }
+        }
+      }
+    } else {
+      // css-shadow-1 #part, css-shadow-1 #slotted-pseudo
+      const partMatch = sel.match(/^(.*?)::part\(\s*([a-zA-Z0-9_-]+)\s*\)$/);
+      const slottedMatch = sel.match(/^(.*?)::slotted\(\s*([^)]+)\s*\)$/);
+      if (partMatch) {
+        const hostSelector = partMatch[1].trim() || '*';
+        const partName = partMatch[2];
+        const elPartAttr = (domEl as { getAttribute?(a: string): string | null }).getAttribute?.('part') || '';
+        const partTokens = elPartAttr.trim().split(/\s+/);
+        if (partTokens.includes(partName)) {
+          const rootNode = getElementRootNode(domEl);
+          const shadowHost = (rootNode as { host?: unknown })?.host;
+          if (shadowHost && isElement(shadowHost) && matches(shadowHost, hostSelector)) {
+            matchesThisSel = true;
+            currentSelTreeScope = 'part';
+            const hostSpecArr = calculateSpecificity(hostSelector);
+            const baseSpec = hostSpecArr[0] || [0, 0, 0];
+            partOrSlottedSpec = [baseSpec[0], baseSpec[1], baseSpec[2] + 1];
+          }
+        }
+      } else if (slottedMatch) {
+        const slotArg = slottedMatch[2].trim();
+        const parent = (domEl as { parentElement?: unknown }).parentElement as { shadowRoot?: unknown } | null;
+        const isSlotted = Boolean((domEl as { assignedSlot?: unknown }).assignedSlot || parent?.shadowRoot);
+        if (isSlotted && matches(domEl, slotArg)) {
+          matchesThisSel = true;
+          currentSelTreeScope = 'slotted';
+          const argSpecArr = calculateSpecificity(slotArg);
+          const baseSpec = argSpecArr[0] || [0, 0, 0];
+          partOrSlottedSpec = [baseSpec[0], baseSpec[1], baseSpec[2] + 1];
+        }
+      } else if (sel.includes(':host')) {
+        matchesThisSel = matches(domEl, sel);
+        if (matchesThisSel) {
+          currentSelTreeScope = 'shadow';
+        }
+      } else {
+        const hasPseudo = /::[a-zA-Z-]+(?:\([^)]*\))?$/.test(sel) || /:(before|after|first-line|first-letter)\b/.test(sel);
+        if (!hasPseudo) {
+          if (scopeNode) {
+            const trimmed = sel.trim();
+            const startsWithComb = /^([>+~]|\s)/.test(trimmed);
+            const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
+            if (startsWithComb || containsScopeOrNesting) {
+              matchesThisSel = matches(domEl, sel, scopeNode);
+            } else {
+              matchesThisSel = matches(domEl, `:where(:scope) ${sel}`, scopeNode);
+            }
+          } else {
+            matchesThisSel = matches(domEl, sel, scopeNode);
+          }
+          if (matchesThisSel) {
+            const rootNode = getElementRootNode(domEl);
+            if (rootNode && (rootNode as { host?: unknown }).host) {
+              currentSelTreeScope = 'shadow';
+            } else {
+              currentSelTreeScope = 'document';
+            }
+          }
+        }
+      }
+    }
+
+    if (matchesThisSel) {
+      isMatching = true;
+      if (currentSelTreeScope) {
+        matchingTreeScope = currentSelTreeScope;
+      }
+      const spec = partOrSlottedSpec || getMatchingSpecificity(domEl, selectorForMatching, scopeNode);
+      if (!maxSpecificity || compareSpecificity(spec, maxSpecificity) > 0) {
+        maxSpecificity = spec;
+      }
+    }
+  }
+
+  return { isMatching, maxSpecificity, matchingTreeScope };
+}
+
 /**
  * Traverses rule list, evaluates conditional at-rules and selectors, and collects matched declarations.
  * css-cascade-5 #filtering
@@ -497,119 +627,12 @@ export function collectMatchedDeclarations(
         const resolvedSelector = resolveNestedSelector(selectorText, parentSelector);
         const selectors = splitSelectorList(resolvedSelector);
 
-        let maxSpecificity: Specificity | null = null;
-        let isMatchingSelector = false;
-        let matchingTreeScope: 'document' | 'part' | 'slotted' | 'shadow' | undefined;
-
-        for (const sel of selectors) {
-          let matchesThisSel = false;
-          let selectorForMatching = sel;
-          let currentSelTreeScope: 'document' | 'part' | 'slotted' | 'shadow' | undefined;
-          let partOrSlottedSpec: Specificity | null = null;
-
-          if (pseudoElement) {
-            const normTarget = pseudoElement.toLowerCase().replace(/\s+/g, '');
-            const isLegacy = ['::before', '::after', '::first-line', '::first-letter'].includes(normTarget);
-            const legacySingleColon = isLegacy ? `:${normTarget.slice(2)}` : null;
-
-            const pseudoRegex = /(::?[a-zA-Z-]+(?:\([^)]*\))?)\s*$/;
-            const match = sel.match(pseudoRegex);
-            if (match) {
-              const rawMatchedPseudo = match[1].toLowerCase().replace(/\s+/g, '');
-              let isMatch = rawMatchedPseudo === normTarget;
-              if (!isMatch && legacySingleColon && rawMatchedPseudo === legacySingleColon) {
-                isMatch = true;
-              }
-              if (isMatch) {
-                selectorForMatching = sel.slice(0, match.index).trim() || ':scope';
-                if (scopeNode) {
-                  const trimmed = selectorForMatching.trim();
-                  const startsWithComb = /^([>+~]|\s)/.test(trimmed);
-                  const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
-                  if (startsWithComb || containsScopeOrNesting) {
-                    matchesThisSel = matches(element, selectorForMatching, scopeNode);
-                  } else {
-                    matchesThisSel = matches(element, `:where(:scope) ${selectorForMatching}`, scopeNode);
-                  }
-                } else {
-                  matchesThisSel = matches(element, selectorForMatching, scopeNode);
-                }
-              }
-            }
-          } else {
-            // css-shadow-1 #part, css-shadow-1 #slotted-pseudo
-            const partMatch = sel.match(/^(.*?)::part\(\s*([a-zA-Z0-9_-]+)\s*\)$/);
-            const slottedMatch = sel.match(/^(.*?)::slotted\(\s*([^)]+)\s*\)$/);
-            if (partMatch) {
-              const hostSelector = partMatch[1].trim() || '*';
-              const partName = partMatch[2];
-              const elPartAttr = (element as { getAttribute?(a: string): string | null }).getAttribute?.('part') || '';
-              const partTokens = elPartAttr.trim().split(/\s+/);
-              if (partTokens.includes(partName)) {
-                const rootNode = getElementRootNode(element);
-                const shadowHost = (rootNode as { host?: unknown })?.host;
-                if (shadowHost && isElement(shadowHost) && matches(shadowHost, hostSelector)) {
-                  matchesThisSel = true;
-                  currentSelTreeScope = 'part';
-                  const hostSpecArr = calculateSpecificity(hostSelector);
-                  const baseSpec = hostSpecArr[0] || [0, 0, 0];
-                  partOrSlottedSpec = [baseSpec[0], baseSpec[1], baseSpec[2] + 1];
-                }
-              }
-            } else if (slottedMatch) {
-              const slotArg = slottedMatch[2].trim();
-              const parent = (element as { parentElement?: unknown }).parentElement as { shadowRoot?: unknown } | null;
-              const isSlotted = Boolean((element as { assignedSlot?: unknown }).assignedSlot || parent?.shadowRoot);
-              if (isSlotted && matches(element, slotArg)) {
-                matchesThisSel = true;
-                currentSelTreeScope = 'slotted';
-                const argSpecArr = calculateSpecificity(slotArg);
-                const baseSpec = argSpecArr[0] || [0, 0, 0];
-                partOrSlottedSpec = [baseSpec[0], baseSpec[1], baseSpec[2] + 1];
-              }
-            } else if (sel.includes(':host')) {
-              matchesThisSel = matches(element, sel);
-              if (matchesThisSel) {
-                currentSelTreeScope = 'shadow';
-              }
-            } else {
-              const hasPseudo = /::[a-zA-Z-]+(?:\([^)]*\))?$/.test(sel) || /:(before|after|first-line|first-letter)\b/.test(sel);
-              if (!hasPseudo) {
-                if (scopeNode) {
-                  const trimmed = sel.trim();
-                  const startsWithComb = /^([>+~]|\s)/.test(trimmed);
-                  const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
-                  if (startsWithComb || containsScopeOrNesting) {
-                    matchesThisSel = matches(element, sel, scopeNode);
-                  } else {
-                    matchesThisSel = matches(element, `:where(:scope) ${sel}`, scopeNode);
-                  }
-                } else {
-                  matchesThisSel = matches(element, sel, scopeNode);
-                }
-                if (matchesThisSel) {
-                  const rootNode = getElementRootNode(element);
-                  if (rootNode && (rootNode as { host?: unknown }).host) {
-                    currentSelTreeScope = 'shadow';
-                  } else {
-                    currentSelTreeScope = 'document';
-                  }
-                }
-              }
-            }
-          }
-
-          if (matchesThisSel) {
-            isMatchingSelector = true;
-            if (currentSelTreeScope) {
-              matchingTreeScope = currentSelTreeScope;
-            }
-            const spec = partOrSlottedSpec || getMatchingSpecificity(element, selectorForMatching, scopeNode);
-            if (!maxSpecificity || compareSpecificity(spec, maxSpecificity) > 0) {
-              maxSpecificity = spec;
-            }
-          }
-        }
+        const { isMatching: isMatchingSelector, maxSpecificity, matchingTreeScope } = matchSelectorList(
+          selectors,
+          element,
+          pseudoElement,
+          scopeNode
+        );
 
         if (isMatchingSelector && maxSpecificity) {
           const spec = maxSpecificity;
@@ -698,6 +721,9 @@ export function collectMatchedDeclarations(
         const mediaText = rule.media?.mediaText;
         const env = resolveMediaEnvironment(element);
         if (mediaText && !MediaParser.evaluate(mediaText, env)) {
+          continue;
+        }
+        if (rule.supportsText && !supports(rule.supportsText)) {
           continue;
         }
 
@@ -851,26 +877,19 @@ export function collectMatchedDeclarations(
         walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode, scopeProximity);
       // css-nesting-1 #nested-declarations
       } else if (rule instanceof CSSNestedDeclarations) {
-        let selectorToMatch = parentSelector || ':scope';
-        let isMatchingDecl = false;
-        const normalizedPseudo = pseudoElement
-          ? (pseudoElement.startsWith('::') ? pseudoElement : `::${pseudoElement.replace(/^:/, '')}`)
-          : null;
-        if (normalizedPseudo) {
-          if (selectorToMatch.endsWith(normalizedPseudo) || selectorToMatch.endsWith(`:${normalizedPseudo.slice(2)}`)) {
-            selectorToMatch = selectorToMatch.replace(/::?[a-zA-Z-]+$/, '').trim() || ':scope';
-            isMatchingDecl = matches(element, selectorToMatch, scopeNode);
-          }
-        } else {
-          const hasPseudo = /::[a-zA-Z-]+$/.test(selectorToMatch) || /:(before|after|first-line|first-letter)\b/.test(selectorToMatch);
-          if (!hasPseudo) {
-            isMatchingDecl = matches(element, selectorToMatch, scopeNode);
-          }
-        }
+        const rawParent = parentSelector || ':scope';
+        const selectors = splitSelectorList(rawParent);
+        const { isMatching: isMatchingDecl, maxSpecificity } = matchSelectorList(
+          selectors,
+          element,
+          pseudoElement,
+          scopeNode
+        );
 
-        if (isMatchingDecl) {
-          // css-nesting-1 #nesting-at-scope: '&' in @scope behaves like :where(:scope) with (0, 0, 0) specificity
-          const spec = (scopeNode ? [0, 0, 0] : getMatchingSpecificity(element, selectorToMatch)) as Specificity;
+        if (isMatchingDecl && maxSpecificity) {
+          // css-nesting-1 #nesting-at-scope: '&' directly in @scope behaves like :where(:scope) with (0, 0, 0) specificity
+          const isDirectScope = scopeNode && (!parentSelector || parentSelector === ':scope');
+          const spec = isDirectScope ? ([0, 0, 0] as Specificity) : maxSpecificity;
           const style = rule.style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;
           const ruleBase = getRuleBaseURL(rule, element);

@@ -153,6 +153,17 @@ export class CSSGroupingRule extends CSSRule {
     const isScopeRule = (r: CSSRule) => r[Symbol.toStringTag] === 'CSSScopeRule';
     const isStyleRule = (r: CSSRule) => r[Symbol.toStringTag] === 'CSSStyleRule';
     const isNested = isStyleRule(this) || isScopeRule(this) || this.parentRule !== null;
+    let isInsideStyleRule = isStyleRule(this);
+    if (!isInsideStyleRule) {
+      let p = this.parentRule;
+      while (p) {
+        if (isStyleRule(p)) {
+          isInsideStyleRule = true;
+          break;
+        }
+        p = p.parentRule;
+      }
+    }
 
     // Check if the input rule is a top-level rule to validate hierarchy constraints
     let topRule: Rule | null = null;
@@ -164,7 +175,7 @@ export class CSSGroupingRule extends CSSRule {
         throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
       }
       // css-nesting-1 #conditionals: style rules only allow conditional group rules; nested conditional rules allow top-level rules
-      if (isNested && !(topRule instanceof CSSGroupingRule)) {
+      if (isInsideStyleRule && !(topRule instanceof CSSGroupingRule)) {
         throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');
       }
     }

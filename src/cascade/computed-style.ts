@@ -391,8 +391,12 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return 'none';
     }
 
-    if (dashed === 'color' || (dashed.endsWith('-color') && (dashed.startsWith('border-') || dashed.startsWith('outline-')))) {
+    if (dashed === 'color') {
       return 'rgb(0, 0, 0)';
+    }
+    // css-color-4 #resolving-other-colors: border-*-color and outline-color fallback to currentcolor
+    if (dashed.endsWith('-color') && (dashed.startsWith('border-') || dashed.startsWith('outline-'))) {
+      return this.getPropertyValue('color') || 'rgb(0, 0, 0)';
     }
     if (dashed === 'background-color') return 'rgba(0, 0, 0, 0)';
     if (SVG_PRESENTATION_ATTRIBUTES.has(dashed)) {

@@ -20,10 +20,12 @@ import {
   CSSLayerStatementRule,
   CSSImportRule,
   CSSMediaRule,
+  CSSSupportsRule,
   CSSGroupingRule,
   CSSStyleRule,
 } from '../CSSOM.ts';
 import { MediaParser } from '../MediaParser.ts';
+import { supports } from '../parser-api.ts';
 import type { Rule, MediaEnvironment, ElementLike } from '../types.ts';
 
 interface LayerState {
@@ -135,6 +137,9 @@ function scanLayers(
         // Condition is false; does not contribute to layer ordering
         continue;
       }
+      if (r.supportsText && !supports(r.supportsText)) {
+        continue;
+      }
 
       const rawLayer = r.layerName;
       if (rawLayer !== null && rawLayer !== undefined) {
@@ -161,6 +166,16 @@ function scanLayers(
       // do not contribute to layer order unless condition is true
       const mediaText = r.media.mediaText;
       if (mediaText && !MediaParser.evaluate(mediaText, env)) {
+        continue;
+      }
+      const childRules = r.cssRules;
+      if (childRules && childRules.length > 0) {
+        scanLayers(Array.from(childRules), root, state, prefix, env, isInsideStyleRule);
+      }
+    } else if (r instanceof CSSSupportsRule) {
+      // css-cascade-5 #layer-ordering: Layers defined inside conditional group rule
+      // do not contribute to layer order unless condition is true
+      if (r.conditionText && !supports(r.conditionText)) {
         continue;
       }
       const childRules = r.cssRules;

@@ -256,7 +256,12 @@ export function processStandardDeclarations(
         }
         // css-cascade-5 #revert-layer: rolls back to earlier cascade layer
         let prevIdx = i - 1;
-        while (prevIdx >= 0 && decls[prevIdx].layerOrder >= decl.layerOrder) {
+        while (
+          prevIdx >= 0 &&
+          decls[prevIdx].isInline === decl.isInline &&
+          decls[prevIdx].layerOrder === decl.layerOrder &&
+          decls[prevIdx].important === decl.important
+        ) {
           prevIdx--;
         }
         if (prevIdx >= 0) {

@@ -497,7 +497,8 @@ export function substituteVariables(
 export function resolveVariables(
   style: CSSStyleDeclaration,
   property: string,
-  envMap?: Record<string, string>
+  envMap?: Record<string, string>,
+  activeProperties?: Map<string, PropertyDefinition>
 ): string {
   const value = style.getPropertyValue(property);
   if (!value) return '';
@@ -524,7 +525,7 @@ export function resolveVariables(
     undefined,
     undefined,
     undefined,
-    undefined,
+    activeProperties,
     envMap,
     true
   );
@@ -534,7 +535,7 @@ export function resolveVariables(
   }
 
   if (property.startsWith('--')) {
-    const def = PropertyRegistry.get(property);
+    const def = activeProperties?.get(property) ?? PropertyRegistry.get(property);
     if (def && def.syntax && def.syntax !== '*') {
       const tokens = ParseHooks.parseComponentValues(tokenize(res)).filter(
         t => t.type !== 'whitespace' && t.type !== 'comment'
@@ -580,6 +581,16 @@ export function resolveCustomProperties(
     return activeProperties?.get(propName) ?? jsDef;
   };
 
+  const getRegisteredFallback = (
+    def: PropertyDefinition | undefined,
+    propName: string,
+    parentStyle: CSSStyleDeclaration | null | undefined
+  ): string => {
+    if (!def || !def.syntax || def.syntax === '*') return '';
+    const fallbackVal = (def.inherits && parentStyle) ? parentStyle.getPropertyValue(propName) : '';
+    return fallbackVal !== '' ? fallbackVal : (def.initialValue ?? '');
+  };
+
   function resolveCustomProp(name: string, callStack: Set<string>): string | null {
     if (cyclicProps.has(name)) return null;
     if (resolvedCustomProps.has(name)) return resolvedCustomProps.get(name)!;
@@ -622,17 +633,20 @@ export function resolveCustomProperties(
           taintedProps.add(name);
         }
 
+        const def = getPropertyDefinition(name);
+
         if (subVal === null || cyclicProps.has(name)) {
           // css-variables-1 #guaranteed-invalid
           // css-variables-1 #using-variables
           // When variable substitution fails, property is invalid at computed-value time.
-          // Store guaranteed-invalid value ('') and do NOT continue down earlier rules in cascade.
-          resolvedCustomProps.set(name, '');
-          return null;
+          // Store guaranteed-invalid value ('') or registered fallback and do NOT continue down earlier rules in cascade.
+          const fallback = getRegisteredFallback(def, name, parentCascaded);
+          resolvedCustomProps.set(name, fallback);
+          return fallback || null;
         }
 
         // css-values-5 #attr-security: registered <url> cannot use tainted data
-        const reg = getPropertyDefinition(name);
+        const reg = def;
         if (reg?.syntax === '<url>' && taintOut.tainted) {
           const initVal = reg.initialValue ?? '';
           resolvedCustomProps.set(name, initVal);
@@ -683,7 +697,6 @@ export function resolveCustomProperties(
           }
         }
         // css-properties-values-api #calculation-of-computed-values
-        const def = getPropertyDefinition(name);
         if (trimmed === 'revert') {
           if (def && !def.inherits) {
             const initVal = def.initialValue ?? null;
@@ -713,6 +726,18 @@ export function resolveCustomProperties(
           const parentVal = parentCascaded ? parentCascaded.getPropertyValue(name) : '';
           resolvedCustomProps.set(name, parentVal);
           return parentVal || null;
+        }
+
+        if (def && def.syntax && def.syntax !== '*') {
+          const tokens = ParseHooks.parseComponentValues(tokenize(subVal)).filter(
+            t => t.type !== 'whitespace' && t.type !== 'comment'
+          );
+          if (!matchesSyntax(tokens, def.syntax)) {
+            // css-properties-values-api #calculation-of-computed-values
+            const fallback = getRegisteredFallback(def, name, parentCascaded);
+            resolvedCustomProps.set(name, fallback);
+            return fallback || null;
+          }
         }
 
         const finalSubVal = subVal === '' ? ' ' : subVal;
@@ -760,7 +785,8 @@ export function resolveCustomProperties(
     if (res !== null && !cyclicProps.has(prop)) {
       resolvedCustomProps.set(prop, res);
     } else {
-      resolvedCustomProps.set(prop, '');
+      const def = getPropertyDefinition(prop);
+      resolvedCustomProps.set(prop, getRegisteredFallback(def, prop, parentCascaded));
     }
   }
 

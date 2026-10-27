@@ -30,10 +30,16 @@ export interface PropertyDefinition {
   parsedInitialValue?: ComponentValue[];
 }
 
-const VALID_COMPONENTS = new Set([
+// css-properties-values-api #supported-names
+const REGISTERED_PROPERTY_COMPONENTS = new Set([
   'length', 'number', 'percentage', 'length-percentage',
   'color', 'image', 'url', 'integer', 'angle', 'time',
-  'resolution', 'transform-function', 'transform-list', 'custom-ident', 'string', 'flex'
+  'resolution', 'transform-function', 'transform-list', 'custom-ident', 'string'
+]);
+
+const ALL_SYNTAX_COMPONENTS = new Set([
+  ...REGISTERED_PROPERTY_COMPONENTS,
+  'flex'
 ]);
 
 const VIEWPORT_UNITS = new Set([
@@ -51,7 +57,7 @@ interface SyntaxComponent {
 }
 
 // css-properties-values-api #consume-syntax-definition
-function parseSyntax(syntax: string): SyntaxComponent[] | '*' {
+function parseSyntax(syntax: string, isRegistered = false): SyntaxComponent[] | '*' {
   const s = syntax.trim();
   if (s === '*') return '*';
   if (s === '') throw new DOMException('Empty syntax string', 'SyntaxError');
@@ -69,7 +75,7 @@ function parseSyntax(syntax: string): SyntaxComponent[] | '*' {
   skipWhitespace();
 
   while (stream.peek().type !== 'EOF') {
-    const component = consumeSyntaxComponent(stream);
+    const component = consumeSyntaxComponent(stream, isRegistered);
     definition.push(component);
 
     skipWhitespace();
@@ -86,7 +92,7 @@ function parseSyntax(syntax: string): SyntaxComponent[] | '*' {
 }
 
 // css-properties-values-api #consume-syntax-component
-function consumeSyntaxComponent(stream: ArrayTokenStream): SyntaxComponent {
+function consumeSyntaxComponent(stream: ArrayTokenStream, isRegistered = false): SyntaxComponent {
   const token = stream.next();
   let name = '';
   let multiplier = '';
@@ -107,7 +113,8 @@ function consumeSyntaxComponent(stream: ArrayTokenStream): SyntaxComponent {
       }
     }
     const bareName = name.slice(1, -1);
-    if (!VALID_COMPONENTS.has(bareName)) {
+    const allowed = isRegistered ? REGISTERED_PROPERTY_COMPONENTS : ALL_SYNTAX_COMPONENTS;
+    if (!allowed.has(bareName)) {
       throw new DOMException(`Unknown syntax component: ${name}`, 'SyntaxError');
     }
   } else if (token.type === 'ident') {
@@ -125,39 +132,20 @@ function consumeSyntaxComponent(stream: ArrayTokenStream): SyntaxComponent {
     return { name, multiplier: '' };
   }
 
+  // css-properties-values-api #consume-syntax-component
+  // css-properties-values-api #multipliers
   const next = stream.peek();
-  if (next.type === 'whitespace') {
-    stream.next();
-    const afterWs = stream.peek();
-    if (afterWs.type === 'delim' && (afterWs.value === '+' || afterWs.value === '#' || afterWs.value === '?' || afterWs.value === '*')) {
-      stream.next();
-      multiplier = afterWs.value;
-    } else if (afterWs.type === '{') {
-      stream.next();
-      while (true) {
-        const t = stream.next();
-        if (t.type === '}' || t.type === 'EOF') break;
-      }
-      multiplier = '+';
-    }
-  } else if (next.type === 'delim' && (next.value === '+' || next.value === '#' || next.value === '?' || next.value === '*')) {
+  if (next.type === 'delim' && (next.value === '+' || next.value === '#')) {
     stream.next();
     multiplier = next.value;
-  } else if (next.type === '{') {
-    stream.next();
-    while (true) {
-      const t = stream.next();
-      if (t.type === '}' || t.type === 'EOF') break;
-    }
-    multiplier = '+';
   }
 
   return { name, multiplier };
 }
 
-function validateSyntax(syntax: string): boolean {
+function validateSyntax(syntax: string, isRegistered = false): boolean {
   try {
-    parseSyntax(syntax);
+    parseSyntax(syntax, isRegistered);
     return true;
   } catch (e) {
     return false;
@@ -178,9 +166,11 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
     let name = comp.name;
     const multiplier = comp.multiplier;
 
+    let checkItem: (itemTokens: ComponentValue[]) => boolean;
+
     if (name.startsWith('<') && name.endsWith('>')) {
-      name = name.slice(1, -1);
-      
+      const typeName = name.slice(1, -1);
+
       const VALID_TRANSFORM_FUNCTIONS = new Set([
         'matrix', 'matrix3d',
         'translate', 'translate3d', 'translatex', 'translatey', 'translatez',
@@ -190,8 +180,8 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
         'perspective'
       ]);
 
-      const checkItem = (itemTokens: ComponentValue[]) => {
-        if (name === 'transform-list') {
+      checkItem = (itemTokens: ComponentValue[]) => {
+        if (typeName === 'transform-list') {
           if (itemTokens.length === 0) return false;
           return itemTokens.every(t => {
             if (t.type !== 'function') return false;
@@ -204,18 +194,18 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
         const t = itemTokens[0];
         const MATH_FUNCTIONS = new Set(['calc', 'min', 'max', 'clamp', 'round', 'mod', 'rem', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'pow', 'sqrt', 'hypot', 'log', 'exp', 'abs', 'sign']);
         const isMathFunction = t.type === 'function' && MATH_FUNCTIONS.has((t as CSSFunction).name.toLowerCase());
-        
-        if (name === 'length') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || (t.type === 'number' && t.value === 0);
-        if (name === 'number') return isMathFunction || t.type === 'number';
-        if (name === 'percentage') return isMathFunction || t.type === 'percentage';
-        if (name === 'length-percentage') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || t.type === 'percentage' || (t.type === 'number' && t.value === 0);
-        if (name === 'integer') return isMathFunction || (t.type === 'number' && t.numberType === 'integer');
-        if (name === 'angle') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'angle');
-        if (name === 'time') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'time');
-        if (name === 'resolution') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'resolution');
-        if (name === 'flex') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'flex');
 
-        if (name === 'color') {
+        if (typeName === 'length') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || (t.type === 'number' && t.value === 0);
+        if (typeName === 'number') return isMathFunction || t.type === 'number';
+        if (typeName === 'percentage') return isMathFunction || t.type === 'percentage';
+        if (typeName === 'length-percentage') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || t.type === 'percentage' || (t.type === 'number' && t.value === 0);
+        if (typeName === 'flex') return isMathFunction || (t.type === 'dimension' && t.unit.toLowerCase() === 'fr');
+        if (typeName === 'integer') return isMathFunction || (t.type === 'number' && t.numberType === 'integer');
+        if (typeName === 'angle') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'angle');
+        if (typeName === 'time') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'time');
+        if (typeName === 'resolution') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'resolution');
+
+        if (typeName === 'color') {
           if (t.type === 'hash') {
             return /^[0-9a-fA-F]{3,4}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(t.value);
           }
@@ -242,37 +232,62 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
           }
           return false;
         }
-        if (name === 'url') return t.type === 'url' || (t.type === 'function' && (t as CSSFunction).name === 'url');
-        if (name === 'image') return t.type === 'url' || t.type === 'function';
-        if (name === 'custom-ident') {
+        if (typeName === 'url') return t.type === 'url' || (t.type === 'function' && (t as CSSFunction).name === 'url');
+        if (typeName === 'image') return t.type === 'url' || t.type === 'function';
+        if (typeName === 'custom-ident') {
           if (t.type !== 'ident') return false;
           const val = (t as Token).value.toString().toLowerCase();
           return !['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default'].includes(val);
         }
-        if (name === 'string') return t.type === 'string';
-        if (name === 'transform-function') {
+        if (typeName === 'string') return t.type === 'string';
+        if (typeName === 'transform-function') {
           if (t.type !== 'function') return false;
           const funcName = (t as CSSFunction).name.toLowerCase();
           return VALID_TRANSFORM_FUNCTIONS.has(funcName);
         }
         return true;
       };
-
-      if (multiplier === '#') {
-        const items: ComponentValue[][] = [[]];
-        for (const t of tokens) {
-          if (t.type === 'comma') items.push([]);
-          else items[items.length - 1].push(t);
-        }
-        if (items.every(item => checkItem(item))) return true;
-      } else if (multiplier === '+') {
-        if (tokens.length > 0 && tokens.every(t => checkItem([t]))) return true;
-      } else {
-        if (checkItem(tokens)) return true;
-      }
     } else {
       // Ident literal
-      if (tokens.length === 1 && tokens[0].type === 'ident' && (tokens[0] as Token).value.toString() === name) return true;
+      checkItem = (itemTokens: ComponentValue[]) => {
+        return (
+          itemTokens.length === 1 &&
+          itemTokens[0].type === 'ident' &&
+          (itemTokens[0] as Token).value.toString() === name
+        );
+      };
+    }
+
+    if (multiplier === '#') {
+      const items: ComponentValue[][] = [[]];
+      for (const t of tokens) {
+        if (t.type === 'EOF') continue;
+        if (t.type === 'comma') {
+          items.push([]);
+        } else if (t.type !== 'whitespace' && t.type !== 'comment') {
+          items[items.length - 1].push(t);
+        }
+      }
+      if (items.length > 0 && items.every(item => item.length > 0 && checkItem(item))) return true;
+    } else if (multiplier === '+') {
+      const items: ComponentValue[][] = [];
+      let current: ComponentValue[] = [];
+      for (const t of tokens) {
+        if (t.type === 'EOF') continue;
+        if (t.type === 'whitespace' || t.type === 'comment') {
+          if (current.length > 0) {
+            items.push(current);
+            current = [];
+          }
+        } else {
+          current.push(t);
+        }
+      }
+      if (current.length > 0) items.push(current);
+      if (items.length > 0 && items.every(item => item.length > 0 && checkItem(item))) return true;
+    } else {
+      const nonWs = tokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
+      if (checkItem(nonWs)) return true;
     }
   }
   return false;
@@ -323,7 +338,7 @@ export const PropertyRegistry = {
     }
     
     const syntax = definition.syntax || '*';
-    if (!validateSyntax(syntax)) {
+    if (!validateSyntax(syntax, true)) {
       throw new DOMException(`Invalid syntax string: ${syntax}`, 'SyntaxError');
     }
 
@@ -357,7 +372,7 @@ export const PropertyRegistry = {
           throw new DOMException(`initialValue is not computationally independent: ${definition.initialValue}`, 'SyntaxError');
         }
         
-        if (!matchesSyntax(nonWsValues, syntax)) {
+        if (!matchesSyntax(values, syntax)) {
           throw new DOMException(`initialValue "${definition.initialValue}" does not match syntax "${syntax}"`, 'SyntaxError');
         }
       }
