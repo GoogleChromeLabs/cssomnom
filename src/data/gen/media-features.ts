@@ -181,7 +181,7 @@ export const FEATURE_ALLOWED_IDENTS: Record<string, readonly string[]> = {
   'any-hover': ["none","hover"] as const,
   'any-pointer': ["none","coarse","fine"] as const,
   'color-gamut': ["srgb","p3","rec2020"] as const,
-  'display-mode': ["fullscreen","standalone","minimal-ui","browser","picture-in-picture","window-controls-overlay","unframed","borderless","tabbed"] as const,
+  'display-mode': ["application","fullscreen","standalone","minimal-ui","browser","picture-in-picture","window-controls-overlay","unframed","borderless","tabbed"] as const,
   'display-state': ["normal","minimized","maximized","fullscreen"] as const,
   'dynamic-range': ["standard","high"] as const,
   'environment-blending': ["opaque","additive","subtractive"] as const,

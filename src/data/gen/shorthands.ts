@@ -80,7 +80,7 @@ export const SHORTHANDS_DATA = {
   'columns': ["column-width","column-count","column-height"],
   'contain-intrinsic-size': ["contain-intrinsic-width","contain-intrinsic-height"],
   'container': ["container-name","container-type"],
-  'corner': ["border-radius","corner-shape"],
+  'corner': ["corner-shape","border-radius"],
   'corner-block-end': ["border-block-end-radius","corner-block-end-shape"],
   'corner-block-end-shape': ["corner-end-start-shape","corner-end-end-shape"],
   'corner-block-start': ["border-block-start-radius","corner-block-start-shape"],

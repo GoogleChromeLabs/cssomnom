@@ -85,11 +85,11 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
-    "@webref/css": "^8.7.7",
-    "linkedom": "^0.18.13",
+    "@webref/css": "^8.7.8",
+    "linkedom": "^0.18.14",
     "mdn-data": "^2.37.2",
-    "oxlint": "^1.88.0",
-    "puppeteer-core": "^25.14.0",
+    "oxlint": "^1.89.0",
+    "puppeteer-core": "^25.16.0",
     "tsup": "^9.0.0",
     "typescript": "^7.0.2"
   }
