@@ -149,6 +149,18 @@ describe('Phase 158.4 Compliance Verification', () => {
       assert.equal(rules.length, 1);
       assert.ok(rules[0] instanceof CSSSupportsRule);
     });
+
+    it('accepts empty parens in general-enclosed @supports rule', () => {
+      const rules = parseStyleSheet('@supports () { body { color: red; } }');
+      assert.equal(rules.length, 1);
+      assert.ok(rules[0] instanceof CSSSupportsRule);
+      assert.equal((rules[0] as CSSSupportsRule).conditionText, '()');
+
+      const nestedRules = parseStyleSheet('@supports (()) { body { color: red; } }');
+      assert.equal(nestedRules.length, 1);
+      assert.ok(nestedRules[0] instanceof CSSSupportsRule);
+      assert.equal((nestedRules[0] as CSSSupportsRule).conditionText, '(())');
+    });
   });
 
   describe('BC-39: 2-arg CSS.supports(property, value) does not trim property', () => {

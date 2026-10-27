@@ -67,7 +67,7 @@ export function isGrammaticallyValidSupportsCondition(values: ComponentValue[]):
     if (item.type === 'function') return true;
     if (item.type === 'simple-block' && (item as SimpleBlock).associatedToken.value === '(') {
       const blockValues = (item as SimpleBlock).value.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-      if (blockValues.length === 0) return false;
+      if (blockValues.length === 0) return true;
       const hasTopOp = blockValues.some(v => v.type === 'ident' && ['and', 'or', 'not'].includes(String((v as Token).value).toLowerCase()));
       const isNestedParenBlock = blockValues.length === 1 &&
         blockValues[0].type === 'simple-block' &&

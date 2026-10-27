@@ -481,7 +481,6 @@ function evalSupportsInParens(item: ComponentValue): boolean {
 }
 
 function evalSupportsConditionValues(values: ComponentValue[]): boolean {
-  if (!isGrammaticallyValidSupportsCondition(values)) return false;
   const items = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
   if (items.length === 0) return false;
 
@@ -491,19 +490,34 @@ function evalSupportsConditionValues(values: ComponentValue[]): boolean {
   let i = 0;
   while (i < items.length) {
     if (items[i].type === 'ident' && String((items[i] as Token).value).toLowerCase() === 'not') {
-      evalResults.push(!evalSupportsInParens(items[i + 1]));
+      if (i + 1 >= items.length) return false;
+      const next = items[i + 1];
+      if (next.type !== 'function' && !(next.type === 'simple-block' && (next as SimpleBlock).associatedToken.value === '(')) {
+        return false;
+      }
+      evalResults.push(!evalSupportsInParens(next));
       i += 2;
     } else {
-      evalResults.push(evalSupportsInParens(items[i]));
+      const item = items[i];
+      if (item.type !== 'function' && !(item.type === 'simple-block' && (item as SimpleBlock).associatedToken.value === '(')) {
+        return false;
+      }
+      evalResults.push(evalSupportsInParens(item));
       i += 1;
     }
 
     if (i < items.length) {
-      operators.push(String((items[i] as Token).value).toLowerCase());
+      if (items[i].type !== 'ident') return false;
+      const op = String((items[i] as Token).value).toLowerCase();
+      if (op !== 'and' && op !== 'or') return false;
+      if (operators.length > 0 && operators[0] !== op) return false;
+      operators.push(op);
       i += 1;
+      if (i >= items.length) return false;
     }
   }
 
+  if (evalResults.length === 0) return false;
   if (evalResults.length === 1) {
     return evalResults[0];
   }

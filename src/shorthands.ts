@@ -26,6 +26,7 @@ export interface ShorthandDefinition {
   contract: (longhands: Record<string, ComponentValue[]>) => string | null;
   logicalLonghands?: readonly string[];
   physicalLonghands?: readonly string[];
+  allLonghands?: readonly string[];
   stub?: boolean;
 }
 
@@ -1351,23 +1352,23 @@ function contractBorderRadius(values: Record<string, ComponentValue[]>): string 
   return hStr === vStr ? hStr : `${hStr} / ${vStr}`;
 }
 
-const logicalLonghands = Array.from(SUPPORTED_PROPERTIES).filter(prop => (
-  prop !== 'all' &&
-  prop !== 'direction' &&
-  prop !== 'unicode-bidi' &&
-  !prop.startsWith('--') &&
-  !(prop in SHORTHANDS_DATA) &&
-  prop in LOGICAL_MAPPING
-));
-
-const physicalLonghands = Array.from(SUPPORTED_PROPERTIES).filter(prop => (
-  prop !== 'all' &&
-  prop !== 'direction' &&
-  prop !== 'unicode-bidi' &&
-  !prop.startsWith('--') &&
-  !(prop in SHORTHANDS_DATA) &&
-  !(prop in LOGICAL_MAPPING)
-));
+const logicalLonghands: string[] = [];
+const physicalLonghands: string[] = [];
+for (const prop of SUPPORTED_PROPERTIES) {
+  if (
+    prop !== 'all' &&
+    prop !== 'direction' &&
+    prop !== 'unicode-bidi' &&
+    !prop.startsWith('--') &&
+    !(prop in SHORTHANDS_DATA)
+  ) {
+    if (prop in LOGICAL_MAPPING) {
+      logicalLonghands.push(prop);
+    } else {
+      physicalLonghands.push(prop);
+    }
+  }
+}
 
 export const ALL_SHORTHAND_LONGHANDS: readonly string[] = Object.freeze([
   ...logicalLonghands,
@@ -1614,8 +1615,25 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
   },
 };
 
+export function getShorthandAllLonghands(shorthand: ShorthandDefinition): readonly string[] {
+  if (shorthand.allLonghands) return shorthand.allLonghands;
+  if (!shorthand.logicalLonghands && !shorthand.physicalLonghands) return shorthand.longhands;
+  const combined = Object.freeze([
+    ...shorthand.longhands,
+    ...(shorthand.logicalLonghands || []),
+    ...(shorthand.physicalLonghands || [])
+  ]);
+  shorthand.allLonghands = combined;
+  return combined;
+}
+
 export const LONGHAND_TO_SHORTHAND: Record<string, string[]> = {};
 for (const [shorthand, def] of Object.entries(SHORTHANDS)) {
+  def.allLonghands = Object.freeze([
+    ...def.longhands,
+    ...(def.logicalLonghands || []),
+    ...(def.physicalLonghands || [])
+  ]);
   if (shorthand === 'all') continue;
   for (const longhand of def.longhands) {
     if (!LONGHAND_TO_SHORTHAND[longhand]) LONGHAND_TO_SHORTHAND[longhand] = [];

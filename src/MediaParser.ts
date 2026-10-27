@@ -17,7 +17,7 @@
 import { tokenize } from './tokenizer.ts';
 import { Parser } from './parser.ts';
 import { serialize, getMirrorToken, serializeIdentifier } from './serializer.ts';
-import type { ComponentValue, Token, CSSFunction, GeneralEnclosed, MediaFeature, MediaCondition, MediaQuery, MediaEnvironment } from './types.ts';
+import type { ComponentValue, Token, SimpleBlock, CSSFunction, GeneralEnclosed, MediaFeature, MediaCondition, MediaQuery, MediaEnvironment } from './types.ts';
 import { unitToBase } from './data/gen/units.ts';
 import { parseMathFunction, simplify } from './math-parser.ts';
 import { CSSUnitValue } from './typed-om.ts';
@@ -95,15 +95,6 @@ export class MediaParser {
       };
     }
 
-    const preValidator = new MediaQueryValidator(values);
-    if (!preValidator.validate()) {
-      return {
-        type: 'media-query',
-        invalid: true,
-        tokens: values
-      };
-    }
-
     const canonical = this.canonicalSerialize(values);
     const tokens = tokenize(canonical);
     const parser = new Parser(tokens);
@@ -129,9 +120,10 @@ export class MediaParser {
     const filtered = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
 
     let startIndex = 0;
-    if (filtered.length >= 2 && 
+    if (filtered.length >= 3 && 
         filtered[0].type === 'ident' && filtered[0].value.toLowerCase() === 'all' &&
-        filtered[1].type === 'ident' && filtered[1].value.toLowerCase() === 'and') {
+        filtered[1].type === 'ident' && filtered[1].value.toLowerCase() === 'and' &&
+        filtered[2]?.type === 'simple-block' && (filtered[2] as SimpleBlock).associatedToken?.value === '(') {
       startIndex = 2;
     }
 
@@ -492,19 +484,9 @@ export class MediaQueryValidator {
       const rightIsIdent = right.length === 1 && right[0].type === 'ident';
       if (!leftIsIdent && !rightIsIdent) return null;
 
-      let featureOnLeft = leftIsIdent;
-      if (leftIsIdent && rightIsIdent) {
-        const leftName = String((left[0] as Token).value).toLowerCase();
-        const rightName = String((right[0] as Token).value).toLowerCase();
-        const rangeFeatures = RANGE_FEATURES as Set<string>;
-        if (rangeFeatures.has(leftName) && !rangeFeatures.has(rightName)) {
-          featureOnLeft = true;
-        } else if (rangeFeatures.has(rightName) && !rangeFeatures.has(leftName)) {
-          featureOnLeft = false;
-        }
-      } else if (!leftIsIdent) {
-        featureOnLeft = false;
-      }
+      const leftName = leftIsIdent ? String((left[0] as Token).value).toLowerCase() : '';
+      const rightName = rightIsIdent ? String((right[0] as Token).value).toLowerCase() : '';
+      const featureOnLeft = leftIsIdent && ((RANGE_FEATURES as Set<string>).has(leftName) || !(RANGE_FEATURES as Set<string>).has(rightName));
 
       const featureName = String((featureOnLeft ? left[0] : right[0] as Token).value).toLowerCase();
       const valueTokens = normalizeAspectRatioTokens(featureName, featureOnLeft ? right : left);

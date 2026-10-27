@@ -19,7 +19,7 @@ import { serialize, serializeDeclarations, serializeFontFamily } from './seriali
 import { tokenize } from './tokenizer.ts';
 import type { Declaration, ComponentValue } from './types.ts';
 import type { CSSRule } from './rules/base.ts';
-import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from './shorthands.ts';
+import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
@@ -267,11 +267,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       let important: boolean | null = null;
       let consistentImportant = true;
 
-      const allLonghandsToCheck = [
-        ...shorthand.longhands,
-        ...(shorthand.logicalLonghands || []),
-        ...(shorthand.physicalLonghands || [])
-      ];
+      const allLonghandsToCheck = getShorthandAllLonghands(shorthand);
       
       for (const lh of allLonghandsToCheck) {
         const item = this._getLonghandForContraction(lh);
@@ -356,11 +352,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       const directDecl = this._getWinningDeclaration(property);
       if (directDecl) {
         const directIdx = this._declarations.indexOf(directDecl);
-        const allLonghands = [
-          ...shorthand.longhands,
-          ...(shorthand.logicalLonghands || []),
-          ...(shorthand.physicalLonghands || [])
-        ];
+        const allLonghands = getShorthandAllLonghands(shorthand);
         const hasOverridingLonghand = this._declarations.some((d, idx) => {
           if (!allLonghands.includes(d.name)) return false;
           if (d.important && !directDecl.important) return true;
