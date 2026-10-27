@@ -103,7 +103,7 @@ export class StreamingTokenizer extends AbstractTokenizer {
   }
 
   /**
-   * Preprocess a chunk of input per CSS Syntax 3 § 3.3 #input-preprocessing.
+   * Preprocess a chunk of input per css-syntax-3 #input-preprocessing.
    */
   private preprocessChunk(chunk: string, isLast: boolean): string {
     let text = this.remnant + chunk;
@@ -127,7 +127,7 @@ export class StreamingTokenizer extends AbstractTokenizer {
       .replace(/\f/g, '\n')
       // oxlint-disable-next-line no-control-regex
       .replace(/\u0000/g, '\uFFFD')
-      // Replace lone surrogates per CSS Syntax 3 § 3.3 #input-preprocessing
+      // Replace lone surrogates per css-syntax-3 #input-preprocessing
       .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
   }
 

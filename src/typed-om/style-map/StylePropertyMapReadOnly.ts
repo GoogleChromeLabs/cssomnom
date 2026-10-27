@@ -35,7 +35,7 @@ export interface StyleReadOnlyLike {
   [property: string]: unknown;
 }
 
-// Spec: CSS Typed OM Level 1 § 2.1 #the-stylepropertymapreadonly-interface
+// css-typed-om #computed-stylepropertymapreadonly-objects
 export class StylePropertyMapReadOnly {
   protected _style: StyleReadOnlyLike;
   protected _element?: ElementLike;
@@ -63,7 +63,7 @@ export class StylePropertyMapReadOnly {
     return this._style._declarations || this._style.declarations || [];
   }
 
-  // css-typed-om § 3.2 #the-stylepropertymap
+  // css-typed-om #the-stylepropertymap
   private _getKeys(): string[] {
     const rawKeys = new Set<string>();
     const declarations = this._getDeclarations();

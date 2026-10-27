@@ -32,8 +32,8 @@ interface LayerState {
 
 /**
  * Hierarchical tree of cascade layers to support implicit sublayer ordering.
- * css-cascade-5 § 6.4.2 #layer-names
- * css-cascade-5 § 6.4.3 #layer-ordering
+ * css-cascade-5 #layer-names
+ * css-cascade-5 #layer-ordering
  */
 class LayerTree {
   public name: string;
@@ -57,8 +57,8 @@ class LayerTree {
 
   /**
    * Registers a layer path e.g. "A.B.C" into the tree.
-   * css-cascade-5 § 6.4.2 #layer-names
-   * css-cascade-5 § 6.4.3 #layer-ordering
+   * css-cascade-5 #layer-names
+   * css-cascade-5 #layer-ordering
    */
   public registerPath(path: string): LayerTree {
     const parts = path.split('.');
@@ -70,7 +70,7 @@ class LayerTree {
 }
 
 /**
- * Assigns order numbers to layers according to CSS Cascade 5 § 6.4.3 #layer-ordering:
+ * Assigns order numbers to layers according to css-cascade-5 #layer-ordering:
  * "Cascade layers are sorted by the order in which they first are declared,
  * with nested layers grouped within their parent layer.
  * Unlayered rules are sorted later than any layered rules within the same parent layer (if any)."
@@ -98,9 +98,9 @@ function assignLayerOrders(
 
 /**
  * Discovers and registers @layer declarations in layer order.
- * css-cascade-5 § 6.4.1 #layer-declaration
- * css-cascade-5 § 6.4.2 #layer-names
- * css-cascade-5 § 6.4.3 #layer-ordering
+ * css-cascade-5 #layer-declaration
+ * css-cascade-5 #layer-names
+ * css-cascade-5 #layer-ordering
  */
 function scanLayers(
   list: Rule[],
@@ -112,22 +112,22 @@ function scanLayers(
 ): void {
   for (const r of list) {
     if (!isInsideStyleRule && r instanceof CSSLayerStatementRule) {
-      // css-cascade-5 § 6.4.1 #layer-declaration, § 6.4.4.2 #layer-empty (Layer Statement Rules)
-      // css-cascade-5 § 6.4.2 #layer-names (nested layers concatenated with period)
+      // css-cascade-5 #layer-declaration, #layer-empty (Layer Statement Rules)
+      // css-cascade-5 #layer-names (nested layers concatenated with period)
       const names = r.nameList || [];
       for (const n of names) {
         const fullName = prefix ? `${prefix}.${n}` : n;
         root.registerPath(fullName);
       }
     } else if (r instanceof CSSLayerBlockRule) {
-      // css-cascade-5 § 6.4.1 #layer-declaration, § 6.4.4.1 #layer-block (Layer Block Rules)
+      // css-cascade-5 #layer-declaration, #layer-block (Layer Block Rules)
       const rawName = r.name;
       let fullName: string;
       if (!rawName) {
-        // css-cascade-5 § 6.4.2.1 #unnamed-layers (Anonymous Layers: unique anonymous segment)
+        // css-cascade-5 #unnamed-layers (Anonymous Layers: unique anonymous segment)
         fullName = prefix ? `${prefix}.__anon_${state.nextLayerIndex++}` : `__anon_${state.nextLayerIndex++}`;
       } else {
-        // css-cascade-5 § 6.4.2 #layer-names (nested layers grouped within parent layer per § 6.4.3)
+        // css-cascade-5 #layer-names : nested layers grouped within parent layer per #layer-ordering
         fullName = prefix ? `${prefix}.${rawName}` : rawName;
       }
       root.registerPath(fullName);
@@ -137,10 +137,10 @@ function scanLayers(
         scanLayers(Array.from(childRules), root, state, fullName, env, isInsideStyleRule);
       }
     } else if (r instanceof CSSImportRule) {
-      // css-cascade-5 § 6.4.1 #layer-declaration, § 6.4.3 #layer-ordering
+      // css-cascade-5 #layer-declaration, #layer-ordering
       const mediaText = r.media?.mediaText;
       if (mediaText && !MediaParser.evaluate(mediaText, env)) {
-        // css-cascade-5 § 6.4.3: Condition is false; does not contribute to layer ordering
+        // css-cascade-5 #layer-ordering: condition is false; does not contribute to layer ordering
         continue;
       }
 
@@ -165,7 +165,7 @@ function scanLayers(
         }
       }
     } else if (r instanceof CSSMediaRule) {
-      // css-cascade-5 § 6.4.3 #layer-ordering: Layers defined inside conditional group rule
+      // css-cascade-5 #layer-ordering: Layers defined inside conditional group rule
       // do not contribute to layer order unless condition is true
       const mediaText = r.media.mediaText;
       if (mediaText && !MediaParser.evaluate(mediaText, env)) {
@@ -187,7 +187,7 @@ function scanLayers(
 
 /**
  * Builds the layer declaration order map from a rule list.
- * css-cascade-5 § 6.4.3 #layer-ordering
+ * css-cascade-5 #layer-ordering
  */
 export function getLayerDeclarationOrder(
   ruleList: Rule[],
@@ -203,7 +203,7 @@ export function getLayerDeclarationOrder(
 
 /**
  * Resolves media environment parameters from a DOM element or window.
- * mediaqueries-4 § 3 #media-queries
+ * mediaqueries-4 #media
  */
 export function resolveMediaEnvironment(element?: ElementLike | null): Partial<MediaEnvironment> | undefined {
   if (!element || typeof element !== 'object') return undefined;

@@ -57,7 +57,7 @@ import type { MatchedDeclaration, Specificity } from './types.ts';
 
 /**
  * Harvests all applicable stylesheets and rule lists for an element across document and shadow contexts.
- * css-cascade-5 § 2 #filtering
+ * css-cascade-5 #filtering
  */
 export function collectStyleSheetsAndRules(
   element: ElementLike | DocumentLike | null | undefined,
@@ -143,8 +143,8 @@ export function collectStyleSheetsAndRules(
     }
   };
 
-  // HTML § 4.8.4 #dom-link-disabled
-  // cssom-1 § 4.6 #the-linkstyle-interface
+  // HTML #dom-link-disabled
+  // cssom-1 #the-linkstyle-interface
   const isSheetEnabledForSet = (sheet: unknown): boolean => {
     if (!sheet || typeof sheet !== 'object') return false;
     const title = getSheetTitle(sheet);
@@ -467,7 +467,7 @@ function getDeclarationStringValue(d: Declaration): string {
 
 /**
  * Traverses rule list, evaluates conditional at-rules and selectors, and collects matched declarations.
- * css-cascade-5 § 2 #filtering
+ * css-cascade-5 #filtering
  */
 export function collectMatchedDeclarations(
   element: ElementLike,
@@ -537,7 +537,7 @@ export function collectMatchedDeclarations(
               }
             }
           } else {
-            // css-shadow-parts § 4 #part, css-scoping-1 § 3.2 #slotted-pseudo
+            // css-shadow-1 #part, css-shadow-1 #slotted-pseudo
             const partMatch = sel.match(/^(.*?)::part\(\s*([a-zA-Z0-9_-]+)\s*\)$/);
             const slottedMatch = sel.match(/^(.*?)::slotted\(\s*([^)]+)\s*\)$/);
             if (partMatch) {
@@ -686,15 +686,15 @@ export function collectMatchedDeclarations(
           walkRules(rule.cssRules, parentSelector, layerName, scopeNode, scopeProximity);
         }
       } else if (rule instanceof CSSMediaRule) {
-        // css-cascade-5 § 2 #filtering
-        // mediaqueries-4 § 3.2 #evaluating-mq-list
+        // css-cascade-5 #filtering
+        // mediaqueries-4 #mq-list
         const mediaText = rule.media.mediaText;
         const env = resolveMediaEnvironment(element);
         if (MediaParser.evaluate(mediaText, env) && rule.cssRules) {
           walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode, scopeProximity);
         }
       } else if (rule instanceof CSSImportRule) {
-        // css-cascade-6 § 5 #at-import
+        // css-cascade-6 #at-import
         const mediaText = rule.media?.mediaText;
         const env = resolveMediaEnvironment(element);
         if (mediaText && !MediaParser.evaluate(mediaText, env)) {
@@ -722,7 +722,7 @@ export function collectMatchedDeclarations(
           }
         }
       } else if (rule instanceof CSSScopeRule) {
-        // css-cascade-6 § 3 #scoped-styles
+        // css-cascade-6 #scoped-styles
         const childRules = (rule as CSSGroupingRule).cssRules || [];
         const candidateScopeRoots: DOMElement[] = [];
 
@@ -868,7 +868,7 @@ export function collectMatchedDeclarations(
         }
 
         if (isMatchingDecl) {
-          // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface:
+          // css-nesting-1 #the-cssnestrule:
           // Nested @scope rules behave like :where(:scope) with specificity (0, 0, 0)
           const spec = (scopeNode ? [0, 0, 0] : getMatchingSpecificity(element, selectorToMatch)) as Specificity;
           const style = rule.style;
@@ -897,7 +897,7 @@ export function collectMatchedDeclarations(
 
 /**
  * Extracts SVG presentation attributes with UA-level precedence.
- * svg-2 § 6.2 #presentation-attributes, css-cascade-5 § 3 #cascade-origins
+ * svg-2 #presentation-attributes, css-cascade-5 #cascading-origins
  */
 export function collectSvgPresentationAttributes(
   element: ElementLike,
@@ -926,7 +926,7 @@ export function collectSvgPresentationAttributes(
 
 /**
  * Extracts inline style attribute declarations.
- * css-cascade-5 § 6.2 #cascade-sort
+ * css-cascade-5 #cascade-sort
  */
 export function collectInlineDeclarations(
   element: ElementLike,
@@ -964,7 +964,7 @@ export function collectInlineDeclarations(
 
 /**
  * Resolves nesting '&' selectors within child rules.
- * css-nesting-1 § 4 #nesting-selector
+ * css-nesting-1 #nesting-selector
  */
 export function resolveNestedSelector(selector: string, parentSelector: string): string {
   if (!parentSelector && !selector.includes('&')) return selector;
@@ -1098,7 +1098,7 @@ export function resolveNestedSelector(selector: string, parentSelector: string):
 
 /**
  * Calculates specificity for matching selector.
- * selectors-4 § 4 #specificity-rules
+ * selectors-4 #specificity-rules
  */
 export function getMatchingSpecificity(element: ElementLike, selectorText: string, scope?: DOMElement): Specificity {
   const tokens = tokenize(selectorText);

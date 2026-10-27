@@ -40,7 +40,7 @@ export interface StyleLike extends StyleReadOnlyLike {
   removeProperty(property: string): string;
 }
 
-// Spec: CSS Typed OM Level 1 § 2.2 #the-stylepropertymap-interface
+// css-typed-om #the-stylepropertymap
 export class StylePropertyMap extends StylePropertyMapReadOnly {
   declare protected _style: StyleLike;
 
@@ -146,7 +146,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
     }
   }
 
-  // css-typed-om § 3.2 #dom-stylepropertymap-append
+  // css-typed-om #dom-stylepropertymap-append
   append(property: string, ...values: (CSSStyleValue | string)[]): void {
     validateProperty(property);
     this._checkPendingSubstitution(property);
@@ -166,7 +166,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
       throw new TypeError(`Property ${property} is not list-valued and cannot be appended to.`);
     }
 
-    // Check if existing property contains a var() reference or CSS-wide keyword per css-typed-om § 3.2 step 7
+    // Check if existing property contains a var() reference or CSS-wide keyword per css-typed-om #dom-stylepropertymap-append: step 7
     const current = getPropertyValueSafe(this._style, property);
     if (current && ['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(current.trim().toLowerCase())) {
       throw new TypeError(`Cannot append to CSS-wide keyword '${current}'.`);

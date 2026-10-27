@@ -36,7 +36,7 @@ function validateCompatibleSumTypes(numericArgs: CSSNumericValue[], context: str
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 4.4 #cssmathnegate
+// css-typed-om #cssmathnegate
 export class CSSMathNegate extends CSSMathValue {
   readonly value: CSSNumericValue;
   constructor(child: number | CSSNumericValue) {
@@ -58,7 +58,7 @@ export class CSSMathNegate extends CSSMathValue {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 4.4 #cssmathinvert
+// css-typed-om #cssmathinvert
 export class CSSMathInvert extends CSSMathValue {
   readonly value: CSSNumericValue;
   constructor(child: number | CSSNumericValue) {
@@ -91,7 +91,7 @@ export class CSSMathInvert extends CSSMathValue {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 4.4 #cssmathsum
+// css-typed-om #cssmathsum
 export class CSSMathSum extends CSSMathValue {
   readonly values: CSSNumericArray;
   constructor(...args: (number | CSSNumericValue)[]) {
@@ -130,7 +130,7 @@ export class CSSMathSum extends CSSMathValue {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 4.4 #cssmathproduct
+// css-typed-om #cssmathproduct
 export class CSSMathProduct extends CSSMathValue {
   readonly values: CSSNumericArray;
   constructor(...args: (number | CSSNumericValue)[]) {
@@ -153,7 +153,7 @@ export class CSSMathProduct extends CSSMathValue {
     for (let i = 1; i < sortedChildren.length; i++) {
       const child = sortedChildren[i];
       if (child instanceof CSSMathInvert) {
-        // CSS Values 4 #serialize-a-calculation-tree
+        // css-values-4 #serialize-a-calculation-tree
         s += ` / ${stripOuterParens(child.value.serialize())}`;
         continue;
       }
@@ -171,7 +171,7 @@ export class CSSMathProduct extends CSSMathValue {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 4.4 #cssmathmin
+// css-typed-om #cssmathmin
 export class CSSMathMin extends CSSMathValue {
   readonly values: CSSNumericArray;
   constructor(...args: (number | CSSNumericValue)[]) {
@@ -198,7 +198,7 @@ export class CSSMathMin extends CSSMathValue {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 4.4 #cssmathmax
+// css-typed-om #cssmathmax
 export class CSSMathMax extends CSSMathValue {
   readonly values: CSSNumericArray;
   constructor(...args: (number | CSSNumericValue)[]) {
@@ -225,7 +225,7 @@ export class CSSMathMax extends CSSMathValue {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 4.4 #cssmathclamp
+// css-typed-om #cssmathclamp
 export class CSSMathClamp extends CSSMathValue {
   readonly lower: CSSNumericValue | CSSKeywordValue;
   readonly value: CSSNumericValue;
@@ -277,7 +277,7 @@ export class CSSMathClamp extends CSSMathValue {
   }
 }
 
-// Spec: CSS Values 4 § 10.6 #round-func
+// css-values-4 #round-func
 export class CSSMathRound extends CSSMathValue {
   readonly strategy: string;
   readonly value: CSSNumericValue;
@@ -311,7 +311,7 @@ export class CSSMathRound extends CSSMathValue {
 
   get operator(): string { return 'round'; }
 
-  // CSS Values 4: The round() function is serialized as:
+  // css-values-4: The round() function is serialized as:
   // - If the rounding strategy is nearest, it is omitted.
   // - If the step value is 1 and was omitted in the source, it is omitted in the serialization.
   serialize(): string {
@@ -343,7 +343,7 @@ export class CSSMathRound extends CSSMathValue {
   }
 }
 
-// Spec: CSS Values 4 § 10 #math-func
+// css-values-4 #math
 export class CSSMathFunction extends CSSMathValue {
   readonly values: CSSNumericArray;
   readonly name: string;

@@ -30,7 +30,7 @@ import {
   parseMatrix
 } from './transform-parser.ts';
 
-// Spec: CSS Typed OM Level 1 § 5 #transformvalue-objects
+// css-typed-om #transformvalue-objects
 export class CSSTransformValue extends CSSStyleValue {
   [index: number]: CSSTransformComponent;
   public components: CSSTransformComponent[];
@@ -48,7 +48,7 @@ export class CSSTransformValue extends CSSStyleValue {
         }
         return Reflect.get(target, prop, receiver);
       },
-      // css-typed-om § 7 #transformvalue-objects
+      // css-typed-om #transformvalue-objects
       set(target, prop, value, receiver) {
         if (typeof prop === 'string' && /^\d+$/.test(prop)) {
           const index = parseInt(prop, 10);

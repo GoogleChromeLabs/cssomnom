@@ -59,9 +59,9 @@ function cloneComponentValues(values: ComponentValue[]): ComponentValue[] {
 
 /**
  * Recursively resolves var() and env() references with fallback substitution and circular reference detection.
- * css-variables-1 § 4 #resolving-var-functions
- * css-variables-1 § 4.4 #cycles
- * css-env-1 § 3.1 #syntax-of-env
+ * css-variables-1 #using-variables
+ * css-variables-1 #using-variables
+ * css-env-1 #funcdef-env
  */
 function hasSubstitutionValue(tokens: ComponentValue[]): boolean {
   for (const t of tokens) {
@@ -124,7 +124,7 @@ export function substituteVariables(
         const funcNameLower = funcNode.name.toLowerCase();
 
         if (funcNameLower === 'env') {
-          // css-env-1 § 3.1 Syntax of env()
+          // css-env-1 #funcdef-env: syntax of env()
           const args = funcNode.value;
           const commaIndex = args.findIndex(t => typeof t === 'object' && t !== null && 'type' in t && t.type === 'comma');
           const nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
@@ -166,7 +166,7 @@ export function substituteVariables(
         }
 
         if (funcNameLower === 'attr') {
-          // css-values-5 § 3.1 #attr-notation, § 3.3 #attr-security
+          // css-values-5 #attr-notation, #attr-security
           hasAttrTaint = true;
           const nonWs = funcNode.value.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
           const attrNameToken = nonWs[0];
@@ -194,7 +194,7 @@ export function substituteVariables(
         }
 
         if (funcNameLower === 'ident') {
-          // css-values-5 § 14.1 #ident: ident() remains unresolved on custom properties, only resolved inside var()
+          // css-values-5 #ident: ident() remains unresolved on custom properties, only resolved inside var()
           if (!inVarContext) {
             pushTokens([node]);
             continue;
@@ -206,7 +206,7 @@ export function substituteVariables(
               str += String((arg as Token).value ?? '');
             } else if (arg.type === 'function' && ['calc', 'sign', 'abs', 'mod', 'rem'].includes((arg as CSSFunction).name.toLowerCase())) {
               try {
-                // css-values-5 § 14.1 #ident: resolve font-relative units (1em = 16px) inside math functions in computed context
+                // css-values-5 #ident: resolve font-relative units (1em = 16px) inside math functions in computed context
                 const resolveUnits = (toks: ComponentValue[]): ComponentValue[] => {
                   return toks.map(t => {
                     if (typeof t === 'object' && t !== null && 'type' in t) {
@@ -241,7 +241,7 @@ export function substituteVariables(
         }
 
         if (funcNameLower === 'if') {
-          // css-values-5 § 2.2 #if-notation
+          // css-values-5 #if-notation
           const text = serialize(funcNode.value);
           const branches = text.split(';');
           let matchedValue: string | null = null;
@@ -284,7 +284,7 @@ export function substituteVariables(
         }
 
         if (funcNameLower === 'random-item') {
-          // css-values-5 § 17.2 #random-item
+          // css-values-5 #random-item
           const args = serialize(funcNode.value).split(',');
           if (args.length >= 2) {
             const item = args[args.length - 1].trim();
@@ -300,7 +300,7 @@ export function substituteVariables(
           let nameTokens = commaIndex !== -1 ? args.slice(0, commaIndex) : args;
           const fallbackTokens = commaIndex !== -1 ? args.slice(commaIndex + 1) : null;
 
-          // Strip outer { ... } block per css-values-5 § 3.2 #component-function-commas
+          // Strip outer { ... } block per css-values-5 #component-function-commas
           const nonWsNameTokens = nameTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
           if (nonWsNameTokens.length === 1 && nonWsNameTokens[0].type === 'simple-block' && (nonWsNameTokens[0] as SimpleBlock).associatedToken?.type === '{') {
             nameTokens = (nonWsNameTokens[0] as SimpleBlock).value;
@@ -308,7 +308,7 @@ export function substituteVariables(
 
           const hasSubstInName = hasSubstitutionValue(nameTokens);
 
-          // Evaluate nested substitution functions in name argument: css-variables-2 § 3 #replace-a-var-function
+          // Evaluate nested substitution functions in name argument: css-variables-1 #using-variables
           let varName: string | undefined;
           let nameWasTainted = false;
           const prevTaint = hasAttrTaint;
@@ -449,7 +449,7 @@ export function substituteVariables(
 
             pushTokens(substitutedTokens);
           } else {
-            // css-properties-values-api-1 § 5
+            // css-properties-values-api #register-a-custom-property
             const jsDef = PropertyRegistry.get(varName);
             const def = (jsDef && jsDef.origin === 'js') ? jsDef : (activeProperties?.get(varName) ?? jsDef);
             if (def?.initialValue !== undefined) {
@@ -492,8 +492,8 @@ export function substituteVariables(
 
 /**
  * Resolves all CSS custom properties and environment variables on a style declaration for a property.
- * css-variables-1 § 4 #resolving-var-functions
- * css-env-1 § 3.1 #syntax-of-env
+ * css-variables-1 #using-variables
+ * css-env-1 #funcdef-env
  */
 export function resolveVariables(
   style: CSSStyleDeclaration,
@@ -557,9 +557,9 @@ export function resolveVariables(
 
 /**
  * Resolves custom properties with dependency cycle detection and cascade rollback.
- * css-variables-1 § 3.1 #guaranteed-invalid
- * css-variables-1 § 4.4 #cycles
- * css-cascade-5 § 6.2 #default, § 6.3 #revert-layer, § 6.3.3 #revert-rule-keyword
+ * css-variables-1 #guaranteed-invalid
+ * css-variables-1 #using-variables
+ * css-cascade-5 #default, #revert-layer, #revert-rule-keyword
  */
 export function resolveCustomProperties(
   declarationsByProperty: Map<string, MatchedDeclaration[]>,
@@ -573,7 +573,7 @@ export function resolveCustomProperties(
   const taintedProps = new Set<string>();
 
   const getPropertyDefinition = (propName: string): PropertyDefinition | undefined => {
-    // css-properties-values-api-1 § 5: JS registrations cannot be overridden by CSS @property rules
+    // css-properties-values-api #register-a-custom-property: JS registrations cannot be overridden by CSS @property rules
     const jsDef = PropertyRegistry.get(propName);
     if (jsDef && jsDef.origin === 'js') {
       return jsDef;
@@ -624,15 +624,15 @@ export function resolveCustomProperties(
         }
 
         if (subVal === null || cyclicProps.has(name)) {
-          // css-variables-1 § 3.1 #guaranteed-invalid
-          // css-variables-1 § 4.4 #cycles
+          // css-variables-1 #guaranteed-invalid
+          // css-variables-1 #using-variables
           // When variable substitution fails, property is invalid at computed-value time.
           // Store guaranteed-invalid value ('') and do NOT continue down earlier rules in cascade.
           resolvedCustomProps.set(name, '');
           return null;
         }
 
-        // css-values-5 § 3.3 #attr-security: registered <url> cannot use tainted data
+        // css-values-5 #attr-security: registered <url> cannot use tainted data
         const reg = getPropertyDefinition(name);
         if (reg?.syntax === '<url>' && taintOut.tainted) {
           const initVal = reg.initialValue ?? '';
@@ -642,7 +642,7 @@ export function resolveCustomProperties(
 
         const trimmed = subVal.trim();
         if (trimmed === 'revert-rule') {
-          // css-cascade-5 § 6.3.3 #revert-rule-keyword
+          // css-cascade-5 #revert-rule-keyword
           if (decl.important) {
             hasImportantRevertRule = true;
           }
@@ -653,7 +653,7 @@ export function resolveCustomProperties(
         }
         if (trimmed === 'revert-layer') {
           if (hasImportantRevertRule) {
-            // css-cascade-5 § 6.3.3 #revert-rule-keyword
+            // css-cascade-5 #revert-rule-keyword
             // W3C csswg-drafts #13916: Cycle between revert-rule !important and revert-layer resolves to unset
             const def = getPropertyDefinition(name);
             if (def && !def.inherits) {
@@ -684,7 +684,7 @@ export function resolveCustomProperties(
             return parentVal || null;
           }
         }
-        // css-properties-values-api-1 § 5 #determining-computed-value-of-registered-custom-property
+        // css-properties-values-api #register-a-custom-property #calculation-of-computed-values
         const def = getPropertyDefinition(name);
         if (trimmed === 'revert') {
           if (def && !def.inherits) {

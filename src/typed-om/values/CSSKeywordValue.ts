@@ -18,7 +18,7 @@
 import { CSSStyleValue } from './CSSStyleValue.ts';
 import { escape } from '../../css-escape.ts';
 
-// Spec: CSS Typed OM Level 1 § 3.1 #keywordvalue-objects
+// css-typed-om #keywordvalue-objects
 export class CSSKeywordValue extends CSSStyleValue {
   private _value: string = '';
 

@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-// WebIDL § 3.6 #es-attributes
-// WebIDL § 3.6.1 #es-attribute-getter
-// WebIDL § 3.6.2 #es-attribute-setter
-// WebIDL § 3.6.3 #interface-prototype-object
-// WebIDL § 3.6.4 #es-constants
-// WebIDL § 3.6.5 #constants-on-interface-prototype-object
-// WebIDL § 3.7 #es-operations
+// WebIDL #es-attributes
+// WebIDL #es-attribute-getter
+// WebIDL #es-attribute-setter
+// WebIDL #interface-prototype-object
+// WebIDL #es-constants
+// WebIDL #constants-on-interface-prototype-object
+// WebIDL #es-operations
 
 const appliedCtors = new WeakSet<Function>();
 
@@ -79,7 +79,7 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
     const desc = Object.getOwnPropertyDescriptor(proto, name);
     if (!desc) continue;
 
-    // WebIDL § 3.6 #es-attributes
+    // WebIDL #es-attributes
     if (desc.get || desc.set) {
       const origGet = desc.get;
       const origSet = desc.set;
@@ -87,7 +87,7 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
       let get = origGet;
       if (origGet && brandCheck) {
         get = function (this: unknown) {
-          // WebIDL § 3.6.1 #es-attribute-getter:
+          // WebIDL #es-attribute-getter:
           // If this value is not an ECMAScript object that implements the interface, throw TypeError.
           if (!this || this === proto || !(this instanceof ctor)) {
             throw new TypeError(
@@ -102,7 +102,7 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
       let set = origSet;
       if (origSet && brandCheck) {
         set = function (this: unknown, val: unknown) {
-          // WebIDL § 3.6.2 #es-attribute-setter:
+          // WebIDL #es-attribute-setter:
           // If this value is not an ECMAScript object that implements the interface, throw TypeError.
           if (!this || this === proto || !(this instanceof ctor)) {
             throw new TypeError(
@@ -123,7 +123,7 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
       continue;
     }
 
-    // WebIDL § 3.7 #es-operations
+    // WebIDL #es-operations
     if (typeof desc.value === 'function') {
       const origFn = desc.value;
       const minArgs = origFn.length;
@@ -141,7 +141,7 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
             }
             throw err;
           }
-          // WebIDL § 3.7 #es-operations step 2:
+          // WebIDL #es-operations step 2:
           // If fewer arguments than required are passed, throw or reject with TypeError.
           if (arityCheck && arguments.length < minArgs) {
             const err = new TypeError(
@@ -193,8 +193,8 @@ export function applyWebIDLPrototypeDescriptors(ctor: Function): void {
 
 /**
  * Defines constants on an interface object and its prototype per WebIDL:
- * - WebIDL § 3.6.4 #es-constants: { [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false }
- * - WebIDL § 3.6.5 #constants-on-interface-prototype-object: same attributes on prototype
+ * - WebIDL #es-constants: { [[Writable]]: false, [[Enumerable]]: true, [[Configurable]]: false }
+ * - WebIDL #constants-on-interface-prototype-object: same attributes on prototype
  */
 export function applyWebIDLConstants(ctor: Function, constants: Record<string, number>): void {
   for (const [name, val] of Object.entries(constants)) {

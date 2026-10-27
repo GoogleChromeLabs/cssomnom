@@ -21,7 +21,7 @@ import { parseAnPlusB } from './SelectorParser.ts';
 
 /**
  * Determines whether two consecutive tokens require an empty comment separator
- * between them to prevent coalescing per CSS Syntax Module Level 3 § 8.
+ * between them to prevent coalescing per css-syntax-3 #serialization.
  * @see https://drafts.csswg.org/css-syntax-3/#serialization
  */
 export function requiresTokenSeparator(t1: Token, t2: Token): boolean {
@@ -79,32 +79,32 @@ export function requiresTokenSeparator(t1: Token, t2: Token): boolean {
     isDimension2 ||
     isCDC2;
 
-  // Row: ident (css-syntax-3 § 8 #serialization)
+  // Row: ident (css-syntax-3 #serialization)
   if (isIdent1) {
     return inGroupA || isOpenParen2;
   }
 
-  // Rows: at-keyword, hash, dimension, #, - (css-syntax-3 § 8 #serialization)
+  // Rows: at-keyword, hash, dimension, #, - (css-syntax-3 #serialization)
   if (isAtKeyword1 || isHash1 || isDimension1 || isDelimHash1 || isDelimDash1) {
     return inGroupA;
   }
 
-  // Row: number (css-syntax-3 § 8 #serialization)
+  // Row: number (css-syntax-3 #serialization)
   if (isNumber1) {
     return isIdent2 || isFunction2 || isUrl2 || isBadUrl2 || isNumber2 || isPercentage2 || isDimension2 || isCDC2 || isDelimPercent2;
   }
 
-  // Row: @ (css-syntax-3 § 8 #serialization)
+  // Row: @ (css-syntax-3 #serialization)
   if (isDelimAt1) {
     return isIdent2 || isFunction2 || isUrl2 || isBadUrl2 || isDelimDash2 || isCDC2;
   }
 
-  // Rows: . and + (css-syntax-3 § 8 #serialization)
+  // Rows: . and + (css-syntax-3 #serialization)
   if (isDelimDot1 || isDelimPlus1) {
     return isNumber2 || isPercentage2 || isDimension2;
   }
 
-  // Row: / (css-syntax-3 § 8 #serialization)
+  // Row: / (css-syntax-3 #serialization)
   if (isDelimSlash1) {
     return isDelimStar2;
   }

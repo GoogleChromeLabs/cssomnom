@@ -22,7 +22,7 @@ import { serialize, getMirrorToken } from '../../serializer.ts';
 import { isCSSFunction, hasVarFunction } from '../utils/validation.ts';
 import type { CSSNumericType } from '../numeric/CSSNumericType.ts';
 
-// Spec: CSS Typed OM Level 1 § 3.4 #unparsedvalue-objects
+// css-typed-om #unparsedvalue-objects
 export class CSSUnparsedValue extends CSSStyleValue {
   [index: number]: string | CSSVariableReferenceValue;
   private _values: (string | CSSVariableReferenceValue)[];
@@ -38,7 +38,7 @@ export class CSSUnparsedValue extends CSSStyleValue {
         }
         return Reflect.get(target, prop, receiver);
       },
-      // css-typed-om § 3.4 #unparsedvalue-objects
+      // css-typed-om #unparsedvalue-objects
       set(target, prop, value, receiver) {
         if (typeof prop === 'string' && /^\d+$/.test(prop)) {
           const index = parseInt(prop, 10);

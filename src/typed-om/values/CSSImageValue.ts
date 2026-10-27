@@ -17,7 +17,7 @@
 
 import { CSSStyleValue } from './CSSStyleValue.ts';
 
-// Spec: CSS Typed OM Level 1 § 3.5 #imagevalue-objects
+// css-typed-om #imagevalue-objects
 export abstract class CSSImageValue extends CSSStyleValue {}
 
 export class CSSURLImageValue extends CSSImageValue {

@@ -33,13 +33,13 @@ import { createCSSStyleValue } from '../values/style-value-factory.ts';
 
 import { matchesAngle } from '../utils/type-guards.ts';
 
-// Spec: CSS Typed OM Level 1 § 8.1
+// css-typed-om #cssrgb
 export type CSSColorRGBComp = CSSNumericValue | CSSKeywordValue | number | string;
 export type CSSColorPercent = CSSNumericValue | CSSKeywordValue | number | string;
 export type CSSColorNumber = CSSNumericValue | CSSKeywordValue | number | string;
 export type CSSColorAngle = CSSNumericValue | CSSKeywordValue | number | string;
 
-// Spec: CSS Typed OM Level 2 § 2.1 #cssrgb
+// css-typed-om #cssrgb
 export class CSSRGB extends CSSColorValue {
   private _r!: CSSNumericValue | CSSKeywordValue;
   private _g!: CSSNumericValue | CSSKeywordValue;
@@ -75,7 +75,7 @@ export class CSSRGB extends CSSColorValue {
   set alpha(val: CSSColorPercent) { checkBrand(this, CSSRGB); this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
-    // CSS Color 4 #css-serialization-of-srgb:
+    // css-color-4 #css-serialization-of-srgb:
     // "For compatibility, the legacy form with comma separators is used; exactly one ASCII space follows each comma."
     // Alpha is omitted if unity, and serialized as a unitless <number> otherwise.
     // Note: HSL and HWB serialize using modern space-separated syntax, but sRGB is legacy for web compat.
@@ -90,7 +90,7 @@ export class CSSRGB extends CSSColorValue {
   }
 }
 
-// Spec: CSS Typed OM Level 2 § 2.2 #csshsl
+// css-typed-om #csshsl
 export class CSSHSL extends CSSColorValue {
   private _h!: CSSNumericValue | CSSKeywordValue;
   private _s!: CSSNumericValue | CSSKeywordValue;
@@ -133,7 +133,7 @@ export class CSSHSL extends CSSColorValue {
   }
 }
 
-// Spec: CSS Typed OM Level 2 § 2.3 #csshwb
+// css-typed-om #csshwb
 export class CSSHWB extends CSSColorValue {
   private _h!: CSSNumericValue;
   private _w!: CSSNumericValue | CSSKeywordValue;
@@ -185,7 +185,7 @@ export class CSSHWB extends CSSColorValue {
   }
 }
 
-// Spec: CSS Typed OM Level 2 § 2.4 #csslab
+// css-typed-om #csslab
 export class CSSLab extends CSSColorValue {
   private _l!: CSSNumericValue | CSSKeywordValue;
   private _a!: CSSNumericValue | CSSKeywordValue;
@@ -228,7 +228,7 @@ export class CSSLab extends CSSColorValue {
   }
 }
 
-// Spec: CSS Typed OM Level 2 § 2.5 #csslch
+// css-typed-om #csslch
 export class CSSLCH extends CSSColorValue {
   private _l!: CSSNumericValue | CSSKeywordValue;
   private _c!: CSSNumericValue | CSSKeywordValue;
@@ -271,7 +271,7 @@ export class CSSLCH extends CSSColorValue {
   }
 }
 
-// Spec: CSS Typed OM Level 2 § 2.6 #cssoklab
+// css-typed-om #cssoklab
 export class CSSOKLab extends CSSColorValue {
   private _l!: CSSNumericValue | CSSKeywordValue;
   private _a!: CSSNumericValue | CSSKeywordValue;
@@ -314,7 +314,7 @@ export class CSSOKLab extends CSSColorValue {
   }
 }
 
-// Spec: CSS Typed OM Level 2 § 2.7 #cssoklch
+// css-typed-om #cssoklch
 export class CSSOKLCH extends CSSColorValue {
   private _l!: CSSNumericValue | CSSKeywordValue;
   private _c!: CSSNumericValue | CSSKeywordValue;
@@ -357,7 +357,7 @@ export class CSSOKLCH extends CSSColorValue {
   }
 }
 
-// Spec: CSS Typed OM Level 2 § 2.8 #csscolor
+// css-typed-om #csscolor
 export class CSSColor extends CSSColorValue {
   private _colorSpace!: CSSKeywordValue;
   private _channels!: (CSSNumericValue | CSSKeywordValue)[];

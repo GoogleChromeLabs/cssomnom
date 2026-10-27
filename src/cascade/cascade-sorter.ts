@@ -19,16 +19,16 @@ import { compareSpecificity } from '../specificity.ts';
 import type { MatchedDeclaration } from './types.ts';
 
 /**
- * Compares two declarations according to CSS Cascade 5 § 6.1 #cascade-sort.
- * 1. Origin & Importance: css-cascade-5 § 6.1 #cascade-origin, § 6.1 #style-attr, § 6.1 #cascade-layering, § 6.3 #importance
+ * Compares two declarations according to css-cascade-5 #cascade-sort.
+ * 1. Origin & Importance: css-cascade-5 #cascade-origin, #style-attr, #cascade-layering, #importance
  *    (Important inline > Important layered > Important unlayered > Normal inline > Normal unlayered > Normal layered)
- * 2. Layer Order: css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering (Normal: ascending; Important: descending)
- * 3. Specificity: css-cascade-5 § 6.1 #cascade-specificity, selectors-4 § 15 #specificity-rules
- * 4. Order of Appearance: css-cascade-5 § 6.1 #cascade-order (ascending)
+ * 2. Layer Order: css-cascade-5 #cascade-layering, #layer-ordering (Normal: ascending; Important: descending)
+ * 3. Specificity: css-cascade-5 #cascade-specificity, selectors-4 #specificity-rules
+ * 4. Order of Appearance: css-cascade-5 #cascade-order (ascending)
  */
 export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDeclaration): number {
   const getPrecedence = (decl: MatchedDeclaration): number => {
-    // css-scoping-1 § 3.3, css-cascade-5 § 6.1 #cascade-origin, § 6.1 #cascade-sort
+    // css-cascade-5 #cascading-origins, #cascade-sort
     // Criterion 1: Origin & Importance (Important Author > Normal Author)
     // Criterion 2: Context (Shadow Encapsulation)
     //   - Normal: document / part (2) > shadow (1) > slotted (0)
@@ -44,7 +44,7 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
       scopeScore = decl.important ? 1 : 2;
     }
 
-    // css-cascade-5 § 6.1 #cascade-origin, § 6.2 #cascading-origins
+    // css-cascade-5 #cascade-origin, #cascading-origins
     // 1. Important user-agent declarations (beat important author)
     // 2. Important author declarations
     // 3. Animation declarations (beats normal author)
@@ -61,15 +61,15 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
     }
 
     if (decl.important) {
-      // css-cascade-5 § 6.1 #style-attr, § 6.3 #importance
+      // css-cascade-5 #style-attr, #importance
       const inlineBonus = decl.isInline ? 50 : 0;
-      // css-cascade-5 § 6.1 #cascade-layering, § 6.3 #importance (layered beats unlayered)
+      // css-cascade-5 #cascade-layering, #importance (layered beats unlayered)
       const layerTier = decl.layerOrder !== Infinity ? 20 : 10;
       return 1000 + scopeScore * 100 + inlineBonus + layerTier;
     } else {
-      // css-cascade-5 § 6.1 #style-attr
+      // css-cascade-5 #style-attr
       const inlineBonus = decl.isInline ? 50 : 0;
-      // css-cascade-5 § 6.1 #cascade-layering (unlayered beats layered)
+      // css-cascade-5 #cascade-layering (unlayered beats layered)
       const layerTier = decl.layerOrder === Infinity ? 20 : 10;
       return scopeScore * 100 + inlineBonus + layerTier;
     }
@@ -81,26 +81,26 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
     return precA - precB;
   }
 
-  // Layer order within importance bucket: css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering
+  // Layer order within importance bucket: css-cascade-5 #cascade-layering, #layer-ordering
   if (a.important && a.layerOrder !== Infinity && b.layerOrder !== Infinity) {
-    // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering: for important rules, earliest layer wins (lower index)
+    // css-cascade-5 #cascade-layering, #layer-ordering: for important rules, earliest layer wins (lower index)
     if (a.layerOrder !== b.layerOrder) {
       return b.layerOrder - a.layerOrder;
     }
   } else if (!a.important && a.layerOrder !== Infinity && b.layerOrder !== Infinity) {
-    // css-cascade-5 § 6.1 #cascade-layering, § 6.4.3 #layer-ordering: for normal rules, latest layer wins (higher index)
+    // css-cascade-5 #cascade-layering, #layer-ordering: for normal rules, latest layer wins (higher index)
     if (a.layerOrder !== b.layerOrder) {
       return a.layerOrder - b.layerOrder;
     }
   }
 
-  // Compare Specificity: css-cascade-5 § 6.1 #cascade-specificity, selectors-4 § 15 #specificity-rules
+  // Compare Specificity: css-cascade-5 #cascade-specificity, selectors-4 #specificity-rules
   const specDiff = compareSpecificity(a.specificity, b.specificity);
   if (specDiff !== 0) {
     return specDiff;
   }
 
-  // Compare Scope Proximity: css-cascade-6 § 3.3 #cascade-proximity
+  // Compare Scope Proximity: css-cascade-6 #cascade-proximity
   // The declaration with the fewest generational or sibling hops between scoping root and subject wins.
   const proxA = a.scopeProximity ?? Infinity;
   const proxB = b.scopeProximity ?? Infinity;
@@ -108,15 +108,15 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
     return proxB - proxA; // smaller proximity wins (higher precedence)
   }
 
-  // Order of Appearance: css-cascade-5 § 6.1 #cascade-order (last declaration in document order wins)
+  // Order of Appearance: css-cascade-5 #cascade-order (last declaration in document order wins)
   return a.sourceOrder - b.sourceOrder;
 }
 
 /**
  * Groups declarations by property name (case-sensitive for custom properties, lowercase for standard).
- * css-cascade-5 § 6 #cascading (grouping declared values for a given property)
- * css-variables-1 § 2 #defining-custom-properties (custom property names are case-sensitive)
- * css-values-4 § 3.1 #keywords (standard property names are ASCII case-insensitive)
+ * css-cascade-5 #cascading (grouping declared values for a given property)
+ * css-variables-1 #defining-variables (custom property names are case-sensitive)
+ * css-values-4 #keywords (standard property names are ASCII case-insensitive)
  */
 export function groupDeclarationsByProperty(matchedDeclarations: MatchedDeclaration[]): Map<string, MatchedDeclaration[]> {
   const declarationsByProperty = new Map<string, MatchedDeclaration[]>();

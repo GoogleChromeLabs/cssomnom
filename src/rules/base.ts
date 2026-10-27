@@ -59,19 +59,19 @@ export class CSSRule {
     return this._location;
   }
 
-  // cssom-1 § 6.4 #dom-cssrule-parentrule
+  // cssom-1 #dom-cssrule-parentrule
   get parentRule(): CSSRule | null {
     return this._parentRule;
   }
 
-  // cssom-1 § 6.4 #dom-cssrule-parentstylesheet
+  // cssom-1 #dom-cssrule-parentstylesheet
   get parentStyleSheet(): CSSStyleSheet | null {
     if (this._parentStyleSheet) return this._parentStyleSheet;
     if (this._parentRule) return this._parentRule.parentStyleSheet;
     return null;
   }
 
-  // WebIDL § 3.6.4 #es-constants & WebIDL § 3.6.5 #constants-on-interface-prototype-object
+  // WebIDL #es-constants & WebIDL #constants-on-interface-prototype-object
   declare static readonly STYLE_RULE: 1;
   declare static readonly CHARSET_RULE: 2;
   declare static readonly IMPORT_RULE: 3;
@@ -100,7 +100,7 @@ export class CSSRule {
   declare readonly SUPPORTS_RULE: 12;
   declare readonly FONT_FEATURE_VALUES_RULE: 14;
 
-  // cssom-1 § 6.4 #dom-cssrule-type: returns 0 if no legacy constant matches
+  // cssom-1 #dom-cssrule-type: returns 0 if no legacy constant matches
   get type(): number {
     return 0;
   }
@@ -123,7 +123,7 @@ export class CSSGroupingRule extends CSSRule {
   protected _rules: CSSRule[];
   private _parseRuleInBlock: (text: string, nested?: boolean) => Rule;
 
-  // cssom-1 § 6.4.3 #dom-cssgroupingrule-cssrules
+  // cssom-1 #dom-cssgroupingrule-cssrules
   get cssRules(): CSSRuleList {
     if (!this._cssRules) {
       this._cssRules = new CSSRuleList(() => this._rules);
@@ -143,12 +143,12 @@ export class CSSGroupingRule extends CSSRule {
     }
   }
 
-  // cssom-1 § 6.4.3 #the-cssgroupingrule-interface
-  // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
+  // cssom-1 #the-cssgroupingrule-interface
+  // css-nesting-1 #the-cssnestrule
   insertRule(rule: string, index: number = 0): number {
     // 1. Set length to the number of items in list.
     // 2. If index is greater than length (or index < 0), throw IndexSizeError.
-    // NOTE: This boundary check MUST precede parsing per CSSOM 1 § 6.5.3 step 2!
+    // cssom-1 #insert-a-css-rule: step 2 bounds check precedes parsing
     if (index < 0 || index > this._rules.length) {
       throw new DOMException('Index size error', 'IndexSizeError');
     }
@@ -167,7 +167,7 @@ export class CSSGroupingRule extends CSSRule {
       if (isImportRule(topRule) || isNamespaceRule(topRule)) {
         throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
       }
-      // css-nesting-1 § 2: only style rules and conditional group rules may be nested
+      // css-nesting-1 #nesting: only style rules and conditional group rules may be nested
       if (isNested && !(topRule instanceof CSSGroupingRule)) {
         throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');
       }
@@ -215,7 +215,7 @@ export class CSSGroupingRule extends CSSRule {
     }
 
     // 8. Insert new rule into list at zero-indexed position index.
-    // cssom-1 § 6.4 #the-cssrule-interface: establish parentRule reference
+    // cssom-1 #the-cssrule-interface: establish parentRule reference
     if (parsedRule instanceof CSSRule) {
       parsedRule._parentRule = this;
       parsedRule._parentStyleSheet = null;
@@ -224,8 +224,8 @@ export class CSSGroupingRule extends CSSRule {
     return index;
   }
 
-  // cssom-1 § 6.16 #the-cssgroupingrule-interface
-  // cssom-1 § 6.5.4 #remove-a-css-rule
+  // cssom-1 #the-cssgroupingrule-interface
+  // cssom-1 #remove-a-css-rule
   deleteRule(index: number): void {
     deleteRuleFromArray(this._rules, index);
   }

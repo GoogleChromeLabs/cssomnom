@@ -38,7 +38,7 @@ export function createIndexedProxy<T extends object, V, R = V>(
   });
 }
 
-// cssom-1 § 6.5.4 #remove-a-css-rule
+// cssom-1 #remove-a-css-rule
 export function deleteRuleFromArray(rules: Rule[], index: number): Rule {
   // 1. Set length to the number of items in list.
   // 2. If index is greater than or equal to length (or index < 0), throw IndexSizeError.

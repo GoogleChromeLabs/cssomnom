@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-// Spec: CSS Typed OM Level 1 § 4.1 #numeric-typing
+// css-typed-om #numeric-typing
 export interface CSSNumericType {
   length?: number;
   angle?: number;

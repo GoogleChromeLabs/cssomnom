@@ -17,7 +17,7 @@
 
 import type { CSSNumericValue } from './CSSNumericValue.ts';
 
-// Spec: CSS Typed OM Level 1 § 4.3 #numeric-array
+// css-typed-om #cssnumericarray
 export class CSSNumericArray {
   [index: number]: CSSNumericValue;
   private _values: readonly CSSNumericValue[];

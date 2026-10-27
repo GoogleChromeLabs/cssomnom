@@ -46,8 +46,8 @@ function parseNumeric(v: ComponentValue): CSSNumericValue {
   return new CSSUnitValue(0, 'number');
 }
 
-// CSS Values 4 § 6.2 #lengths
-// CSS Transforms 2 § 2 #transform-functions
+// css-values-4 #lengths
+// css-transforms-2 #transform-functions
 function normalizeLength(v: CSSNumericValue): CSSNumericValue {
   if (v instanceof CSSUnitValue && v.unit === 'number' && v.value === 0) {
     return new CSSUnitValue(0, 'px');
@@ -55,8 +55,8 @@ function normalizeLength(v: CSSNumericValue): CSSNumericValue {
   return v;
 }
 
-// CSS Values 4 § 6.1 #angles
-// CSS Transforms 2 § 2 #transform-functions
+// css-values-4 #angles
+// css-transforms-2 #transform-functions
 function normalizeAngle(v: CSSNumericValue): CSSNumericValue {
   if (v instanceof CSSUnitValue && v.unit === 'number' && v.value === 0) {
     return new CSSUnitValue(0, 'deg');

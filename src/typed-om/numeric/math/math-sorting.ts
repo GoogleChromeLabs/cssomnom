@@ -19,7 +19,7 @@ import type { CSSNumericValue } from '../CSSNumericValue.ts';
 import { CSSUnitValue } from '../CSSUnitValue.ts';
 import { compareStrings } from '../../utils/validation.ts';
 
-// Spec: CSS Values 4 § 10.7 #serialize-a-calculation-tree
+// css-values-4 #serialize-a-calculation-tree
 // Sorts calculation tree terms: numbers first (ascending value), percents second (ascending value), dimensions third (alphabetical unit).
 export function sortNumericNodes(nodes: CSSNumericValue[]): CSSNumericValue[] {
   const allSimple = nodes.every(n => n instanceof CSSUnitValue);

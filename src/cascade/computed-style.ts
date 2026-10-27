@@ -42,9 +42,9 @@ import { parseMathFunction, simplify } from '../math-parser.ts';
 import { CSSUnitValue } from '../typed-om.ts';
 /**
  * CSSComputedStyleDeclaration represents the resolved/computed style declaration of a DOM element.
- * cssom-1 § 6.8 #resolved-values
- * cssom-1 § 6.4.3 #the-cssstyledeclaration-interface
- * css-cascade-5 § 7.2 #computed-values
+ * cssom-1 #resolved-values
+ * cssom-1 #the-cssstyledeclaration-interface
+ * css-cascade-5 #computed
  */
 export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
   private _parentStyle: CSSStyleDeclaration | null;
@@ -116,7 +116,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
     }
 
-    // cssom-1 § 6.2 & § 6.4.3: Synthesize computed shorthand getters
+    // cssom-1 #serialize-a-css-declaration-block: synthesize computed shorthand getters
     if (dashed === 'border-top') {
       const w = this.getPropertyValue('border-top-width') || '0px';
       const s = this.getPropertyValue('border-top-style') || 'none';
@@ -164,7 +164,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return `${color} ${image} ${repeat} ${attachment} ${position} / ${size} ${origin} ${clip}`;
     }
 
-    // cssom-1 § 6.8: Resolved values for relative positioning offsets
+    // cssom-1 #resolved-values: resolved values for relative positioning offsets
     if (dashed === 'left' || dashed === 'right' || dashed === 'top' || dashed === 'bottom') {
       const direct = super.getPropertyValue(dashed);
       if (direct === '0' || direct === '0px') return '0px';
@@ -178,7 +178,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return direct;
     }
 
-    // CSS Box Model 3 § 4.3 & CSSOM 1 § 6.7.2: Canonicalize unitless 0 to 0px
+    // css-box-3 #margin-physical & cssom-1 #resolved-values: canonicalize unitless 0 to 0px
     if (dashed.startsWith('margin-')) {
       const direct = super.getPropertyValue(dashed).trim();
       if (direct === '0') {
@@ -186,7 +186,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       }
     }
 
-    // css-pseudo-4 § 2: Restricted properties on ::first-letter and ::first-line
+    // css-pseudo-4 #first-letter-styling: restricted properties on ::first-letter and ::first-line
     // Position cannot be altered by ::first-letter or ::first-line and always computes to static
     if (dashed === 'position' && (this._pseudoElement === '::first-letter' || this._pseudoElement === '::first-line')) {
       return 'static';
@@ -194,12 +194,12 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
 
     let rawVal = super.getPropertyValue(dashed).trim();
 
-    // css-images-4 § 5.1 #image-set-notation: computed value resolves strings to url() and adds default 1dppx
+    // css-images-4 #image-set-notation: computed value resolves strings to url() and adds default 1dppx
     if (dashed === 'background-image' && rawVal.toLowerCase().includes('image-set(')) {
       rawVal = rawVal.replace(/image-set\(\s*(["'])([^"']+)\1\s*\)/g, 'image-set(url("$2") 1dppx)');
     }
 
-    // svg2 § 13.2 #presentation-attributes
+    // svg2 #presentation-attributes
     const isSvg = isSvgElement(this._element);
     if (isSvg) {
       if (dashed === 'baseline-shift') {
@@ -213,7 +213,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
     if (rawVal) {
       const lowerRaw = rawVal.trim().toLowerCase();
 
-      // css-values-4 § 10.10 #calc-computed-value
+      // css-values-4 #calc-computed-value
       if (dashed === 'width' || dashed === 'height' || lowerRaw.startsWith('calc(')) {
         try {
           const decl = this._getWinningDeclaration(dashed);
@@ -233,7 +233,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
       }
 
-      // css-masking-1 § 5.1 #clip-property, css21 § 11.1.2 #clipping-properties
+      // css-masking-1 #clip-property, css21 #clipping-properties
       if (dashed === 'clip' && lowerRaw.startsWith('rect(') && lowerRaw.endsWith(')')) {
         const inner = rawVal.trim().slice(5, -1).trim();
         const parts = inner.split(/[\s,]+/);
@@ -252,7 +252,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
           return `rect(${resolvedParts.join(', ')})`;
         }
       }
-      // css-cascade-5 § 7.3.2 #inherit
+      // css-cascade-5 #inherit
       if (lowerRaw === 'inherit') {
         if (this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
@@ -260,11 +260,11 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return getInitialValue(dashed, this._element);
       }
-      // css-cascade-5 § 7.3.1 #initial
+      // css-cascade-5 #initial
       if (lowerRaw === 'initial') {
         return getInitialValue(dashed, this._element);
       }
-      // css-cascade-5 § 7.3.3 #unset
+      // css-cascade-5 #unset
       if (lowerRaw === 'unset') {
         if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
@@ -272,7 +272,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return getInitialValue(dashed, this._element);
       }
-      // css-cascade-5 § 6.2 #default
+      // css-cascade-5 #default
       if (lowerRaw === 'revert' || lowerRaw === 'revert-layer' || lowerRaw === 'revert-rule') {
         if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
@@ -281,7 +281,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         return getInitialValue(dashed, this._element);
       }
       if (dashed === 'box-shadow' || dashed === 'text-shadow') {
-        // css-backgrounds-3 § 3.10 #box-shadow, css-text-decor-3 § 4 #text-shadow
+        // css-backgrounds-3 #box-shadow, css-text-decor-3 #text-shadow-property
         // Token-aware parsing preserves rgb(...) colors intact
         const decl = this._getWinningDeclaration(dashed);
         const p = decl ? decl.value : ParseHooks.parseComponentValues(tokenize(rawVal));
@@ -340,7 +340,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         return rawVal;
       }
       if (dashed === 'perspective-origin' || dashed === '-webkit-perspective-origin') {
-        // css-transforms-2 § 3.2: computed value is two offsets (horizontal then vertical)
+        // css-transforms-2 #propdef-perspective-origin: computed value is two offsets (horizontal then vertical)
         // keywords become percentages (left/top 0%, center 50%, right/bottom 100%), lengths absolutize
         const fs = parseFloat(this.getPropertyValue('font-size')) || 16;
         const tokens = lowerRaw.split(/\s+/).filter(Boolean);

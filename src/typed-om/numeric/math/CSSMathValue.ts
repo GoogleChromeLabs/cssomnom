@@ -18,7 +18,7 @@
 import { CSSNumericValue } from '../CSSNumericValue.ts';
 import { stripOuterParens } from '../../utils/formatting.ts';
 
-// Spec: CSS Typed OM Level 1 § 4.4 #mathvalue-objects
+// css-typed-om #complex-numeric
 export abstract class CSSMathValue extends CSSNumericValue {
   constructor() {
     super();

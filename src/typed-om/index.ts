@@ -137,8 +137,8 @@ import { CSSPositionValue } from './position/CSSPositionValue.ts';
 import { StylePropertyMapReadOnly } from './style-map/StylePropertyMapReadOnly.ts';
 import { StylePropertyMap } from './style-map/StylePropertyMap.ts';
 
-// WebIDL § 3.6 #es-attributes
-// WebIDL § 3.7 #es-operations
+// WebIDL #es-attributes
+// WebIDL #es-operations
 // Ensure all regular prototype members match WebIDL enumerable descriptor requirements.
 // Covers Typed OM interfaces plus the Geometry interfaces we expose alongside them.
 // Membership is enforced by the drift guard in tests/typed-om-webidl-descriptors.test.ts,

@@ -18,7 +18,7 @@
 import { NAMED_COLORS } from '../data/gen/colors.ts';
 
 /**
- * System color definitions per CSS Color 4 § 6 #system-colors.
+ * System color definitions per css-color-4 #css-system-colors.
  */
 export const SYSTEM_COLORS: Record<string, [number, number, number]> = {
   canvas: [255, 255, 255],
@@ -179,9 +179,9 @@ function parseHslComponents(content: string): [number, number, number, number] |
 
 /**
  * Normalizes a CSS color value to its computed/resolved format.
- * css-color-4 § 4 #resolving-color-values
- * css-color-4 § 15 #named-colors
- * cssom-1 § 6.8 #resolved-values
+ * css-color-4 #resolving-color-values
+ * css-color-4 #named-colors
+ * cssom-1 #resolved-values
  */
 export function normalizeComputedColor(val: string): string {
   if (!val || typeof val !== 'string') return '';
@@ -190,7 +190,7 @@ export function normalizeComputedColor(val: string): string {
 
   const lower = trimmed.toLowerCase();
 
-  // 1. Named colors (css-color-4 § 15 #named-colors)
+  // 1. Named colors (css-color-4 #named-colors)
   if (lower in NAMED_COLORS) {
     const [r, g, b, a] = NAMED_COLORS[lower];
     if (a !== undefined && a < 1) {
@@ -199,13 +199,13 @@ export function normalizeComputedColor(val: string): string {
     return `rgb(${r}, ${g}, ${b})`;
   }
 
-  // 1.1 System colors (css-color-4 § 6 #system-colors)
+  // 1.1 System colors (css-color-4 #css-system-colors)
   if (lower in SYSTEM_COLORS) {
     const [r, g, b] = SYSTEM_COLORS[lower];
     return `rgb(${r}, ${g}, ${b})`;
   }
 
-  // 2. Hex colors (css-color-4 § 4.2 #hex-notation)
+  // 2. Hex colors (css-color-4 #hex-notation)
   if (trimmed.startsWith('#')) {
     const hex = trimmed.slice(1);
     if (/^[0-9a-fA-F]{3}$/.test(hex)) {
@@ -238,7 +238,7 @@ export function normalizeComputedColor(val: string): string {
     }
   }
 
-  // 3. rgb() / rgba() function (css-color-4 § 4.1)
+  // 3. rgb() / rgba() function (css-color-4 #rgb-functions)
   const rgbMatch = /^(?:rgb|rgba)\s*\(\s*([^)]+)\s*\)$/i.exec(trimmed);
   if (rgbMatch) {
     const parsed = parseRgbComponents(rgbMatch[1]);
@@ -249,7 +249,7 @@ export function normalizeComputedColor(val: string): string {
     }
   }
 
-  // 4. hsl() / hsla() function (css-color-4 § 4.3)
+  // 4. hsl() / hsla() function (css-color-4 #the-hsl-notation)
   const hslMatch = /^(?:hsl|hsla)\s*\(\s*([^)]+)\s*\)$/i.exec(trimmed);
   if (hslMatch) {
     const parsed = parseHslComponents(hslMatch[1]);

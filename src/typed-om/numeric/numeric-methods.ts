@@ -552,7 +552,7 @@ export function numericEquals(self: CSSNumericValue, ...values: (number | CSSNum
   return true;
 }
 
-// Spec: CSS Typed OM Level 1 § 4.1 #numericvalue-objects
+// css-typed-om #numeric-value
 CSSNumericValue.prototype.to = function(unit: string): CSSUnitValue {
   return numericTo(this, unit);
 };

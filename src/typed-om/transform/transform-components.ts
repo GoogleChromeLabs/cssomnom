@@ -32,7 +32,7 @@ function validateNumberish(val: unknown, name: string): CSSNumericValue {
   throw new TypeError(`${name} must be a unitless number`);
 }
 
-// Spec: CSS Typed OM Level 1 § 5.2 #csstranslate
+// css-typed-om #csstranslate
 export class CSSTranslate extends CSSTransformComponent {
   private _x!: CSSNumericValue;
   private _y!: CSSNumericValue;
@@ -103,7 +103,7 @@ export class CSSTranslate extends CSSTransformComponent {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 5.4 #cssscale
+// css-typed-om #cssscale
 export class CSSScale extends CSSTransformComponent {
   private _x!: CSSNumericValue;
   private _y!: CSSNumericValue;
@@ -161,7 +161,7 @@ export class CSSScale extends CSSTransformComponent {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 5.3 #cssrotate
+// css-typed-om #cssrotate
 export class CSSRotate extends CSSTransformComponent {
   private _x!: CSSNumericValue;
   private _y!: CSSNumericValue;
@@ -267,7 +267,7 @@ export class CSSRotate extends CSSTransformComponent {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 5.5 #cssskew
+// css-typed-om #cssskew
 export class CSSSkew extends CSSTransformComponent {
   private _ax!: CSSNumericValue;
   private _ay!: CSSNumericValue;
@@ -284,7 +284,7 @@ export class CSSSkew extends CSSTransformComponent {
     return true;
   }
   override set is2D(_val: boolean) {
-    // Spec: CSS Typed OM Level 1 § 5.5 #dom-cssskew-is2d
+    // css-typed-om #dom-cssskew-is2d
     // "The is2D attribute of a CSSSkew, CSSSkewX, or CSSSkewY object must, on setting, do nothing."
   }
   get ax(): CSSNumericValue { return this._ax; }
@@ -314,7 +314,7 @@ export class CSSSkew extends CSSTransformComponent {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 5.5 #cssskewx
+// css-typed-om #cssskewx
 export class CSSSkewX extends CSSTransformComponent {
   private _ax!: CSSNumericValue;
   constructor(ax: CSSNumericValue) {
@@ -329,7 +329,7 @@ export class CSSSkewX extends CSSTransformComponent {
     return true;
   }
   override set is2D(_val: boolean) {
-    // Spec: CSS Typed OM Level 1 § 5.5 #dom-cssskew-is2d
+    // css-typed-om #dom-cssskew-is2d
     // "The is2D attribute of a CSSSkew, CSSSkewX, or CSSSkewY object must, on setting, do nothing."
   }
   get ax(): CSSNumericValue { return this._ax; }
@@ -348,7 +348,7 @@ export class CSSSkewX extends CSSTransformComponent {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 5.5 #cssskewy
+// css-typed-om #cssskewy
 export class CSSSkewY extends CSSTransformComponent {
   private _ay!: CSSNumericValue;
   constructor(ay: CSSNumericValue) {
@@ -363,7 +363,7 @@ export class CSSSkewY extends CSSTransformComponent {
     return true;
   }
   override set is2D(_val: boolean) {
-    // Spec: CSS Typed OM Level 1 § 5.5 #dom-cssskew-is2d
+    // css-typed-om #dom-cssskew-is2d
     // "The is2D attribute of a CSSSkew, CSSSkewX, or CSSSkewY object must, on setting, do nothing."
   }
   get ay(): CSSNumericValue { return this._ay; }
@@ -382,7 +382,7 @@ export class CSSSkewY extends CSSTransformComponent {
   }
 }
 
-// Spec: CSS Typed OM Level 1 § 5.6 #cssperspective
+// css-typed-om #cssperspective
 export class CSSPerspective extends CSSTransformComponent {
   private _length!: CSSNumericValue | CSSKeywordValue;
   constructor(length: CSSNumericValue | CSSKeywordValue | string) {
@@ -397,7 +397,7 @@ export class CSSPerspective extends CSSTransformComponent {
     return false;
   }
   override set is2D(_val: boolean) {
-    // Spec: CSS Typed OM Level 1 § 5.6 #dom-cssperspective-is2d
+    // css-typed-om #dom-cssperspective-is2d
     // "The is2D attribute of a CSSPerspective object must, on setting, do nothing."
   }
   get length(): CSSNumericValue | CSSKeywordValue { return this._length; }
@@ -452,7 +452,7 @@ export interface CSSMatrixComponentOptions {
   is2D?: boolean;
 }
 
-// Spec: CSS Typed OM Level 1 § 5.7 #cssmatrixcomponent
+// css-typed-om #cssmatrixcomponent
 export class CSSMatrixComponent extends CSSTransformComponent {
   public matrix: DOMMatrix;
   constructor(matrix: DOMMatrixReadOnly, options?: CSSMatrixComponentOptions) {

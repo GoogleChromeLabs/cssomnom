@@ -24,7 +24,7 @@ import {
   matchesAngle
 } from '../utils/type-guards.ts';
 
-// Spec: CSS Typed OM Level 1 § 8.1 #rectify-a-csscolorrgbcomp
+// css-typed-om #cssrgb #rectify-a-csscolorrgbcomp
 export function rectifyColorRGBComp(v: unknown): CSSNumericValue | CSSKeywordValue {
   if (typeof v === 'number') {
     return new CSSUnitValue(v * 100, 'percent');
@@ -44,7 +44,7 @@ export function rectifyColorRGBComp(v: unknown): CSSNumericValue | CSSKeywordVal
   throw new DOMException('Invalid CSSColorRGBComp value', 'SyntaxError');
 }
 
-// Spec: CSS Typed OM Level 1 § 8.1 #rectify-a-csscolorpercent
+// css-typed-om #cssrgb #rectify-a-csscolorpercent
 export function rectifyColorPercent(v: unknown): CSSNumericValue | CSSKeywordValue {
   if (typeof v === 'number') {
     return new CSSUnitValue(v * 100, 'percent');
@@ -64,7 +64,7 @@ export function rectifyColorPercent(v: unknown): CSSNumericValue | CSSKeywordVal
   throw new DOMException('Invalid CSSColorPercent value', 'SyntaxError');
 }
 
-// Spec: CSS Typed OM Level 1 § 8.1 #rectify-a-csscolornumber
+// css-typed-om #cssrgb #rectify-a-csscolornumber
 export function rectifyColorNumber(v: unknown): CSSNumericValue | CSSKeywordValue {
   if (typeof v === 'number') {
     return new CSSUnitValue(v, 'number');
@@ -84,7 +84,7 @@ export function rectifyColorNumber(v: unknown): CSSNumericValue | CSSKeywordValu
   throw new DOMException('Invalid CSSColorNumber value', 'SyntaxError');
 }
 
-// Spec: CSS Typed OM Level 1 § 8.1 #rectify-a-csscolorangle
+// css-typed-om #cssrgb #rectify-a-csscolorangle
 export function rectifyColorAngle(v: unknown): CSSNumericValue | CSSKeywordValue {
   if (typeof v === 'number') {
     return new CSSUnitValue(v, 'deg');

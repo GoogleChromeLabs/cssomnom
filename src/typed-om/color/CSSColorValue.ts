@@ -18,7 +18,7 @@
 import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 import type { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 
-// Spec: CSS Typed OM Level 2 § 2 #colorvalue-objects
+// css-typed-om #colorvalue-objects
 export abstract class CSSColorValue extends CSSStyleValue {
   constructor() {
     super();

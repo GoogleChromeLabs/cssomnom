@@ -16,7 +16,7 @@
  */
 import type { Token, TokenStream, ComponentValue, ComponentValueStream } from './types.ts';
 
-// css-syntax-3 § 5.3 Token Streams #parser-definitions
+// css-syntax-3 #parser-definitions
 export class ArrayTokenStream implements TokenStream {
   private tokens: Token[];
   private index: number = 0;
@@ -25,7 +25,7 @@ export class ArrayTokenStream implements TokenStream {
     this.tokens = tokens;
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (consume a token)
+  // css-syntax-3 #parser-definitions (consume a token)
   next(): Token {
     const token = this.peek();
     if (token.type !== 'EOF') {
@@ -34,13 +34,13 @@ export class ArrayTokenStream implements TokenStream {
     return token;
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (next token)
+  // css-syntax-3 #parser-definitions (next token)
   peek(): Token {
     return this.tokens[this.index] || { type: 'EOF', value: '' };
   }
 }
 
-// css-syntax-3 § 5.3 Token Streams #parser-definitions
+// css-syntax-3 #parser-definitions
 export class ArrayComponentValueStream implements ComponentValueStream {
   private values: ComponentValue[];
   private index: number = 0;
@@ -49,7 +49,7 @@ export class ArrayComponentValueStream implements ComponentValueStream {
     this.values = values;
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (consume a token)
+  // css-syntax-3 #parser-definitions (consume a token)
   next(): ComponentValue {
     const val = this.peek();
     if (val.type !== 'EOF') {
@@ -58,12 +58,12 @@ export class ArrayComponentValueStream implements ComponentValueStream {
     return val;
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (next token)
+  // css-syntax-3 #parser-definitions (next token)
   peek(): ComponentValue {
     return this.values[this.index] || { type: 'EOF', value: '' };
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (index / mark / restore a mark)
+  // css-syntax-3 #parser-definitions (index / mark / restore a mark)
   get position(): number {
     return this.index;
   }
@@ -78,7 +78,7 @@ export class ArrayComponentValueStream implements ComponentValueStream {
 }
 
 
-// css-syntax-3 § 5.3 Token Streams #parser-definitions
+// css-syntax-3 #parser-definitions
 export class LazyComponentValueStream implements ComponentValueStream {
   private fetchNext: () => ComponentValue;
   private mirrorToken: string;
@@ -93,7 +93,7 @@ export class LazyComponentValueStream implements ComponentValueStream {
     this.mirrorToken = mirrorToken;
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (consume a token)
+  // css-syntax-3 #parser-definitions (consume a token)
   next(): ComponentValue {
     const val = this.peek();
     if (val.type !== 'EOF') {
@@ -102,7 +102,7 @@ export class LazyComponentValueStream implements ComponentValueStream {
     return val;
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (next token)
+  // css-syntax-3 #parser-definitions (next token)
   peek(): ComponentValue {
     if (this.index < this.buffer.length) {
       return this.buffer[this.index];
@@ -128,7 +128,7 @@ export class LazyComponentValueStream implements ComponentValueStream {
     return val;
   }
 
-  // css-syntax-3 § 5.3 #parser-definitions (index / mark / restore a mark)
+  // css-syntax-3 #parser-definitions (index / mark / restore a mark)
   get position(): number {
     return this.index;
   }

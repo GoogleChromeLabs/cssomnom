@@ -198,8 +198,8 @@ function shouldWrapInCalc(property: string, val: CSSUnitValue): boolean {
   return false;
 }
 
-// Spec: CSS Typed OM Level 1 § 3.2 #the-stylepropertymap
-// Spec: CSS Properties and Values API Level 1 § 3 #syntax-strings
+// css-typed-om #the-stylepropertymap
+// css-properties-values-api #syntax-strings
 function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propKey: string): boolean {
   const propLower = propKey.toLowerCase();
   if (value instanceof CSSUnparsedValue || value instanceof CSSVariableReferenceValue) {
@@ -298,7 +298,7 @@ function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propKey: 
   return false;
 }
 
-// Spec: CSS Typed OM Level 1 § 3.2 #the-stylepropertymap
+// css-typed-om #the-stylepropertymap
 export function validateValuesForProperty(property: string, values: (CSSStyleValue | string)[]): string {
   validateProperty(property);
   const propKey = property.startsWith('--') ? property : property.toLowerCase();
@@ -353,7 +353,7 @@ export function validateValuesForProperty(property: string, values: (CSSStyleVal
 
   const finalString = valStrings.join(isList ? ', ' : ' ');
 
-  // css-typed-om-1 § 3.2 #dom-stylepropertymap-set
+  // css-typed-om #dom-stylepropertymap-set
   // "A direct CSSStyleValue object (not a subclass) with a non-null [[associatedProperty]] slot
   //  matches the grammar of the property specified in its [[associatedProperty]] slot, regardless of what it is."
   const allAssociatedDirectStyleValues = values.every(

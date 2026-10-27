@@ -56,7 +56,7 @@ export function isSvgElement(element: unknown): boolean {
 }
 
 export function getInitialValue(prop: string, element: unknown): string {
-  // svg2 § 13.2 #presentation-attributes
+  // svg2 #presentation-attributes
   if (isSvgElement(element)) {
     if (prop === 'baseline-shift') return 'baseline';
     if (prop === 'flood-color' || prop === 'lighting-color' || prop === 'stop-color' || prop === 'stroke') return '';
@@ -72,7 +72,7 @@ export function getInitialValue(prop: string, element: unknown): string {
 }
 
 /**
- * Expands shorthands after variable substitution per CSS Cascade 5 § 7 and CSS Variables 1 § 3.
+ * Expands shorthands after variable substitution per css-cascade-5 #shorthand and css-variables-1 #using-variables.
  */
 function expandShorthandWithVariables(
   decl: MatchedDeclaration,
@@ -98,9 +98,9 @@ function expandShorthandWithVariables(
   ) {
     const taintOut = { tainted: false };
     const res = substituteVariables(subVal, resolvedCustomProps, new Set(), cyclicProps, element, taintedProps, taintOut, activeProperties);
-    // css-values-5 § 3.3 #attr-security: attr()-tainted values used in a <url> make declaration invalid at computed-value time
+    // css-values-5 #attr-security: attr()-tainted values used in a <url> make declaration invalid at computed-value time
     if (res === null || (taintOut.tainted && (res.includes('url(') || res.includes('image-set(')))) {
-      // css-variables-1 § 3.1: Invalid at computed-value time
+      // css-variables-1 #using-variables: invalid at computed-value time
       // When a shorthand contains an invalid var(), each longhand is invalid at computed-value time
       // and reverts to its initial value (e.g. 0px for margin).
       const results: MatchedDeclaration[] = [];
@@ -173,8 +173,8 @@ function expandShorthandWithVariables(
 
 /**
  * Resolves winning standard property declarations, CSS-wide keyword rollbacks, and shorthands.
- * css-cascade-5 § 6.2 #default, § 6.3 #revert-layer, § 6.3.3 #revert-rule-keyword
- * css-variables-1 § 3 #variables-in-shorthands
+ * css-cascade-5 #default, #revert-layer, #revert-rule-keyword
+ * css-cascade-5 #shorthand
  */
 export function processStandardDeclarations(
   matchedDeclarations: MatchedDeclaration[],
@@ -193,7 +193,7 @@ export function processStandardDeclarations(
     const expandedList = expandShorthandWithVariables(decl, resolvedCustomProps, cyclicProps, element, taintedProps, activeProperties);
     for (const expDecl of expandedList) {
       const key = expDecl.name.toLowerCase();
-      // css-logical-1 § 4 #box: Corresponding flow-relative and physical properties share a computed value
+      // css-logical-1 #box: Corresponding flow-relative and physical properties share a computed value
       // determined by cascading declarations of both properties together as one.
       const targetProp = key in LOGICAL_MAPPING ? resolveLogicalProperty(key, writingMode, direction).toLowerCase() : key;
       if (!standardDeclarationsByProperty.has(targetProp)) {
@@ -220,11 +220,11 @@ export function processStandardDeclarations(
       const taintOut = { tainted: false };
       const subVal = substituteVariables(decl.value, resolvedCustomProps, new Set(), cyclicProps, element, taintedProps, taintOut, activeProperties);
       if (subVal === null) {
-        // css-variables-1 § 3.1: Invalid at computed-value time
+        // css-variables-1 #using-variables: invalid at computed-value time
         continue;
       }
 
-      // css-values-5 § 3.3 #attr-security: attr()-tainted values used in a <url> make declaration invalid at computed-value time
+      // css-values-5 #attr-security: attr()-tainted values used in a <url> make declaration invalid at computed-value time
       if (taintOut.tainted && (subVal.includes('url(') || subVal.includes('image-set('))) {
         continue;
       }
@@ -235,7 +235,7 @@ export function processStandardDeclarations(
 
       const trimmedVal = subVal.trim();
       if (trimmedVal === 'revert-rule') {
-        // css-cascade-5 § 6.3.3 #revert-rule-keyword
+        // css-cascade-5 #revert-rule-keyword
         if (decl.important) {
           hasImportantRevertRule = true;
         }
@@ -246,7 +246,7 @@ export function processStandardDeclarations(
       }
       if (trimmedVal === 'revert-layer') {
         if (hasImportantRevertRule) {
-          // css-cascade-5 § 6.3.3 #revert-rule-keyword
+          // css-cascade-5 #revert-rule-keyword
           // W3C csswg-drafts #13916: Cycle between revert-rule !important and revert-layer resolves to unset
           const val = (INHERITED_PROPERTIES.has(prop) && parentCascaded)
             ? parentCascaded.getPropertyValue(prop)
@@ -254,7 +254,7 @@ export function processStandardDeclarations(
           winningDeclarations.set(prop, { ...decl, value: val });
           break;
         }
-        // css-cascade-5 § 6.3 #revert-layer: rolls back to earlier cascade layer
+        // css-cascade-5 #revert-layer: rolls back to earlier cascade layer
         let prevIdx = i - 1;
         while (prevIdx >= 0 && decls[prevIdx].layerOrder >= decl.layerOrder) {
           prevIdx--;
@@ -281,7 +281,7 @@ export function processStandardDeclarations(
         }
       }
       if (trimmedVal === 'revert') {
-        // css-cascade-5 § 6.2 #default: rolls back the cascaded value to the earlier origin
+        // css-cascade-5 #default: rolls back the cascaded value to the earlier origin
         const currOrigin = decl.origin || 'author';
         let prevOriginIdx = i - 1;
         while (prevOriginIdx >= 0 && (decls[prevOriginIdx].origin || 'author') === currOrigin) {

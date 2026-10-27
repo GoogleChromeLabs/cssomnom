@@ -127,9 +127,9 @@ export interface SelectorParserOptions {
 /**
  * Selector Parser according to Selectors Level 4.
  *
- * selectors-4 § 16 #grammar
- * selectors-4 § 17.1 #parse-selector
- * selectors-4 § 17.2 #parse-relative-selector
+ * selectors-4 #grammar
+ * selectors-4 #parse-selector
+ * selectors-4 #parse-relative-selector
  */
 export class SelectorParser {
   public static readonly PSEUDO_CLASSES = PSEUDO_CLASSES;
@@ -169,10 +169,10 @@ export class SelectorParser {
   /**
    * Parses component values into a SelectorList.
    *
-   * selectors-4 § 4.1 #grouping (<selector-list>)
-   * selectors-4 § 16 #grammar (<complex-selector-list>)
-   * selectors-4 § 16.1 #forgiving-selector (parsing forgiving selector list)
-   * selectors-4 § 17.1 #parse-selector
+   * selectors-4 #grouping (<selector-list>)
+   * selectors-4 #grammar (<complex-selector-list>)
+   * selectors-4 #forgiving-selector (parsing forgiving selector list)
+   * selectors-4 #parse-selector
    */
   public parse(): SelectorList {
     const selectors: (ComplexSelector | InvalidSelector)[] = [];
@@ -226,8 +226,8 @@ export class SelectorParser {
   /**
    * Validates namespace prefixes against declared namespaces.
    *
-   * selectors-4 § 3.8 #namespaces
-   * selectors-4 § 17.1 #parse-selector step 2
+   * selectors-4 #namespaces
+   * selectors-4 #parse-selector step 2
    */
   private validateNamespace(namespace: string | undefined): void {
     if (this.declaredNamespaces !== undefined && namespace !== undefined && namespace !== '*' && namespace !== '') {
@@ -239,8 +239,8 @@ export class SelectorParser {
   /**
    * Consumes a complex selector.
    *
-   * selectors-4 § 3.1 #structure (<complex-selector>)
-   * selectors-4 § 16 #grammar
+   * selectors-4 #structure (<complex-selector>)
+   * selectors-4 #grammar
    */
   private consumeComplexSelector(): ComplexSelector {
     const items: (CompoundSelector | Combinator)[] = [];
@@ -254,15 +254,15 @@ export class SelectorParser {
       // Check for combinators
       const combinator = this.tryConsumeCombinator();
       if (combinator) {
-        // selectors-4 § 3.4 #relative: Relative selector allowed only when flag is set
+        // selectors-4 #relative: Relative selector allowed only when flag is set
         if (items.length === 0 && !this.allowRelative) {
           throw new DOMException('Relative selector not allowed in this context', 'SyntaxError');
         }
-        // selectors-4 § 3.6.1 #pseudo-element-syntax, § 3.6.5 #pseudo-element-structure
+        // selectors-4 #pseudo-element-syntax, #pseudo-element-structure
         if (seenPseudoElement) {
           throw new DOMException('Pseudo-element must be at the end of the selector', 'SyntaxError');
         }
-        // selectors-4 § 16 #grammar: consecutive combinators are not allowed
+        // selectors-4 #grammar: consecutive combinators are not allowed
         if (items.length > 0 && items[items.length - 1].type === 'combinator') {
           throw new DOMException('Consecutive combinators are not allowed', 'SyntaxError');
         }
@@ -272,14 +272,14 @@ export class SelectorParser {
       
       const compound = this.consumeCompoundSelector();
       if (compound.selectors.length > 0) {
-        // selectors-4 § 3.6.1 #pseudo-element-syntax, § 3.6.5 #pseudo-element-structure
+        // selectors-4 #pseudo-element-syntax, #pseudo-element-structure
         if (seenPseudoElement) {
           throw new DOMException('Pseudo-element must be at the end of the selector', 'SyntaxError');
         }
         
         const hasPseudo = compound.selectors.some(s => s.type === 'pseudo-element-selector');
         
-        // selectors-4 § 14.1 #descendant-combinators, § 16 #white-space: implicit descendant combinator between compounds
+        // selectors-4 #descendant-combinators, #white-space: implicit descendant combinator between compounds
         if (items.length > 0 && items[items.length - 1].type === 'compound-selector') {
           items.push({ type: 'combinator', value: ' ' });
         }
@@ -293,12 +293,12 @@ export class SelectorParser {
       }
     }
     
-    // selectors-4 § 16 #grammar: trailing combinator is not allowed
+    // selectors-4 #grammar: trailing combinator is not allowed
     if (items.length > 0 && items[items.length - 1].type === 'combinator') {
       throw new DOMException('Trailing combinator is not allowed', 'SyntaxError');
     }
     
-    // selectors-4 § 16 #grammar: complex selector cannot be empty
+    // selectors-4 #grammar: complex selector cannot be empty
     if (items.length === 0) {
       throw new DOMException('Complex selector cannot be empty', 'SyntaxError');
     }
@@ -309,8 +309,8 @@ export class SelectorParser {
   }
 
   /**
-   * selectors-4 § 14 #combinators
-   * selectors-5 § #the-column-combinator (||)
+   * selectors-4 #combinators
+   * selectors-5 #the-column-combinator (||)
    */
   private tryConsumeCombinator(): Combinator | null {
     const token = this.cursor.next;
@@ -318,12 +318,12 @@ export class SelectorParser {
     
     if (isDelimToken(token)) {
       const val = token.value;
-      // selectors-4 § 14.2 #child-combinators (>), § 14.3 #adjacent-sibling-combinators (+), § 14.4 #general-sibling-combinators (~)
+      // selectors-4 #child-combinators (>), #adjacent-sibling-combinators (+), #general-sibling-combinators (~)
       if (val === '>' || val === '+' || val === '~') {
         this.cursor.consume();
         return { type: 'combinator', value: val as ' ' | '>' | '+' | '~' | '||' };
       }
-      // selectors-5 § #the-column-combinator (||)
+      // selectors-5 #the-column-combinator (||)
       if (val === '|' && isDelimToken(this.cursor.peek(1), '|')) {
         this.cursor.consume();
         this.cursor.consume();
@@ -334,8 +334,8 @@ export class SelectorParser {
     return null;
   }
 
-  // selectors-4 § 3.6.3 #pseudo-element-states
-  // selectors-4 § 9 #useraction-pseudos
+  // selectors-4 #pseudo-element-states
+  // selectors-4 #useraction-pseudos
   private isUserActionPseudoClass(name: string): boolean {
     const lower = name.toLowerCase();
     return ['hover', 'active', 'focus', 'focus-visible', 'focus-within'].includes(lower);
@@ -598,7 +598,7 @@ export class SelectorParser {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
-        // selectors-4 § 3.3 #pseudo-elements
+        // selectors-4 #pseudo-elements
         // selectors-4 Appendix B Quirks: -webkit- prefixed pseudo-elements
         const isAllowedVendor = (this.allowVendorPseudos && isVendorPrefixed) || (!this.strictSupports && effectiveLowerName.startsWith('-webkit-'));
         if (!PSEUDO_ELEMENTS.has(effectiveLowerName) && !isAllowedVendor) {
@@ -608,7 +608,7 @@ export class SelectorParser {
       }
       
       // Check for legacy pseudo-elements that use single colon
-      // selectors-4 § 3.3 #pseudo-elements
+      // selectors-4 #pseudo-elements
       if (['before', 'after', 'first-line', 'first-letter'].includes(effectiveLowerName)) {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
@@ -616,7 +616,7 @@ export class SelectorParser {
         return { type: 'pseudo-element-selector', name };
       }
       
-      // selectors-4 § 3.2 #pseudo-classes
+      // selectors-4 #pseudo-classes
       // selectors-4 Appendix B Quirks: -webkit- prefixed pseudo-classes
       const isAllowedVendor = (this.allowVendorPseudos && isVendorPrefixed) || (!this.strictSupports && effectiveLowerName.startsWith('-webkit-'));
       if (!PSEUDO_CLASSES.has(effectiveLowerName) && !isAllowedVendor) {
@@ -633,7 +633,7 @@ export class SelectorParser {
         if (this.forbidPseudo || this.insideHas) {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
-        // selectors-4 § 3.3 #pseudo-elements
+        // selectors-4 #pseudo-elements
         if (!PSEUDO_ELEMENTS.has(lowerName) && !(this.allowVendorPseudos && isVendorPrefixed)) {
           throw new DOMException(`Unknown pseudo-element ::${name}()`, 'SyntaxError');
         }
@@ -665,7 +665,7 @@ export class SelectorParser {
         return { type: 'pseudo-element-selector', name, argument: func.value };
       }
       
-      // selectors-4 § 3.2 #pseudo-classes
+      // selectors-4 #pseudo-classes
       if (!PSEUDO_CLASSES.has(lowerName) && lowerName !== 'matches' && !(this.allowVendorPseudos && isVendorPrefixed)) {
         throw new DOMException(`Unknown pseudo-class :${name}()`, 'SyntaxError');
       }
@@ -851,10 +851,10 @@ export interface AnPlusBValue {
 /**
  * Parses An+B microsyntax into { a, b }.
  *
- * selectors-4 § 13.3 #child-index
- * css-syntax-3 § 8 #anb-microsyntax
- * css-syntax-3 § 8.1 #anb-syntax
- * css-syntax-3 § 8.2 #the-anb-type (<a-n-plus-b> production)
+ * selectors-4 #child-index
+ * css-syntax-3 #anb-microsyntax
+ * css-syntax-3 #anb-syntax
+ * css-syntax-3 #the-anb-type (<a-n-plus-b> production)
  */
 export function parseAnPlusB(values: ComponentValue[]): AnPlusBValue | null {
   const nonComment = values.filter(v => v.type !== 'comment');

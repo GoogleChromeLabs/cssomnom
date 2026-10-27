@@ -36,7 +36,7 @@ export class StyleSheetList {
     return this._sheets[index] || null;
   }
 
-  // cssom-1 § 6.5.7 #the-stylesheetlist-interface
+  // cssom-1 #the-stylesheetlist-interface
   get [Symbol.toStringTag](): string {
     return 'StyleSheetList';
   }
@@ -52,7 +52,7 @@ export interface LinkStyle {
   readonly sheet: CSSStyleSheet | null;
 }
 
-// cssom-1 § 6.2 #the-medialist-interface
+// cssom-1 #the-medialist-interface
 export class MediaList {
   [index: number]: string;
   private _mediaQueries: MediaQuery[] = [];
@@ -62,7 +62,7 @@ export class MediaList {
     return createIndexedProxy(this, (t) => t._mediaQueries.map(q => serializeMediaQuery(q)));
   }
 
-  // cssom-1 § 6.2 #the-medialist-interface
+  // cssom-1 #the-medialist-interface
   get [Symbol.toStringTag](): string {
     return 'MediaList';
   }
@@ -152,7 +152,7 @@ export class CSSRuleList {
     return (this._getRules()[index] as CSSRule) || null;
   }
 
-  // cssom-1 § 6.5.5 #the-cssrulelist-interface
+  // cssom-1 #the-cssrulelist-interface
   get [Symbol.toStringTag](): string {
     return 'CSSRuleList';
   }

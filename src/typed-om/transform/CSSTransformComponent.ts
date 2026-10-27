@@ -21,8 +21,8 @@ import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
 import { CSSMathSum, CSSMathProduct, CSSMathNegate, CSSMathInvert } from '../numeric/math/CSSMathOperations.ts';
 import { DOMMatrix } from '../../DOMMatrix.ts';
 
-// Spec: CSS Typed OM Level 1 § 7.3 #dom-cssrotate-angle
-// Spec: CSS Transforms 2 § 3 #transform-functions
+// css-typed-om #dom-cssrotate-angle
+// css-transforms-2 #transform-functions
 export function normalizeAngleUnits(node: CSSNumericValue): CSSNumericValue {
   if (node instanceof CSSUnitValue) {
     if (node.unit === 'turn') return new CSSUnitValue(node.value * 360, 'deg');
@@ -47,7 +47,7 @@ export function normalizeAngleUnits(node: CSSNumericValue): CSSNumericValue {
 
 
 
-// Spec: CSS Typed OM Level 1 § 5.1 #csstransformcomponent
+// css-typed-om #csstransformcomponent
 export abstract class CSSTransformComponent extends CSSStyleValue {
   constructor() {
     super();

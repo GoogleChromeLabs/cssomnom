@@ -20,7 +20,7 @@ import type { CSSStyleSheet } from './CSSOM.ts';
 
 
 /**
- * CSS Token Types according to CSS Syntax Module Level 3.
+ * CSS Token Types according to css-syntax-3.
  * @see https://drafts.csswg.org/css-syntax-3/#tokenization
  */
 export type TokenType =

@@ -17,7 +17,7 @@
 
 import { privateToken } from '../utils/validation.ts';
 
-// Spec: CSS Typed OM Level 1 § 3 #stylevalue-objects
+// css-typed-om #stylevalue-objects
 export class CSSStyleValue {
   get [Symbol.toStringTag]() {
     return this.constructor.name;

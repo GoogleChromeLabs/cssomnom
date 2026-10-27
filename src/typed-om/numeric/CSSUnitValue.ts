@@ -20,7 +20,7 @@ import { CSSNumericValue } from './CSSNumericValue.ts';
 import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from '../../data/gen/units.ts';
 import { formatNumber } from '../../utils/format.ts';
 
-// Spec: CSS Typed OM Level 1 § 4.2 #unitvalue-objects
+// css-typed-om #simple-numeric
 export class CSSUnitValue extends CSSNumericValue {
   value: number;
   unit: CSSUnit;

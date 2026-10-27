@@ -19,7 +19,6 @@ import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 import { CSSNumericValue } from '../numeric/CSSNumericValue.ts';
 import { isNumericValue, isLengthPercentage } from '../utils/type-guards.ts';
 
-// Spec: CSS Typed OM Level 1 § 6 #positionvalue-objects
 export function validatePositionCoord(val: unknown, paramName: string): void {
   if (!isNumericValue(val)) {
     throw new TypeError(`${paramName} must be a CSSNumericValue`);

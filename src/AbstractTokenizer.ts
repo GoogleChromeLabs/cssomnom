@@ -27,13 +27,13 @@ export abstract class AbstractTokenizer {
   
   public errors: ParseError[] = [];
 
-  // css-syntax-3 § 2.2 Error Handling #error-handling
+  // css-syntax-3 #error-handling
   protected parseError(message: string): void {
     this.errors.push({ message });
     console.warn(`CSS Parse Error: ${message}`);
   }
 
-  // css-syntax-3 § 4.3.1 Consume a token #consume-token
+  // css-syntax-3 #consume-token
   protected consumeToken(): Token {
     while (true) {
       this.consumeComments();
@@ -172,7 +172,7 @@ export abstract class AbstractTokenizer {
     }
   }
 
-  // css-syntax-3 § 4.3.2 Consume comments #consume-comment
+  // css-syntax-3 #consume-comment
   protected consumeComments(): void {
     while (this.cp === 0x002F && this.peek(1) === 0x002A) { // /*
       this.consume();
@@ -191,7 +191,7 @@ export abstract class AbstractTokenizer {
     }
   }
 
-  // css-syntax-3 § 4.3.3 Consume a numeric token #consume-numeric-token
+  // css-syntax-3 #consume-numeric-token
   protected consumeNumericToken(): Token {
     const number = this.consumeNumber();
     if (this.wouldStartIdentSequence(this.cp, this.peek(1), this.peek(2))) {
@@ -207,7 +207,7 @@ export abstract class AbstractTokenizer {
   }
 
 
-  // css-syntax-3 § 4.3.4 Consume an ident-like token #consume-ident-like-token
+  // css-syntax-3 #consume-ident-like-token
   protected consumeIdentLikeToken(): Token {
     const string = this.consumeIdentSequence();
     if (string.toLowerCase() === 'url' && this.cp === 0x0028) { // (
@@ -229,7 +229,7 @@ export abstract class AbstractTokenizer {
     return { type: 'ident', value: string };
   }
 
-  // css-syntax-3 § 4.3.5 Consume a string token #consume-string-token
+  // css-syntax-3 #consume-string-token
   protected consumeStringToken(endingCodePoint: number): Token {
     const startPos = this.getPosition();
     let hasEscapes = false;
@@ -281,7 +281,7 @@ export abstract class AbstractTokenizer {
     }
   }
 
-  // css-syntax-3 § 4.3.6 Consume a url token #consume-url-token
+  // css-syntax-3 #consume-url-token
   protected consumeUrlToken(): Token {
     let value = '';
     while (this.isWhitespace(this.cp)) {
@@ -328,7 +328,7 @@ export abstract class AbstractTokenizer {
     }
   }
 
-  // css-syntax-3 § 4.3.7 Consume an escaped code point #consume-escaped-code-point
+  // css-syntax-3 #consume-escaped-code-point
   protected consumeEscapedCodePoint(): number {
     const cp = this.consume();
     if (this.isHexDigit(cp)) {
@@ -354,14 +354,14 @@ export abstract class AbstractTokenizer {
     return cp;
   }
 
-  // css-syntax-3 § 4.3.8 Check if two code points are a valid escape #starts-with-a-valid-escape
+  // css-syntax-3 #starts-with-a-valid-escape
   protected isValidEscape(cp1: number, cp2: number): boolean {
     if (cp1 !== 0x005C) return false; // \
     if (this.isNewline(cp2)) return false;
     return true;
   }
 
-  // css-syntax-3 § 4.3.9 Check if three code points would start an ident sequence #would-start-an-identifier
+  // css-syntax-3 #would-start-an-identifier
   protected wouldStartIdentSequence(cp1: number, cp2: number, cp3: number): boolean {
     if (cp1 === 0x002D) { // -
       if (this.isIdentStartCodePoint(cp2) || cp2 === 0x002D) return true;
@@ -376,7 +376,7 @@ export abstract class AbstractTokenizer {
     return false;
   }
 
-  // css-syntax-3 § 4.3.10 Check if three code points would start a number #starts-with-a-number
+  // css-syntax-3 #starts-with-a-number
   protected wouldStartNumber(cp1: number, cp2: number, cp3: number): boolean {
     if (cp1 === 0x002B || cp1 === 0x002D) { // + or -
       if (this.isDigit(cp2)) return true;
@@ -391,7 +391,7 @@ export abstract class AbstractTokenizer {
     return false;
   }
 
-  // css-syntax-3 § 4.3.11 Consume an ident sequence #consume-name
+  // css-syntax-3 #consume-name
   protected consumeIdentSequence(): string {
     const startPos = this.getPosition();
     let hasEscapes = false;
@@ -429,7 +429,7 @@ export abstract class AbstractTokenizer {
     return result;
   }
 
-  // css-syntax-3 § 4.3.12 Consume a number #consume-number
+  // css-syntax-3 #consume-number
   protected consumeNumber(): { value: number; type: 'integer' | 'number'; sign: '+' | '-' | null } {
     let type: 'integer' | 'number' = 'integer';
     let sign: '+' | '-' | null = null;
@@ -490,7 +490,7 @@ export abstract class AbstractTokenizer {
     return { value, type, sign };
   }
 
-  // css-syntax-3 § 4.3.15 Consume the remnants of a bad url #consume-remnants-of-bad-url
+  // css-syntax-3 #consume-remnants-of-bad-url
   protected consumeRemnantsOfBadUrl(): void {
     while (true) {
       const cp = this.consume();
@@ -503,7 +503,7 @@ export abstract class AbstractTokenizer {
     }
   }
 
-  // css-syntax-3 § 4.3.11 Check if three code points would start a unicode-range #starts-a-unicode-range
+  // css-syntax-3 #starts-a-unicode-range
   protected wouldStartUnicodeRange(cp1: number, cp2: number, cp3: number): boolean {
     if (cp1 !== 0x0055 && cp1 !== 0x0075) return false; // U or u
     if (cp2 !== 0x002B) return false; // +
@@ -511,7 +511,7 @@ export abstract class AbstractTokenizer {
     return false;
   }
 
-  // css-syntax-3 § 4.3.14 Consume a unicode-range token #consume-unicode-range-token
+  // css-syntax-3 #consume-unicode-range-token
   protected consumeUnicodeRangeToken(): Token {
     let hex = '';
     let hasQuestionMarks = false;
@@ -589,34 +589,34 @@ export abstract class AbstractTokenizer {
     };
   }
 
-  // css-syntax-3 § 4.3.2 Consume comments #consume-comment
+  // css-syntax-3 #consume-comment
   protected startsComment(): boolean {
     return this.cp === 0x002F && this.peek(1) === 0x002A;
   }
 
-  // css-syntax-3 § 4.2 Definitions #whitespace
+  // css-syntax-3 #whitespace
   protected isWhitespace(cp: number): boolean {
     return cp === 0x000A || cp === 0x0009 || cp === 0x0020;
   }
 
-  // css-syntax-3 § 4.2 Definitions #newline
+  // css-syntax-3 #newline
   protected isNewline(cp: number): boolean {
     return cp === 0x000A;
   }
 
-  // css-syntax-3 § 4.2 Definitions #digit
+  // css-syntax-3 #digit
   protected isDigit(cp: number): boolean {
     return cp >= 0x0030 && cp <= 0x0039;
   }
 
-  // css-syntax-3 § 4.2 Definitions #hex-digit
+  // css-syntax-3 #hex-digit
   protected isHexDigit(cp: number): boolean {
     return this.isDigit(cp) || 
            (cp >= 0x0041 && cp <= 0x0046) || 
            (cp >= 0x0061 && cp <= 0x0066);
   }
 
-  // css-syntax-3 § 4.2 Definitions #ident-start-code-point
+  // css-syntax-3 #ident-start-code-point
   protected isIdentStartCodePoint(cp: number): boolean {
     return (cp >= 0x0041 && cp <= 0x005A) || // A-Z
            (cp >= 0x0061 && cp <= 0x007A) || // a-z
@@ -624,14 +624,14 @@ export abstract class AbstractTokenizer {
            this.isNonAsciiIdentCodePoint(cp);
   }
 
-  // css-syntax-3 § 4.2 Definitions #ident-code-point
+  // css-syntax-3 #ident-code-point
   protected isIdentCodePoint(cp: number): boolean {
     return this.isIdentStartCodePoint(cp) || 
            this.isDigit(cp) || 
            cp === 0x002D; // -
   }
 
-  // css-syntax-3 § 4.2 Definitions #non-ascii-ident-code-point
+  // css-syntax-3 #non-ascii-ident-code-point
   protected isNonAsciiIdentCodePoint(cp: number): boolean {
     return cp === 0x00B7 ||
            (cp >= 0x00C0 && cp <= 0x00D6) ||
@@ -650,7 +650,7 @@ export abstract class AbstractTokenizer {
            cp >= 0x10000;
   }
 
-  // css-syntax-3 § 4.2 Definitions #non-printable-code-point
+  // css-syntax-3 #non-printable-code-point
   protected isNonPrintable(cp: number): boolean {
     return (cp >= 0x0000 && cp <= 0x0008) ||
            cp === 0x000B ||

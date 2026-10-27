@@ -53,7 +53,7 @@ export class StyleSheet {
   private _media: MediaList;
   private _disabledFlag = false;
 
-  // cssom-1 § 6.1 #the-stylesheet-interface
+  // cssom-1 #the-stylesheet-interface
   get [Symbol.toStringTag](): string {
     return 'StyleSheet';
   }
@@ -129,14 +129,14 @@ export class CSSStyleSheet extends StyleSheet {
   }
 
   override get parentStyleSheet(): CSSStyleSheet | null {
-    // cssom-1 § 6.4.3: parentStyleSheet of child stylesheet is ownerRule's parentStyleSheet
+    // cssom-1 #dom-stylesheet-parentstylesheet: child sheet's parent is ownerRule's parentStyleSheet
     if (this._ownerRule) {
       return this._ownerRule.parentStyleSheet;
     }
     return this._parentStyleSheet;
   }
 
-  // cssom-1 § 6.5 #the-cssstylesheet-interface
+  // cssom-1 #the-cssstylesheet-interface
   get [Symbol.toStringTag](): string {
     return 'CSSStyleSheet';
   }
@@ -275,7 +275,7 @@ export class CSSStyleSheet extends StyleSheet {
     }
   }
 
-  // cssom-1 § 6.5.1 #dom-cssstylesheet-replace
+  // cssom-1 #dom-cssstylesheet-replace
   replace(text: string): Promise<CSSStyleSheet> {
     if (!this._constructedFlag || this._disallowModificationFlag) {
       return Promise.reject(new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError"));
@@ -296,8 +296,8 @@ export class CSSStyleSheet extends StyleSheet {
     });
   }
 
-  // cssom-1 § 6.5.1 #dom-cssstylesheet-replacesync
-  // cssom-1 § 6.5.1 #synchronously-replace-the-rules-of-a-cssstylesheet
+  // cssom-1 #dom-cssstylesheet-replacesync
+  // cssom-1 #synchronously-replace-the-rules-of-a-cssstylesheet
   replaceSync(text: string): void {
     if (!this._constructedFlag) {
       throw new DOMException("Can't call replace or replaceSync on non-constructed stylesheets.", "NotAllowedError");
@@ -308,8 +308,8 @@ export class CSSStyleSheet extends StyleSheet {
     this._replaceRulesFromText(text);
   }
 
-  // cssom-1 § 6.3 #dom-cssstylesheet-insertrule
-  // cssom-1 § 6.5.3 #insert-a-css-rule
+  // cssom-1 #dom-cssstylesheet-insertrule
+  // cssom-1 #insert-a-css-rule
   insertRule(rule: string, index: number = 0): number {
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
@@ -318,10 +318,10 @@ export class CSSStyleSheet extends StyleSheet {
       throw new DOMException('The style sheet is not origin-clean.', 'SecurityError');
     }
 
-    // cssom-1 § 6.5.3 #insert-a-css-rule step 1 & 2:
+    // cssom-1 #insert-a-css-rule step 1 & 2:
     // 1. Set length to the number of items in list.
     // 2. If index is greater than length (or index < 0), throw IndexSizeError.
-    // NOTE: This boundary check MUST precede parsing per CSSOM 1 § 6.5.3 step 2!
+    // cssom-1 #insert-a-css-rule: step 2 bounds check precedes parsing
     if (index < 0 || index > this._rules.length) {
       throw new DOMException('Index size error', 'IndexSizeError');
     }
@@ -336,13 +336,13 @@ export class CSSStyleSheet extends StyleSheet {
     const isImport = isImportRule(parsedRule);
     const isNamespace = isNamespaceRule(parsedRule);
 
-    // cssom-1 § 6.3 #dom-cssstylesheet-insertrule step 5:
+    // cssom-1 #dom-cssstylesheet-insertrule step 5:
     // If parsed rule is an @import rule, and the constructed flag is set, throw a SyntaxError DOMException.
     if (isImport && this._constructedFlag) {
       throw new DOMException('HierarchyRequestError: @import rules are not allowed in constructed stylesheets', 'SyntaxError');
     }
 
-    // cssom-1 § 6.5.3 #insert-a-css-rule step 6 & step 7:
+    // cssom-1 #insert-a-css-rule step 6 & step 7:
     if (isImport) {
       // 6. An @import rule must precede all other rules except @charset / @import
       for (let i = 0; i < index; i++) {
@@ -372,7 +372,7 @@ export class CSSStyleSheet extends StyleSheet {
     }
 
     // 8. Insert new rule into list at zero-indexed position index.
-    // cssom-1 § 6.4 #the-cssrule-interface: establish parentStyleSheet reference
+    // cssom-1 #the-cssrule-interface: establish parentStyleSheet reference
     if (parsedRule instanceof CSSRule) {
       parsedRule._parentStyleSheet = this;
       parsedRule._parentRule = null;
@@ -382,8 +382,8 @@ export class CSSStyleSheet extends StyleSheet {
     return index;
   }
 
-  // cssom-1 § 6.3 #dom-cssstylesheet-deleterule
-  // cssom-1 § 6.5.4 #remove-a-css-rule
+  // cssom-1 #dom-cssstylesheet-deleterule
+  // cssom-1 #remove-a-css-rule
   deleteRule(index: number): void {
     if (this._disallowModificationFlag) {
       throw new DOMException('Modification is disallowed', 'NotAllowedError');
@@ -460,8 +460,8 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._style._parentRule = this;
   }
 
-  // css-typed-om § 2.3 #declared-stylepropertymap-objects
-  // WebIDL § 3.6 #es-attributes
+  // css-typed-om #declared-stylepropertymap-objects
+  // WebIDL #es-attributes
   get styleMap(): StylePropertyMap {
     if (!this || !(this instanceof CSSStyleRule)) {
       throw new TypeError("Value of 'this' is not a CSSStyleRule");
@@ -592,7 +592,7 @@ export class CSSStyleRule extends CSSGroupingRule {
 
   get type() { return 1; }
 
-  // 6.14 The CSSStyleRule Interface & css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
+  // 6.14 The CSSStyleRule Interface & css-nesting-1 #the-cssnestrule
   get cssText() {
     const declsStr = serializeDeclarations(this.style._declarations);
     
@@ -623,7 +623,7 @@ export class CSSStyleRule extends CSSGroupingRule {
   }
 }
 
-// WebIDL § 3.6 #es-attributes
+// WebIDL #es-attributes
 Object.defineProperty(CSSStyleRule.prototype, 'styleMap', {
   enumerable: true
 });
@@ -651,16 +651,16 @@ for (const ctor of cssomClasses) {
   }
 }
 
-// cssom-1 § 6.6 #the-cssstyledeclaration-interface
-// WebIDL § 3.6.3 #interface-prototype-object
+// cssom-1 #the-cssstyledeclaration-interface
+// WebIDL #interface-prototype-object
 Object.defineProperty(CSSStyleDeclaration.prototype, Symbol.toStringTag, {
   value: 'CSSStyleDeclaration',
   configurable: true,
   writable: false,
   enumerable: false
 });
-// cssom-1 § 6.7 #the-cssstyleproperties-interface
-// WebIDL § 3.6.3 #interface-prototype-object
+// cssom-1 #the-cssstyledeclaration-interface
+// WebIDL #interface-prototype-object
 Object.defineProperty(CSSStyleProperties.prototype, Symbol.toStringTag, {
   value: 'CSSStyleProperties',
   configurable: true,

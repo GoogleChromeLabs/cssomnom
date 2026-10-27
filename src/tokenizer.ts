@@ -17,7 +17,7 @@
 import { AbstractTokenizer } from './AbstractTokenizer.ts';
 import type { Token, ParseError } from './types.ts';
 
-// css-syntax-3 § 4 Tokenization #tokenization
+// css-syntax-3 #tokenization
 export function tokenize(input: string, unicodeRangesAllowed: boolean = false, errors?: ParseError[]): Token[] {
   const tokenizer = new Tokenizer(input);
   tokenizer.unicodeRangesAllowed = unicodeRangesAllowed;
@@ -37,7 +37,7 @@ class Tokenizer extends AbstractTokenizer {
     this.input = this.preprocess(input);
   }
 
-  // css-syntax-3 § 3.3 Preprocessing the input stream #input-preprocessing (filter code points)
+  // css-syntax-3 #input-preprocessing (filter code points)
   private preprocess(input: string): string {
     // Any surrogate code point (U+D800 to U+DFFF) is replaced by U+FFFD REPLACEMENT CHARACTER.
     // We use a regex to replace lone surrogates while preserving valid surrogate pairs.
@@ -50,7 +50,7 @@ class Tokenizer extends AbstractTokenizer {
       .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
   }
 
-  // css-syntax-3 § 4 Tokenization #tokenization
+  // css-syntax-3 #tokenization
   tokenize(): Token[] {
     const tokens: Token[] = [];
     while (true) {
@@ -67,7 +67,7 @@ class Tokenizer extends AbstractTokenizer {
     return tokens;
   }
 
-  // css-syntax-3 § 4.2 Definitions #next-input-code-point
+  // css-syntax-3 #next-input-code-point
   protected get cp(): number {
     return this.pos < this.input.length ? this.input.codePointAt(this.pos)! : -1;
   }
@@ -82,7 +82,7 @@ class Tokenizer extends AbstractTokenizer {
     return index < this.input.length ? this.input.codePointAt(index)! : -1;
   }
 
-  // css-syntax-3 § 4.2 Definitions #next-input-code-point (consume the next input code point)
+  // css-syntax-3 #next-input-code-point (consume the next input code point)
   protected consume(): number {
     const cp = this.cp;
     if (cp !== -1) {
@@ -91,7 +91,7 @@ class Tokenizer extends AbstractTokenizer {
     return cp;
   }
 
-  // css-syntax-3 § 4.2 Definitions #reconsume-the-current-input-code-point
+  // css-syntax-3 #reconsume-the-current-input-code-point
   protected reconsume(): void {
     // We can't trivially reconsume without knowing the previous character length in UTF-16.
     // However, in CSS parsing, we usually reconsume exactly 1 code point.

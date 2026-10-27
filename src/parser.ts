@@ -113,7 +113,7 @@ const FONT_FEATURE_VALUE_BLOCKS: Record<string, 'annotation' | 'ornaments' | 'st
 
 /**
  * Skeleton Parser for CSSOM.
- * Implements top-level parsing algorithms from CSS Syntax Module Level 3.
+ * Implements top-level parsing algorithms from css-syntax-3.
  * @see https://drafts.csswg.org/css-syntax-3/#parsing
  * 
  * @note We recommend a more ergonomic entry point like `CSS.parseStylesheet` 
@@ -166,8 +166,8 @@ export class Parser {
     'keyframes', 'property', 'counter-style', 'font-feature-values', 'view-transition'
   ]);
 
-  // css-nesting-1 § 3.3 #conditionals
-  // css-syntax-3 § 3.2 #charset-rule & § 5.4.4 #consume-at-rule
+  // css-nesting-1 #conditionals
+  // css-syntax-3 #charset-rule & #consume-at-rule
   private isSupportedAtRule(name: string, nested: boolean = false): boolean {
     const lower = name.toLowerCase();
     if (lower === 'charset') return false;
@@ -454,7 +454,7 @@ export class Parser {
     return parts.join('');
   }
 
-  // css-cascade-5 § 6.4.4 #declaring-layers
+  // css-cascade-5 #layer-declaration
   private handleLayerRule(rule: ASTAtRule, block?: SimpleBlock, nested: boolean = false): Rule | null {
     if (block) {
       const trimmed = trimComponentValues(rule.prelude, true);
@@ -491,7 +491,7 @@ export class Parser {
     }
   }
 
-  // css-nesting-1 § 4.1 #nesting-at-scope (Issue 9740)
+  // css-nesting-1 #nesting-at-scope (Issue 9740)
   private handleScopeRule(rule: ASTAtRule, block?: SimpleBlock, _nested: boolean = false): Rule | null {
     if (!block) return null;
     this.scopeContextDepth++;
@@ -626,12 +626,12 @@ export class Parser {
     return new CSSMarginRule(rule.name, this.consumeDeclarationsFromBlockContents(block.value), INTERNAL_RULE_TOKEN);
   }
 
-  // css-counter-styles-3 § 8.1 #csscounterstylerule
+  // css-counter-styles-3 #the-csscounterstylerule-interface
   private handleCounterStyleRule(rule: ASTAtRule, block: SimpleBlock): Rule {
     return new CSSCounterStyleRule(serialize(rule.prelude).trim(), this.consumeDeclarationsFromBlockContents(block.value));
   }
 
-  // css-fonts-4 § 8 #cssfontfeaturevaluesrule-interface
+  // css-fonts-4 #om-fontfeaturevalues
   private handleFontFeatureValuesRule(rule: ASTAtRule, block: SimpleBlock): Rule {
     const fontFeatureRule = new CSSFontFeatureValuesRule(serialize(rule.prelude).trim());
     const stream = new ArrayComponentValueStream(block.value);
@@ -758,7 +758,7 @@ export class Parser {
       }
     }
 
-    // css-cascade-6 § 5 #at-import: layer, scope, and supports can appear in any order before media queries
+    // css-cascade-6 #at-import: layer, scope, and supports can appear in any order before media queries
     while (i < prelude.length) {
       while (i < prelude.length && prelude[i].type === 'whitespace') i++;
       if (i >= prelude.length) break;
@@ -814,7 +814,7 @@ export class Parser {
     return nsRule;
   }
 
-  // Media Queries 5 § 2.3 #custom-mq
+  // mediaqueries-5 #custom-mq
   private handleCustomMediaRule(rule: ASTAtRule): Rule | null {
     const prelude = rule.prelude;
     let i = 0;
@@ -1061,7 +1061,7 @@ export class Parser {
       }
     }
 
-    // css-syntax-3 § 5.5.5 #consume-a-declaration Step 7
+    // css-syntax-3 #consume-a-declaration Step 7
     while (declValue.length > 0 && declValue[declValue.length - 1].type === 'whitespace') {
       declValue.pop();
     }
@@ -1177,7 +1177,7 @@ export class Parser {
     }
   }
 
-  // css-syntax-3 § 5.5.5 #consume-remnants-of-a-bad-declaration
+  // css-syntax-3 #consume-the-remnants-of-a-bad-declaration
   private consumeRemnantsOfABadDeclaration(stream: ComponentValueStream, nested: boolean = false): void {
     while (true) {
       const val = stream.peek();
@@ -1296,7 +1296,7 @@ export class Parser {
     }
   }
 
-  // css-nesting-1 § 3 #nest-selector & § 4 #cssom
+  // css-nesting-1 #nest-selector & #cssom
   private normalizeNestedSelector(prelude: ComponentValue[]): string {
     const segments = splitComponentValuesByComma(prelude, true);
     if (segments.length === 1 && segments[0].length === 0) return '';
@@ -1412,8 +1412,8 @@ export class Parser {
     return new Parser(tokenize(text), { source: text }).consumeListOfRules(true);
   }
 
-  // css-nesting-1 § 4.1 #the-cssnesteddeclarations-interface
-  // cssom-1 § 6.4.3 #the-cssgroupingrule-interface
+  // css-nesting-1 #the-cssnestrule
+  // cssom-1 #the-cssgroupingrule-interface
   public static parseRuleInBlockText(text: string, nested = true, inScope = false): Rule {
     const parser = new Parser(tokenize(`{ ${text} }`));
     if (inScope) parser.scopeContextDepth = 1;
@@ -1430,7 +1430,7 @@ export class Parser {
     return contents[0];
   }
 
-  // css-cascade-6 § 3 #scoped-styles
+  // css-cascade-6 #scoped-styles
   public static parseRuleInScopeBlockText(text: string): Rule {
     return Parser.parseRuleInBlockText(text, true, true);
   }
@@ -1448,7 +1448,7 @@ export class Parser {
   }
 }
 
-// css-variables-1 § 3 Using Cascading Variables: The var() Notation #using-variables
+// css-variables-1 #using-variables
 function validateVarFunction(func: CSSFunction): boolean {
   if (func.name.toLowerCase() !== 'var') return true;
   const args = func.value;
@@ -1476,7 +1476,7 @@ function validateVarFunction(func: CSSFunction): boolean {
   return true;
 }
 
-// css-syntax-3 § 5.4.5 Consume a declaration #consume-declaration
+// css-syntax-3 #consume-declaration
 export function validateDeclarationValue(values: ComponentValue[]): boolean {
   for (const v of values) {
     if (v.type === 'bad-string' || v.type === 'bad-url') return false;

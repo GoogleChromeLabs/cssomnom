@@ -123,7 +123,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return false;
   }
 
-  // cssom-1 § 6.6 #dom-cssstyledeclaration-parentrule
+  // cssom-1 #dom-cssstyledeclaration-parentrule
   get parentRule(): CSSRule | null {
     return this._parentRule;
   }
@@ -169,7 +169,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
   }
 
-  // cssom-1 § 6.4.1 #concept-declarations-specified-order
+  // cssom-1 #concept-declarations-specified-order
   private _addDeclaration(d: Declaration) {
     const shorthand = SHORTHANDS[d.name];
     if (shorthand) {
@@ -220,7 +220,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return null;
   }
 
-  // cssom-1 § 6.6.2 #dom-cssstyledeclaration-getpropertyvalue
+  // cssom-1 #dom-cssstyledeclaration-getpropertyvalue
   getPropertyValue(property: string): string {
     if (!property.startsWith('--')) property = property.toLowerCase();
     else if (!ParseHooks.isValidDashedIdent(property)) return '';
@@ -425,7 +425,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return exact;
   }
 
-  // cssom-1 § 6.6.2 #dom-cssstyledeclaration-getpropertypriority
+  // cssom-1 #dom-cssstyledeclaration-getpropertypriority
   getPropertyPriority(property: string): string {
     if (!property.startsWith('--')) property = property.toLowerCase();
     const shorthand = SHORTHANDS[property];
@@ -482,7 +482,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return (winner && winner.important) ? 'important' : '';
   }
 
-  // cssom-1 § 6.7.1 #the-cssstyledeclaration-interface
+  // cssom-1 #the-cssstyledeclaration-interface
   setProperty(property: string, value: string | null, priority: string = '', notify: boolean = true) {
     // 1. If the readonly flag is set, then throw a NoModificationAllowedError exception.
     if (this._readonly) {
@@ -536,8 +536,8 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
     const compVals = ParseHooks.parseComponentValues(tokens);
     if (!property.startsWith('--')) {
-      // css-syntax-3 § 5.4.5 Consume a declaration #consume-declaration
-      // css-variables-1 § 3 Using Cascading Variables: The var() Notation #using-variables
+      // css-syntax-3 #consume-declaration
+      // css-variables-1 #using-variables
       if (ParseHooks.validateDeclarationValue && !ParseHooks.validateDeclarationValue(compVals)) {
         return;
       }
@@ -589,7 +589,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       componentValues.splice(0, componentValues.length, ...assembled);
     }
 
-    // cssom-1 § 6.7.1 #set-a-css-declaration
+    // cssom-1 #set-a-css-declaration
     if (existing) {
       existing.value = componentValues;
       existing.important = isImportant;
@@ -597,7 +597,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         existing.raw = valueStr ?? undefined;
       }
       
-      // cssom-1 § 6.5.1 #set-a-css-declaration
+      // cssom-1 #set-a-css-declaration
       const idx = this._declarations.indexOf(existing);
       if (idx !== -1) {
         const info = LOGICAL_PROPERTY_INFO[property];

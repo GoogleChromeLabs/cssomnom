@@ -23,9 +23,9 @@ import { supports } from '../parser-api.ts';
 
 /**
  * Discovers and resolves active @property and @keyframes definitions across stylesheets and layers.
- * css-cascade-5 § 6.4.3 #layer-ordering
- * css-properties-values-api-1 § 5 #determining-computed-value-of-registered-custom-property
- * css-animations-1 § 4 #keyframes
+ * css-cascade-5 #layer-ordering
+ * css-properties-values-api #calculation-of-computed-values
+ * css-animations-1 #keyframes
  */
 export function collectActiveAtRules(
   ruleList: Rule[],
@@ -46,7 +46,7 @@ export function collectActiveAtRules(
   let sourceOrder = 0;
 
   function winsOver<T>(candidate: Candidate<T>, existing: Candidate<T>): boolean {
-    // css-cascade-5 § 6.4.3 #layer-ordering:
+    // css-cascade-5 #layer-ordering:
     // "At-rules that define named entities resolve conflicts according to cascade layers:
     // Rules in the same layer resolve by source order (latest wins).
     // Rules in later cascade layers override rules in earlier cascade layers.

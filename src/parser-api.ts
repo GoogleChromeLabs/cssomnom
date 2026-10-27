@@ -528,7 +528,7 @@ export const CSS = {
     // Typed OM Factories
     ...CSSFactories,
 
-    // Utility APIs (cssom-1 § 3 #the-css.escape()-method)
+    // Utility APIs (cssom-1 #the-css.escape()-method)
     escape: cssEscape,
 
     // Tooling Extensions
@@ -551,7 +551,7 @@ export const CSS = {
     registerProperty: (definition: PropertyDefinition) => PropertyRegistry.register(definition),
 };
 
-// WebIDL namespace @@toStringTag definition (webidl § 3.6.3, cssom-1 § 3 #namespacedef-css)
+// WebIDL namespace @@toStringTag definition (webidl #namespacedef-css)
 Object.defineProperty(CSS, Symbol.toStringTag, {
   value: 'CSS',
   writable: false,

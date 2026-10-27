@@ -26,15 +26,15 @@ import { MediaList, CSSRuleList } from './collections.ts';
 import { serializeGroupingRule, FONT_FACE_DESCRIPTORS } from './utils.ts';
 import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
 
-// css-conditional-3 § 3 #the-cssconditionrule-interface
+// css-conditional-3 #the-cssconditionrule-interface
 export class CSSConditionRule extends CSSGroupingRule {
   get conditionText(): string {
     return '';
   }
 }
 
-// css-conditional-3 § 4 #the-cssmediarule-interface
-// cssom-1 § 6.4.3 #the-cssmediarule-interface
+// css-conditional-3 #the-cssmediarule-interface
+// cssom-1 #the-cssmediarule-interface
 export class CSSMediaRule extends CSSConditionRule {
   private _media: MediaList;
 
@@ -43,13 +43,13 @@ export class CSSMediaRule extends CSSConditionRule {
     this._media = new MediaList(mediaText);
   }
 
-  // cssom-1 § 6.4.3 #dom-cssmediarule-media
+  // css-conditional-3 #dom-cssmediarule-media
   get media(): MediaList {
     return this._media;
   }
 
-  // cssom-1 § 6.4.3 #dom-cssmediarule-media
-  // WebIDL § 3.3.6 #putforwards
+  // css-conditional-3 #dom-cssmediarule-media
+  // WebIDL #putforwards
   set media(val: unknown) {
     this._media.mediaText = val === null ? '' : String(val);
   }
@@ -74,7 +74,7 @@ export class CSSMediaRule extends CSSConditionRule {
   }
 }
 
-// Media Queries 5 § 2.3 #custom-mq
+// mediaqueries-5 #custom-mq
 export class CSSCustomMediaRule extends CSSRule {
   readonly name: string;
   readonly query: CustomMediaQuery;
@@ -95,7 +95,7 @@ export class CSSCustomMediaRule extends CSSRule {
   }
 }
 
-// css-conditional-3 § 5 #the-csssupportsrule-interface
+// css-conditional-3 #the-csssupportsrule-interface
 export class CSSSupportsRule extends CSSConditionRule {
   private _conditionText: string;
 
@@ -108,7 +108,7 @@ export class CSSSupportsRule extends CSSConditionRule {
     return this._conditionText;
   }
 
-  // css-conditional-3 § 5 #the-csssupportsrule-interface
+  // css-conditional-3 #the-csssupportsrule-interface
   get [Symbol.toStringTag](): string {
     return 'CSSSupportsRule';
   }
@@ -141,7 +141,7 @@ function parseContainerPrelude(containerQuery: string, containerName: string): {
   return { name: '', query: trimmed };
 }
 
-// css-conditional-5 § 4 #the-csscontainerrule-interface
+// css-conditional-5 #the-csscontainerrule-interface
 export class CSSContainerRule extends CSSConditionRule {
   readonly containerName: string;
   readonly containerQuery: string;
@@ -176,7 +176,7 @@ function formatInlineStyleBlock(prefix: string, style: CSSStyleDeclaration): str
   return `${prefix} {${body ? ' ' + body + ' ' : ''}}`;
 }
 
-// css-cascade-5 § 6.4.4 #the-csslayerblockrule-interface
+// css-cascade-5 #the-csslayerblockrule-interface
 export class CSSLayerBlockRule extends CSSGroupingRule {
   private _name: string;
 
@@ -200,7 +200,7 @@ export class CSSLayerBlockRule extends CSSGroupingRule {
   set cssText(_value: string) {}
 }
 
-// css-cascade-5 § 6.4.5 #the-csslayerstatementrule-interface
+// css-cascade-5 #the-csslayerstatementrule-interface
 export class CSSLayerStatementRule extends CSSRule {
   private _nameList: readonly string[];
 
@@ -239,7 +239,7 @@ export class CSSStartingStyleRule extends CSSGroupingRule {
   set cssText(_value: string) {}
 }
 
-// css-cascade-6 § 3.2 #the-cssscoperule-interface
+// css-cascade-6 #the-cssscoperule-interface
 export class CSSScopeRule extends CSSGroupingRule {
   readonly startSelector: string | null;
   readonly endSelector: string | null;
@@ -344,7 +344,7 @@ export class CSSKeyframesRule extends CSSRule {
 
   get type() { return 7; }
 
-  // css-animations-1 § 5.2 #the-csskeyframesrule-interface
+  // css-animations-1 #interface-csskeyframesrule
   get [Symbol.toStringTag](): string {
     return 'CSSKeyframesRule';
   }
@@ -403,7 +403,7 @@ export class CSSKeyframesRule extends CSSRule {
   }
 }
 
-// css-animations-1 § 4.2 #keyframes
+// css-animations-1 #keyframes
 class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
   protected override get _filterDeclarationsInConstructor(): boolean {
     return true;
@@ -443,7 +443,7 @@ export class CSSKeyframeRule extends CSSRule {
 
   get type() { return 8; }
 
-  // css-animations-1 § 5.3 #the-csskeyframerule-interface
+  // css-animations-1 #interface-csskeyframerule
   get [Symbol.toStringTag](): string {
     return 'CSSKeyframeRule';
   }
@@ -488,8 +488,8 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   declare fontDisplay?: string;
   declare unicodeRange?: string;
 
-  // css-fonts-4 § 6 #om-fontface
-  // WebIDL § 3.6.3 #interface-prototype-object
+  // css-fonts-4 #om-fontface
+  // WebIDL #interface-prototype-object
   get [Symbol.toStringTag](): string {
     return 'CSSFontFaceDescriptors';
   }
@@ -499,8 +499,8 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   }
 }
 
-// css-fonts-4 § 6 #om-fontface
-// cssom-1 § 6.4.3 #the-cssfontfacerule-interface
+// css-fonts-4 #om-fontface
+// css-fonts-4 #om-fontface
 export class CSSFontFaceRule extends CSSRule {
   private _style: CSSFontFaceDescriptors;
 
@@ -510,7 +510,7 @@ export class CSSFontFaceRule extends CSSRule {
     this._style._parentRule = this;
   }
 
-  // css-fonts-4 § 6 #dom-cssfontfacerule-style
+  // css-fonts-4 #dom-cssfontfacerule-style
   get style(): CSSStyleDeclaration {
     return this._style;
   }
@@ -532,15 +532,15 @@ export class CSSFontFaceRule extends CSSRule {
   set cssText(_value: string) {}
 }
 
-// css-page-3 § 3 #conform-partial
+// css-page-3 #page-properties
 const PAGE_ALLOWED_PROPERTIES = new Set<string>([
-  // Page descriptors (css-page-3 § 3.2)
+  // Page descriptors (css-page-3 #page-size)
   'size',
   'page-orientation',
   'marks',
   'bleed',
   'page-margin-safety',
-  // Page margin properties (css-page-3 § 3)
+  // Page margin properties (css-page-3 #margin-property-list)
   'margin',
   'margin-top',
   'margin-right',
@@ -552,7 +552,7 @@ const PAGE_ALLOWED_PROPERTIES = new Set<string>([
   'margin-inline',
   'margin-inline-start',
   'margin-inline-end',
-  // Page-break properties (css-page-3 § 3)
+  // Page-break properties (css-page-3 #page-breaks)
   'page-break-before',
   'page-break-after',
   'page-break-inside',
@@ -600,12 +600,12 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
   declare bleed: string;
   declare pageMarginSafety?: string;
 
-  // css-page-3 § 3 #conform-partial
+  // css-page-3 #page-properties
   override _isPropertySupported(property: string): boolean {
     return PAGE_ALLOWED_PROPERTIES.has(property);
   }
 
-  // cssom-1 § 6.4.4 #the-csspagedescriptors-interface
+  // cssom-1 #the-csspagerule-interface
   get [Symbol.toStringTag](): string {
     return 'CSSPageDescriptors';
   }
@@ -628,11 +628,11 @@ const PAGE_DESCRIPTOR_PROPERTIES = [
   'bleed',
 ] as const;
 
-// WebIDL § 3.6 #es-attributes
+// WebIDL #es-attributes
 for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {
   const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
   Object.defineProperty(CSSPageDescriptors.prototype, prop, {
-    // css-page-3 § 3.2 #the-csspagedescriptors-interface
+    // cssom-1 #the-csspagerule-interface
     get(this: unknown): string {
       return (this as CSSPageDescriptors).getPropertyValue(cssProp);
     },
@@ -652,8 +652,8 @@ export class CSSMarginRule extends CSSRule {
   private _style: CSSMarginDescriptors;
 
   constructor(name: string, declarations: Declaration[], internalToken?: symbol) {
-    // css-page-3 § 7.3 #the-cssmarginrule-interface
-    // WebIDL § 3.6.3 #interface-prototype-object
+    // cssom-1 #the-cssmarginrule-interface
+    // WebIDL #interface-prototype-object
     if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
@@ -663,7 +663,7 @@ export class CSSMarginRule extends CSSRule {
     this._style._parentRule = this;
   }
 
-  // css-page-3 § 3.2.1 #the-cssmarginrule-interface
+  // cssom-1 #the-cssmarginrule-interface
   get name(): string {
     return this._name;
   }
@@ -676,7 +676,7 @@ export class CSSMarginRule extends CSSRule {
     this._style.cssText = value;
   }
 
-  // css-page-3 § 7.3 #the-cssmarginrule-interface
+  // cssom-1 #the-cssmarginrule-interface
   get [Symbol.toStringTag](): string {
     return 'CSSMarginRule';
   }
@@ -726,7 +726,7 @@ export class CSSImportRule extends CSSRule {
     isScoped: boolean = false,
     internalToken?: symbol
   ) {
-    // cssom-1 § 6.4.3 #the-cssimportrule-interface
+    // cssom-1 #the-cssimportrule-interface
     if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
@@ -740,14 +740,14 @@ export class CSSImportRule extends CSSRule {
     this._isScoped = isScoped || Boolean(scopeStart || scopeEnd);
   }
 
-  // cssom-1 § 6.4.3 #dom-cssimportrule-href
+  // cssom-1 #dom-cssimportrule-href
   get href(): string { return this._href; }
 
-  // cssom-1 § 6.4.3 #dom-cssimportrule-media
+  // cssom-1 #dom-cssimportrule-media
   get media(): MediaList { return this._media; }
   set media(val: unknown) { this._media.mediaText = val === null ? '' : String(val); }
 
-  // cssom-1 § 6.4.3 #dom-cssimportrule-stylesheet
+  // cssom-1 #dom-cssimportrule-stylesheet
   get styleSheet(): CSSStyleSheet | null {
     if (!this._styleSheet) {
       this._styleSheet = CSSStyleSheet.createInternal(
@@ -798,7 +798,7 @@ export class CSSNamespaceRule extends CSSRule {
   private _prefix: string;
 
   constructor(prefix: string, namespaceURI: string, internalToken?: symbol) {
-    // cssom-1 § 6.4.5 #the-cssnamespacerule-interface
+    // cssom-1 #the-cssnamespacerule-interface
     if (internalToken !== INTERNAL_RULE_TOKEN) {
       throw new TypeError('Illegal constructor');
     }
@@ -1001,7 +1001,7 @@ const COUNTER_STYLE_DESCRIPTORS: ReadonlyArray<readonly [string, string]> = [
 
 const COUNTER_STYLE_PROP_BY_DESCRIPTOR = new Map<string, string>(COUNTER_STYLE_DESCRIPTORS);
 
-// css-counter-styles-3 § 8.1 #csscounterstylerule
+// css-counter-styles-3 #the-csscounterstylerule-interface
 export class CSSCounterStyleRule extends CSSRule {
   private _name: string;
   private _declarations: Declaration[] = [];
@@ -1043,14 +1043,14 @@ export class CSSCounterStyleRule extends CSSRule {
     }
   }
 
-  // css-counter-styles-3 § 8.1 #dom-csscounterstylerule-name
+  // css-counter-styles-3 #dom-csscounterstylerule-name
   get name(): string { return this._name; }
   set name(value: string) { this._name = value; }
 
   get [Symbol.toStringTag]() { return 'CSSCounterStyleRule'; }
   get type() { return 11; }
 
-  // css-counter-styles-3 § 8.1 #csscounterstylerule
+  // css-counter-styles-3 #the-csscounterstylerule-interface
   get cssText() {
     const decls = this._declarations.map(d => {
       const valStr = Array.isArray(d.value) ? serialize(d.value).trim() : (typeof d.value === 'string' ? d.value : '');
@@ -1070,7 +1070,7 @@ for (const [, prop] of COUNTER_STYLE_DESCRIPTORS) {
   });
 }
 
-// css-fonts-4 § 8 #om-fontfeaturevalues
+// css-fonts-4 #om-fontfeaturevalues
 export class CSSFontFeatureValuesMap {
   private _map = new Map<string, number[]>();
 
@@ -1099,7 +1099,7 @@ const FONT_FEATURE_VALUE_MAP_DEFS = [
   ['historical-forms', 'historicalForms'],
 ] as const;
 
-// css-fonts-4 § 8 #cssfontfeaturevaluesrule-interface
+// css-fonts-4 #om-fontfeaturevalues
 export class CSSFontFeatureValuesRule extends CSSRule {
   private _fontFamily: string;
   readonly annotation = new CSSFontFeatureValuesMap();

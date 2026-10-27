@@ -18,7 +18,7 @@
 import { serializeIdentifier } from '../../serializer.ts';
 import type { CSSUnparsedValue } from './CSSUnparsedValue.ts';
 
-// Spec: CSS Typed OM Level 1 § 3.4 #variable-reference-value-objects
+// css-typed-om #unparsedvalue-objects
 export class CSSVariableReferenceValue {
   private _variable!: string;
   private _fallback: CSSUnparsedValue | null = null;

@@ -335,7 +335,7 @@ export function parseMathExpressionTokens(tokenList: ComponentValue[]): CSSNumer
       if (!val) return null;
       if (token.value === '-') {
         if (val instanceof CSSMathSum) {
-          // Negation distribution over sum (CSS Values 4 § 10.7 step 6.3)
+          // Negation distribution over sum (css-values-4 #calc-simplification: step 6.3)
           const negatedGrandchildren = val.values.map(grandchild => {
             if (grandchild instanceof CSSUnitValue) {
               return new CSSUnitValue(-grandchild.value, grandchild.unit);
@@ -769,7 +769,7 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
       return new CSSUnitValue(-simplifiedChild.value, simplifiedChild.unit);
     }
     if (simplifiedChild instanceof CSSMathSum) {
-      // css-values-4 § 10.7 step 6.3 #calc-simplification
+      // css-values-4 #calc-simplification
       const negatedGrandchildren = simplifiedChild.values.map(grandchild => {
         if (grandchild instanceof CSSUnitValue) {
           return new CSSUnitValue(-grandchild.value, grandchild.unit);
@@ -982,7 +982,7 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
   return node;
 }
 
-// css-values-4 § 10.7 #calc-simplification
+// css-values-4 #calc-simplification
 function simplifyMinMax(nodeName: 'min' | 'max', values: CSSNumericValue[]): CSSNumericValue {
   const isMin = nodeName === 'min';
   const flattened: CSSNumericValue[] = [];
@@ -995,7 +995,7 @@ function simplifyMinMax(nodeName: 'min' | 'max', values: CSSNumericValue[]): CSS
     }
   }
   
-  // Combine numeric children by unit per CSS Values 4 § 10.7 step 5
+  // Combine numeric children by unit per css-values-4 #calc-simplification: step 5
   const combined: CSSNumericValue[] = [];
   const unitMap = new Map<string, CSSUnitValue>();
 

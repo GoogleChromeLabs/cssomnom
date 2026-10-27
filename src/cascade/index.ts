@@ -128,11 +128,11 @@ let cachedUaRules: Rule[] | null = null;
 const emptyLayerOrder = new Map<string, number>();
 
 /**
- * Resolves the cascaded style statically for a DOM element according to CSS Cascade 5 and CSS Variables 1.
- * css-cascade-5 § 3 #cascading
- * css-cascade-5 § 6 #cascade-sort
- * css-cascade-5 § 7 #cascaded-values
- * css-variables-1 § 4 #resolving-var-functions
+ * Resolves the cascaded style statically for a DOM element according to css-cascade-5 and css-variables-1.
+ * css-cascade-5 #cascading
+ * css-cascade-5 #cascade-sort
+ * css-cascade-5 #cascaded
+ * css-variables-1 #using-variables
  */
 export function getCascadedStyle(
   element?: ElementLike | null,
@@ -163,13 +163,13 @@ export function getCascadedStyle(
     return new CSSStyleDeclaration([], true);
   }
 
-  // 2. Discover @layer ordering (CSS Cascade 5 § 6.4 #layer-ordering)
+  // 2. Discover @layer ordering (css-cascade-5 #layer-ordering)
   const env = resolveMediaEnvironment(element);
   const layerDeclarationOrder = getLayerDeclarationOrder(ruleList, env);
   const { activeProperties, activeKeyframes } = collectActiveAtRules(ruleList, layerDeclarationOrder, env);
 
   // 3. Collect matched declarations from stylesheet rules
-  // 3a. User-Agent origin rules (CSS Cascade 5 § 6.1 #cascade-origin, § 6.2 #cascading-origins)
+  // 3a. User-Agent origin rules (css-cascade-5 #cascade-origin, #cascading-origins)
   if (!cachedUaRules) {
     cachedUaRules = ParseHooks.consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true);
   }
@@ -266,7 +266,7 @@ export function getCascadedStyle(
     }
   }
 
-  // 9. Resolve custom properties (CSS Variables 1 § 3, § 4, CSS Variables 2 § 3, CSS Values 5 § 3.3, CSS Cascade 5 § 6.4.3)
+  // 9. Resolve custom properties (css-variables-1 #using-variables)
   const { resolvedCustomProps, cyclicProps, taintedProps } = resolveCustomProperties(
     declarationsByProperty,
     rawCustomProps,
@@ -288,7 +288,7 @@ export function getCascadedStyle(
     direction
   );
 
-  // 10.1. Apply animation declarations (css-cascade-5 § 6.1 #cascade-sort, css-animations-1 § 4 #keyframes)
+  // 10.1. Apply animation declarations (css-cascade-5 #cascade-sort, css-animations-1 #keyframes)
   const animDecl = winningDeclarations.get('animation') || winningDeclarations.get('animation-name');
   if (animDecl && !animDecl.value.startsWith('none')) {
     const tokens = animDecl.value.trim().split(/\s+/);
@@ -373,7 +373,7 @@ export function getCascadedStyle(
 
   for (const [name, decl] of winningDeclarations) {
     const mappedName = resolveLogicalProperty(name, writingMode, direction);
-    // svg2 § 13.2 #presentation-attributes
+    // svg2 #presentation-attributes
     const isSvg = isSvgElement(element);
     const isSvgColorProp = isSvg && (mappedName === 'flood-color' || mappedName === 'lighting-color' || mappedName === 'stop-color' || mappedName === 'stroke');
     const finalValue = COLOR_PROPERTIES.has(mappedName) && !isSvgColorProp ? normalizeComputedColor(decl.value) : decl.value;
