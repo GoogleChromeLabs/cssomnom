@@ -136,7 +136,6 @@ export class CSSStyleSheet extends StyleSheet {
     return this._parentStyleSheet;
   }
 
-  // cssom-1 #the-cssstylesheet-interface
   get [Symbol.toStringTag](): string {
     return 'CSSStyleSheet';
   }
@@ -425,6 +424,7 @@ export class CSSStyleSheet extends StyleSheet {
     return this.cssRules;
   }
 
+  // cssom-1 #legacy-css-style-sheet-members: addRule returns -1
   addRule(selector: string = 'undefined', style: string = 'undefined', optionalIndex?: number): number {
     let rule = '';
     rule += selector;
@@ -439,6 +439,7 @@ export class CSSStyleSheet extends StyleSheet {
     return -1;
   }
 
+  // cssom-1 #legacy-css-style-sheet-members: removeRule forwards to deleteRule
   removeRule(index: number = 0): void {
     this.deleteRule(index);
   }
@@ -592,7 +593,7 @@ export class CSSStyleRule extends CSSGroupingRule {
 
   get type() { return 1; }
 
-  // 6.14 The CSSStyleRule Interface & css-nesting-1 #the-cssnestrule
+  // cssom-1 #serialize-a-css-rule
   get cssText() {
     const declsStr = serializeDeclarations(this.style._declarations);
     

@@ -36,7 +36,6 @@ export class StyleSheetList {
     return this._sheets[index] || null;
   }
 
-  // cssom-1 #the-stylesheetlist-interface
   get [Symbol.toStringTag](): string {
     return 'StyleSheetList';
   }
@@ -62,7 +61,6 @@ export class MediaList {
     return createIndexedProxy(this, (t) => t._mediaQueries.map(q => serializeMediaQuery(q)));
   }
 
-  // cssom-1 #the-medialist-interface
   get [Symbol.toStringTag](): string {
     return 'MediaList';
   }
@@ -96,6 +94,7 @@ export class MediaList {
     return this._mediaQueries;
   }
 
+  // cssom-1 #dom-medialist-appendmedium
   appendMedium(medium: string): void {
     const parsed = MediaParser.parse(medium);
     if (parsed.length !== 1) {
@@ -109,6 +108,7 @@ export class MediaList {
     this._mediaQueries.push(m);
   }
 
+  // cssom-1 #dom-medialist-deletemedium
   deleteMedium(medium: string): void {
     const parsed = MediaParser.parse(medium);
     if (parsed.length !== 1) {
@@ -152,7 +152,6 @@ export class CSSRuleList {
     return (this._getRules()[index] as CSSRule) || null;
   }
 
-  // cssom-1 #the-cssrulelist-interface
   get [Symbol.toStringTag](): string {
     return 'CSSRuleList';
   }

@@ -232,6 +232,7 @@ export function getCascadedStyle(
   const toWinner = declarationsByProperty.get('text-orientation')?.at(-1);
   if (toWinner) textOrientation = toWinner.value;
 
+  // css-writing-modes-4 #text-orientation: upright text orientation forces direction to ltr in vertical modes
   if (textOrientation === 'upright' && (writingMode === 'vertical-rl' || writingMode === 'vertical-lr')) {
     direction = 'ltr';
   }
@@ -288,7 +289,7 @@ export function getCascadedStyle(
     direction
   );
 
-  // 10.1. Apply animation declarations (css-cascade-5 #cascade-sort, css-animations-1 #keyframes)
+  // css-cascade-5 #cascade-sort, css-animations-1 #keyframes: apply animation declarations
   const animDecl = winningDeclarations.get('animation') || winningDeclarations.get('animation-name');
   if (animDecl && !animDecl.value.startsWith('none')) {
     const tokens = animDecl.value.trim().split(/\s+/);

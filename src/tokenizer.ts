@@ -50,7 +50,6 @@ class Tokenizer extends AbstractTokenizer {
       .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
   }
 
-  // css-syntax-3 #tokenization
   tokenize(): Token[] {
     const tokens: Token[] = [];
     while (true) {
@@ -67,7 +66,6 @@ class Tokenizer extends AbstractTokenizer {
     return tokens;
   }
 
-  // css-syntax-3 #next-input-code-point
   protected get cp(): number {
     return this.pos < this.input.length ? this.input.codePointAt(this.pos)! : -1;
   }
@@ -82,7 +80,6 @@ class Tokenizer extends AbstractTokenizer {
     return index < this.input.length ? this.input.codePointAt(index)! : -1;
   }
 
-  // css-syntax-3 #next-input-code-point (consume the next input code point)
   protected consume(): number {
     const cp = this.cp;
     if (cp !== -1) {

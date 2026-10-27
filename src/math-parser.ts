@@ -360,11 +360,11 @@ export function parseMathExpressionTokens(tokenList: ComponentValue[]): CSSNumer
   return res;
 }
 
-// 10 Mathematical Expressions
+// css-values-4 #math
 export function parseMathFunction(name: string, values: ComponentValue[]): CSSNumericValue | null {
   const nameLower = name.toLowerCase();
 
-  // 10.1 Basic Arithmetic: calc()
+  // css-values-4 #calc-func
   if (nameLower === 'calc') {
     const result = parseMathExpressionTokens(values);
     if (!result) return null;
@@ -396,7 +396,7 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
     return parseMathExpressionTokens(argTokens);
   }
 
-  // 10.2 Comparison Functions: min(), max(), and clamp()
+  // css-values-4 #comp-func
   if (nameLower === 'min' || nameLower === 'max') {
     const args: CSSNumericValue[] = [];
     const firstArg = consumeArg();
@@ -421,7 +421,7 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
     return result;
   }
   
-  // 10.2 Comparison Functions: min(), max(), and clamp()
+  // css-values-4 #comp-func
   if (nameLower === 'clamp') {
     let lower: CSSNumericValue | CSSKeywordValue | null = null;
     let valueNode: CSSNumericValue | null = null;
@@ -506,10 +506,10 @@ export function parseMathFunction(name: string, values: ComponentValue[]): CSSNu
     return new CSSMathRound(strategy, value, precision, precisionOmitted);
   }
 
-  // 10.3 Trigonometric Functions: sin(), cos(), tan(), etc.
-  // 10.4 Exponential Functions: pow(), sqrt(), exp(), log(), hypot()
-  // 10.5 Sign-Related Functions: abs(), sign()
-  // 10.6 Stepped-Value Functions: round(), mod(), rem()
+  // css-values-4 #trig-funcs
+  // css-values-4 #exponent-funcs
+  // css-values-4 #sign-funcs
+  // css-values-4 #round-func
   if (MATH_FUNCTIONS.includes(nameLower)) {
     const args: CSSNumericValue[] = [];
     const firstArg = consumeArg();
@@ -737,6 +737,7 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
         }
       } else {
         // If they cannot be simplified to a single CSSUnitValue, fall back to adding them as they are
+        // css-values-4 #sort-a-calculations-children
         for (const child of numericChildren) {
           otherChildren.push(child.original);
         }

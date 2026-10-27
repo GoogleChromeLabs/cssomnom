@@ -21,7 +21,7 @@ import type { CSSStyleSheet } from './CSSOM.ts';
 
 /**
  * CSS Token Types according to css-syntax-3.
- * @see https://drafts.csswg.org/css-syntax-3/#tokenization
+ * css-syntax-3 #tokenization
  */
 export type TokenType =
   | 'ident'
@@ -221,7 +221,7 @@ export type CustomMediaQuery = MediaList | boolean;
 
 /**
  * Structured Selector AST
- * @see https://drafts.csswg.org/selectors-4/#grammar
+ * selectors-4 #grammar
  */
 export interface SelectorList {
   type: 'selector-list';
@@ -307,7 +307,7 @@ export interface NestingSelector {
 
 /**
  * Structured Media Query AST for <general-enclosed>
- * @see https://drafts.csswg.org/mediaqueries-4/#mq-syntax
+ * mediaqueries-4 #mq-syntax
  */
 export interface GeneralEnclosed {
   type: 'general-enclosed';

@@ -50,6 +50,7 @@ interface SyntaxComponent {
   multiplier: string;
 }
 
+// css-properties-values-api #consume-syntax-definition
 function parseSyntax(syntax: string): SyntaxComponent[] | '*' {
   const s = syntax.trim();
   if (s === '*') return '*';
@@ -84,6 +85,7 @@ function parseSyntax(syntax: string): SyntaxComponent[] | '*' {
   return definition;
 }
 
+// css-properties-values-api #consume-syntax-component
 function consumeSyntaxComponent(stream: ArrayTokenStream): SyntaxComponent {
   const token = stream.next();
   let name = '';
@@ -295,6 +297,7 @@ interface PropertyDefinitionInternal extends PropertyDefinition {
 const registry = new Map<string, PropertyDefinitionInternal>();
 
 export const PropertyRegistry = {
+  // css-properties-values-api #register-a-custom-property: WPT enforces Level 1 required inherits and non-universal initialValue
   validate(definition: PropertyDefinition) {
     if (definition.name === undefined) {
       throw new TypeError('The name parameter is required.');

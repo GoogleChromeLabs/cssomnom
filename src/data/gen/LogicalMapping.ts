@@ -20,7 +20,7 @@
 
 /**
  * Logical property to physical property mapping for default horizontal-tb, ltr.
- * @see https://drafts.csswg.org/css-logical-1/#box
+ * css-logical-1 #box
  */
 export const LOGICAL_MAPPING = {
   'background-position-block': 'background-position-y',
@@ -98,7 +98,7 @@ for (const [logical, physical] of Object.entries(LOGICAL_MAPPING)) {
 
 /**
  * Logical property groups and mapping logic.
- * @see https://drafts.csswg.org/css-logical-1/#logical-property-group
+ * css-logical-1 #logical-property-group
  */
 export const LOGICAL_PROPERTY_INFO: Record<string, { group: string; logic: 'logical' | 'physical' }> = {
   'background-position-block': { group: 'background-position', logic: 'logical' },

@@ -43,13 +43,10 @@ export class CSSMediaRule extends CSSConditionRule {
     this._media = new MediaList(mediaText);
   }
 
-  // css-conditional-3 #dom-cssmediarule-media
   get media(): MediaList {
     return this._media;
   }
 
-  // css-conditional-3 #dom-cssmediarule-media
-  // WebIDL #putforwards
   set media(val: unknown) {
     this._media.mediaText = val === null ? '' : String(val);
   }
@@ -64,7 +61,7 @@ export class CSSMediaRule extends CSSConditionRule {
 
   get type() { return 4; }
 
-  // 6.17 The CSSMediaRule Interface
+  // cssom-1 #serialize-a-css-rule
   get cssText() {
     return serializeGroupingRule('media', this._media.mediaText, this._rules);
   }
@@ -108,7 +105,6 @@ export class CSSSupportsRule extends CSSConditionRule {
     return this._conditionText;
   }
 
-  // css-conditional-3 #the-csssupportsrule-interface
   get [Symbol.toStringTag](): string {
     return 'CSSSupportsRule';
   }
@@ -455,6 +451,7 @@ export class CSSKeyframeRule extends CSSRule {
   set cssText(_value: string) {}
 }
 
+// css-nesting-1 #the-cssnestrule
 export class CSSNestedDeclarations extends CSSRule {
   private _style: CSSStyleDeclaration;
 
@@ -499,7 +496,6 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   }
 }
 
-// css-fonts-4 #om-fontface
 // css-fonts-4 #om-fontface
 export class CSSFontFaceRule extends CSSRule {
   private _style: CSSFontFaceDescriptors;
@@ -605,7 +601,6 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
     return PAGE_ALLOWED_PROPERTIES.has(property);
   }
 
-  // cssom-1 #the-csspagerule-interface
   get [Symbol.toStringTag](): string {
     return 'CSSPageDescriptors';
   }
@@ -632,7 +627,6 @@ const PAGE_DESCRIPTOR_PROPERTIES = [
 for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {
   const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
   Object.defineProperty(CSSPageDescriptors.prototype, prop, {
-    // cssom-1 #the-csspagerule-interface
     get(this: unknown): string {
       return (this as CSSPageDescriptors).getPropertyValue(cssProp);
     },
@@ -663,7 +657,6 @@ export class CSSMarginRule extends CSSRule {
     this._style._parentRule = this;
   }
 
-  // cssom-1 #the-cssmarginrule-interface
   get name(): string {
     return this._name;
   }
@@ -676,7 +669,6 @@ export class CSSMarginRule extends CSSRule {
     this._style.cssText = value;
   }
 
-  // cssom-1 #the-cssmarginrule-interface
   get [Symbol.toStringTag](): string {
     return 'CSSMarginRule';
   }
@@ -740,10 +732,8 @@ export class CSSImportRule extends CSSRule {
     this._isScoped = isScoped || Boolean(scopeStart || scopeEnd);
   }
 
-  // cssom-1 #dom-cssimportrule-href
   get href(): string { return this._href; }
 
-  // cssom-1 #dom-cssimportrule-media
   get media(): MediaList { return this._media; }
   set media(val: unknown) { this._media.mediaText = val === null ? '' : String(val); }
 

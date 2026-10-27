@@ -23,8 +23,6 @@ export type Specificity = [number, number, number];
 
 /**
  * Matched CSS declaration with full cascade metadata.
- * css-cascade-5 #filtering
- * css-cascade-5 #cascade-sort
  */
 export interface MatchedDeclaration {
   name: string;
@@ -43,28 +41,15 @@ export interface MatchedDeclaration {
 
 /**
  * Cascade origin and importance precedence levels.
- * css-cascade-5 #cascade-origin
- * css-cascade-5 #style-attr
- * css-cascade-5 #cascade-layering
- * css-cascade-5 #cascading-origins
- * css-cascade-5 #importance
  */
 export const CascadeOrigin = {
-  // css-cascade-5 #cascade-origin, #cascade-origin-ua
   USER_AGENT: 0,
-  // css-cascade-5 #cascade-origin, #cascade-origin-user
   USER: 10,
-  // css-cascade-5 #cascade-origin, #cascade-layering
   AUTHOR_NORMAL_LAYERED: 10,
-  // css-cascade-5 #cascade-origin, #cascade-layering (implicit final layer)
   AUTHOR_NORMAL_UNLAYERED: 20,
-  // css-cascade-5 #style-attr (element-attached styles)
   INLINE_NORMAL: 30,
-  // css-cascade-5 #cascade-origin, #cascade-layering, #importance
   AUTHOR_IMPORTANT_UNLAYERED: 40,
-  // css-cascade-5 #cascade-origin, #cascade-layering, #importance
   AUTHOR_IMPORTANT_LAYERED: 50,
-  // css-cascade-5 #style-attr, #importance
   INLINE_IMPORTANT: 60,
 } as const;
 

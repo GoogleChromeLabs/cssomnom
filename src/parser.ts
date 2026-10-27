@@ -114,7 +114,7 @@ const FONT_FEATURE_VALUE_BLOCKS: Record<string, 'annotation' | 'ornaments' | 'st
 /**
  * Skeleton Parser for CSSOM.
  * Implements top-level parsing algorithms from css-syntax-3.
- * @see https://drafts.csswg.org/css-syntax-3/#parsing
+ * // css-syntax-3 #parsing
  * 
  * @note We recommend a more ergonomic entry point like `CSS.parseStylesheet` 
  * or `CSS.parseStylesheetSync` for standard usage.
@@ -138,6 +138,7 @@ export class Parser {
     'font-face': (parser, rule, block) => block ? parser.handleFontFaceRule(rule, block) : null,
     page: (parser, rule, block) => block ? parser.handlePageRule(rule, block) : null,
     property: (parser, rule, block) => block ? parser.handlePropertyRule(rule, block) : null,
+    // css-conditional-3 #at-supports
     supports: (parser, rule, block, nested) => parser.handleGroupingAtRule(rule, block, nested || false, CSSSupportsRule),
     container: (parser, rule, block, nested) => parser.handleGroupingAtRule(rule, block, nested || false, CSSContainerRule),
     layer: (parser, rule, block, nested) => parser.handleLayerRule(rule, block, nested || false),
@@ -258,7 +259,7 @@ export class Parser {
     }
   }
 
-  // 5.4.9 Parse a list of component values https://drafts.csswg.org/css-syntax/#parse-list-of-component-values
+  // css-syntax-3 #parse-list-of-component-values
   public parseComponentValues(): ComponentValue[] {
     const values: ComponentValue[] = [];
     while (this.nextToken.type !== 'EOF') {
@@ -267,12 +268,12 @@ export class Parser {
     return values;
   }
 
-  // 5.4.10 Parse a comma-separated list of component values https://drafts.csswg.org/css-syntax/#parse-comma-separated-list-of-component-values
+  // css-syntax-3 #parse-comma-separated-list-of-component-values
   public parseCommaSeparatedListOfComponentValues(): ComponentValue[][] {
     return splitComponentValuesByComma(this.parseComponentValues());
   }
 
-  // 5.4.3 Parse a stylesheet https://drafts.csswg.org/css-syntax/#parse-stylesheet
+  // css-syntax-3 #parse-stylesheet
   public parseStyleSheet(): CSSStyleSheet {
     const rules = this.consumeListOfRules(true);
     return CSSStyleSheet.createInternal(rules, (text: string) => this.parseRule(text));
@@ -288,23 +289,24 @@ export class Parser {
     return rule;
   }
 
-  // 5.4.5 Parse a list of declarations https://drafts.csswg.org/css-syntax/#parse-block-contents
+  // css-style-attr-1 #syntax
+  // css-syntax-3 #consume-block-contents
   public parseStyleAttribute(): CSSStyleDeclaration {
     const declarations = this.consumeDeclarationsFromBlockContents(this.parseComponentValues());
     return new CSSStyleDeclaration(declarations);
   }
 
-  // 5.4.4 Parse a stylesheet's contents https://drafts.csswg.org/css-syntax/#parse-stylesheet-contents
+  // css-syntax-3 #parse-stylesheet-contents
   public parseStyleSheetContents(): Rule[] {
     return this.consumeListOfRules(true);
   }
 
-  // 5.4.5 Parse a block's contents https://drafts.csswg.org/css-syntax/#parse-block-contents
+  // css-syntax-3 #consume-block-contents
   public parseBlockContents(): Rule[] {
     return this.consumeBlockContents(new ArrayComponentValueStream(this.parseComponentValues()), true, false);
   }
 
-  // 5.4.7 Parse a declaration https://drafts.csswg.org/css-syntax/#parse-declaration
+  // css-syntax-3 #parse-declaration
   public parseDeclaration(): Declaration | null {
     this.skipWhitespace();
     if (this.nextToken.type !== 'ident') return null;
@@ -312,7 +314,7 @@ export class Parser {
     return this.consumeDeclarationFromStream(stream);
   }
 
-  // 5.4.8 Parse a component value https://drafts.csswg.org/css-syntax/#parse-component-value
+  // css-syntax-3 #parse-component-value
   public parseComponentValue(): ComponentValue | null {
     this.skipWhitespace();
     if (this.nextToken.type === 'EOF') return null;
@@ -321,7 +323,7 @@ export class Parser {
     return (this.nextToken as Token).type === 'EOF' ? value : null;
   }
 
-  // 5.5.1 Consume a stylesheet's contents https://drafts.csswg.org/css-syntax/#consume-stylesheet-contents
+  // css-syntax-3 #consume-stylesheet-contents
   public consumeListOfRules(topLevel: boolean): Rule[] {
     const rules: Rule[] = [];
     while (true) {
@@ -339,7 +341,7 @@ export class Parser {
     }
   }
 
-  // 5.4.6 https://drafts.csswg.org/css-syntax/#parse-rule
+  // css-syntax-3 #parse-rule
   public consumeRule(nested: boolean = false): Rule | null {
     this.skipWhitespace();
     if (this.nextToken.type === 'EOF') return null;
@@ -392,7 +394,7 @@ export class Parser {
     return atRule;
   }
 
-  // 5.5.2 Consume an at-rule https://drafts.csswg.org/css-syntax/#consume-at-rule
+  // css-syntax-3 #consume-at-rule
   private consumeAtRule(nested: boolean = false): Rule | null {
     const token = this.consumeToken();
     if (token.type !== 'at-keyword') return null;
@@ -844,11 +846,7 @@ export class Parser {
     return new CSSCustomMediaRule(name, query);
   }
 
-  /**
-   * Consume a qualified rule.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-qualified-rule
-   */
-  // 5.5.3 Consume a qualified rule https://drafts.csswg.org/css-syntax/#consume-qualified-rule
+  // css-syntax-3 #consume-qualified-rule
   private consumeQualifiedRule(nested: boolean = false): CSSStyleRule | null {
     const prelude: ComponentValue[] = [];
 
@@ -898,11 +896,7 @@ export class Parser {
     }
   }
 
-  /**
-   * Consume a list of declarations.
-   * @see https://drafts.csswg.org/css-syntax-3/#consume-list-of-declarations
-   */
-  // 5.5.5 Consume a block's contents https://drafts.csswg.org/css-syntax/#consume-block-contents
+  // css-syntax-3 #consume-block-contents
   public consumeDeclarationsFromBlockContents(values: ComponentValue[]): Declaration[] {
     const stream = new ArrayComponentValueStream(values);
     const decls: Declaration[] = [];
@@ -1061,7 +1055,7 @@ export class Parser {
       }
     }
 
-    // css-syntax-3 #consume-a-declaration Step 7
+    // css-syntax-3 #consume-declaration: step 7 whitespace trimming
     while (declValue.length > 0 && declValue[declValue.length - 1].type === 'whitespace') {
       declValue.pop();
     }
@@ -1076,6 +1070,7 @@ export class Parser {
       if (!validateDeclarationValue(declValue)) return null;
     }
 
+    // css-syntax-3 #consume-unicode-range-value: re-tokenizes raw value with unicodeRangesAllowed=true
     if (name.toLowerCase() === 'unicode-range') {
       const text = getOriginalText(declValue);
       const errors: ParseError[] = [];
@@ -1296,7 +1291,7 @@ export class Parser {
     }
   }
 
-  // css-nesting-1 #nest-selector & #cssom
+  // css-nesting-1 #cssom: absolutize relative selector by inserting implied nesting selector
   private normalizeNestedSelector(prelude: ComponentValue[]): string {
     const segments = splitComponentValuesByComma(prelude, true);
     if (segments.length === 1 && segments[0].length === 0) return '';
@@ -1326,7 +1321,7 @@ export class Parser {
     return normalizedSegments.join(', ');
   }
 
-  // 5.5.9 Consume a simple block https://drafts.csswg.org/css-syntax/#consume-simple-block
+  // css-syntax-3 #consume-simple-block
   private consumeBlock(startToken: Token): SimpleBlock {
     const block: SimpleBlock = {
       type: 'simple-block',
@@ -1353,7 +1348,7 @@ export class Parser {
     }
   }
 
-  // 5.5.10 Consume a function https://drafts.csswg.org/css-syntax/#consume-function
+  // css-syntax-3 #consume-function
   private consumeFunction(nameToken: FunctionToken): CSSFunction {
     const func: CSSFunction = {
       type: 'function',
@@ -1375,7 +1370,7 @@ export class Parser {
     }
   }
 
-  // 5.5.8 Consume a component value https://drafts.csswg.org/css-syntax/#consume-component-value
+  // css-syntax-3 #consume-component-value
   public consumeComponentValue(): ComponentValue {
     const token = this.consumeToken();
     if (token.type === '{' || token.type === '[' || token.type === '(') {
@@ -1412,8 +1407,7 @@ export class Parser {
     return new Parser(tokenize(text), { source: text }).consumeListOfRules(true);
   }
 
-  // css-nesting-1 #the-cssnestrule
-  // cssom-1 #the-cssgroupingrule-interface
+  // css-syntax-3 #consume-block-contents
   public static parseRuleInBlockText(text: string, nested = true, inScope = false): Rule {
     const parser = new Parser(tokenize(`{ ${text} }`));
     if (inScope) parser.scopeContextDepth = 1;

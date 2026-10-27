@@ -694,14 +694,14 @@ Currently, `src/matcher.ts` uses basic prefix matching (`elementLang === clean |
 
 Result (`3e68527`): `src/` (excluding `src/data/gen`) net **−110 lines** (`185 insertions, 295 deletions` across 17 files), also removing a lingering direct `Parser` import in `variable-resolver.ts` in favor of `ParseHooks`. WPT **21,639 / 23,157** (**+2** genuine passes on `stop-opacity` and `pointer-events` inheritance from spec-derived `INHERITED_PROPERTIES`, **0** regressions).
 
-## Phase 158: High-Scrutiny Spec Compliance & Citation Hygiene Audit [ ]
+## Phase 158: High-Scrutiny Spec Compliance & Citation Hygiene Audit [~]
 **Objective**: Address the 37 `Scrutineer`-validated behavioral compliance gaps (`BC-*`) and high-bar citation hygiene improvements (`CH-*`) across all 10 CSS specification domains documented in [`docs/reports/spec_compliance_audit_report.md`](./docs/reports/spec_compliance_audit_report.md) (after pruning 10 false-positive claims against WPT / specs).
 
 ### Tasks
-- [ ] **Phase 158.1 — Citation Hygiene & CI Guard Tightening (`CH-R01`–`CH-R28`, `CH-P01`–`CH-P09`, `CH-A01`–`CH-A15`)**:
+- [x] **Phase 158.1 — Citation Hygiene & CI Guard Tightening (`CH-R01`–`CH-R28`, `CH-P01`–`CH-P09`, `CH-A01`–`CH-A15`)**:
   - Retarget all 28 mismatched/bare-section/URL comments (`CH-R01`–`CH-R28`), prune the 9 ceremonial getter/predicate comment groups (`CH-P01`–`CH-P09`), and add the 14 high-bar algorithm entry points & cross-spec/linkedom notes (`CH-A01`–`CH-A15`).
-  - Tighten `scripts/ci/check-spec-anchors.ts` to also reject bare leading section numbers (e.g. `// 5.4.9 ...`, `// 6.14 The CSS...`, `// 10.1 ...`) and raw `drafts.csswg.org` / `drafts.css-houdini.org` URLs in `src/`.
-- [ ] **Phase 158.2 — CSSOM, Syntax & Selectors Compliance (`BC-01`, `BC-02`, `BC-04`, `BC-05`, `BC-07`–`BC-10`, `BC-12`)**:
+  - Replace the brittle keyword-enumerating `citationRegex`, `VENDORED_SPEC_PATTERN`, and prose `SPEC_ALIASES` in `scripts/ci/check-spec-anchors.ts` with dynamic submodule directory discovery from `SpecAnchorRegistry` + a generic `<spec-token> #<anchor>` matcher, and also reject bare leading section numbers (e.g. `// 5.4.9 ...`, `// 6.14 The CSS...`, `// 10.1 ...`), unnormalized prose spec names before `#<anchor>`, and raw `drafts.csswg.org` / `drafts.css-houdini.org` URLs in `src/`.
+- [~] **Phase 158.2 — CSSOM, Syntax & Selectors Compliance (`BC-01`, `BC-02`, `BC-04`, `BC-05`, `BC-07`–`BC-10`, `BC-12`)**:
   - `MediaList.deleteMedium` early return on `null`/multi-query (`BC-01`), `CSSStyleDeclaration.setProperty` `undefined` value coercion (`BC-02`), `CSSPropertyRule.prototype.type === 0` (`BC-04`), and `removeProperty` canonical `getPropertyValue` return (`BC-05`).
   - `consumeUnicodeRangeToken` empty range tokenization vs descriptor validation (`BC-07`), `validateDeclarationValue` rejecting unmatched `)`, `]`, `}` and top-level `;`/`!` (`BC-08`), `parseDeclaration` trailing EOF check (`BC-09`), and `serializeToken` `delim('\\')` -> `'\\\n'` (`BC-10`).
   - XML document no-namespace `lang` attribute restricted to HTML/SVG elements (`BC-12`).

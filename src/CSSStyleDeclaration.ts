@@ -123,7 +123,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return false;
   }
 
-  // cssom-1 #dom-cssstyledeclaration-parentrule
   get parentRule(): CSSRule | null {
     return this._parentRule;
   }
@@ -289,6 +288,8 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         const wm = this.getPropertyValue('writing-mode') || 'horizontal-tb';
         const dir = this.getPropertyValue('direction') || 'ltr';
 
+        // css-logical-1 #box
+        // css-logical-1 #logical-shorthand-keyword
         // Conflict detection for dynamic logical property mappings
         const physicalToLogicalSet = new Map<string, { lh: string; decl: Declaration | null }>();
         for (const lh of Object.keys(longhandValues)) {
@@ -482,7 +483,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return (winner && winner.important) ? 'important' : '';
   }
 
-  // cssom-1 #the-cssstyledeclaration-interface
+  // cssom-1 #dom-cssstyledeclaration-setproperty
   setProperty(property: string, value: string | null, priority: string = '', notify: boolean = true) {
     // 1. If the readonly flag is set, then throw a NoModificationAllowedError exception.
     if (this._readonly) {
@@ -589,7 +590,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       componentValues.splice(0, componentValues.length, ...assembled);
     }
 
-    // cssom-1 #set-a-css-declaration
     if (existing) {
       existing.value = componentValues;
       existing.important = isImportant;
@@ -629,6 +629,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     }
   }
 
+  // cssom-1 #dom-cssstyledeclaration-removeproperty
   removeProperty(property: string): string {
     if (this._readonly) {
       throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');

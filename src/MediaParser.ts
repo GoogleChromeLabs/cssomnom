@@ -29,16 +29,12 @@ import {
   FEATURE_ALLOWED_IDENTS
 } from './data/gen/media-features.ts';
 
-// mediaqueries-4 #media
-// mediaqueries-4 #media-types
-// mediaqueries-4 #mq-features
-// mediaqueries-5 #mq-syntax
+// mediaqueries-4 #mq-syntax
 export class MediaParser {
   /**
    * Parse a media query list string into an array of normalized media queries.
    * Invalid queries are replaced with 'not all'.
-   * // mediaqueries-4 #mq-syntax
-   * // mediaqueries-4 #mq-list
+   * mediaqueries-4 #mq-syntax: parse a <media-query-list> production
    */
   public static parse(mediaText: string): MediaQuery[] {
     if (!mediaText || mediaText.trim() === '') {
@@ -73,6 +69,7 @@ export class MediaParser {
   /**
    * Evaluate a media query or media query list against a media environment.
    * Uses Kleene 3-valued logic, converting 'unknown' to false in boolean context.
+   * mediaqueries-4 #evaluating
    */
   public static evaluate(query: string | MediaQuery | MediaQuery[], env?: Partial<MediaEnvironment>): boolean {
     const fullEnv: MediaEnvironment = { ...DEFAULT_MEDIA_ENV, ...env };
@@ -667,6 +664,7 @@ export const DEFAULT_MEDIA_ENV: MediaEnvironment = {
 
 export type EvalResult = boolean | 'unknown';
 
+// cssom-1 #serializing-media-queries
 export function serializeMediaQuery(query: MediaQuery): string {
   if (query.invalid) return 'not all';
 
@@ -858,6 +856,7 @@ function parseIdent(tokens: ComponentValue[]): string | null {
   return (filtered.length === 1 && filtered[0].type === 'ident') ? filtered[0].value.toLowerCase() : null;
 }
 
+// mediaqueries-4 #mq-range-context: false in negative range
 function compareOp(actual: number, op: string, queried: number, isNegativeRangeFeature: boolean): boolean {
   if (isNegativeRangeFeature && queried < 0) {
     return op === '>' || op === '>=';

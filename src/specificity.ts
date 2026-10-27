@@ -110,20 +110,15 @@ function calculateCompoundSelectorSpecificity(compound: CompoundSelector, parent
 
 function calculateSimpleSelectorSpecificity(simple: SimpleSelector, parentSpecificity?: Specificity): Specificity {
   switch (simple.type) {
-    // selectors-4 #specificity-rules: count ID selectors (= A)
     case 'id-selector':
       return [1, 0, 0];
-    // selectors-4 #specificity-rules: count class selectors and attribute selectors (= B)
     case 'class-selector':
     case 'attribute-selector':
       return [0, 1, 0];
-    // selectors-4 #specificity-rules: count type selectors (= C)
     case 'type-selector':
       return [0, 0, 1];
-    // selectors-4 #specificity-rules: count pseudo-elements (= C)
     case 'pseudo-element-selector':
       return calculatePseudoElementSpecificity(simple, parentSpecificity);
-    // selectors-4 #specificity-rules: ignore universal selector
     case 'universal-selector':
       return ZERO;
     // css-nesting-1 #nesting-selector:
@@ -154,7 +149,7 @@ function calculatePseudoClassSpecificity(pseudo: PseudoClassSelector, parentSpec
   }
   
   // selectors-4 #specificity-rules: pseudo-class (1 in B) plus argument specificity
-  // css-shadow-1 #host-selector
+  // css-scoping-1 #host-selector
   if (['nth-child', 'nth-last-child', 'host', 'host-context'].includes(name)) {
     const argSpec = getArgumentSpecificity(pseudo, parentSpecificity);
     return [argSpec[0], argSpec[1] + 1, argSpec[2]];
@@ -166,7 +161,7 @@ function calculatePseudoClassSpecificity(pseudo: PseudoClassSelector, parentSpec
 
 function calculatePseudoElementSpecificity(pseudo: PseudoElementSelector, parentSpecificity?: Specificity): Specificity {
   const name = pseudo.name.toLowerCase();
-  // css-shadow-1 #slotted-pseudo:
+  // css-scoping-1 #slotted-pseudo:
   // "The specificity of ::slotted() is that of a pseudo-element, plus the specificity of its argument."
   if (name === 'slotted') {
     const argSpec = getArgumentSpecificity(pseudo, parentSpecificity);

@@ -28,7 +28,6 @@ import type { MatchedDeclaration } from './types.ts';
  */
 export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDeclaration): number {
   const getPrecedence = (decl: MatchedDeclaration): number => {
-    // css-cascade-5 #cascading-origins, #cascade-sort
     // Criterion 1: Origin & Importance (Important Author > Normal Author)
     // Criterion 2: Context (Shadow Encapsulation)
     //   - Normal: document / part (2) > shadow (1) > slotted (0)
@@ -44,7 +43,6 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
       scopeScore = decl.important ? 1 : 2;
     }
 
-    // css-cascade-5 #cascade-origin, #cascading-origins
     // 1. Important user-agent declarations (beat important author)
     // 2. Important author declarations
     // 3. Animation declarations (beats normal author)
@@ -61,15 +59,11 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
     }
 
     if (decl.important) {
-      // css-cascade-5 #style-attr, #importance
       const inlineBonus = decl.isInline ? 50 : 0;
-      // css-cascade-5 #cascade-layering, #importance (layered beats unlayered)
       const layerTier = decl.layerOrder !== Infinity ? 20 : 10;
       return 1000 + scopeScore * 100 + inlineBonus + layerTier;
     } else {
-      // css-cascade-5 #style-attr
       const inlineBonus = decl.isInline ? 50 : 0;
-      // css-cascade-5 #cascade-layering (unlayered beats layered)
       const layerTier = decl.layerOrder === Infinity ? 20 : 10;
       return scopeScore * 100 + inlineBonus + layerTier;
     }
@@ -83,12 +77,12 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
 
   // Layer order within importance bucket: css-cascade-5 #cascade-layering, #layer-ordering
   if (a.important && a.layerOrder !== Infinity && b.layerOrder !== Infinity) {
-    // css-cascade-5 #cascade-layering, #layer-ordering: for important rules, earliest layer wins (lower index)
+    // For important rules, earliest layer wins (lower index)
     if (a.layerOrder !== b.layerOrder) {
       return b.layerOrder - a.layerOrder;
     }
   } else if (!a.important && a.layerOrder !== Infinity && b.layerOrder !== Infinity) {
-    // css-cascade-5 #cascade-layering, #layer-ordering: for normal rules, latest layer wins (higher index)
+    // For normal rules, latest layer wins (higher index)
     if (a.layerOrder !== b.layerOrder) {
       return a.layerOrder - b.layerOrder;
     }
@@ -116,7 +110,7 @@ export function compareCascadeDeclarations(a: MatchedDeclaration, b: MatchedDecl
  * Groups declarations by property name (case-sensitive for custom properties, lowercase for standard).
  * css-cascade-5 #cascading (grouping declared values for a given property)
  * css-variables-1 #defining-variables (custom property names are case-sensitive)
- * css-values-4 #keywords (standard property names are ASCII case-insensitive)
+ * css-syntax-3 #consume-declaration: standard property names are ASCII case-insensitive
  */
 export function groupDeclarationsByProperty(matchedDeclarations: MatchedDeclaration[]): Map<string, MatchedDeclaration[]> {
   const declarationsByProperty = new Map<string, MatchedDeclaration[]>();

@@ -24,7 +24,7 @@ import { supports } from '../parser-api.ts';
 /**
  * Discovers and resolves active @property and @keyframes definitions across stylesheets and layers.
  * css-cascade-5 #layer-ordering
- * css-properties-values-api #calculation-of-computed-values
+ * css-properties-values-api #determining-registration
  * css-animations-1 #keyframes
  */
 export function collectActiveAtRules(

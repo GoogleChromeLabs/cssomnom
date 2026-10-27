@@ -70,6 +70,7 @@ function createCSSUnitValueFromSumValueItem(item: SumValueItem): CSSUnitValue | 
   return new CSSUnitValue(item.value, unit as CSSUnit);
 }
 
+// css-typed-om #create-a-sum-value
 function createSumValue(node: CSSNumericValue): SumValue | null {
   if (node instanceof CSSUnitValue) {
     let unit: string = node.unit;
@@ -271,6 +272,7 @@ export function numericToSum(self: CSSNumericValue, ...units: string[]): CSSMath
   return new CSSMathSum(...result);
 }
 
+// css-typed-om #dom-cssnumericvalue-parse
 export function parseNumericValue(css: string): CSSNumericValue {
   if (arguments.length < 1) {
     throw new TypeError("Failed to execute 'parse' on 'CSSNumericValue': 1 argument required, but only 0 present.");
@@ -552,7 +554,6 @@ export function numericEquals(self: CSSNumericValue, ...values: (number | CSSNum
   return true;
 }
 
-// css-typed-om #numeric-value
 CSSNumericValue.prototype.to = function(unit: string): CSSUnitValue {
   return numericTo(this, unit);
 };

@@ -490,6 +490,8 @@ function isValidLengthOrPercentage(val: ComponentValue, allowNegative: boolean =
   return false;
 }
 
+// css-logical-1 #box
+// css-logical-1 #logical-shorthand-keyword
 const expandBox = (physical: readonly string[], logical: readonly string[]) => (values: ComponentValue[]): Record<string, ComponentValue[]> | null => {
   const filtered = filterSignificantTokens(values);
   if (filtered.length === 0) return null;
@@ -1426,6 +1428,7 @@ function createBorderSideShorthand(
   };
 }
 
+// css-logical-1 #border-shorthands
 function createBorderAxisShorthand(
   name: 'border-block' | 'border-inline',
   startProp: string,

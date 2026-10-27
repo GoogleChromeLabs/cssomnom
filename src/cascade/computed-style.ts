@@ -233,7 +233,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
       }
 
-      // css-masking-1 #clip-property, css21 #clipping-properties
+      // css-masking-1 #clip-property
       if (dashed === 'clip' && lowerRaw.startsWith('rect(') && lowerRaw.endsWith(')')) {
         const inner = rawVal.trim().slice(5, -1).trim();
         const parts = inner.split(/[\s,]+/);
@@ -252,7 +252,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
           return `rect(${resolvedParts.join(', ')})`;
         }
       }
-      // css-cascade-5 #inherit
+      // css-cascade-5 #defaulting-keywords
       if (lowerRaw === 'inherit') {
         if (this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
@@ -260,11 +260,9 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return getInitialValue(dashed, this._element);
       }
-      // css-cascade-5 #initial
       if (lowerRaw === 'initial') {
         return getInitialValue(dashed, this._element);
       }
-      // css-cascade-5 #unset
       if (lowerRaw === 'unset') {
         if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);
@@ -272,7 +270,6 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         }
         return getInitialValue(dashed, this._element);
       }
-      // css-cascade-5 #default
       if (lowerRaw === 'revert' || lowerRaw === 'revert-layer' || lowerRaw === 'revert-rule') {
         if (INHERITED_PROPERTIES.has(dashed) && this._parentStyle) {
           const parentVal = this._parentStyle.getPropertyValue(dashed);

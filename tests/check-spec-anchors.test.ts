@@ -71,6 +71,33 @@ describe('check-spec-anchors CI validator', () => {
       assert.equal(violation.rule, 'RULE_A_FORBIDDEN_SECTION');
     });
 
+    it('rejects bare section numbers without spec prefix', () => {
+      const fixtureFile = path.join(tempDir, 'bare-section.ts');
+      fs.writeFileSync(
+        fixtureFile,
+        `// 5.4.9 Consume a declaration\n// 10 Mathematical Expressions\nconst x = 1;\n`,
+        'utf-8'
+      );
+
+      const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('bare-section'));
+      assert.equal(violations.length, 2);
+      assert.equal(violations[0].rule, 'RULE_A_FORBIDDEN_SECTION');
+      assert.equal(violations[1].rule, 'RULE_A_FORBIDDEN_SECTION');
+    });
+
+    it('rejects bare § section numbers without spec prefix', () => {
+      const fixtureFile = path.join(tempDir, 'bare-section-symbol.ts');
+      fs.writeFileSync(
+        fixtureFile,
+        `// § 6.7.1 Something\nconst x = 1;\n`,
+        'utf-8'
+      );
+
+      const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('bare-section-symbol'));
+      assert.equal(violations.length, 1);
+      assert.equal(violations[0].rule, 'RULE_A_FORBIDDEN_SECTION');
+    });
+
     it('allows immutable external RFC, WebIDL, and SVG2 section citations', () => {
       const fixtureFile = path.join(tempDir, 'valid-external.ts');
       fs.writeFileSync(
@@ -81,6 +108,19 @@ describe('check-spec-anchors CI validator', () => {
 
       const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('valid-external'));
       assert.equal(violations.length, 0);
+    });
+
+    it('rejects section numbers (§) when vendored spec appears after external spec name with filler words', () => {
+      const fixtureFile = path.join(tempDir, 'mixed-specs.ts');
+      fs.writeFileSync(
+        fixtureFile,
+        `// rfc4647 § 3.3.2 and css-values-4 § 5.1\nconst x = 1;\n`,
+        'utf-8'
+      );
+
+      const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('mixed-specs'));
+      assert.equal(violations.length, 1);
+      assert.equal(violations[0].rule, 'RULE_A_FORBIDDEN_SECTION');
     });
   });
 
@@ -119,6 +159,73 @@ describe('check-spec-anchors CI validator', () => {
       assert.equal(violations.length, 1);
       assert.equal(violations[0].rule, 'RULE_B_INVALID_ANCHOR');
       assert.match(violations[0].message, /non-existent-hallucinated-anchor-12345/);
+    });
+
+    it('rejects unknown or unvendored spec shortnames', () => {
+      const fixtureFile = path.join(tempDir, 'unknown-spec.ts');
+      fs.writeFileSync(
+        fixtureFile,
+        `// css-unknown-spec-99 #some-anchor\n`,
+        'utf-8'
+      );
+
+      const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('unknown-spec'));
+      assert.equal(violations.length, 1);
+      assert.equal(violations[0].rule, 'RULE_B_INVALID_ANCHOR');
+      assert.match(violations[0].message, /Unknown spec shortname/);
+    });
+
+    it('rejects prose spec titles before anchor', () => {
+      const fixtureFile = path.join(tempDir, 'prose-spec-title.ts');
+      fs.writeFileSync(
+        fixtureFile,
+        `// CSS Values 4 #lengths\n`,
+        'utf-8'
+      );
+
+      const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('prose-spec-title'));
+      assert.equal(violations.length, 1);
+      assert.equal(violations[0].rule, 'RULE_B_INVALID_ANCHOR');
+      assert.match(violations[0].message, /Prose spec name.*before.*is forbidden/);
+    });
+  });
+
+  describe('Rule C: Raw spec URLs', () => {
+    let tempDir: string;
+
+    before(() => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'spec-anchor-rule-c-'));
+    });
+
+    after(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    });
+
+    it('rejects raw drafts.csswg.org URLs', () => {
+      const fixtureFile = path.join(tempDir, 'raw-url.ts');
+      fs.writeFileSync(
+        fixtureFile,
+        `* @see https://drafts.csswg.org/css-syntax-3/#tokenization\n`,
+        'utf-8'
+      );
+
+      const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('raw-url'));
+      assert.equal(violations.length, 1);
+      assert.equal(violations[0].rule, 'RULE_C_RAW_SPEC_URL');
+      assert.match(violations[0].message, /Raw drafts URL found/);
+    });
+
+    it('rejects raw drafts.css-houdini.org URLs', () => {
+      const fixtureFile = path.join(tempDir, 'raw-houdini-url.ts');
+      fs.writeFileSync(
+        fixtureFile,
+        `// https://drafts.css-houdini.org/css-typed-om-1/#numeric-value\n`,
+        'utf-8'
+      );
+
+      const violations = checkSpecAnchors({ srcDir: tempDir }).filter((v) => v.file.includes('raw-houdini-url'));
+      assert.equal(violations.length, 1);
+      assert.equal(violations[0].rule, 'RULE_C_RAW_SPEC_URL');
     });
   });
 });

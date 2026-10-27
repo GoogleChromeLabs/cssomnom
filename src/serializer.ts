@@ -22,7 +22,7 @@ import { parseAnPlusB } from './SelectorParser.ts';
 /**
  * Determines whether two consecutive tokens require an empty comment separator
  * between them to prevent coalescing per css-syntax-3 #serialization.
- * @see https://drafts.csswg.org/css-syntax-3/#serialization
+ * // css-syntax-3 #serialization-tables
  */
 export function requiresTokenSeparator(t1: Token, t2: Token): boolean {
   // Extract token categories
@@ -299,7 +299,7 @@ export function getOriginalText(values: ComponentValue[]): string {
 
 
 /**
- * @see https://drafts.csswg.org/cssom-1/#serialize-an-identifier
+ * // cssom-1 #serialize-an-identifier
  */
 export function serializeIdentifier(id: string): string {
   let result = '';
@@ -357,7 +357,7 @@ export function serializeIdentifier(id: string): string {
 }
 
 /**
- * @see https://drafts.csswg.org/cssom-1/#serialize-a-string
+ * // cssom-1 #serialize-a-string
  */
 export function serializeString(s: string): string {
   let result = '"';
@@ -944,6 +944,7 @@ function serializeComplexSelector(complex: ComplexSelector, nsContext: { hasDefa
   }).join('');
 }
 
+// css-syntax-3 #serializing-anb
 function formatAnPlusB(tokens: ComponentValue[]): string {
   const parsed = parseAnPlusB(tokens);
   if (parsed === null) return serialize(tokens).trim();

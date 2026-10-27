@@ -59,12 +59,10 @@ export class CSSRule {
     return this._location;
   }
 
-  // cssom-1 #dom-cssrule-parentrule
   get parentRule(): CSSRule | null {
     return this._parentRule;
   }
 
-  // cssom-1 #dom-cssrule-parentstylesheet
   get parentStyleSheet(): CSSStyleSheet | null {
     if (this._parentStyleSheet) return this._parentStyleSheet;
     if (this._parentRule) return this._parentRule.parentStyleSheet;
@@ -105,7 +103,7 @@ export class CSSRule {
     return 0;
   }
 
-  // 6.13 The CSSRule Interface
+  // cssom-1 #the-cssrule-interface
   get cssText(): string {
     throw new Error('Not implemented');
   }
@@ -123,7 +121,6 @@ export class CSSGroupingRule extends CSSRule {
   protected _rules: CSSRule[];
   private _parseRuleInBlock: (text: string, nested?: boolean) => Rule;
 
-  // cssom-1 #dom-cssgroupingrule-cssrules
   get cssRules(): CSSRuleList {
     if (!this._cssRules) {
       this._cssRules = new CSSRuleList(() => this._rules);
@@ -143,8 +140,7 @@ export class CSSGroupingRule extends CSSRule {
     }
   }
 
-  // cssom-1 #the-cssgroupingrule-interface
-  // css-nesting-1 #the-cssnestrule
+  // cssom-1 #dom-cssgroupingrule-insertrule: step 4 wraps declarations in CSSNestedDeclarations
   insertRule(rule: string, index: number = 0): number {
     // 1. Set length to the number of items in list.
     // 2. If index is greater than length (or index < 0), throw IndexSizeError.
@@ -167,7 +163,7 @@ export class CSSGroupingRule extends CSSRule {
       if (isImportRule(topRule) || isNamespaceRule(topRule)) {
         throw new DOMException('HierarchyRequestError: @import and @namespace rules are not allowed inside grouping rules', 'HierarchyRequestError');
       }
-      // css-nesting-1 #nesting: only style rules and conditional group rules may be nested
+      // css-nesting-1 #conditionals: style rules only allow conditional group rules; nested conditional rules allow top-level rules
       if (isNested && !(topRule instanceof CSSGroupingRule)) {
         throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');
       }
@@ -224,7 +220,7 @@ export class CSSGroupingRule extends CSSRule {
     return index;
   }
 
-  // cssom-1 #the-cssgroupingrule-interface
+  // cssom-1 #dom-cssgroupingrule-deleterule
   // cssom-1 #remove-a-css-rule
   deleteRule(index: number): void {
     deleteRuleFromArray(this._rules, index);

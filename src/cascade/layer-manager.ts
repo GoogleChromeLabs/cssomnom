@@ -57,8 +57,6 @@ class LayerTree {
 
   /**
    * Registers a layer path e.g. "A.B.C" into the tree.
-   * css-cascade-5 #layer-names
-   * css-cascade-5 #layer-ordering
    */
   public registerPath(path: string): LayerTree {
     const parts = path.split('.');
@@ -112,22 +110,17 @@ function scanLayers(
 ): void {
   for (const r of list) {
     if (!isInsideStyleRule && r instanceof CSSLayerStatementRule) {
-      // css-cascade-5 #layer-declaration, #layer-empty (Layer Statement Rules)
-      // css-cascade-5 #layer-names (nested layers concatenated with period)
       const names = r.nameList || [];
       for (const n of names) {
         const fullName = prefix ? `${prefix}.${n}` : n;
         root.registerPath(fullName);
       }
     } else if (r instanceof CSSLayerBlockRule) {
-      // css-cascade-5 #layer-declaration, #layer-block (Layer Block Rules)
       const rawName = r.name;
       let fullName: string;
       if (!rawName) {
-        // css-cascade-5 #unnamed-layers (Anonymous Layers: unique anonymous segment)
         fullName = prefix ? `${prefix}.__anon_${state.nextLayerIndex++}` : `__anon_${state.nextLayerIndex++}`;
       } else {
-        // css-cascade-5 #layer-names : nested layers grouped within parent layer per #layer-ordering
         fullName = prefix ? `${prefix}.${rawName}` : rawName;
       }
       root.registerPath(fullName);
@@ -137,10 +130,9 @@ function scanLayers(
         scanLayers(Array.from(childRules), root, state, fullName, env, isInsideStyleRule);
       }
     } else if (r instanceof CSSImportRule) {
-      // css-cascade-5 #layer-declaration, #layer-ordering
       const mediaText = r.media?.mediaText;
       if (mediaText && !MediaParser.evaluate(mediaText, env)) {
-        // css-cascade-5 #layer-ordering: condition is false; does not contribute to layer ordering
+        // Condition is false; does not contribute to layer ordering
         continue;
       }
 

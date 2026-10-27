@@ -57,8 +57,8 @@ export interface DOMElement extends ElementLike {
  * Converts only ASCII uppercase characters (A-Z, U+0041..U+005A) to lowercase (a-z, U+0061..U+007A).
  * Non-ASCII characters (e.g. Kelvin sign \u212A, Turkish \u0130, Greek \u03A9, Cyrillic \u0414) remain untouched.
  *
- * selectors-4 #case-sensitive)
- * html#case-sensitivity-of-selectors
+ * selectors-4 #case-sensitive
+ * html #case-sensitivity-of-selectors
  */
 export function toAsciiLowerCase(str: string): string {
   return str.replace(/[A-Z]/g, c => String.fromCharCode(c.charCodeAt(0) + 32));
@@ -307,10 +307,6 @@ function matchCompoundSelector(element: DOMElement, compound: CompoundSelector, 
  */
 function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?: DOMElement): boolean {
   switch (simple.type) {
-    // selectors-4 #type-selectors
-    // selectors-4 #type-nmsp
-    // selectors-4 #case-sensitive
-    // html #case-sensitivity-of-selectors
     case 'type-selector': {
       const isXml = element.ownerDocument?.contentType === 'application/xhtml+xml';
       const elLocal = isXml ? (element.localName || element.tagName || '') : toAsciiLowerCase(element.localName || element.tagName || '');
@@ -319,6 +315,7 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       if (simple.namespace !== undefined && simple.namespace !== '*') {
         const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
         if (simple.namespace === '') {
+          // Trigger #3: Linkedom compatibility invariant - document.createElementNS(null, 'x') and un-namespaced XML elements in linkedom return 'http://www.w3.org/1999/xhtml' instead of null.
           if (element.namespaceURI && element.namespaceURI !== 'http://www.w3.org/1999/xhtml') return false;
           if (isSvg) return false;
         } else if (simple.namespace === 'svg') {
@@ -330,9 +327,6 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       return true;
     }
 
-    // selectors-4 #the-universal-selector
-    // selectors-4 #type-nmsp
-    // selectors-4 #case-sensitive
     case 'universal-selector': {
       const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
       if (simple.namespace !== undefined && simple.namespace !== '*') {
@@ -957,7 +951,7 @@ function isValidSubtag(subtag: string, allowWildcard = false): boolean {
 }
 
 /**
- * RFC 4647 #the-lang-pseudo
+ * selectors-4 #the-lang-pseudo: extended filtering per rfc4647 § 3.3.2
  */
 function matchLangRange(elementLang: string | null, range: string): boolean {
   // selectors-4 #the-lang-pseudo:
@@ -1039,6 +1033,7 @@ function matchLangRange(elementLang: string | null, range: string): boolean {
 
 const XML_LANG_NS = 'http://www.w3.org/XML/1998/namespace';
 
+// html #the-lang-and-xml:lang-attributes: determine element language with xml:lang namespace precedence
 function getElementLanguage(element: DOMElement): string | null {
   const isXml = element.ownerDocument?.contentType
     ? element.ownerDocument.contentType !== 'text/html'

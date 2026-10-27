@@ -48,7 +48,6 @@ export class CSSTransformValue extends CSSStyleValue {
         }
         return Reflect.get(target, prop, receiver);
       },
-      // css-typed-om #transformvalue-objects
       set(target, prop, value, receiver) {
         if (typeof prop === 'string' && /^\d+$/.test(prop)) {
           const index = parseInt(prop, 10);

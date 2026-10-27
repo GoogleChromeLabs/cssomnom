@@ -672,6 +672,7 @@ export class SelectorParser {
       
       // For functional pseudo-classes, some take selector lists
       if (['is', 'not', 'has', 'where', 'matches'].includes(lowerName)) {
+        // selectors-4 #relational: :has() cannot be nested within :has() and forbids pseudo-elements
         const isHas = lowerName === 'has';
         if (isHas && this.insideHas) {
           throw new DOMException(':has() cannot be nested', 'SyntaxError');
@@ -724,6 +725,7 @@ export class SelectorParser {
           }
         }
         if (ofIdx !== -1) {
+          // selectors-4 #the-nth-child-pseudo: 'of' clause requires <complex-real-selector-list>, forbidding pseudo-elements and relative combinators
           if (['nth-of-type', 'nth-last-of-type'].includes(lowerName)) {
             throw new DOMException(`'of' is not allowed in :${name}()`, 'SyntaxError');
           }

@@ -27,7 +27,6 @@ export abstract class AbstractTokenizer {
   
   public errors: ParseError[] = [];
 
-  // css-syntax-3 #error-handling
   protected parseError(message: string): void {
     this.errors.push({ message });
     console.warn(`CSS Parse Error: ${message}`);
@@ -589,27 +588,22 @@ export abstract class AbstractTokenizer {
     };
   }
 
-  // css-syntax-3 #consume-comment
   protected startsComment(): boolean {
     return this.cp === 0x002F && this.peek(1) === 0x002A;
   }
 
-  // css-syntax-3 #whitespace
   protected isWhitespace(cp: number): boolean {
     return cp === 0x000A || cp === 0x0009 || cp === 0x0020;
   }
 
-  // css-syntax-3 #newline
   protected isNewline(cp: number): boolean {
     return cp === 0x000A;
   }
 
-  // css-syntax-3 #digit
   protected isDigit(cp: number): boolean {
     return cp >= 0x0030 && cp <= 0x0039;
   }
 
-  // css-syntax-3 #hex-digit
   protected isHexDigit(cp: number): boolean {
     return this.isDigit(cp) || 
            (cp >= 0x0041 && cp <= 0x0046) || 
@@ -650,7 +644,6 @@ export abstract class AbstractTokenizer {
            cp >= 0x10000;
   }
 
-  // css-syntax-3 #non-printable-code-point
   protected isNonPrintable(cp: number): boolean {
     return (cp >= 0x0000 && cp <= 0x0008) ||
            cp === 0x000B ||

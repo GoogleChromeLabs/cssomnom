@@ -3,10 +3,15 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+export type ViolationRule =
+  | 'RULE_A_FORBIDDEN_SECTION'
+  | 'RULE_B_INVALID_ANCHOR'
+  | 'RULE_C_RAW_SPEC_URL';
+
 export interface SpecAnchorViolation {
   file: string;
   lineNumber: number;
-  rule: 'RULE_A_FORBIDDEN_SECTION' | 'RULE_B_INVALID_ANCHOR';
+  rule: ViolationRule;
   message: string;
   lineContent: string;
 }
@@ -21,61 +26,6 @@ export interface CheckSpecAnchorsOptions {
  * (e.g. RFCs, WebIDL, SVG2).
  */
 const ALLOWED_EXTERNAL_SPECS_RE = /\b(rfc\s*4647|webidl|svg2?)\b/i;
-
-/**
- * Recognized spec name prefixes / patterns for vendored specs in submodules.
- */
-const VENDORED_SPEC_PATTERN =
-  /\b(css-[a-z0-9-]+|cssom-[a-z0-9-]+|selectors-[a-z0-9-]+|mediaqueries-[a-z0-9-]+|html|css\s+(?:box\s+model|cascade|color|conditional|counter\s+styles|fonts|images|logical|masking|nesting|page|properties\s+and\s+values|scoping|shadow|sizing|syntax|transforms|typed\s+om|values|variables)|selectors\s+\d+|media\s+queries\s+\d+|html\s+standard|cssom(?:\s+level)?\s*\d*)\b/i;
-
-/**
- * Normalized alias mapping for spec names to submodule directory names.
- */
-const SPEC_ALIASES: Record<string, string> = {
-  'css-typed-om-1': 'css-typed-om',
-  'css-properties-values-api-1': 'css-properties-values-api',
-  'css-shadow-parts': 'css-shadow-1',
-  'css-shadow-parts-1': 'css-shadow-1',
-  'css-scoping-1': 'css-shadow-1',
-  'css-box-3': 'css-box-3',
-  'css box model 3': 'css-box-3',
-  'css-cascade-5': 'css-cascade-5',
-  'css cascade 5': 'css-cascade-5',
-  'css-color-4': 'css-color-4',
-  'css color 4': 'css-color-4',
-  'css-transforms-2': 'css-transforms-2',
-  'css transforms 2': 'css-transforms-2',
-  'css-typed-om': 'css-typed-om',
-  'css typed om': 'css-typed-om',
-  'css typed om level 1': 'css-typed-om',
-  'css-typed-om-2': 'css-typed-om-2',
-  'css typed om level 2': 'css-typed-om-2',
-  'css-values-4': 'css-values-4',
-  'css values 4': 'css-values-4',
-  'css values and units level 4': 'css-values-4',
-  'css-values-5': 'css-values-5',
-  'css values 5': 'css-values-5',
-  'css-variables-1': 'css-variables-1',
-  'css variables 1': 'css-variables-1',
-  'css-variables-2': 'css-variables-2',
-  'css variables 2': 'css-variables-2',
-  'css-syntax-3': 'css-syntax-3',
-  'css syntax 3': 'css-syntax-3',
-  'css syntax module level 3': 'css-syntax-3',
-  'selectors-4': 'selectors-4',
-  'selectors 4': 'selectors-4',
-  'css selectors 4': 'selectors-4',
-  'html': 'html',
-  'html standard': 'html',
-  'mediaqueries-4': 'mediaqueries-4',
-  'media queries 4': 'mediaqueries-4',
-  'mediaqueries-5': 'mediaqueries-5',
-  'media queries 5': 'mediaqueries-5',
-  'cssom-1': 'cssom-1',
-  'cssom': 'cssom-1',
-  'cssom 1': 'cssom-1',
-  'cssom level 1': 'cssom-1',
-};
 
 interface SpecFileLocation {
   path: string;
@@ -131,6 +81,12 @@ function extractAnchorsFromBs(content: string): Set<string> {
       .replace(/[^a-z0-9_-]+/g, '-')
       .replace(/^-+|-+$/g, '');
     if (slug) anchors.add(slug);
+    const noApos = title
+      .replace(/'/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (noApos) anchors.add(noApos);
   }
 
   // 5. Underline-style headings: Title \n ===== or -----
@@ -173,11 +129,20 @@ function extractAnchorsFromBs(content: string): Set<string> {
     }
     const forMatch = /\bfor=["']?([^"'>]+)["']?/i.exec(attrs);
     const forVals = forMatch ? forMatch[1].split(',').map((s) => s.trim().toLowerCase()) : [''];
-    const cleanInner = rawInner.replace(/\(.*?\)/g, '').trim().toLowerCase();
+    let cleanInner = rawInner.replace(/\(.*?\)/g, '').trim().toLowerCase();
+    let slotName: string | null = null;
+    const slotMatch = /^\\?\[\[([a-zA-Z0-9_-]+)\]\]$/.exec(cleanInner);
+    if (slotMatch) {
+      slotName = slotMatch[1];
+      cleanInner = slotMatch[1];
+    }
 
     for (const forVal of forVals) {
       if (/\b(?:method|attribute|operation)\b/i.test(attrs) && forVal) {
         anchors.add(`dom-${forVal}-${cleanInner}`);
+        if (slotName) {
+          anchors.add(`dom-${forVal}-${slotName}-slot`);
+        }
       } else if (/\bconstructor\b/i.test(attrs) && forVal) {
         anchors.add(`dom-${forVal}-${forVal}`);
       } else if (/\bproperty\b/i.test(attrs)) {
@@ -194,17 +159,50 @@ function extractAnchorsFromBs(content: string): Set<string> {
     }
 
     const ltMatch = /\blt=["']([^"']+)["']/i.exec(attrs);
-    const terms = ltMatch ? ltMatch[1].split('|') : [rawInner];
-    for (const term of terms) {
+    let terms = ltMatch ? ltMatch[1].split('|') : [rawInner];
+    const expandedTerms: string[] = [];
+    for (const t of terms) {
+      expandedTerms.push(t);
+      const linkMatch = /^\[=([\s\S]*?)=\]$/.exec(t.trim());
+      if (linkMatch) {
+        for (const sub of linkMatch[1].split('|')) {
+          expandedTerms.push(sub.trim());
+        }
+      }
+    }
+    for (const term of expandedTerms) {
       const slug = term
         .toLowerCase()
         .replace(/[^a-z0-9_-]+/g, '-')
         .replace(/^-+|-+$/g, '');
       if (slug) anchors.add(slug);
+      const noApos = term
+        .replace(/'/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      if (noApos) anchors.add(noApos);
     }
   }
 
-  // 8. <pre class=propdef> and <pre class=descdef>
+  // 8. Bikeshed algorithm attributes: <div algorithm="name"> or <section algorithm="name">
+  const algoRegex = /\balgorithm=["']([^"']+)["']/gi;
+  while ((m = algoRegex.exec(content)) !== null) {
+    const rawAlgo = m[1].trim();
+    const slug = rawAlgo
+      .toLowerCase()
+      .replace(/\(.*?\)/g, '')
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (slug) anchors.add(slug);
+    const directSlug = rawAlgo
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    if (directSlug) anchors.add(directSlug);
+  }
+
+  // 9. <pre class=propdef> and <pre class=descdef>
   const propdefRegex = /<pre\s+class=["']?(?:propdef|descdef)[^>]*>([\s\S]*?)<\/pre>/gi;
   while ((m = propdefRegex.exec(content)) !== null) {
     const isDesc = m[0].includes('descdef');
@@ -288,7 +286,7 @@ function extractAnchorsFromHtml(content: string): Set<string> {
 /**
  * Caches discovered spec locations and parsed anchors.
  */
-class SpecAnchorRegistry {
+export class SpecAnchorRegistry {
   private repoRoot: string;
   private specLocations = new Map<string, SpecFileLocation>();
   private anchorCache = new Map<string, Set<string>>();
@@ -356,11 +354,20 @@ class SpecAnchorRegistry {
 
   public getCanonicalSpec(specName: string): string | null {
     const lower = specName.toLowerCase().trim();
-    if (SPEC_ALIASES[lower]) {
-      return SPEC_ALIASES[lower];
+    if (lower === 'css-shadow-parts' || lower === 'css-shadow-parts-1') {
+      return 'css-shadow-1';
     }
     if (this.specLocations.has(lower)) {
       return lower;
+    }
+    if (lower.endsWith('-1')) {
+      const base = lower.slice(0, -2);
+      if (this.specLocations.has(base)) {
+        return base;
+      }
+    }
+    if (this.specLocations.has(`${lower}-1`)) {
+      return `${lower}-1`;
     }
     return null;
   }
@@ -405,8 +412,9 @@ function findSourceFiles(dir: string): string[] {
 
 /**
  * Checks all TypeScript files in `src/` (excluding `src/data/gen/`) for:
- * 1. Rule A: Reject any comment referencing a vendored spec with `§ <number>`.
+ * 1. Rule A: Reject any forbidden section citations (§ or bare leading section numbers).
  * 2. Rule B: Every `<spec> #<anchor>` referencing a vendored spec must have `<anchor>` in the spec.
+ * 3. Rule C: Reject raw drafts URLs.
  */
 export function checkSpecAnchors(options?: CheckSpecAnchorsOptions): SpecAnchorViolation[] {
   const repoRoot = options?.repoRoot ?? process.cwd();
@@ -416,9 +424,10 @@ export function checkSpecAnchors(options?: CheckSpecAnchorsOptions): SpecAnchorV
 
   const files = findSourceFiles(srcDir);
 
-  // Regex to extract `<spec> #<anchor>` or `<spec> § ... #<anchor>` citations from comments
-  const citationRegex =
-    /(?:^|\s)(css-[a-z0-9-]+|cssom-[a-z0-9-]+|selectors-[a-z0-9-]+|mediaqueries-[a-z0-9-]+|html|css\s+(?:box\s+model|cascade|color|conditional|counter\s+styles|fonts|images|logical|masking|nesting|page|properties\s+and\s+values|scoping|shadow|sizing|syntax|transforms|typed\s+om|values|variables)\s*\d*|selectors\s+\d+|media\s+queries\s+\d+|html\s+standard|cssom(?:\s+level)?\s*\d*)\s+(?:§[^\n#]+)?#([a-zA-Z0-9_.:()-]+)/gi;
+  const rawUrlRegex = /https?:\/\/drafts\.(?:csswg|css-houdini)\.org\/[^\s)>,]+/i;
+  const bareSectionRegex = /^\s*(?:\/\/|\/\*|\*)\s*(\d+(?:\.\d+)+|\d+\s+[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)(?:\s|$|:)/;
+  const proseSpecRegex = /\b(css\s+[a-zA-Z][a-zA-Z0-9\s-]*|cssom\s+\d+|selectors\s+\d+|html\s+standard|media\s+queries\s+\d+)\s+(?:§[^\n#]+)?#([a-zA-Z][a-zA-Z0-9_.:()-]*)/gi;
+  const genericCitationRegex = /(?:^|[\s,;(/])([a-zA-Z][a-zA-Z0-9-]*)\s+(?:§[^\n#]+)?#([a-zA-Z][a-zA-Z0-9_.:()-]*)/g;
 
   for (const filePath of files) {
     const relPath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
@@ -430,21 +439,48 @@ export function checkSpecAnchors(options?: CheckSpecAnchorsOptions): SpecAnchorV
       const isComment = line.includes('//') || line.includes('/*') || line.trimStart().startsWith('*');
       if (!isComment) continue;
 
-      // Rule A: Check for forbidden section numbers (§) referencing vendored specs
+      // 1. Raw spec draft URLs check (drafts.csswg.org or drafts.css-houdini.org)
+      const rawUrlMatch = rawUrlRegex.exec(line);
+      if (rawUrlMatch) {
+        violations.push({
+          file: relPath,
+          lineNumber: i + 1,
+          rule: 'RULE_C_RAW_SPEC_URL',
+          message: `Raw drafts URL found in comment. Use anchor-first format '// <spec> #<anchor>' instead.`,
+          lineContent: line.trim(),
+        });
+      }
+
+      // 2. Bare leading section number comments (e.g. // 5.4.9 ... or // 10.1 ... or // 6.13 The CSS... or // 10 Mathematical...)
+      const bareSectionMatch = bareSectionRegex.exec(line);
+      if (bareSectionMatch) {
+        violations.push({
+          file: relPath,
+          lineNumber: i + 1,
+          rule: 'RULE_A_FORBIDDEN_SECTION',
+          message: `Forbidden bare section number '${bareSectionMatch[1]}'. Use anchor-first format '// <spec> #<anchor>' per AGENTS.md.`,
+          lineContent: line.trim(),
+        });
+      }
+
+      // 3. Section symbol (§) check: any § is forbidden unless preceded by an allowed external spec (WebIDL, RFC 4647, SVG2)
       if (line.includes('§')) {
         let hasViolation = false;
         for (let charIdx = 0; charIdx < line.length; charIdx++) {
           if (line[charIdx] !== '§') continue;
-          const before = line.slice(Math.max(0, charIdx - 45), charIdx);
+          const before = line.slice(0, charIdx);
           const extMatch = [...before.matchAll(new RegExp(ALLOWED_EXTERNAL_SPECS_RE, 'gi'))].pop();
-          const venMatch = [...before.matchAll(new RegExp(VENDORED_SPEC_PATTERN, 'gi'))].pop();
-
-          if (extMatch && (!venMatch || extMatch.index > venMatch.index)) {
-            // Allowed external citation (e.g. webidl, rfc4647, svg2)
-            continue;
+          if (!extMatch) {
+            hasViolation = true;
+            break;
           }
-          hasViolation = true;
-          break;
+          // Verify no vendored spec exists between extMatch and §
+          const between = before.slice(extMatch.index! + extMatch[0].length);
+          const tokens = between.match(/\b[a-zA-Z][a-zA-Z0-9-]*\b/g);
+          if (tokens?.some((t) => registry.isVendoredSpec(t))) {
+            hasViolation = true;
+            break;
+          }
         }
 
         if (hasViolation) {
@@ -458,16 +494,45 @@ export function checkSpecAnchors(options?: CheckSpecAnchorsOptions): SpecAnchorV
         }
       }
 
-      // Rule B: Check that every vendored spec anchor exists in the submodule
-      citationRegex.lastIndex = 0;
+      // 4. Prose spec names before #<anchor> (e.g. CSS Values 4 #lengths, Selectors 4 #...)
+      proseSpecRegex.lastIndex = 0;
+      let pm: RegExpExecArray | null;
+      while ((pm = proseSpecRegex.exec(line)) !== null) {
+        const proseSpec = pm[1].trim();
+        const rawAnchor = pm[2].trim().replace(/[:);,.]+$/, '');
+        violations.push({
+          file: relPath,
+          lineNumber: i + 1,
+          rule: 'RULE_B_INVALID_ANCHOR',
+          message: `Prose spec name '${proseSpec}' before '#${rawAnchor}' is forbidden. Use the canonical submodule directory shortname.`,
+          lineContent: line.trim(),
+        });
+      }
+
+      // 5. Generic citation check: `<token> #<anchor>`
+      genericCitationRegex.lastIndex = 0;
       let m: RegExpExecArray | null;
-      while ((m = citationRegex.exec(line)) !== null) {
-        const rawSpec = m[1].toLowerCase().replace(/\s+/g, ' ');
-        // Strip trailing punctuation from anchor
+      while ((m = genericCitationRegex.exec(line)) !== null) {
+        const rawSpec = m[1].trim();
         const rawAnchor = m[2].toLowerCase().replace(/[:);,.]+$/, '');
 
+        if (ALLOWED_EXTERNAL_SPECS_RE.test(rawSpec)) {
+          continue;
+        }
+
         const canonical = registry.getCanonicalSpec(rawSpec);
-        if (!canonical) continue;
+        if (!canonical) {
+          if (/^(?:css|cssom|selectors|mediaqueries)-/i.test(rawSpec) || rawSpec.toLowerCase() === 'html') {
+            violations.push({
+              file: relPath,
+              lineNumber: i + 1,
+              rule: 'RULE_B_INVALID_ANCHOR',
+              message: `Unknown spec shortname '${rawSpec}'. Use the canonical submodule directory name.`,
+              lineContent: line.trim(),
+            });
+          }
+          continue;
+        }
 
         const anchors = registry.getAnchorsForSpec(canonical);
         if (!anchors) {

@@ -114,6 +114,7 @@ function createValueFromTokens(values: ComponentValue[], property?: string): CSS
   return new CSSStyleValue(serialize(trimmed).trim(), privateToken);
 }
 
+// css-typed-om #parse-a-cssstylevalue
 export function parseAllStyleValues(property: string, css: string): CSSStyleValue[] {
   if (arguments.length < 2) {
     throw new TypeError("Failed to execute 'parseAll' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");
@@ -305,20 +306,20 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     }
   }
 
-  // css-typed-om #reify-property (Overview.bs lines 3622+)
-  // Note on spec conflict: css-typed-om #reify-color (Overview.bs lines 5540-5545) states:
+  // css-typed-om #reify-property
+  // Note on spec conflict: css-typed-om #reify-color states:
   //   "CSS <color> values become either CSSColorValues (if they can be resolved to an absolute color)
   //    or generic CSSStyleValues (otherwise)."
-  // That prose is unreferenced and has no algorithmic caller — "reify a color value" (line 5548)
+  // That prose is unreferenced and has no algorithmic caller — "reify a color value"
   // is ONLY invoked by CSSColorValue.parse() (css-typed-om #dom-csscolorvalue-parse).
   // Confirmed by implementers in W3C Houdini Issue #1159:
   // https://github.com/w3c/css-houdini-drafts/issues/1159
   //
   // Claim (a) — What the normative per-property table literally says & Houdini Issue #689:
-  // The table at #reify-property defines reification for color properties (e.g. 'color' line 4105,
-  // 'caret-color' line 4078, 'border-top-color' line 4013, 'outline-color' line 4745, 'background-color' line 3752):
+  // The table at #reify-property defines reification for color properties (e.g. 'color',
+  // 'caret-color', 'border-top-color', 'outline-color', 'background-color'):
   // 1. If value is 'currentcolor', reify an identifier;
-  // 2. Otherwise, reify as a CSSStyleValue (css-typed-om #reify-failure line 5307).
+  // 2. Otherwise, reify as a CSSStyleValue (css-typed-om #reify-failure).
   //
   // This deliberate policy decision was established by Tab Atkins and Blink in W3C Houdini Issue #689:
   // https://github.com/w3c/css-houdini-drafts/issues/689
@@ -337,7 +338,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     if (trimmed.length === 1 && trimmed[0].type === 'ident') {
       const kw = (trimmed[0] as IdentToken).value.toLowerCase();
       // currentcolor reifies as an identifier (CSSKeywordValue)
-      // css-typed-om #reify-property (e.g. line 4108)
+      // css-typed-om #reify-property
       if (kw === 'currentcolor') {
         return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
       }
@@ -360,7 +361,8 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
     }
 
     // Property reification produces a base CSSStyleValue, NOT a CSSColorValue
-    // css-typed-om #reify-failure (lines 5307-5315)
+    // css-typed-om #reify-failure
+    // css-typed-om #reification
     return [new CSSStyleValue(css, privateToken)];
   }
   if (trimmed.length === 1) {
@@ -407,6 +409,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
   return results;
 }
 
+// css-typed-om #parse-a-cssstylevalue
 export function parseStyleValue(property: string, css: string): CSSStyleValue {
   if (arguments.length < 2) {
     throw new TypeError("Failed to execute 'parse' on 'CSSStyleValue': 2 arguments required, but only " + arguments.length + " present.");

@@ -20,7 +20,6 @@ import type { CSSUnitValue } from './CSSUnitValue.ts';
 import type { CSSMathSum } from './math/CSSMathOperations.ts';
 import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 
-// css-typed-om #numeric-value
 export abstract class CSSNumericValue extends CSSStyleValue {
   constructor() {
     super();

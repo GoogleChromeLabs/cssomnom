@@ -34,7 +34,7 @@ export function isRegularRule(r: Rule): boolean {
   return !isImportRule(r) && !isNamespaceRule(r);
 }
 
-// cssom-1 #the-cssgroupingrule-interface
+// cssom-1 #serialize-a-css-rule
 export function serializeGroupingRule(atKeyword: string, condition: string, rules: CSSRule[]): string {
   const cond = condition ? ' ' + condition : '';
   const ruleTexts = rules.map(r => r.cssText).filter(p => p !== '');

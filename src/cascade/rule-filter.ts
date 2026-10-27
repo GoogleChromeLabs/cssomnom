@@ -86,7 +86,7 @@ export function collectStyleSheetsAndRules(
     };
   };
 
-  // If element is explicitly disconnected from DOM
+  // css-cascade-5 #value-stages: disconnected elements do not participate in cascade
   if (elObj.isConnected === false) {
     return null;
   }
@@ -849,6 +849,7 @@ export function collectMatchedDeclarations(
         }
       } else if (rule instanceof CSSGroupingRule) {
         walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode, scopeProximity);
+      // css-nesting-1 #nested-declarations
       } else if (rule instanceof CSSNestedDeclarations) {
         let selectorToMatch = parentSelector || ':scope';
         let isMatchingDecl = false;
@@ -868,8 +869,7 @@ export function collectMatchedDeclarations(
         }
 
         if (isMatchingDecl) {
-          // css-nesting-1 #the-cssnestrule:
-          // Nested @scope rules behave like :where(:scope) with specificity (0, 0, 0)
+          // css-nesting-1 #nesting-at-scope: '&' in @scope behaves like :where(:scope) with (0, 0, 0) specificity
           const spec = (scopeNode ? [0, 0, 0] : getMatchingSpecificity(element, selectorToMatch)) as Specificity;
           const style = rule.style;
           const layerOrder = currentLayer ? (layerDeclarationOrder.get(currentLayer) ?? 0) : Infinity;

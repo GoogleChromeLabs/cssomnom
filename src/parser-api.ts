@@ -499,6 +499,7 @@ function evalSupportsConditionValues(values: ComponentValue[]): boolean {
   }
 }
 
+// css-conditional-3 #the-css-namespace
 export function supports(propertyOrCondition: string, value?: string): boolean {
   if (typeof value === 'string') {
     return evaluateSupportsDeclaration(propertyOrCondition, value);
