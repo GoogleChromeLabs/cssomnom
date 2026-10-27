@@ -27,6 +27,7 @@ export interface PropertyDefinition {
   inherits: boolean;
   initialValue?: string;
   origin?: 'js' | 'css';
+  parsedInitialValue?: ComponentValue[];
 }
 
 const VALID_COMPONENTS = new Set([
@@ -320,6 +321,7 @@ export const PropertyRegistry = {
       const tokens = tokenize(definition.initialValue).filter(t => t.type !== 'whitespace');
       const parser = new Parser(tokens);
       const values = parser.parseComponentValues();
+      definition.parsedInitialValue = values;
       
       if (parser.errors.length > 0) {
         throw new DOMException(`initialValue "${definition.initialValue}" has parse errors`, 'SyntaxError');

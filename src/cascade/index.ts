@@ -377,11 +377,12 @@ export function getCascadedStyle(
     const isSvg = isSvgElement(element);
     const isSvgColorProp = isSvg && (mappedName === 'flood-color' || mappedName === 'lighting-color' || mappedName === 'stop-color' || mappedName === 'stroke');
     const finalValue = COLOR_PROPERTIES.has(mappedName) && !isSvgColorProp ? normalizeComputedColor(decl.value) : decl.value;
+    const parsedFinalValue = ParseHooks.parseComponentValues(tokenize(finalValue));
 
     finalDeclarations.push({
       type: 'declaration',
       name: mappedName,
-      value: tokenize(finalValue),
+      value: parsedFinalValue,
       important: decl.important,
     });
 
@@ -389,7 +390,7 @@ export function getCascadedStyle(
       finalDeclarations.push({
         type: 'declaration',
         name,
-        value: tokenize(finalValue),
+        value: parsedFinalValue,
         important: decl.important,
       });
     }
@@ -401,7 +402,7 @@ export function getCascadedStyle(
       finalDeclarations.push({
         type: 'declaration',
         name: customProp,
-        value: tokenize(customVal),
+        value: ParseHooks.parseComponentValues(tokenize(customVal)),
         important: false,
         raw: customVal,
       });

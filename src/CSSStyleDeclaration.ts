@@ -265,13 +265,13 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       ];
       
       for (const lh of allLonghandsToCheck) {
-        const val = this.getPropertyValue(lh);
-        if (val) {
+        const decl = this._getWinningDeclaration(lh);
+        if (decl && decl.value.length > 0) {
           anySet = true;
-          longhandValues[lh] = tokenize(val);
-          const prio = this.getPropertyPriority(lh);
-          if (important === null) important = prio === 'important';
-          else if (important !== (prio === 'important')) {
+          longhandValues[lh] = decl.value;
+          const isImp = decl.important;
+          if (important === null) important = isImp;
+          else if (important !== isImp) {
             consistentImportant = false;
           }
         }
@@ -305,9 +305,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           : shorthand.longhands;
 
         for (const lh of allLonghands) {
-          const val = this.getPropertyValue(lh);
+          const val = longhandValues[lh];
           if (val) {
-            valuesForContractor[lh] = tokenize(val);
+            valuesForContractor[lh] = val;
             if (resolveLogicalProperty(lh, wm, dir) !== lh) anyLogical = true;
             if (shorthand.logicalLonghands?.includes(lh)) anyLogical = true;
           }
@@ -372,7 +372,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return '';
   }
 
-  private _getExactWinningDeclaration(property: string): Declaration | null {
+  protected _getExactWinningDeclaration(property: string): Declaration | null {
     if (!property.startsWith('--')) property = property.toLowerCase();
     const isCustom = property.startsWith('--');
     const isCoveredByAll = !isCustom && property !== 'direction' && property !== 'unicode-bidi' && property !== 'all';
@@ -394,7 +394,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return winner;
   }
 
-  private _getWinningDeclaration(property: string): Declaration | null {
+  protected _getWinningDeclaration(property: string): Declaration | null {
     const exact = this._getExactWinningDeclaration(property);
     const shorthands = LONGHAND_TO_SHORTHAND[property];
     if (shorthands) {
@@ -429,10 +429,10 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         let importantCount = 0;
         const values: Record<string, ComponentValue[]> = {};
         for (const lh of longhands) {
-          const val = this.getPropertyValue(lh);
-          if (val) {
-            values[lh] = tokenize(val);
-            if (this.getPropertyPriority(lh) === 'important') importantCount++;
+          const decl = this._getWinningDeclaration(lh);
+          if (decl && decl.value.length > 0) {
+            values[lh] = decl.value;
+            if (decl.important) importantCount++;
           }
         }
         return { importantCount, values };

@@ -306,15 +306,26 @@ export function substituteVariables(
           hasAttrTaint = prevTaint || nameWasTainted;
 
           if (resolvedNameTokens !== null) {
-            let serializedName = serialize(resolvedNameTokens).trim();
-            if (serializedName.startsWith('{') && serializedName.endsWith('}')) {
-              serializedName = serializedName.slice(1, -1).trim();
+            let unwrapped = resolvedNameTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
+            if (unwrapped.length === 1 && unwrapped[0].type === 'simple-block' && Array.isArray((unwrapped[0] as SimpleBlock).value)) {
+              unwrapped = (unwrapped[0] as SimpleBlock).value.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
             }
-            const nameToks = tokenize(serializedName).filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
-            if (nameToks.length === 1 && nameToks[0].type === 'ident') {
-              const val = String(nameToks[0].value);
+            if (unwrapped.length === 1 && unwrapped[0].type === 'ident') {
+              const val = String((unwrapped[0] as Token).value);
               if (val.startsWith('--') && val.length > 2) {
                 varName = val;
+              }
+            } else {
+              let serializedName = serialize(resolvedNameTokens).trim();
+              if (serializedName.startsWith('{') && serializedName.endsWith('}')) {
+                serializedName = serializedName.slice(1, -1).trim();
+              }
+              const nameToks = tokenize(serializedName).filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
+              if (nameToks.length === 1 && nameToks[0].type === 'ident') {
+                const val = String(nameToks[0].value);
+                if (val.startsWith('--') && val.length > 2) {
+                  varName = val;
+                }
               }
             }
           }
@@ -408,7 +419,7 @@ export function substituteVariables(
                 ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(String((cleanTokens[0] as Token).value).toLowerCase());
               if (!isCSSWideKeyword && !matchesSyntax(cleanTokens, def.syntax || '*')) {
                 if (def.initialValue !== undefined) {
-                  substitutedTokens = ParseHooks.parseComponentValues(tokenize(def.initialValue));
+                  substitutedTokens = def.parsedInitialValue ?? ParseHooks.parseComponentValues(tokenize(def.initialValue));
                 } else if (fallbackTokens) {
                   const resolvedFallback = resolveNodes(fallbackTokens);
                   if (resolvedFallback === null) return null;
@@ -427,7 +438,7 @@ export function substituteVariables(
             const jsDef = PropertyRegistry.get(varName);
             const def = (jsDef && jsDef.origin === 'js') ? jsDef : (activeProperties?.get(varName) ?? jsDef);
             if (def?.initialValue !== undefined) {
-              const substitutedTokens = ParseHooks.parseComponentValues(tokenize(def.initialValue));
+              const substitutedTokens = def.parsedInitialValue ?? ParseHooks.parseComponentValues(tokenize(def.initialValue));
               pushTokens(substitutedTokens);
             } else if (fallbackTokens) {
               const resolvedFallback = resolveNodes(fallbackTokens);
@@ -510,7 +521,7 @@ export function resolveVariables(
 
   if (property.startsWith('--')) {
     const def = PropertyRegistry.get(property);
-    if (def) {
+    if (def && def.syntax && def.syntax !== '*') {
       const tokens = ParseHooks.parseComponentValues(tokenize(res)).filter(
         t => t.type !== 'whitespace' && t.type !== 'comment'
       );
@@ -520,7 +531,7 @@ export function resolveVariables(
         ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(
           String((tokens[0] as Token).value).toLowerCase()
         );
-      if (!isCSSWideKeyword && !matchesSyntax(tokens, def.syntax || '*')) {
+      if (!isCSSWideKeyword && !matchesSyntax(tokens, def.syntax)) {
         return def.initialValue ?? '';
       }
     }

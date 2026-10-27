@@ -17,7 +17,7 @@
 
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { tokenize } from '../tokenizer.ts';
-import { Parser } from '../parser.ts';
+import { ParseHooks } from '../parse-hooks.ts';
 import { serialize } from '../serializer.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import {
@@ -203,7 +203,8 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       // css-values-4 § 10.10 #calc-computed-value
       if (dashed === 'width' || dashed === 'height' || lowerRaw.startsWith('calc(')) {
         try {
-          const tokens = new Parser(tokenize(rawVal)).parseComponentValues();
+          const decl = this._getWinningDeclaration(dashed);
+          const tokens = decl ? decl.value : ParseHooks.parseComponentValues(tokenize(rawVal));
           const fn = tokens.find(t => t.type === 'function' && (t as { name: string }).name === 'calc');
           if (fn && 'value' in fn && Array.isArray((fn as { value: unknown }).value)) {
             const mathNode = parseMathFunction('calc', (fn as CSSFunction).value);
@@ -269,7 +270,8 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       if (dashed === 'box-shadow' || dashed === 'text-shadow') {
         // css-backgrounds-3 § 3.10 #box-shadow, css-text-decor-3 § 4 #text-shadow
         // Token-aware parsing preserves rgb(...) colors intact
-        const p = new Parser(tokenize(rawVal)).parseComponentValues();
+        const decl = this._getWinningDeclaration(dashed);
+        const p = decl ? decl.value : ParseHooks.parseComponentValues(tokenize(rawVal));
         const nonWsNodes = p.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
         const tokens = nonWsNodes.map(t => serialize([t]));
         const normalizedTokens = tokens.map(t => {

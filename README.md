@@ -373,12 +373,12 @@ To preserve clean architectural separation and prevent circular import cycles be
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **93.4%** (21,640 / 23,157 passed assertions across 1,882 test files).
-* **Chrome 154 Parity**: **93.4%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
+* **W3C Standards Conformance**: **93.5%** (21,641 / 23,157 passed assertions across 1,882 test files).
+* **Chrome 154 Parity**: **93.5%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
-| **`Typed OM`** | 12,768 | 12,186 | **95.4%** | 🟢 **+1.9%** (ahead of Chrome) |
+| **`Typed OM`** | 12,768 | 12,187 | **95.4%** | 🟢 **+1.9%** (ahead of Chrome) |
 | **`CSSOM`** | 2,527 | 2,334 | **92.4%** | -4.8% |
 | **`Nesting`** | 126 | 126 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 418 | 412 | **98.6%** | 🟢 **+0.2%** (ahead of Chrome) |
@@ -386,7 +386,7 @@ To preserve clean architectural separation and prevent circular import cycles be
 | **`Variables`** | 501 | 466 | **93.0%** | 🟢 **+2.5%** (ahead of Chrome) |
 | **`Selectors`** | 5,842 | 5,178 | **88.6%** | 🟢 **+2.7%** (ahead of Chrome) |
 | **`Media Queries`** | 419 | 410 | **97.9%** | -0.7% |
-| **OVERALL** | **23,157** | **21,640** | **93.4%** | 🟢 **+0.4%** |
+| **OVERALL** | **23,157** | **21,641** | **93.5%** | 🟢 **+0.4%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

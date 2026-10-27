@@ -3723,6 +3723,7 @@
     "Setting 'background-size' to an angle: calc(0deg + 0rad) throws TypeError"
   ],
   "submodules/web-platform-tests/css/css-typed-om/the-stylepropertymap/properties/background.html": [
+    "'background' does not support 'content-box radial-gradient(crimson, skyblue)'",
     "'background' does not support 'green'",
     "'background' does not support 'left 5% / 15% 60% repeat-x url(\"http://foo.com\")'",
     "'background' does not support 'no-repeat url(\"http://foo.com\")'",

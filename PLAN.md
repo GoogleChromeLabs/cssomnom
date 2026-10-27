@@ -594,11 +594,11 @@ Completed phases 1–125 live in [PLAN.archive.md](./PLAN.archive.md). Every ~20
 - [x] Delete `getUaTagStyles()` margin/em normalization and as much of `getUaDefault()` as the cascade now covers. Net-negative line count expected.
 - [x] Zero WPT regressions (`pnpm run wpt:verify`) and `pnpm run preflight` clean.
 
-## Phase 150: Parser & Cascade — Eliminate Re-tokenization Round-Trips [ ]
+## Phase 150: Parser & Cascade — Eliminate Re-tokenization Round-Trips [x]
 Moved from earlier deferred items (Phase 13 "Avoid Re-tokenization", and CSS Syntax findings "Operate on Token Stream").
 
 ### Tasks
-- [ ] **Phase 150.1 — Avoid re-tokenization**: remove serialize→`tokenize()` round trips on already-parsed values. Known sites: shorthand reading/contraction in [`CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts) (where `_declarations` already holds `ComponentValue[]`, yet `getPropertyValue()` serializes longhands to strings and immediately calls `tokenize(val)`), `parseStyleAttribute(tokenize(serialize(blockVal)))` in [`rule-filter.ts`](./src/cascade/rule-filter.ts), `value: tokenize(finalValue)` in [`cascade/index.ts`](./src/cascade/index.ts), `tokenize()` round-trips inside [`variable-resolver.ts`](./src/cascade/variable-resolver.ts) and [`computed-style.ts`](./src/cascade/computed-style.ts), and re-parsers in [`parser.ts`](./src/parser.ts). Audit all `tokenize(` call sites in `src/` and keep only true string entry points.
+- [x] **Phase 150.1 — Avoid re-tokenization**: remove serialize→`tokenize()` round trips on already-parsed values. Known sites: shorthand reading/contraction in [`CSSStyleDeclaration.ts`](./src/CSSStyleDeclaration.ts) (where `_declarations` already holds `ComponentValue[]`, yet `getPropertyValue()` serializes longhands to strings and immediately calls `tokenize(val)`), `parseStyleAttribute(tokenize(serialize(blockVal)))` in [`rule-filter.ts`](./src/cascade/rule-filter.ts), `value: tokenize(finalValue)` in [`cascade/index.ts`](./src/cascade/index.ts), `tokenize()` round-trips inside [`variable-resolver.ts`](./src/cascade/variable-resolver.ts) and [`computed-style.ts`](./src/cascade/computed-style.ts), and re-parsers in [`parser.ts`](./src/parser.ts). Audit all `tokenize(` call sites in `src/` and keep only true string entry points.
 - [ ] *(Parked — skip for now)* **Operate on token stream**: evaluate refactoring the parser to consume the token stream directly (css-syntax-3 § 5 parser algorithms) instead of pre-grouped component values. Large change; not pursuing unless benchmarks justify the churn.
 
 ## Phase 151 (Future): Benchmark Sensitivity [ ]
