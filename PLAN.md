@@ -733,6 +733,32 @@ Result (`3e68527`): `src/` (excluding `src/data/gen`) net **−110 lines** (`185
 
 Result: Tree-shakeable `cssomnom/parse` subpath export reduces standalone parsing bundle size from 872.9 KB to 439.0 KB (49.7% reduction) for `linkedom/worker.js`. Public `CSSStyleDeclaration.onChange` and `setCssTextSilent` enable seamless DOM mutation tracking without infinite cycles. `isXmlDocument` and bounded LRU `selectorCache` (1,000 entries) in `matcher.ts` resolve `linkedom#352`, `#348`, and `#327`.
 
+## Phase 160: Public API Lockdown, `./parse` Bundle Diet & Code Quality Cleanup [ ]
+**Objective**: Lock down the public API surface across `.` and `./parse`, cut the `./parse` bundle footprint below `@acemir/cssom` for `linkedom/worker.js`, and execute the high-signal structural simplifications and bug fixes from the Accretion Bouncer and Thermo-Nuclear reviews.
+
+### Settled Tasks
+- [ ] **Drop Redundant `*Sync` WICG Exports (`src/parser-api.ts`, `tests/api-surface.test.ts.snapshot`)**:
+  - Remove the duplicate top-level `*Sync` exports (`parseRuleSync`, `parseRuleListSync`, `parseDeclarationSync`, `parseDeclarationListSync`, `parseComponentValueSync`, `parseStylesheetSync`, `parseValueSync`, `parseValueListSync`, `parseCommaValueListSync`) and `CSS.parseStylesheetSync` from `src/parser-api.ts`, keeping the canonical WICG function names (`parseRule`, `parseStylesheet`, etc.) and `CSS.parse*` methods (which are already synchronous by design; see `README.md`).
+- [ ] **Lock Down `CSSStyleDeclaration`, `Parser` Statics & Published `.d.ts` Types (`src/CSSStyleDeclaration.ts`, `src/parser.ts`, `tsconfig.build.json`)**:
+  - Delete `setCssTextSilent(value)` from `CSSStyleDeclaration.prototype` (in `linkedom`, suppress `onChange` during attribute hydration via `decl.onChange = null; decl.cssText = val; decl.onChange = onChange;`).
+  - Restrict public `CSSStyleDeclaration.prototype.setProperty(property, value, priority = '')` to its 3 standard WebIDL parameters, moving internal recursion flags (`notify`, `fromAll`) to a private `_setProperty` helper.
+  - Make internal `Parser` static helpers (`isValidDashedIdent`, `isCustomPropertyDeclaration`, `validateCustomPropertyValue`, `parseRuleInBlockText`, `parseRuleInScopeBlockText`) module-private functions in `src/parser.ts` wired directly to `ParseHooks`.
+  - Enable `"stripInternal": true` in `tsconfig.build.json` and annotate internal underscore fields (`_declarations`, `_declMap`, `_parentRule`, `_readonly`, `_onChange`, `_isPropertySupported`, `_location`, `_initImportedSheet`, `_replaceRulesFromText`, etc.) with `/** @internal */` so they are stripped from emitted `dist/*.d.ts` files.
+
+### Pending Discussion (Needs Alignment Before Execution)
+- [ ] **Entrypoint & Export Alignment Between `.` (`src/index.ts`) and `./parse` (`src/parse-entry.ts`)**:
+  - *Issue*: `src/index.ts` exports WICG `parseRule(css: string | CSSToken[]): CSSParserRule` and `parseStylesheet(css)` from `src/parser-api.ts`, whereas `src/parse-entry.ts` exports low-level CSS Syntax 3 token-AST `parseRule(tokens: Token[]): Rule`, `parseStyleSheet(tokens: Token[]): Rule[]`, `parseRuleInBlock`, and `parseRuleInScopeBlock` from `src/parser.ts`. Additionally, `resolveNestedSelector` is a top-level export in `./parse` but only hung on `CSS.resolveNestedSelector` in `.`.
+  - *Options*: Make `./parse` a strict subset of `.` by removing the 4 low-level `Token[] -> Rule` internal helpers (`parseRule`, `parseStyleSheet`, `parseRuleInBlock`, `parseRuleInScopeBlock`) from `src/parse-entry.ts`, and decide whether `resolveNestedSelector` should be a top-level export in both (dropping or keeping `CSS.resolveNestedSelector`).
+- [ ] **`./parse` Bundle Size Diet (Target: Beat `@acemir/cssom`'s 580 KB in `linkedom/worker.js`)**:
+  - Remove the accidental 60.0 KB `STANDARD_PROPERTIES_SYNTAX` (`src/data/gen/standard-syntax.ts`) import from `src/CSSStyleDeclaration.ts` (added in Phase 158.2 for a single `value === undefined` check at L549) by delegating to `ParseHooks.validatePropertyValue`.
+  - Evaluate decoupling `src/PropertyRegistry.ts` (+ `colors.ts` + `units.ts`, ~20.1 KB) from `src/parser.ts` and compacting `src/data/gen/property-list.ts` (`new Set('...'.split(','))`, saving ~10 KB).
+- [ ] **Accretion Bouncer & Thermo-Nuclear Bug / Complexity Fixes**:
+  - Delete redundant `validateDeclarationValue` & `validateVarFunction` in `src/parser.ts` (~50 lines).
+  - Eliminate `String -> AST -> String -> Regex -> String -> AST` round-trips between `src/nesting.ts` (`resolveNestedSelector`) and `src/cascade/rule-filter.ts` (`matchSelectorList`) (~110 net lines).
+  - Fix `@layer` and `@property` prelude validation in `src/parser.ts` where `/* comment */` tokens cause valid rules (`@property --foo /* note */ {}`) to be silently dropped.
+  - Replace string `indexOf('{')` / `lastIndexOf('}')` slicing in `CSSKeyframesRule.prototype.appendRule` (`src/rules/at-rules.ts`) with token-based parsing so comments containing `}` (`appendRule("0% { color: red; } /* } */")`) do not corrupt keyframe bodies.
+  - Clean up inline structural casts in `src/cascade/rule-filter.ts` (`getEffectiveParent(node)` helper) and refactor the 275-line `matchPseudoClassSelector` `if/else` chain in `src/matcher.ts` into a dispatch table.
+
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
 
