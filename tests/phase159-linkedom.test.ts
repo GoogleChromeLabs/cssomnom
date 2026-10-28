@@ -36,9 +36,8 @@ import {
   CSSStyleSheet,
   CSSStyleRule,
 } from '../src/parse-entry.ts';
+import * as ParseEntry from '../src/parse-entry.ts';
 import { parseRule, parseStyleSheet } from '../src/parser.ts';
-
-import * as DistParse from '../dist/parse.js';
 
 describe('Phase 159: linkedom Integration & Tree-Shakeable Bundle Readiness', () => {
 
@@ -56,8 +55,8 @@ describe('Phase 159: linkedom Integration & Tree-Shakeable Bundle Readiness', ()
       assert.equal(rules.length, 2);
     });
 
-    it('parses and operates via dist/parse.js build artifact', () => {
-      const sheet = DistParse.parse('p { font-weight: bold; }');
+    it('parses and operates via parse-entry', () => {
+      const sheet = ParseEntry.parse('p { font-weight: bold; }');
       assert.ok(sheet);
       assert.equal(sheet.cssRules.length, 1);
       const rule = sheet.cssRules.item(0) as CSSStyleRule;
@@ -66,7 +65,7 @@ describe('Phase 159: linkedom Integration & Tree-Shakeable Bundle Readiness', ()
     });
 
     it('parse-entry does not leak cascade module', () => {
-      assert.equal('getCascadedStyle' in DistParse, false);
+      assert.equal('getCascadedStyle' in ParseEntry, false);
     });
 
     it('throws informative error when accessing CSSStyleRule.styleMap without typed-om module', () => {

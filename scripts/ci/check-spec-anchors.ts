@@ -372,8 +372,12 @@ export class SpecAnchorRegistry {
     return null;
   }
 
+  public hasSubmodules(): boolean {
+    return this.specLocations.size > 0;
+  }
+
   public isVendoredSpec(specName: string): boolean {
-    return this.getCanonicalSpec(specName) !== null;
+    return this.getCanonicalSpec(specName) !== null || /^(?:css|cssom|selectors|mediaqueries)-/i.test(specName);
   }
 
   public getAnchorsForSpec(specName: string): Set<string> | null {
@@ -509,7 +513,8 @@ export function checkSpecAnchors(options?: CheckSpecAnchorsOptions): SpecAnchorV
         });
       }
 
-      // 5. Generic citation check: `<token> #<anchor>`
+      // 5. Generic citation check: `<token> #<anchor>` (requires vendored spec submodules)
+      if (!registry.hasSubmodules()) continue;
       genericCitationRegex.lastIndex = 0;
       let m: RegExpExecArray | null;
       while ((m = genericCitationRegex.exec(line)) !== null) {

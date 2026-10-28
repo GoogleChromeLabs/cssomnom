@@ -29,10 +29,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Preflight and build
+      - name: Build and preflight
         run: |
-          pnpm run preflight
           pnpm run build
+          pnpm run preflight
 
       - name: Publish to npm with provenance
         run: npm publish --provenance --access public --registry https://registry.npmjs.org/

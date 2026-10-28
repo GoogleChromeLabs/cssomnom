@@ -126,6 +126,7 @@ describe('check-spec-anchors CI validator', () => {
 
   describe('Rule B: Submodule anchor validation', () => {
     let tempDir: string;
+    const hasSubmodules = fs.existsSync(path.join(process.cwd(), 'submodules/csswg-drafts/cssom-1'));
 
     before(() => {
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'spec-anchor-rule-b-'));
@@ -135,7 +136,7 @@ describe('check-spec-anchors CI validator', () => {
       fs.rmSync(tempDir, { recursive: true, force: true });
     });
 
-    it('accepts valid anchors in Bikeshed specs', () => {
+    it('accepts valid anchors in Bikeshed specs', { skip: !hasSubmodules }, () => {
       const fixtureFile = path.join(tempDir, 'valid-anchors.ts');
       fs.writeFileSync(
         fixtureFile,
@@ -147,7 +148,7 @@ describe('check-spec-anchors CI validator', () => {
       assert.equal(violations.length, 0);
     });
 
-    it('rejects invalid or hallucinated anchors in vendored specs', () => {
+    it('rejects invalid or hallucinated anchors in vendored specs', { skip: !hasSubmodules }, () => {
       const fixtureFile = path.join(tempDir, 'invalid-anchor.ts');
       fs.writeFileSync(
         fixtureFile,
@@ -161,7 +162,7 @@ describe('check-spec-anchors CI validator', () => {
       assert.match(violations[0].message, /non-existent-hallucinated-anchor-12345/);
     });
 
-    it('rejects unknown or unvendored spec shortnames', () => {
+    it('rejects unknown or unvendored spec shortnames', { skip: !hasSubmodules }, () => {
       const fixtureFile = path.join(tempDir, 'unknown-spec.ts');
       fs.writeFileSync(
         fixtureFile,
