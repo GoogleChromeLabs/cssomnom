@@ -22,18 +22,22 @@
   ],
   "type": "module",
   "sideEffects": [
-    "src/cascade.ts",
-    "src/MediaParser.ts",
-    "src/typed-om/**"
+    "./dist/index.js",
+    "./src/cascade.ts",
+    "./src/css-namespace.ts",
+    "./src/MediaParser.ts",
+    "./src/PropertyRegistry.ts",
+    "./src/typed-om/**"
   ],
   "publishConfig": {
     "access": "public"
   },
   "files": [
     "dist",
+    "!dist/cssomnom.iife.global.js",
+    "!dist/browser-entry.d.ts",
     "src",
-    "pnpm-lock.yaml",
-    "pnpm-workspace.yaml"
+    "!src/browser-entry.ts"
   ],
   "exports": {
     ".": {
@@ -59,11 +63,11 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "engines": {
-    "node": ">=24.11.0"
+    "node": ">=20.0.0"
   },
   "packageManager": "pnpm@12.5.1+sha512.e3f305bc784a2bc89f5ad3b6138889470fae8d2af5f36b61216ec91c2c3d64089775f9de38aac331044ea40f245cb0d5666392dfdf65824e1907ef6a2c62de5f",
   "scripts": {
-    "build": "tsup && tsup --config tsup.browser.config.ts && tsc -p tsconfig.build.json",
+    "build": "tsdown && tsc -p tsconfig.build.json",
     "prepare": "git config core.hooksPath .githooks",
     "prepublishOnly": "pnpm run preflight && pnpm run build",
     "test": "pnpm run preflight",
@@ -105,7 +109,7 @@
     "mdn-data": "^2.37.2",
     "oxlint": "^1.89.0",
     "puppeteer-core": "^25.16.0",
-    "tsup": "^9.0.0",
+    "tsdown": "^0.23.2",
     "typescript": "^7.0.2"
   }
 }

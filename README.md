@@ -4,7 +4,7 @@
 
 A high-performance, zero-dependency, spec-compliant CSS Object Model (CSSOM) parser and query engine in pure TypeScript. Purpose-built for static analysis, testing, and eating style rules for breakfast.
 
-_If you couldn't tell, this project was enabled due to coding agents. Coding agents + conformance suites is a really fun meta-project (I recommend it!).  This library is still young and while I am using it in prod, I wouldn't enthusiastically recommend it for all. :)_
+_Built with coding agents against 23,000+ W3C Web Platform Tests (WPT) across CSSOM, Syntax, Selectors, Cascade, Variables, Nesting, Media Queries, and Typed OM. Coding agents + conformance suites is a really fun meta-project (I recommend it!)._
 
 ## Why cssomnom?
 

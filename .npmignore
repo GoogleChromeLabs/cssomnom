@@ -15,7 +15,8 @@ docs/
 
 # Configs & planning docs
 tsconfig*.json
-tsup*.config.ts
+tsdown*.config.ts
+dist/cssomnom.iife.global.js
 .oxlintrc.json
 .eslintignore
 PLAN.md
