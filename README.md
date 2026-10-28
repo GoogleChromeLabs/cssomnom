@@ -47,8 +47,7 @@ import { parse } from 'cssomnom/ts';
 Parse CSS into a standard `CSSStyleSheet` and traverse rules like `CSSStyleRule`, `CSSMediaRule`, and `CSSNestedDeclarations`.
 
 ```typescript
-import { parse } from 'cssomnom';
-import type { CSSStyleRule, CSSMediaRule } from 'cssomnom/ts';
+import { parse, type CSSStyleRule, type CSSMediaRule } from 'cssomnom';
 
 const css = `
   body { color: red; }
@@ -247,8 +246,8 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **Base Hierarchy & Collections**: `StyleSheet`, `CSSStyleSheet`, `StyleSheetList`, `CSSRule`, `CSSRuleList`, `CSSGroupingRule`, `MediaList`, `LinkStyle` (TypeScript interface)
 - **Style Rules & Nesting**: `CSSStyleRule`, `CSSNestedDeclarations`
 - **Conditional & Grouping Rules**: `CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSScopeRule`, `CSSStartingStyleRule`
-- **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSAtRule`
-- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
+- **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSCustomMediaRule`, `CSSAtRule`
+- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSKeyframeStyleDeclaration`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
 
 **Deviations & Extensions**
 - **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. We allow direct instantiation of rule classes with explicit rule and token parameters (e.g., `new CSSStyleRule(selector, decls, rules)`) for headless manipulation. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
@@ -324,11 +323,9 @@ These standalone tree-shakeable functions are exported from `cssomnom` (and the 
 - `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
 - `getCascadedStyle(element, rules, pseudoElement?, options?)`: Computes cascaded styles against a DOM element.
 - `resolveVariables(style, property, envMap?)`: Resolves `var()` and `env()` substitutions with fallback handling.
-- `matches(element, selector)` / `querySelector(root, selector)` / `querySelectorAll(root, selector)`: Static selector matchers against DOM elements (featuring a 1,000-entry bounded LRU selector AST cache and RFC 4647 `:lang()` extended language range matching).
-    - `querySelectorAll(root, selector)` / `querySelector(root, selector)`: Static DOM query utilities.
-    - `escape(ident)`: Top-level string identifier escaping utility (`cssom-1 #serialize-an-identifier`).
-    - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
-    - Standalone Parser API exports for tree-shaking (`parseStylesheet`, `parseStylesheetSync`, `parseRule`, `parseRuleSync`, `parseDeclaration`, `parseDeclarationSync`, `supports`, etc.).
+- `matches(element, selector)` / `querySelector(root, selector)` / `querySelectorAll(root, selector)`: Static selector matchers and DOM query utilities (featuring a 1,000-entry bounded LRU selector AST cache and RFC 4647 `:lang()` extended language range matching).
+- `escape(ident)` / `supports(conditionText)`: Standalone top-level exports matching `CSS.escape()` and `CSS.supports()`.
+- `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
 
 **API Surface Verification**
 The public API surface area is locked down and verified by [api-surface.test.ts](./tests/api-surface.test.ts). Any additions or removals of public exports must be reflected in that test to ensure intentional API changes.
