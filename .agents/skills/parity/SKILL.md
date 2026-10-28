@@ -117,9 +117,9 @@ Before modifying code, ALWAYS open and inspect the Bikeshed source files (`.bs`)
 * **Gotcha**: Wrapping WPT test markup in synthetic `<!DOCTYPE html><html><body>` strings breaks raw DOM structure, tagName casing, and heading selector assertions.
 * **Rule**: Always pass raw WPT test HTML strings directly to LinkeDOM without artificial wrapper injections.
 
-### 3. Circular Dependency Management (`ParseHooks`)
+### 3. Circular Dependency Management & Parser Helpers
 * **Gotcha**: Importing `Parser` directly into `src/CSSOM.ts` or `src/typed-om.ts` creates circular module cycles.
-* **Rule**: Always use `ParseHooks.parseComponentValues()`, `ParseHooks.consumeRule()`, or `ParseHooks.parseStyleAttribute()`. Implementations are injected in `src/parser.ts`.
+* **Rule**: Import standalone parser helpers directly from `src/parser.ts` (`parseComponentValues`, `consumeRule`, `parseStyleAttribute`, etc.) rather than importing the entire `Parser` class. For upward optional feature hooks, use `ParseHooks` (`src/parse-hooks.ts`).
 
 ### 4. Strict WebIDL Type Checking & Rectification
 * **Gotcha**: Coercing strings or accepting raw numbers in Typed OM constructors creates over-mocking false positives.

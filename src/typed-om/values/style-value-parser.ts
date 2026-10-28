@@ -18,6 +18,7 @@
 import type { ComponentValue, IdentToken, CSSFunction } from '../../types.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { ParseHooks } from '../../parse-hooks.ts';
+import { parseComponentValues, parseStyleAttribute } from '../../parser.ts';
 import { serialize } from '../../serializer.ts';
 import { matchesSyntax, PropertyRegistry } from '../../PropertyRegistry.ts';
 import { SHORTHANDS } from '../../shorthands.ts';
@@ -150,7 +151,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
   if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
     throw new TypeError(`Invalid CSS token in '${css}'`);
   }
-  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const componentValues = parseComponentValues(tokens);
   const trimmed = componentValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
 
   if (trimmed.length === 0) {
@@ -273,7 +274,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
   }
 
   if (propLower in SHORTHANDS_DATA && !hasVarFunction(trimmed)) {
-    const parsed = ParseHooks.parseStyleAttribute(tokenize(`${property}: ${css}`));
+    const parsed = parseStyleAttribute(tokenize(`${property}: ${css}`));
     if (parsed._declarations.length === 0) {
       throw new TypeError(`Invalid value for shorthand property ${property}: ${css}`);
     }
@@ -463,7 +464,7 @@ ParseHooks.validatePropertyValue = (property: string, value: string): boolean =>
 
   // Validate <color> syntax for standard color properties (excluding SVG <paint> properties)
   if (lowerProp !== 'fill' && lowerProp !== 'stroke' && STANDARD_PROPERTIES_SYNTAX[lowerProp] === '<color>') {
-    const compVals = ParseHooks.parseComponentValues(tokens).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+    const compVals = parseComponentValues(tokens).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
     if (!matchesSyntax(compVals, '<color>')) {
       return false;
     }

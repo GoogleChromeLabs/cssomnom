@@ -16,7 +16,7 @@
  */
 
 import { tokenize } from '../tokenizer.ts';
-import { ParseHooks } from '../parse-hooks.ts';
+import { parseComponentValues } from '../parser.ts';
 import { serialize } from '../serializer.ts';
 import type { ComponentValue, SimpleBlock, Token, CSSFunction } from '../types.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
@@ -110,7 +110,7 @@ export function substituteVariables(
 
   let hasAttrTaint = false;
   const tokens = tokenize(valueText);
-  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const componentValues = parseComponentValues(tokens);
   const resolveNodes = (nodes: ComponentValue[], inVarContext = false): ComponentValue[] | null => {
     const result: ComponentValue[] = [];
     const pushTokens = (tokens: ComponentValue[]) => {
@@ -145,7 +145,7 @@ export function substituteVariables(
 
           const envVal = envMap?.[fullKey] ?? (envName in STANDARD_ENV_VARS ? STANDARD_ENV_VARS[envName] : undefined);
           if (envVal !== undefined) {
-            const parsedEnv = ParseHooks.parseComponentValues(tokenize(envVal));
+            const parsedEnv = parseComponentValues(tokenize(envVal));
             const resolvedEnv = resolveNodes(parsedEnv, inVarContext);
             if (resolvedEnv !== null) {
               pushTokens(resolvedEnv);
@@ -420,9 +420,9 @@ export function substituteVariables(
                 }
                 return null;
               }
-              substitutedTokens = ParseHooks.parseComponentValues(tokenize(resolvedCustom));
+              substitutedTokens = parseComponentValues(tokenize(resolvedCustom));
             } else {
-              substitutedTokens = ParseHooks.parseComponentValues(tokenize(rawCustomVal));
+              substitutedTokens = parseComponentValues(tokenize(rawCustomVal));
             }
 
             const jsDef = PropertyRegistry.get(varName);
@@ -433,7 +433,7 @@ export function substituteVariables(
                 ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(String((cleanTokens[0] as Token).value).toLowerCase());
               if (!isCSSWideKeyword && !matchesSyntax(cleanTokens, def.syntax || '*')) {
                 if (def.initialValue !== undefined) {
-                  substitutedTokens = def.parsedInitialValue ? cloneComponentValues(def.parsedInitialValue) : ParseHooks.parseComponentValues(tokenize(def.initialValue));
+                  substitutedTokens = def.parsedInitialValue ? cloneComponentValues(def.parsedInitialValue) : parseComponentValues(tokenize(def.initialValue));
                 } else if (fallbackTokens) {
                   const resolvedFallback = resolveNodes(fallbackTokens);
                   if (resolvedFallback === null) return null;
@@ -452,7 +452,7 @@ export function substituteVariables(
             const jsDef = PropertyRegistry.get(varName);
             const def = (jsDef && jsDef.origin === 'js') ? jsDef : (activeProperties?.get(varName) ?? jsDef);
             if (def?.initialValue !== undefined) {
-              const substitutedTokens = def.parsedInitialValue ? cloneComponentValues(def.parsedInitialValue) : ParseHooks.parseComponentValues(tokenize(def.initialValue));
+              const substitutedTokens = def.parsedInitialValue ? cloneComponentValues(def.parsedInitialValue) : parseComponentValues(tokenize(def.initialValue));
               pushTokens(substitutedTokens);
             } else if (fallbackTokens) {
               const resolvedFallback = resolveNodes(fallbackTokens);
@@ -537,7 +537,7 @@ export function resolveVariables(
   if (property.startsWith('--')) {
     const def = activeProperties?.get(property) ?? PropertyRegistry.get(property);
     if (def && def.syntax && def.syntax !== '*') {
-      const tokens = ParseHooks.parseComponentValues(tokenize(res)).filter(
+      const tokens = parseComponentValues(tokenize(res)).filter(
         t => t.type !== 'whitespace' && t.type !== 'comment'
       );
       const isCSSWideKeyword =
@@ -729,7 +729,7 @@ export function resolveCustomProperties(
         }
 
         if (def && def.syntax && def.syntax !== '*') {
-          const tokens = ParseHooks.parseComponentValues(tokenize(subVal)).filter(
+          const tokens = parseComponentValues(tokenize(subVal)).filter(
             t => t.type !== 'whitespace' && t.type !== 'comment'
           );
           if (!matchesSyntax(tokens, def.syntax)) {

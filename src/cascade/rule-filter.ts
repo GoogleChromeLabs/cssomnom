@@ -40,7 +40,7 @@ import { SelectorParser } from '../SelectorParser.ts';
 import { serialize, serializeSelectorList } from '../serializer.ts';
 import { matches, isElement } from '../matcher.ts';
 import type { DOMElement } from '../matcher.ts';
-import { ParseHooks } from '../parse-hooks.ts';
+import { parseComponentValues, parseRuleInScopeBlock, parseStyleAttribute } from '../parser.ts';
 import { SVG_PRESENTATION_ATTRIBUTES } from '../data/gen/cascade-data.ts';
 import type { CSSRuleList } from '../rules/collections.ts';
 import type {
@@ -386,7 +386,7 @@ export function collectStyleSheetsAndRules(
 
 function splitSelectorList(selectorText: string): string[] {
   const list = new SelectorParser(
-    ParseHooks.parseComponentValues(tokenize(selectorText)),
+    parseComponentValues(tokenize(selectorText)),
     { allowRelative: true, forgiving: true }
   ).parse();
   const result = list.selectors
@@ -744,7 +744,7 @@ export function collectMatchedDeclarations(
           if (isScoped) {
             const startStr = scopeStart ? `(${scopeStart})` : null;
             const endStr = scopeEnd ? `(${scopeEnd})` : null;
-            const scopeRule = new CSSScopeRule(startStr, endStr, Array.from(importedSheet.cssRules), ParseHooks.parseRuleInScopeBlock);
+            const scopeRule = new CSSScopeRule(startStr, endStr, Array.from(importedSheet.cssRules), parseRuleInScopeBlock);
             (scopeRule as CSSRule & InternalRuleMetadata)._parentStyleSheet = (rule as CSSRule).parentStyleSheet || findParentStyleSheet(rule as CSSRule);
             walkRules([scopeRule], parentSelector, layerName, scopeNode, scopeProximity);
           } else {
@@ -955,7 +955,7 @@ export function collectInlineDeclarations(
   const declarations: MatchedDeclaration[] = [];
 
   if (styleAttrText && styleAttrText.trim()) {
-    const inlineDecls = ParseHooks.parseStyleAttribute(tokenize(styleAttrText));
+    const inlineDecls = parseStyleAttribute(tokenize(styleAttrText));
     for (const d of inlineDecls._declarations) {
       declarations.push({
         name: d.name,
@@ -981,7 +981,7 @@ export { resolveNestedSelector } from '../nesting.ts';
  */
 export function getMatchingSpecificity(element: ElementLike, selectorText: string, scope?: DOMElement): Specificity {
   const tokens = tokenize(selectorText);
-  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const componentValues = parseComponentValues(tokens);
   const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: true });
   const list = selectorParser.parse();
 

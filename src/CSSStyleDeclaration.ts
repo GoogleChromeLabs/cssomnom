@@ -14,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { CSSRule } from './rules/base.ts';
 import { ParseHooks } from './parse-hooks.ts';
+import { isValidDashedIdent, parseComponentValues, validateCustomPropertyValue, validateDeclarationValue, assembleUnicodeRanges, parseStyleAttribute } from './parser.ts';
 import { serialize, serializeDeclarations, serializeFontFamily } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import type { Declaration, ComponentValue } from './types.ts';
-import type { CSSRule } from './rules/base.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
@@ -253,7 +254,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   // cssom-1 #dom-cssstyledeclaration-getpropertyvalue
   getPropertyValue(property: string): string {
     if (!property.startsWith('--')) property = property.toLowerCase();
-    else if (!ParseHooks.isValidDashedIdent(property)) return '';
+    else if (!isValidDashedIdent(property)) return '';
     const shorthandLonghands = SHORTHANDS[property]?.longhands || (SHORTHANDS_DATA as Record<string, readonly string[]>)[property];
     if (shorthandLonghands && shorthandLonghands.length > 0) {
       let allCssWide: string | null = null;
@@ -563,15 +564,15 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const valueStr = typeof value === 'string' ? value : String(value);
 
     if (property.startsWith('--')) {
-      if (!ParseHooks.isValidDashedIdent(property)) {
+      if (!isValidDashedIdent(property)) {
         return;
       }
       const tokens = tokenize(valueStr);
       if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) {
         return;
       }
-      const componentValues = ParseHooks.parseComponentValues(tokens);
-      if (!ParseHooks.validateCustomPropertyValue(componentValues)) {
+      const componentValues = parseComponentValues(tokens);
+      if (!validateCustomPropertyValue(componentValues)) {
         return;
       }
     }
@@ -586,11 +587,11 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       this._declMap.delete('all');
     }
 
-    const compVals = ParseHooks.parseComponentValues(tokens);
+    const compVals = parseComponentValues(tokens);
     if (!property.startsWith('--')) {
       // css-syntax-3 #consume-declaration
       // css-variables-1 #using-variables
-      if (ParseHooks.validateDeclarationValue && !ParseHooks.validateDeclarationValue(compVals)) {
+      if (!validateDeclarationValue(compVals)) {
         return;
       }
       if (ParseHooks.validatePropertyValue && !ParseHooks.validatePropertyValue(property, valueStr, value)) {
@@ -620,7 +621,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
           return;
         }
       }
-      if (hasVar && ParseHooks.validateDeclarationValue(compVals)) {
+      if (hasVar && validateDeclarationValue(compVals)) {
         for (const lh of shorthand.longhands) {
           this.removeProperty(lh);
         }
@@ -631,10 +632,10 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
     const existing = this._declMap.get(property);
 
-    const componentValues = ParseHooks.parseComponentValues(tokens);
+    const componentValues = parseComponentValues(tokens);
 
     if (property === 'unicode-range') {
-      const assembled = ParseHooks.assembleUnicodeRanges(componentValues);
+      const assembled = assembleUnicodeRanges(componentValues);
       if (!assembled) {
         return;
       }
@@ -755,7 +756,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const tokens = tokenize(value);
     let newStyle;
     try {
-      newStyle = ParseHooks.parseStyleAttribute(tokens);
+      newStyle = parseStyleAttribute(tokens);
     } catch {
       return false;
     }
@@ -818,3 +819,129 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
 // WebIDL § 3.6, § 3.7
 applyWebIDLInterface(CSSStyleDeclaration);
+
+// cssom-1 #the-cssstyledeclaration-interface
+// WebIDL #interface-prototype-object
+Object.defineProperty(CSSStyleDeclaration.prototype, Symbol.toStringTag, {
+  value: 'CSSStyleDeclaration',
+  configurable: true,
+  writable: false,
+  enumerable: false
+});
+
+// css-animations-1 #keyframes
+export class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
+  /** @internal */
+  protected override get _filterDeclarationsInConstructor(): boolean {
+    return true;
+  }
+
+  /** @internal */
+  override _isPropertySupported(property: string): boolean {
+    return property !== 'animation-name' && super._isPropertySupported(property);
+  }
+}
+
+const FONT_FACE_DESCRIPTORS = new Set([
+  'ascent-override', 'descent-override', 'font-display', 'font-family',
+  'font-stretch', 'font-style', 'font-weight', 'font-feature-settings',
+  'font-variation-settings', 'line-gap-override', 'size-adjust', 'src',
+  'unicode-range'
+]);
+
+// css-fonts-4 #om-fontface
+export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
+  declare src?: string;
+  declare fontDisplay?: string;
+  declare unicodeRange?: string;
+
+  // WebIDL #interface-prototype-object
+  get [Symbol.toStringTag](): string {
+    return 'CSSFontFaceDescriptors';
+  }
+
+  /** @internal */
+  override _isPropertySupported(property: string): boolean {
+    return super._isPropertySupported(property) || FONT_FACE_DESCRIPTORS.has(property);
+  }
+}
+
+// css-page-3 #page-properties
+const PAGE_ALLOWED_PROPERTIES = new Set<string>([
+  'size', 'page-orientation', 'marks', 'bleed', 'page-margin-safety', 'margin',
+  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+  'margin-block', 'margin-block-start', 'margin-block-end',
+  'margin-inline', 'margin-inline-start', 'margin-inline-end',
+  'page-break-before', 'page-break-after', 'page-break-inside',
+  'break-before', 'break-after', 'break-inside', 'orphans', 'widows',
+  'page', 'counter-increment', 'counter-reset', 'counter-set', 'quotes',
+]);
+
+export const PAGE_DESCRIPTORS_INTERNAL = Symbol('CSSPageDescriptors.internal');
+
+export class CSSPageDescriptors extends CSSStyleDeclaration {
+  /** @internal */
+  protected override get _filterDeclarationsInConstructor(): boolean {
+    return true;
+  }
+
+  constructor(declarations?: Declaration[], internalToken?: symbol) {
+    if (internalToken !== PAGE_DESCRIPTORS_INTERNAL) {
+      throw new TypeError('Illegal constructor');
+    }
+    super(declarations);
+  }
+
+  declare margin: string;
+  declare marginTop: string;
+  declare marginRight: string;
+  declare marginBottom: string;
+  declare marginLeft: string;
+  declare 'margin-top': string;
+  declare 'margin-right': string;
+  declare 'margin-bottom': string;
+  declare 'margin-left': string;
+  declare size: string;
+  declare pageOrientation: string;
+  declare 'page-orientation': string;
+  declare marks: string;
+  declare bleed: string;
+  declare pageMarginSafety?: string;
+
+  /** @internal */
+  override _isPropertySupported(property: string): boolean {
+    return PAGE_ALLOWED_PROPERTIES.has(property);
+  }
+
+  get [Symbol.toStringTag](): string {
+    return 'CSSPageDescriptors';
+  }
+}
+
+const PAGE_DESCRIPTOR_PROPERTIES = [
+  'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+  'size', 'pageOrientation', 'page-orientation', 'marks', 'bleed',
+] as const;
+
+// WebIDL #es-attributes
+for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {
+  const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+  Object.defineProperty(CSSPageDescriptors.prototype, prop, {
+    get(this: unknown): string {
+      return (this as CSSPageDescriptors).getPropertyValue(cssProp);
+    },
+    set(this: unknown, val: unknown): void {
+      (this as CSSPageDescriptors).setProperty(cssProp, val === null || val === undefined ? '' : String(val));
+    },
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+export class CSSMarginDescriptors extends CSSStyleDeclaration {}
+
+applyWebIDLInterface(CSSFontFaceDescriptors);
+applyWebIDLInterface(CSSPageDescriptors);
+applyWebIDLInterface(CSSMarginDescriptors);
+

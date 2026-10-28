@@ -15,15 +15,21 @@
  * limitations under the License.
  */
 
-import { ParseHooks } from '../parse-hooks.ts';
 import type { Declaration, Rule, RuleSourceLocation } from '../types.ts';
-import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
+import { SUPPORTED_PROPERTIES } from '../data/gen/property-list.ts';
 import { deleteRuleFromArray } from '../utils.ts';
 import { CSSRuleList } from './collections.ts';
 import { isImportRule, isNamespaceRule } from './utils.ts';
 import type { CSSStyleSheet } from '../CSSOM.ts';
 import type { CSSNestedDeclarations } from './at-rules.ts';
 import { applyWebIDLConstants, hideInternalFields } from '../webidl.ts';
+
+/** @internal */
+export interface GroupingRuleParser {
+  parseRule: (rule: string) => Rule | null;
+  parseRuleInBlock: (rule: string, isNested?: boolean) => Rule | null;
+  parseRuleInScopeBlock: (rule: string) => Rule | null;
+}
 
 const RULE_CONSTANTS = {
   STYLE_RULE: 1,
@@ -122,6 +128,8 @@ applyWebIDLConstants(CSSRule, RULE_CONSTANTS);
 
 export class CSSGroupingRule extends CSSRule {
   /** @internal */
+  static _parser: GroupingRuleParser | null = null;
+  /** @internal */
   _cssRules!: CSSRuleList;
   /** @internal */
   _rules: CSSRule[];
@@ -170,10 +178,15 @@ export class CSSGroupingRule extends CSSRule {
       }
     }
 
+    if (!CSSGroupingRule._parser) {
+      throw new DOMException('Parser not initialized', 'SyntaxError');
+    }
+    const { parseRule, parseRuleInBlock, parseRuleInScopeBlock } = CSSGroupingRule._parser;
+
     // Check if the input rule is a top-level rule to validate hierarchy constraints
     let topRule: Rule | null = null;
     try {
-      topRule = ParseHooks.parseRule(rule);
+      topRule = parseRule(rule);
     } catch {}
     if (topRule) {
       if (isImportRule(topRule) || isNamespaceRule(topRule)) {
@@ -199,8 +212,8 @@ export class CSSGroupingRule extends CSSRule {
     }
 
     const parsedRule = isDirectlyInScope
-      ? ParseHooks.parseRuleInScopeBlock(rule)
-      : ParseHooks.parseRuleInBlock(rule, isNested);
+      ? parseRuleInScopeBlock(rule)
+      : parseRuleInBlock(rule, isNested);
     if (!parsedRule) {
       // 5. If new rule is a syntax error, throw a SyntaxError exception.
       throw new DOMException('Syntax error', 'SyntaxError');
@@ -219,7 +232,7 @@ export class CSSGroupingRule extends CSSRule {
       const decls = (parsedRule as CSSNestedDeclarations).style._declarations;
       const validDecls = decls.filter((d: Declaration) => {
         const name = d.name.toLowerCase();
-        return name.startsWith('--') || CSSStyleDeclaration.prototype._isPropertySupported(name);
+        return name.startsWith('--') || SUPPORTED_PROPERTIES.has(name);
       });
       if (validDecls.length === 0) {
         throw new DOMException('Syntax error: CSSNestedDeclarations contains no valid declarations', 'SyntaxError');

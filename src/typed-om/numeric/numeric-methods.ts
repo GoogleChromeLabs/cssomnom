@@ -32,7 +32,7 @@ import {
 } from './math/CSSMathOperations.ts';
 import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { tokenize } from '../../tokenizer.ts';
-import { ParseHooks } from '../../parse-hooks.ts';
+import { parseComponentValues } from '../../parser.ts';
 import { parseMathFunction } from '../../math-parser.ts';
 import { unitToBase, unitToPixels, unitToRadians, unitToSeconds } from '../../data/gen/units.ts';
 import { compareStrings } from '../utils/validation.ts';
@@ -279,7 +279,7 @@ export function parseNumericValue(css: string): CSSNumericValue {
   }
   try {
     const tokens = tokenize(css);
-    const componentValues = ParseHooks.parseComponentValues(tokens).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
+    const componentValues = parseComponentValues(tokens).filter(v => v.type !== 'whitespace' && v.type !== 'comment');
     if (componentValues.length === 0) {
       throw new DOMException(`Invalid numeric value: ${css}`, 'SyntaxError');
     }

@@ -19,7 +19,7 @@ import { DEFAULT_PROPERTY_VALUES } from '../data/gen/cascade-data.ts';
 import { SHORTHANDS } from '../shorthands.ts';
 import { tokenize } from '../tokenizer.ts';
 import { serialize } from '../serializer.ts';
-import { ParseHooks } from '../parse-hooks.ts';
+import { parseComponentValues } from '../parser.ts';
 import { INHERITED_PROPERTIES } from './types.ts';
 import type { MatchedDeclaration } from './types.ts';
 import { substituteVariables } from './variable-resolver.ts';
@@ -140,7 +140,7 @@ function expandShorthandWithVariables(
   }
 
   const tokens = tokenize(subVal);
-  const compValues = ParseHooks.parseComponentValues(tokens);
+  const compValues = parseComponentValues(tokens);
   const expanded = shorthand.expand(compValues);
   if (expanded) {
     const results: MatchedDeclaration[] = [];

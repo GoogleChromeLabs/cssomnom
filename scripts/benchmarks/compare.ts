@@ -78,7 +78,6 @@ export const BENCHMARK_NAMES = [
 ];
 
 // Entry files for each benchmark to automatically derive transitive import dependencies.
-// Note: runtime injection connects src/parser.ts into src/parse-hooks.ts.
 export const BENCHMARK_ENTRY_FILES: Record<string, string[]> = {
   'tokenize: synthetic large (163KB)': ['src/tokenizer.ts'],
   'tokenize: modern.css (7.7KB)': ['src/tokenizer.ts'],
@@ -107,17 +106,6 @@ function getFileImports(filePath: string): string[] {
   const content = fs.readFileSync(filePath, 'utf-8');
   const dir = path.dirname(filePath);
   const imports: string[] = [];
-
-  // ParseHooks blind spot fix:
-  // src/parser.ts injects implementation into src/parse-hooks.ts at runtime.
-  // Any module that reaches parse-hooks.ts functionally depends on parser.ts.
-  const normPath = filePath.replace(/\\/g, '/');
-  if (normPath.endsWith('src/parse-hooks.ts')) {
-    const parserPath = path.resolve(dir, 'parser.ts');
-    if (fs.existsSync(parserPath)) {
-      imports.push(parserPath);
-    }
-  }
 
   const cleanContent = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '');
   const importLines = cleanContent.split('\n');

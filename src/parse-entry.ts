@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+export { CSSRule, CSSGroupingRule } from './rules/base.ts';
 export { parse } from './parser.ts';
 export type { ParserOptions } from './parser.ts';
 export { tokenize } from './tokenizer.ts';

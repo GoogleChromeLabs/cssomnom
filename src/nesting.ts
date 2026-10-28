@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { ParseHooks } from './parse-hooks.ts';
+import { parseComponentValues } from './parser.ts';
 import { SelectorParser } from './SelectorParser.ts';
 import { serializeSelectorList } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
@@ -29,14 +29,14 @@ export function resolveNestedSelector(selector: string, parentSelector: string):
   if (!parentSelector && !selector.includes('&')) return selector;
 
   const tokens = tokenize(selector);
-  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const componentValues = parseComponentValues(tokens);
   const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: true });
   const list = selectorParser.parse();
 
   let parentList: SelectorList | null = null;
   if (parentSelector) {
     const parentTokens = tokenize(parentSelector);
-    const parentComp = ParseHooks.parseComponentValues(parentTokens);
+    const parentComp = parseComponentValues(parentTokens);
     const parentSelectorParser = new SelectorParser(parentComp, { allowRelative: true, forgiving: true });
     parentList = parentSelectorParser.parse();
   }

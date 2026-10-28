@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+export { CSSRule, CSSGroupingRule } from './rules/base.ts';
 import './cascade.ts';
 
 export { parse } from './parser.ts';

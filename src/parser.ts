@@ -14,16 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, UrlToken, FunctionToken, UnicodeRangeToken, CustomMediaQuery, RuleSourceLocation } from './types.ts';
+import type { Token, TokenStream, ComponentValue, ComponentValueStream, SimpleBlock, CSSFunction, Declaration, ASTAtRule, Rule, ParseError, StringToken, UrlToken, FunctionToken, UnicodeRangeToken, CustomMediaQuery, RuleSourceLocation, SelectorList } from './types.ts';
 
 
 import { serialize, getOriginalText, getMirrorToken } from './serializer.ts';
 
 import { tokenize } from './tokenizer.ts';
-import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSRule, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule, MediaList } from './CSSOM.ts';
+import { CSSRule, CSSGroupingRule } from './rules/base.ts';
+import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
+import { MediaList } from './rules/collections.ts';
+import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule } from './rules/at-rules.ts';
+import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { isGrammaticallyValidSupportsCondition } from './rules/utils.ts';
 import { INTERNAL_RULE_TOKEN } from './internal-token.ts';
-import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
 
 export interface ParserOptions {
@@ -31,6 +34,12 @@ export interface ParserOptions {
   allowVendorPseudos?: boolean;
   source?: string;
 }
+
+export type SelectorASTOptions = {
+  declaredNamespaces?: Set<string>;
+  allowRelative?: boolean;
+  allowVendorPseudos?: boolean;
+};
 import { SelectorParser } from './SelectorParser.ts';
 import { ParseHooks } from './parse-hooks.ts';
 
@@ -109,7 +118,7 @@ const FONT_FEATURE_VALUE_BLOCKS: Record<string, 'annotation' | 'ornaments' | 'st
   historicalforms: 'historicalForms',
 };
 
-function isValidDashedIdent(name: string): boolean {
+export function isValidDashedIdent(name: string): boolean {
   return typeof name === 'string' && name.startsWith('--') && name !== '--' && !/\s/.test(name);
 }
 
@@ -1213,7 +1222,7 @@ export class Parser {
   private createStyleRule(prelude: ComponentValue[], blockContents: Rule[], isNested: boolean = false, allowRelative: boolean = isNested, location?: RuleSourceLocation): CSSStyleRule | null {
     const { declarations, nestedRules } = splitLeadingDeclarations(blockContents);
     let selectorText = '';
-    let selectorAST: import('./types.ts').SelectorList | null = null;
+    let selectorAST: SelectorList | null = null;
 
     if (isNested) {
       selectorText = this.normalizeNestedSelector(prelude);
@@ -1257,19 +1266,19 @@ export class Parser {
   public static parseSelectorAST(
     text: string,
     options?: { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean }
-  ): import('./types.ts').SelectorList | null;
+  ): SelectorList | null;
   public static parseSelectorAST(
     text: string,
     declaredNamespaces?: Set<string>,
     allowRelative?: boolean,
     allowVendorPseudos?: boolean
-  ): import('./types.ts').SelectorList | null;
+  ): SelectorList | null;
   public static parseSelectorAST(
     text: string,
     declaredNamespacesOrOptions?: Set<string> | { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean },
     allowRelative = false,
     allowVendorPseudos = false
-  ): import('./types.ts').SelectorList | null {
+  ): SelectorList | null {
     const isOptionsObj = declaredNamespacesOrOptions && !(declaredNamespacesOrOptions instanceof Set);
     const declaredNamespaces = isOptionsObj ? declaredNamespacesOrOptions.declaredNamespaces : declaredNamespacesOrOptions;
     const isRelative = isOptionsObj ? (declaredNamespacesOrOptions.allowRelative ?? false) : allowRelative;
@@ -1620,34 +1629,37 @@ export function isValidUnicodeRangeValue(values: ComponentValue[]): boolean {
   return assembleUnicodeRanges(values) !== null;
 }
 
-// Inject Parser implementations into ParseHooks to break circular dependencies
-ParseHooks.parseStyleAttribute = (tokens) => new Parser(tokens).parseStyleAttribute();
-ParseHooks.consumeRule = (tokens) => new Parser(tokens).consumeRule();
-ParseHooks.consumeListOfRules = (tokens, topLevel) => new Parser(tokens).consumeListOfRules(topLevel);
-ParseHooks.parseRule = (text) => parseRule(text);
-ParseHooks.parseRuleInBlock = (text, nested) => parseRuleInBlockText(text, nested);
-ParseHooks.parseRuleInScopeBlock = (text) => parseRuleInScopeBlockText(text);
-ParseHooks.parseComponentValues = (tokens, errors) => {
+export function parseStyleAttribute(tokens: Token[]): CSSStyleDeclaration {
+  return new Parser(tokens).parseStyleAttribute();
+}
+
+export function consumeRule(tokens: Token[]): Rule | null {
+  return new Parser(tokens).consumeRule();
+}
+
+export function consumeListOfRules(tokens: Token[], topLevel: boolean): Rule[] {
+  return new Parser(tokens).consumeListOfRules(topLevel);
+}
+
+export function parseComponentValues(tokens: TokenStream | Token[], errors?: ParseError[]): ComponentValue[] {
   const p = new Parser(tokens);
   const res = p.parseComponentValues();
   if (errors) {
     errors.push(...p.errors);
   }
   return res;
-};
-ParseHooks.parseSelector = (text) => Parser.parseSelector(text);
-ParseHooks.parseSelectorAST = (text, declaredNamespacesOrOptions, allowRelative, allowVendorPseudos) => {
-  if (declaredNamespacesOrOptions instanceof Set) {
-    return Parser.parseSelectorAST(text, declaredNamespacesOrOptions, allowRelative, allowVendorPseudos);
-  }
-  return Parser.parseSelectorAST(text, declaredNamespacesOrOptions);
-};
-ParseHooks.validateCustomPropertyValue = (values) => validateDeclarationValue(values, true, true);
-ParseHooks.validateDeclarationValue = (values) => validateDeclarationValue(values, true, false);
-ParseHooks.isValidUnicodeRangeValue = (values) => isValidUnicodeRangeValue(values);
-ParseHooks.assembleUnicodeRanges = (values) => assembleUnicodeRanges(values);
-ParseHooks.isValidDashedIdent = (name) => isValidDashedIdent(name);
+}
+
+export const parseSelector = Parser.parseSelector;
+export const parseSelectorAST = Parser.parseSelectorAST;
+
+export function validateCustomPropertyValue(values: ComponentValue[]): boolean {
+  return validateDeclarationValue(values, true, true);
+}
 
 export function parse(css: string, options?: ParserOptions): CSSStyleSheet {
   return new Parser(tokenize(css), { source: css, ...options }).parseStyleSheet();
 }
+
+CSSGroupingRule._parser = { parseRule, parseRuleInBlock, parseRuleInScopeBlock };
+

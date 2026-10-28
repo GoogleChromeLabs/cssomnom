@@ -23,7 +23,7 @@ import type { Token } from '../types.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
 import { HTML_UA_STYLESHEET_TEXT } from '../data/gen/ua-stylesheet.ts';
-import { ParseHooks } from '../parse-hooks.ts';
+import { consumeListOfRules, parseComponentValues } from '../parser.ts';
 import type { Rule, Declaration, InternalStyleDeclaration, ElementLike } from '../types.ts';
 import type { CSSRuleList } from '../rules/collections.ts';
 import type { MatchedDeclaration } from './types.ts';
@@ -171,7 +171,7 @@ export function getCascadedStyle(
   // 3. Collect matched declarations from stylesheet rules
   // 3a. User-Agent origin rules (css-cascade-5 #cascade-origin, #cascading-origins)
   if (!cachedUaRules) {
-    cachedUaRules = ParseHooks.consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true);
+    cachedUaRules = consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true);
   }
   const { matchedDeclarations: uaDeclarations } = collectMatchedDeclarations(
     element,
@@ -378,7 +378,7 @@ export function getCascadedStyle(
     const isSvg = isSvgElement(element);
     const isSvgColorProp = isSvg && (mappedName === 'flood-color' || mappedName === 'lighting-color' || mappedName === 'stop-color' || mappedName === 'stroke');
     const finalValue = COLOR_PROPERTIES.has(mappedName) && !isSvgColorProp ? normalizeComputedColor(decl.value) : decl.value;
-    const parsedFinalValue = ParseHooks.parseComponentValues(tokenize(finalValue));
+    const parsedFinalValue = parseComponentValues(tokenize(finalValue));
 
     finalDeclarations.push({
       type: 'declaration',
@@ -403,7 +403,7 @@ export function getCascadedStyle(
       finalDeclarations.push({
         type: 'declaration',
         name: customProp,
-        value: ParseHooks.parseComponentValues(tokenize(customVal)),
+        value: parseComponentValues(tokenize(customVal)),
         important: false,
         raw: customVal,
       });

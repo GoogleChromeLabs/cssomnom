@@ -91,15 +91,15 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 
 ## Key Invariants and Seams
 
-- **ParseHooks Dependency Inversion**:
-  To prevent circular imports between the parser (`src/parser.ts`) and CSSOM/Typed OM layers (`src/CSSOM.ts`, `src/typed-om.ts`), `src/parse-hooks.ts` declares hook signatures that throw by default. At bootstrap, `src/parser.ts` injects concrete implementations into `ParseHooks` (`ParseHooks.consumeRule = ...`, `ParseHooks.parseStyleAttribute = ...`). Never import `Parser` directly into `src/CSSOM.ts` or `src/typed-om/`.
+- **Tree-Shakeable Parser Helpers & Upward ParseHooks**:
+  Downward parser operations (`parseStyleAttribute`, `consumeRule`, `consumeListOfRules`, `parseComponentValues`, `parseSelectorAST`, `validateCustomPropertyValue`) are exported as standalone pure functions from `src/parser.ts` and directly imported by callers. Upward optional feature hooks (`parseMediaQueryList`, `serializeMediaQuery`, `validatePropertyValue`, `supports`, `createStylePropertyMap`, `validatePropertyRuleDescriptor`, `registerPropertyRule`, `unregisterPropertyRule`) reside in `src/parse-hooks.ts` to allow optional modules to register capabilities without creating circular imports.
 - **Math Simplification Ownership**:
   `src/math-parser.ts` owns math expression parsing (`parseMathFunction()`) and canonical algebraic simplification (`simplify()`). Typed OM (`src/typed-om/numeric/numeric-methods.ts`, `style-value-factory.ts`) delegates `calc()` tree parsing and reduction to `src/math-parser.ts`, while wrapping simplified results into `CSSMathValue` or `CSSUnitValue` trees.
 - **Public Entry Points**:
   - `src/index.ts`: Primary library entry point for Node.js and bundlers.
   - `src/browser-entry.ts`: Browser environment entry point exposing globals with WebIDL property descriptors.
 - **UA Stylesheet Entry into Cascade**:
-  The HTML User Agent stylesheet text is generated into `src/data/gen/ua-stylesheet.ts` from WHATWG HTML. In `src/cascade/index.ts` within `getCascadedStyle()`, it is lazily parsed via `ParseHooks.consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true)` and collected under `'user-agent'` origin with default (empty) layer ordering, running before author rules.
+  The HTML User Agent stylesheet text is generated into `src/data/gen/ua-stylesheet.ts` from WHATWG HTML. In `src/cascade/index.ts` within `getCascadedStyle()`, it is lazily parsed via `consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true)` and collected under `'user-agent'` origin with default (empty) layer ordering, running before author rules.
 - **Test Layout & Harness**:
   - `tests/`: Pure in-memory unit tests (`pnpm test:node`). Must never spawn child processes.
   - `tests/dom-shim/`: In-memory DOM polyfill (built on LinkeDOM) for running DOM-dependent tests and WPT harnesses in Node.js.

@@ -35,23 +35,10 @@ async function main() {
     }
     uniqueProperties.sort();
 
-    let customIdentProps: string[] = [];
-    try {
-        const { STANDARD_PROPERTIES_SYNTAX } = await import('../../src/data/gen/standard-syntax.ts');
-        customIdentProps = Object.keys(STANDARD_PROPERTIES_SYNTAX)
-            .filter(p => STANDARD_PROPERTIES_SYNTAX[p].includes('<custom-ident>'))
-            .sort();
-    } catch {
-        customIdentProps = [
-            '-webkit-animation', '-webkit-animation-name', '-webkit-transition', '-webkit-transition-property',
-            'animation', 'animation-name', 'color-scheme', 'container', 'container-name', 'copy-into',
-            'counter-increment', 'counter-reset', 'counter-set', 'flow-from', 'flow-into', 'font', 'font-family',
-            'grid', 'grid-area', 'grid-column', 'grid-column-end', 'grid-column-start', 'grid-row',
-            'grid-row-end', 'grid-row-start', 'grid-template', 'grid-template-columns', 'grid-template-rows',
-            'list-style', 'list-style-type', 'page', 'string-set', 'transition', 'transition-property',
-            'view-transition-class', 'view-transition-group', 'view-transition-name', 'will-change'
-        ];
-    }
+    const { STANDARD_PROPERTIES_SYNTAX } = await import('../../src/data/gen/standard-syntax.ts');
+    const customIdentProps = Object.keys(STANDARD_PROPERTIES_SYNTAX)
+        .filter(p => STANDARD_PROPERTIES_SYNTAX[p].includes('<custom-ident>'))
+        .sort();
 
     // Generate property-list.ts
     let listContent = `/**

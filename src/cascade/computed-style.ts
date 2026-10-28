@@ -17,7 +17,7 @@
 
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import { tokenize } from '../tokenizer.ts';
-import { ParseHooks } from '../parse-hooks.ts';
+import { parseComponentValues } from '../parser.ts';
 import { serialize } from '../serializer.ts';
 import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapping.ts';
 import {
@@ -90,7 +90,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       return { value: decl.value, important: decl.important };
     }
     return {
-      value: ParseHooks.parseComponentValues(tokenize(computedVal)),
+      value: parseComponentValues(tokenize(computedVal)),
       important: decl?.important ?? false,
     };
   }
@@ -218,7 +218,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
       if (dashed === 'width' || dashed === 'height' || lowerRaw.startsWith('calc(')) {
         try {
           const decl = this._getWinningDeclaration(dashed);
-          const tokens = decl ? decl.value : ParseHooks.parseComponentValues(tokenize(rawVal));
+          const tokens = decl ? decl.value : parseComponentValues(tokenize(rawVal));
           const fn = tokens.find(t => t.type === 'function' && (t as { name: string }).name === 'calc');
           if (fn && 'value' in fn && Array.isArray((fn as { value: unknown }).value)) {
             const mathNode = parseMathFunction('calc', (fn as CSSFunction).value);
@@ -282,7 +282,7 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
         // css-backgrounds-3 #box-shadow, css-text-decor-3 #text-shadow-property
         // Token-aware parsing preserves rgb(...) colors intact
         const decl = this._getWinningDeclaration(dashed);
-        const p = decl ? decl.value : ParseHooks.parseComponentValues(tokenize(rawVal));
+        const p = decl ? decl.value : parseComponentValues(tokenize(rawVal));
         const nonWsNodes = p.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
         const tokens = nonWsNodes.map(t => serialize([t]));
         const normalizedTokens = tokens.map(t => {

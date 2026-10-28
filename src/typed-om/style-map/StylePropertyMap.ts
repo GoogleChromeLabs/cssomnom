@@ -31,7 +31,7 @@ import {
   validateValuesForProperty
 } from './style-validation.ts';
 import { tokenize } from '../../tokenizer.ts';
-import { ParseHooks } from '../../parse-hooks.ts';
+import { parseComponentValues } from '../../parser.ts';
 import { validateProperty, privateToken } from '../utils/validation.ts';
 import type { ElementLike } from '../../types.ts';
 
@@ -111,7 +111,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
 
     if (property.startsWith('--')) {
       const tokens = tokenize(value);
-      const componentValues = ParseHooks.parseComponentValues(tokens);
+      const componentValues = parseComponentValues(tokens);
       const res = [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
       getStyleCache(this._style).set(propKey, res);
       return res;

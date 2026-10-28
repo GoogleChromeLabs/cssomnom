@@ -35,11 +35,11 @@ Use this skill when you need to audit the consistency, link integrity, codebase 
        - **Architecture & Spec Boundaries**:
          - Audit `README.md § Architecture & Spec Boundaries` against actual codebase exports in `src/index.ts` and `tests/api-surface.test.ts`.
          - Ensure documented standard CSSOM / Houdini interfaces, Bridge utilities, intentional spec deviations, and non-goals (e.g. no `getComputedStyle()`) are factually accurate, up to date, and omit no methods or deviations.
-         - Ensure consistent documentation of `ParseHooks` (`src/parse-hooks.ts`) for circular dependency inversion.
+         - Ensure consistent documentation of parser helpers (`src/parser.ts`) and upward `ParseHooks` (`src/parse-hooks.ts`).
        - **`ARCHITECTURE.md` Accuracy (code map)**: Agents rely on this file to orient, so drift is costly. Verify against the code on disk:
          - Every file, directory, and entry point it names exists and still owns what it claims (open the file; don't trust names).
          - Every `src/` module and directory (excluding `src/data/gen/`) is covered, and none that were deleted or renamed are still listed.
-         - The pipeline description, `ParseHooks` injection point, UA stylesheet entry into the cascade, codegen flow, and the "where do I look for X" table match current code.
+         - The pipeline description, upward `ParseHooks` registration points, UA stylesheet entry into the cascade, codegen flow, and the "where do I look for X" table match current code.
          - It stays short (roughly under 150 lines) and contains no phase history.
        - **Execution Rules & Scripts**: Enforce that documentation consistently specifies native Node execution (`node script.ts`, NOT `npx tsx` or `ts-node`) and valid npm scripts (`pnpm run preflight`, `pnpm run codegen`, `pnpm run maintain`, `pnpm test`, `wpt:node:*`, `wpt:browser:*`).
      - Identify any contradictory claims, outdated API signatures, or conflicting guidelines between files.

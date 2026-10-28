@@ -20,7 +20,7 @@ import { CSSStyleValue } from '../values/CSSStyleValue.ts';
 import { CSSTransformComponent } from './CSSTransformComponent.ts';
 import { DOMMatrix } from '../../DOMMatrix.ts';
 import { tokenize } from '../../tokenizer.ts';
-import { ParseHooks } from '../../parse-hooks.ts';
+import { parseComponentValues } from '../../parser.ts';
 import {
   parseTranslate,
   parseScale,
@@ -96,7 +96,7 @@ export class CSSTransformValue extends CSSStyleValue {
       throw new TypeError("Failed to execute 'parse' on 'CSSTransformValue': 1 argument required, but only 0 present.");
     }
     const tokens = tokenize(css);
-    const componentValues = ParseHooks.parseComponentValues(tokens);
+    const componentValues = parseComponentValues(tokens);
 
     const components: CSSTransformComponent[] = [];
     for (const v of componentValues) {

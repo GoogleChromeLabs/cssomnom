@@ -15,17 +15,19 @@
  * limitations under the License.
  */
 
+import { CSSRule, CSSGroupingRule } from './base.ts';
+import { CSSStyleDeclaration, CSSKeyframeStyleDeclaration, CSSFontFaceDescriptors, CSSPageDescriptors, PAGE_DESCRIPTORS_INTERNAL, CSSMarginDescriptors } from '../CSSStyleDeclaration.ts';
+export { CSSFontFaceDescriptors, CSSPageDescriptors, CSSMarginDescriptors } from '../CSSStyleDeclaration.ts';
 import { ParseHooks } from '../parse-hooks.ts';
 import { serialize, serializeString, serializeIdentifier } from '../serializer.ts';
 import { tokenize } from '../tokenizer.ts';
 import type { Declaration, Rule, ComponentValue, CustomMediaQuery, SimpleBlock } from '../types.ts';
-import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
-import { CSSRule, CSSGroupingRule } from './base.ts';
 import { CSSStyleSheet } from '../CSSOM.ts';
 import { MediaList, CSSRuleList } from './collections.ts';
-import { serializeGroupingRule, FONT_FACE_DESCRIPTORS } from './utils.ts';
+import { serializeGroupingRule } from './utils.ts';
 import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
-import { hideInternalFields } from '../webidl.ts';
+import { hideInternalFields, applyWebIDLInterface } from '../webidl.ts';
+import { parseStyleAttribute, consumeListOfRules, consumeRule, parseComponentValues } from '../parser.ts';
 
 // css-conditional-3 #the-cssconditionrule-interface
 export class CSSConditionRule extends CSSGroupingRule {
@@ -411,7 +413,7 @@ export class CSSKeyframesRule extends CSSRule {
       return;
     }
     const bodyTokens = tokens.slice(openIdx + 1, closeIdx);
-    const styleDecl = ParseHooks.parseStyleAttribute(bodyTokens);
+    const styleDecl = parseStyleAttribute(bodyTokens);
     const keyframe = new CSSKeyframeRule(keyText, styleDecl._declarations);
     keyframe._parentRule = this;
     this._rules.push(keyframe);
@@ -423,17 +425,6 @@ export class CSSKeyframesRule extends CSSRule {
   }
 }
 
-// css-animations-1 #keyframes
-class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
-  /** @internal */
-  protected override get _filterDeclarationsInConstructor(): boolean {
-    return true;
-  }
-
-  override _isPropertySupported(property: string): boolean {
-    return property !== 'animation-name' && super._isPropertySupported(property);
-  }
-}
 
 export class CSSKeyframeRule extends CSSRule {
   /** @internal */ _keyText!: string;
@@ -492,22 +483,6 @@ export class CSSNestedDeclarations extends CSSRule {
   set cssText(_value: string) {}
 }
 
-export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
-  declare src?: string;
-  declare fontDisplay?: string;
-  declare unicodeRange?: string;
-
-  // css-fonts-4 #om-fontface
-  // WebIDL #interface-prototype-object
-  get [Symbol.toStringTag](): string {
-    return 'CSSFontFaceDescriptors';
-  }
-
-  /** @internal */
-  override _isPropertySupported(property: string): boolean {
-    return super._isPropertySupported(property) || FONT_FACE_DESCRIPTORS.has(property);
-  }
-}
 
 // css-fonts-4 #om-fontface
 export class CSSFontFaceRule extends CSSRule {
@@ -537,120 +512,8 @@ export class CSSFontFaceRule extends CSSRule {
   set cssText(_value: string) {}
 }
 
-// css-page-3 #page-properties
-const PAGE_ALLOWED_PROPERTIES = new Set<string>([
-  // Page descriptors (css-page-3 #page-size)
-  'size',
-  'page-orientation',
-  'marks',
-  'bleed',
-  'page-margin-safety',
-  // Page margin properties (css-page-3 #margin-property-list)
-  'margin',
-  'margin-top',
-  'margin-right',
-  'margin-bottom',
-  'margin-left',
-  'margin-block',
-  'margin-block-start',
-  'margin-block-end',
-  'margin-inline',
-  'margin-inline-start',
-  'margin-inline-end',
-  // Page-break properties (css-page-3 #page-breaks)
-  'page-break-before',
-  'page-break-after',
-  'page-break-inside',
-  'break-before',
-  'break-after',
-  'break-inside',
-  // Orphans and widows
-  'orphans',
-  'widows',
-  // Page / counters
-  'page',
-  'counter-increment',
-  'counter-reset',
-  'counter-set',
-  'quotes',
-]);
 
-const PAGE_DESCRIPTORS_INTERNAL = Symbol('CSSPageDescriptors.internal');
 
-export class CSSPageDescriptors extends CSSStyleDeclaration {
-  /** @internal */
-  protected override get _filterDeclarationsInConstructor(): boolean {
-    return true;
-  }
-
-  constructor(declarations?: Declaration[], internalToken?: symbol) {
-    if (internalToken !== PAGE_DESCRIPTORS_INTERNAL) {
-      throw new TypeError('Illegal constructor');
-    }
-    super(declarations);
-  }
-
-  declare margin: string;
-  declare marginTop: string;
-  declare marginRight: string;
-  declare marginBottom: string;
-  declare marginLeft: string;
-  declare 'margin-top': string;
-  declare 'margin-right': string;
-  declare 'margin-bottom': string;
-  declare 'margin-left': string;
-  declare size: string;
-  declare pageOrientation: string;
-  declare 'page-orientation': string;
-  declare marks: string;
-  declare bleed: string;
-  declare pageMarginSafety?: string;
-
-  // css-page-3 #page-properties
-  /** @internal */
-  override _isPropertySupported(property: string): boolean {
-    return PAGE_ALLOWED_PROPERTIES.has(property);
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSPageDescriptors';
-  }
-}
-
-const PAGE_DESCRIPTOR_PROPERTIES = [
-  'margin',
-  'marginTop',
-  'marginRight',
-  'marginBottom',
-  'marginLeft',
-  'margin-top',
-  'margin-right',
-  'margin-bottom',
-  'margin-left',
-  'size',
-  'pageOrientation',
-  'page-orientation',
-  'marks',
-  'bleed',
-] as const;
-
-// WebIDL #es-attributes
-for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {
-  const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
-  Object.defineProperty(CSSPageDescriptors.prototype, prop, {
-    get(this: unknown): string {
-      return (this as CSSPageDescriptors).getPropertyValue(cssProp);
-    },
-    set(this: unknown, val: unknown): void {
-      (this as CSSPageDescriptors).setProperty(cssProp, val === null || val === undefined ? '' : String(val));
-    },
-    enumerable: true,
-    configurable: true,
-  });
-}
-
-export class CSSMarginDescriptors extends CSSStyleDeclaration {
-}
 
 export class CSSMarginRule extends CSSRule {
   /** @internal */ _name: string;
@@ -696,7 +559,7 @@ function parseDataUrlRules(href: string): Rule[] {
     const rawData = meta.includes(';base64')
       ? (typeof atob === 'function' ? atob(content) : Buffer.from(content, 'base64').toString('utf-8'))
       : decodeURIComponent(content);
-    return ParseHooks.consumeListOfRules(tokenize(rawData), true);
+    return consumeListOfRules(tokenize(rawData), true);
   } catch {
     return [];
   }
@@ -747,7 +610,7 @@ export class CSSImportRule extends CSSRule {
     if (!this._styleSheet) {
       this._styleSheet = CSSStyleSheet.createInternal(
         parseDataUrlRules(this._href),
-        (text: string) => ParseHooks.consumeRule(tokenize(text)),
+        (text: string) => consumeRule(tokenize(text)),
       );
       this._styleSheet._initImportedSheet(this, this.parentStyleSheet, this._href);
     }
@@ -821,7 +684,7 @@ const VALID_PAGE_PSEUDOS = new Set(['left', 'right', 'first', 'blank']);
 function parsePageSelectorList(text: string): string[] | null {
   if (text.trim() === '') return [''];
 
-  const values = ParseHooks.parseComponentValues(tokenize(text));
+  const values = parseComponentValues(tokenize(text));
   const selectorTokensList: ComponentValue[][] = [[]];
   for (const v of values) {
     if (v.type === 'comma') selectorTokensList.push([]);
@@ -1165,4 +1028,14 @@ for (const [, prop] of FONT_FEATURE_VALUE_MAP_DEFS) {
     configurable: true,
   });
 }
+
+for (const ctor of [
+  CSSAtRule, CSSConditionRule, CSSFontFeatureValuesMap, CSSMediaRule, CSSSupportsRule, CSSContainerRule,
+  CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule,
+  CSSKeyframeRule, CSSNestedDeclarations, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule,
+  CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule, CSSFontFaceRule, CSSPageRule,
+]) {
+  applyWebIDLInterface(ctor as Function);
+}
+
 

@@ -335,8 +335,8 @@ The public API surface area is locked down and verified by [api-surface.test.ts]
 
 ---
 
-### Circular Dependency Inversion (`ParseHooks`)
-To preserve clean architectural separation and prevent circular import cycles between the core parser (`src/parser.ts`) and high-level CSSOM/Typed OM modules (`src/CSSOM.ts`, `src/typed-om.ts`), the codebase employs Dependency Inversion via `ParseHooks` (`src/parse-hooks.ts`). Higher-level classes delegate parser operations to `ParseHooks`, which are populated at bootstrap by `src/parser.ts`.
+### Parser Architecture & Upward `ParseHooks`
+The core parser (`src/parser.ts`) exports standalone pure functions (`parseStyleAttribute`, `consumeRule`, `consumeListOfRules`, `parseComponentValues`, `parseSelectorAST`, `validateCustomPropertyValue`) for direct, tree-shakeable consumption by CSSOM and Typed OM modules. For upward extensibility without circular imports, `ParseHooks` (`src/parse-hooks.ts`) provides optional feature hooks (such as `createStylePropertyMap`, `supports`, and media query parsing/serialization) that higher-level modules register at bootstrap.
 
 ---
 

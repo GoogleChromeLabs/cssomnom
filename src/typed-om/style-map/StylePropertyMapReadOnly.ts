@@ -22,7 +22,7 @@ import { SHORTHANDS } from '../../shorthands.ts';
 import { SUPPORTED_PROPERTIES } from '../../data/gen/property-list.ts';
 import { serialize } from '../../serializer.ts';
 import { tokenize } from '../../tokenizer.ts';
-import { ParseHooks } from '../../parse-hooks.ts';
+import { parseComponentValues } from '../../parser.ts';
 import { validateProperty, compareStrings, privateToken } from '../utils/validation.ts';
 
 export interface StyleReadOnlyLike {
@@ -277,7 +277,7 @@ export class StylePropertyMapReadOnly {
       if (val === '') return [];
       if (propKey.startsWith('--')) {
         const tokens = tokenize(val);
-        const componentValues = ParseHooks.parseComponentValues(tokens);
+        const componentValues = parseComponentValues(tokens);
         return [new CSSUnparsedValue(tokensToUnparsedSegments(componentValues))];
       }
       try {

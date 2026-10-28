@@ -14,20 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { CSSRule, CSSGroupingRule } from './rules/base.ts';
+import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { serializeDeclarations, serializeSelectorList } from './serializer.ts';
 import { tokenize } from './tokenizer.ts';
 import type { StylePropertyMap } from './typed-om.ts';
 import type { Declaration, Rule, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
-import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { deleteRuleFromArray } from './utils.ts';
-
-
-
-
-
-
-
 
 export interface CSSStyleSheetInit {
   baseURL?: string | null;
@@ -36,11 +30,10 @@ export interface CSSStyleSheetInit {
 }
 import { StyleSheetList, type LinkStyle, MediaList, CSSRuleList } from './rules/collections.ts';
 import { isImportRule, isNamespaceRule, isRegularRule, findParentStyleSheet } from './rules/utils.ts';
-import { CSSRule, CSSGroupingRule } from './rules/base.ts';
 import { CSSPropertyRule, type CSSNamespaceRule } from './rules/at-rules.ts';
-import * as AtRules from './rules/at-rules.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface, hideInternalFields } from './webidl.ts';
+import { consumeListOfRules, parseRule, parseSelectorAST } from './parser.ts';
 export { StyleSheetList, type LinkStyle, MediaList, CSSRuleList, CSSRule, CSSGroupingRule, CSSStyleProperties };
 
 export class StyleSheet {
@@ -235,7 +228,7 @@ export class CSSStyleSheet extends StyleSheet {
 
   private _replaceRulesFromText(text: string): void {
     const tokens = tokenize(text);
-    const rules = ParseHooks.consumeListOfRules(tokens, true);
+    const rules = consumeListOfRules(tokens, true);
 
     const filteredRules = rules.filter(rule => {
       if (isImportRule(rule)) {
@@ -315,7 +308,7 @@ export class CSSStyleSheet extends StyleSheet {
     }
 
     // 3. Set new rule to the results of performing parse a CSS rule on argument rule.
-    const parsedRule = ParseHooks.parseRule(rule);
+    const parsedRule = parseRule(rule);
     // 5. If new rule is a syntax error, throw a SyntaxError exception.
     if (!parsedRule) {
       throw new DOMException('Syntax error', 'SyntaxError');
@@ -522,7 +515,7 @@ export class CSSStyleRule extends CSSGroupingRule {
     }
     let selectorAST: SelectorList | null = null;
     try {
-      selectorAST = ParseHooks.parseSelectorAST(value, declaredNamespaces, allowRelative);
+      selectorAST = parseSelectorAST(value, declaredNamespaces, allowRelative);
     } catch {
       return;
     }
@@ -610,7 +603,6 @@ const cssomClasses = [
   CSSRuleList,
   CSSStyleRule,
   CSSStyleProperties,
-  ...Object.values(AtRules).filter(v => typeof v === 'function' && (v as Function).prototype && typeof (v as Function).prototype === 'object')
 ];
 
 for (const ctor of cssomClasses) {
@@ -623,14 +615,6 @@ for (const ctor of cssomClasses) {
   }
 }
 
-// cssom-1 #the-cssstyledeclaration-interface
-// WebIDL #interface-prototype-object
-Object.defineProperty(CSSStyleDeclaration.prototype, Symbol.toStringTag, {
-  value: 'CSSStyleDeclaration',
-  configurable: true,
-  writable: false,
-  enumerable: false
-});
 // cssom-1 #the-cssstyledeclaration-interface
 // WebIDL #interface-prototype-object
 Object.defineProperty(CSSStyleProperties.prototype, Symbol.toStringTag, {

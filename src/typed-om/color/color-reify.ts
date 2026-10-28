@@ -22,7 +22,7 @@ import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
 import { CSSRGB, CSSColor, COLOR_REIFIERS, parseColorArgs } from './color-spaces.ts';
 import { NAMED_COLORS } from '../../data/gen/colors.ts';
 import { tokenize } from '../../tokenizer.ts';
-import { ParseHooks } from '../../parse-hooks.ts';
+import { parseComponentValues } from '../../parser.ts';
 
 const SYSTEM_COLORS = new Set([
   'canvas', 'canvastext', 'linktext', 'visitedtext', 'activetext',
@@ -115,7 +115,7 @@ export function reifyColor(v: ComponentValue): CSSColorValue | CSSKeywordValue |
 
 export function parseColor(css: string): CSSColorValue | CSSKeywordValue {
   const tokens = tokenize(css);
-  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const componentValues = parseComponentValues(tokens);
 
   let singleValue: ComponentValue | null = null;
   for (const v of componentValues) {

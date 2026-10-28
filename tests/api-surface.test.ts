@@ -17,21 +17,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as CSSOM from '../src/index.ts';
-import { Parser } from '../src/parser.ts';
+import * as ParseEntry from '../src/parse-entry.ts';
+import * as ParserApiEntry from '../src/parser-api.ts';
 
-test('API Surface Area', (t) => {
+test('Cupboard 1: cssomnom (.)', (t) => {
   const exports = Object.keys(CSSOM).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
 
-test('Parser static methods', (t) => {
-  const methods = Object.getOwnPropertyNames(Parser)
-    .filter(k => typeof (Parser as unknown as Record<string, unknown>)[k] === 'function')
-    .sort();
-  t.assert.snapshot(methods);
+test('Cupboard 2: cssomnom/parse (./parse)', (t) => {
+  const exports = Object.keys(ParseEntry).filter(k => k !== 'default').sort();
+  t.assert.snapshot(exports);
 });
 
-test('CSS methods', (t) => {
+test('Cupboard 3: cssomnom/parser-api (./parser-api)', (t) => {
+  const exports = Object.keys(ParserApiEntry).filter(k => k !== 'default').sort();
+  t.assert.snapshot(exports);
+});
+
+test('CSS namespace methods', (t) => {
   const methods = Object.keys(CSSOM.CSS)
     .filter(k => typeof (CSSOM.CSS as unknown as Record<string, unknown>)[k] === 'function')
     .sort();
@@ -46,4 +50,3 @@ test('CSSStyleDeclaration prototype does not leak internal helpers as enumerable
     'declarations is an internal helper and must not be enumerable on CSSStyleDeclaration.prototype per CSSOM 1 § 6.6'
   );
 });
-

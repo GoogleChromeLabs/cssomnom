@@ -21,6 +21,7 @@ import { serialize } from './serializer.ts';
 import { PropertyRegistry, type PropertyDefinition, matchesSyntax } from './PropertyRegistry.ts';
 import { CSSFactories } from './data/gen/css-factories.ts';
 import { ParseHooks } from './parse-hooks.ts';
+import { isValidDashedIdent, parseComponentValues, validateCustomPropertyValue } from './parser.ts';
 import { SHORTHANDS } from './shorthands.ts';
 import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from './data/gen/standard-syntax.ts';
@@ -65,10 +66,10 @@ function evaluateSupportsDeclaration(property: string, value: string, isTwoArg =
   }
 
   if (property.startsWith('--')) {
-    if (!ParseHooks.isValidDashedIdent(property)) return false;
+    if (!isValidDashedIdent(property)) return false;
     const tokens = tokenize(value);
-    const componentValues = ParseHooks.parseComponentValues(tokens);
-    return ParseHooks.validateCustomPropertyValue(componentValues);
+    const componentValues = parseComponentValues(tokens);
+    return validateCustomPropertyValue(componentValues);
   }
 
   const prop = property.toLowerCase();
@@ -80,7 +81,7 @@ function evaluateSupportsDeclaration(property: string, value: string, isTwoArg =
   const tokens = tokenize(value);
   if (tokens.some(t => t.type === 'bad-string' || t.type === 'bad-url')) return false;
 
-  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const componentValues = parseComponentValues(tokens);
   const nonWs = componentValues.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
   if (nonWs.length === 0) return false;
 
@@ -213,14 +214,14 @@ export function supports(propertyOrCondition: string, value?: string): boolean {
 
   // Step 1: If conditionText parses as a <supports-condition>, evaluate it
   const tokens = tokenize(condition);
-  const componentValues = ParseHooks.parseComponentValues(tokens);
+  const componentValues = parseComponentValues(tokens);
   if (isGrammaticallyValidSupportsCondition(componentValues)) {
     return evalSupportsConditionValues(componentValues);
   }
 
   // Step 2: If (${conditionText}) parses as a <supports-condition>, evaluate it
   const wrappedTokens = tokenize(`(${condition})`);
-  const wrappedValues = ParseHooks.parseComponentValues(wrappedTokens);
+  const wrappedValues = parseComponentValues(wrappedTokens);
   if (isGrammaticallyValidSupportsCondition(wrappedValues)) {
     return evalSupportsConditionValues(wrappedValues);
   }

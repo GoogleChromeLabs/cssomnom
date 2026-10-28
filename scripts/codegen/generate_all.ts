@@ -25,7 +25,11 @@ function main() {
     
     const scripts = fs.readdirSync(CODEGEN_DIR)
         .filter(file => file.endsWith('.ts') && file !== 'generate_all.ts')
-        .sort();
+        .sort((a, b) => {
+            if (a === 'generate_standard_syntax.ts') return -1;
+            if (b === 'generate_standard_syntax.ts') return 1;
+            return a.localeCompare(b);
+        });
 
     for (const script of scripts) {
         const scriptPath = path.join(CODEGEN_DIR, script);

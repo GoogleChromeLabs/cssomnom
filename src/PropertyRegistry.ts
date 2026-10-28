@@ -18,6 +18,7 @@ import { unitToBase, unitToPixels } from './data/gen/units.ts';
 import { NAMED_COLORS } from './data/gen/colors.ts';
 import { tokenize } from './tokenizer.ts';
 import { ParseHooks } from './parse-hooks.ts';
+import { parseComponentValues, validateCustomPropertyValue } from './parser.ts';
 import type { ComponentValue, Token, SimpleBlock, CSSFunction, ParseError } from './types.ts';
 import { ArrayTokenStream } from './TokenStream.ts';
 
@@ -355,7 +356,7 @@ export const PropertyRegistry = {
       const trimmedTokens = allTokens.slice(start, end);
 
       const errors: ParseError[] = [];
-      const values = ParseHooks.parseComponentValues(trimmedTokens, errors);
+      const values = parseComponentValues(trimmedTokens, errors);
       definition.parsedInitialValue = values;
       
       if (errors.length > 0) {
@@ -363,7 +364,7 @@ export const PropertyRegistry = {
       }
       
       if (syntax === '*') {
-        if (!ParseHooks.validateCustomPropertyValue(values)) {
+        if (!validateCustomPropertyValue(values)) {
           throw new DOMException(`initialValue "${definition.initialValue}" is not a valid declaration value`, 'SyntaxError');
         }
       } else {

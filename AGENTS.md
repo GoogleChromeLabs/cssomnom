@@ -39,8 +39,9 @@ Consult these Bikeshed (`.bs`) sources for normative algorithms and edge cases b
 
 ## Architectural Constraints
 
-### `ParseHooks` (circular dependency inversion)
-Do NOT import `Parser` into `src/CSSOM.ts`, `src/typed-om.ts`, or cascade files. Use `ParseHooks` ([src/parse-hooks.ts](./src/parse-hooks.ts)); see [ARCHITECTURE.md](./ARCHITECTURE.md).
+### Parser Helpers & `ParseHooks`
+- **Pure parser helpers**: Import pure, tree-shakeable parser helper functions (`parseStyleAttribute`, `consumeRule`, `consumeListOfRules`, `parseComponentValues`, `parseSelectorAST`, `validateCustomPropertyValue`, etc.) directly from `src/parser.ts`. Do NOT import the full `Parser` class where helper functions suffice.
+- **`ParseHooks` ([src/parse-hooks.ts](./src/parse-hooks.ts))**: Used strictly for upward optional feature hooks (such as `parseMediaQueryList`, `serializeMediaQuery`, `validatePropertyValue`, `supports`, `createStylePropertyMap`, `validatePropertyRuleDescriptor`, `registerPropertyRule`, `unregisterPropertyRule`) that optional modules inject into the parser without introducing hard upward dependencies.
 
 ### Browser-Only Capabilities: Never Fake Them
 We run in Node with no layout engine, renderer, or input devices ([README § Intentional Non-Goals](./README.md): "if it cannot be completely correct, partially correct is harmful"). WPT subtests needing these are classified browser-only by [scripts/wpt/node/core/classifier.ts](./scripts/wpt/node/core/classifier.ts) into 7 boundaries ([details: scripts/wpt/node/README.md § 4](./scripts/wpt/node/README.md#4-the-7-objective-browser-capability-boundaries)):
