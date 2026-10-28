@@ -493,14 +493,7 @@ function matchAttributeSelector(element: DOMElement, sel: AttributeSelector): bo
 
 // html #case-sensitivity-of-selectors
 // selectors-4 #case-sensitive
-const HTML_CASE_INSENSITIVE_ATTRIBUTES = new Set([
-  'accept', 'accept-charset', 'align', 'alink', 'axis', 'bgcolor', 'charset', 'checked',
-  'clear', 'codetype', 'color', 'compact', 'declare', 'defer', 'dir', 'direction',
-  'disabled', 'enctype', 'face', 'frame', 'hreflang', 'http-equiv', 'lang', 'language',
-  'link', 'media', 'method', 'multiple', 'nohref', 'noresize', 'noshade', 'nowrap',
-  'readonly', 'rel', 'rev', 'rules', 'scope', 'scrolling', 'selected', 'shape',
-  'target', 'text', 'type', 'valign', 'valuetype', 'vlink',
-]);
+const HTML_CASE_INSENSITIVE_ATTRIBUTES = /* @__PURE__ */ new Set('accept,accept-charset,align,alink,axis,bgcolor,charset,checked,clear,codetype,color,compact,declare,defer,dir,direction,disabled,enctype,face,frame,hreflang,http-equiv,lang,language,link,media,method,multiple,nohref,noresize,noshade,nowrap,readonly,rel,rev,rules,scope,scrolling,selected,shape,target,text,type,valign,valuetype,vlink'.split(','));
 
 /**
  * html #case-sensitivity-of-selectors

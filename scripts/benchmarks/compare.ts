@@ -238,8 +238,8 @@ export async function runSingleBenchmarkInDir(workDir: string, benchName: string
     } else {
       fs.symlinkSync(realSubmodules, worktreeSubmodules);
     }
-  } catch {
-    // Ignore if exists or cannot link
+  } catch (err) {
+    console.warn(`Warning: failed to symlink submodules into worktree:`, err);
   }
 
   const res = await safeExecTestFile('', {
@@ -300,8 +300,8 @@ export async function runAllBenchmarksInDir(workDir: string): Promise<Record<str
     } else {
       fs.symlinkSync(realSubmodules, worktreeSubmodules);
     }
-  } catch {
-    // Ignore if exists or cannot link
+  } catch (err) {
+    console.warn(`Warning: failed to symlink submodules into worktree:`, err);
   }
 
   const res = await safeExecTestFile('', {

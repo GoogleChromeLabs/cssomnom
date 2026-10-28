@@ -17,8 +17,23 @@
 import { serialize } from './serializer.ts';
 import type { ComponentValue } from './types.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
-import { SUPPORTED_PROPERTIES } from './data/gen/property-list.ts';
+import {
+  SUPPORTED_PROPERTIES,
+  FONT_VARIANT_LIGATURES_KEYWORDS,
+  FONT_VARIANT_CAPS_KEYWORDS,
+  FONT_VARIANT_NUMERIC_KEYWORDS,
+  FONT_VARIANT_EAST_ASIAN_KEYWORDS,
+  FONT_VARIANT_POSITION_KEYWORDS,
+  FONT_VARIANT_EMOJI_KEYWORDS,
+  FONT_VARIANT_ALTERNATES_FUNCTIONS,
+  SYSTEM_FONT_KEYWORDS,
+  FONT_STRETCH_KEYWORDS,
+  FONT_SIZE_KEYWORDS,
+  FLEX_BASIS_KEYWORDS,
+} from './data/gen/property-list.ts';
 import { LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
+import { NAMED_COLORS } from './data/gen/colors.ts';
+import { LENGTH_UNITS } from './data/gen/units.ts';
 
 export interface ShorthandDefinition {
   longhands: readonly string[];
@@ -30,45 +45,17 @@ export interface ShorthandDefinition {
   stub?: boolean;
 }
 
-const CSS_WIDE_KEYWORDS = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer']);
-const REPEAT_KEYWORDS = new Set(['repeat', 'no-repeat', 'space', 'round', 'repeat-x', 'repeat-y']);
-const ATTACHMENT_KEYWORDS = new Set(['scroll', 'fixed', 'local']);
-const BOX_KEYWORDS = new Set(['border-box', 'padding-box', 'content-box', 'text', 'border-area']);
-const CLIP_ONLY_BOX_KEYWORDS = new Set(['text', 'border-area']);
-const COLOR_FUNCTIONS = new Set(['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
-const IMAGE_FUNCTIONS = new Set([
-  'url', 'src', 'image', 'image-set',
-  'linear-gradient', 'radial-gradient', 'conic-gradient',
-  'repeating-linear-gradient', 'repeating-radial-gradient', 'repeating-conic-gradient'
-]);
-const MATH_FUNCTIONS = new Set(['calc', 'min', 'max', 'clamp']);
-const POSITION_OR_SIZE_KEYWORDS = new Set(['left', 'right', 'top', 'bottom', 'center', 'auto', 'cover', 'contain']);
-const BORDER_WIDTH_KEYWORDS = new Set(['thin', 'medium', 'thick']);
-const BORDER_STYLE_KEYWORDS = new Set(['none', 'hidden', 'dotted', 'dashed', 'solid', 'double', 'groove', 'ridge', 'inset', 'outset']);
-
-const NAMED_COLORS = new Set([
-  'transparent', 'currentcolor',
-  'aliceblue', 'antiquewhite', 'aqua', 'aquamarine', 'azure', 'beige', 'bisque', 'black', 'blanchedalmond',
-  'blue', 'blueviolet', 'brown', 'burlywood', 'cadetblue', 'chartreuse', 'chocolate', 'coral', 'cornflowerblue',
-  'cornsilk', 'crimson', 'cyan', 'darkblue', 'darkcyan', 'darkgoldenrod', 'darkgray', 'darkgreen', 'darkgrey',
-  'darkkhaki', 'darkmagenta', 'darkolivegreen', 'darkorange', 'darkorchid', 'darkred', 'darksalmon', 'darkseagreen',
-  'darkslateblue', 'darkslategray', 'darkslategrey', 'darkturquoise', 'darkviolet', 'deeppink', 'deepskyblue',
-  'dimgray', 'dimgrey', 'dodgerblue', 'firebrick', 'floralwhite', 'forestgreen', 'fuchsia', 'gainsboro',
-  'ghostwhite', 'gold', 'goldenrod', 'gray', 'green', 'greenyellow', 'grey', 'honeydew', 'hotpink', 'indianred',
-  'indigo', 'ivory', 'khaki', 'lavender', 'lavenderblush', 'lawngreen', 'lemonchiffon', 'lightblue', 'lightcoral',
-  'lightcyan', 'lightgoldenrodyellow', 'lightgray', 'lightgreen', 'lightgrey', 'lightpink', 'lightsalmon',
-  'lightseagreen', 'lightskyblue', 'lightslategray', 'lightslategrey', 'lightsteelblue', 'lightyellow', 'lime',
-  'limegreen', 'linen', 'magenta', 'maroon', 'mediumaquamarine', 'mediumblue', 'mediumorchid', 'mediumpurple',
-  'mediumseagreen', 'mediumslateblue', 'mediumspringgreen', 'mediumturquoise', 'mediumvioletred', 'midnightblue',
-  'mintcream', 'mistyrose', 'moccasin', 'navajowhite', 'navy', 'oldlace', 'olive', 'olivedrab', 'orange',
-  'orangered', 'orchid', 'palegoldenrod', 'palegreen', 'paleturquoise', 'palevioletred', 'papayawhip', 'peachpuff',
-  'peru', 'pink', 'plum', 'powderblue', 'purple', 'rebeccapurple', 'red', 'rosybrown', 'royalblue', 'saddlebrown',
-  'salmon', 'sandybrown', 'seagreen', 'seashell', 'sienna', 'silver', 'skyblue', 'slate50', 'slateblue',
-  'slategray', 'slategrey', 'snow', 'springgreen', 'steelblue', 'tan', 'teal', 'thistle', 'tomato', 'turquoise',
-  'violet', 'wheat', 'white', 'whitesmoke', 'yellow', 'yellowgreen',
-  'canvas', 'canvastext', 'linktext', 'visitedtext', 'activetext', 'buttonface', 'buttontext', 'buttonborder',
-  'field', 'fieldtext', 'highlight', 'highlighttext', 'mark', 'marktext', 'graytext'
-]);
+const CSS_WIDE_KEYWORDS = /* @__PURE__ */ new Set('initial,inherit,unset,revert,revert-layer'.split(','));
+const REPEAT_KEYWORDS = /* @__PURE__ */ new Set('repeat,no-repeat,space,round,repeat-x,repeat-y'.split(','));
+const ATTACHMENT_KEYWORDS = /* @__PURE__ */ new Set('scroll,fixed,local'.split(','));
+const BOX_KEYWORDS = /* @__PURE__ */ new Set('border-box,padding-box,content-box,text,border-area'.split(','));
+const CLIP_ONLY_BOX_KEYWORDS = /* @__PURE__ */ new Set('text,border-area'.split(','));
+const COLOR_FUNCTIONS = /* @__PURE__ */ new Set('rgb,rgba,hsl,hsla,hwb,lab,lch,oklab,oklch,color'.split(','));
+const IMAGE_FUNCTIONS = /* @__PURE__ */ new Set('url,src,image,image-set,linear-gradient,radial-gradient,conic-gradient,repeating-linear-gradient,repeating-radial-gradient,repeating-conic-gradient'.split(','));
+const MATH_FUNCTIONS = /* @__PURE__ */ new Set('calc,min,max,clamp'.split(','));
+const POSITION_OR_SIZE_KEYWORDS = /* @__PURE__ */ new Set('left,right,top,bottom,center,auto,cover,contain'.split(','));
+const BORDER_WIDTH_KEYWORDS = /* @__PURE__ */ new Set('thin,medium,thick'.split(','));
+const BORDER_STYLE_KEYWORDS = /* @__PURE__ */ new Set('none,hidden,dotted,dashed,solid,double,groove,ridge,inset,outset'.split(','));
 
 function filterSignificantTokens(values: ComponentValue[]): ComponentValue[] {
   return values.filter(v => v.type !== 'whitespace' && v.type !== 'comment' && v.type !== 'EOF');
@@ -465,12 +452,6 @@ function contractBackground(longhands: Record<string, ComponentValue[]>): string
   return layerStrings.join(', ');
 }
 
-const LENGTH_UNITS = new Set([
-  'px', 'em', 'rem', '%', 'vh', 'vw', 'ch', 'pt', 'cm', 'mm', 'in', 'pc', 'ex', 'cap', 'ic', 'lh',
-  'cqw', 'cqh', 'vmin', 'vmax', 'vi', 'vb', 'q', 'rlh', 'dvh', 'svh', 'lvh', 'dvw', 'svw', 'lvw',
-  'cqi', 'cqb', 'cqmin', 'cqmax'
-]);
-
 function isValidLengthOrPercentage(val: ComponentValue, allowNegative: boolean = true): boolean {
   if (val.type === 'ident') {
     const kw = (val.value ?? '').toString().toLowerCase();
@@ -832,29 +813,6 @@ const FONT_VARIANT_LONGHANDS = [
   'font-variant-emoji',
 ] as const;
 
-const FONT_VARIANT_LIGATURES_KEYWORDS = new Set([
-  'common-ligatures', 'no-common-ligatures',
-  'discretionary-ligatures', 'no-discretionary-ligatures',
-  'historical-ligatures', 'no-historical-ligatures',
-  'contextual', 'no-contextual'
-]);
-const FONT_VARIANT_CAPS_KEYWORDS = new Set([
-  'small-caps', 'all-small-caps', 'petite-caps', 'all-petite-caps', 'unicase', 'titling-caps'
-]);
-const FONT_VARIANT_NUMERIC_KEYWORDS = new Set([
-  'lining-nums', 'oldstyle-nums', 'proportional-nums', 'tabular-nums',
-  'diagonal-fractions', 'stacked-fractions', 'ordinal', 'slashed-zero'
-]);
-const FONT_VARIANT_EAST_ASIAN_KEYWORDS = new Set([
-  'jis78', 'jis83', 'jis90', 'jis04', 'simplified', 'traditional',
-  'full-width', 'proportional-width', 'ruby'
-]);
-const FONT_VARIANT_POSITION_KEYWORDS = new Set(['sub', 'super']);
-const FONT_VARIANT_EMOJI_KEYWORDS = new Set(['text', 'emoji', 'unicode']);
-const FONT_VARIANT_ALTERNATES_FUNCTIONS = new Set([
-  'stylistic', 'styleset', 'character-variant', 'swash', 'ornaments', 'annotation'
-]);
-
 function expandFontVariant(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
   const filtered = filterSignificantTokens(values);
   if (filtered.length === 0) return null;
@@ -944,18 +902,6 @@ const FONT_LONGHANDS = [
   'line-height',
   'font-family',
 ] as const;
-
-const SYSTEM_FONT_KEYWORDS = new Set([
-  ...CSS_WIDE_KEYWORDS,
-  'caption', 'icon', 'menu', 'message-box', 'small-caption', 'status-bar'
-]);
-const FONT_STRETCH_KEYWORDS = new Set([
-  'ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed',
-  'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'
-]);
-const FONT_SIZE_KEYWORDS = new Set([
-  'xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'xxx-large', 'smaller', 'larger'
-]);
 
 function expandFont(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
   const filtered = filterSignificantTokens(values);
@@ -1158,7 +1104,6 @@ function contractListStyle(values: Record<string, ComponentValue[]>): string | n
 }
 
 const FLEX_LONGHANDS = ['flex-grow', 'flex-shrink', 'flex-basis'] as const;
-const FLEX_BASIS_KEYWORDS = new Set(['auto', 'content', 'max-content', 'min-content', 'fit-content']);
 
 function expandFlex(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
   const filtered = filterSignificantTokens(values);

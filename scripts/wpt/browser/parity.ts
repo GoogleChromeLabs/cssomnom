@@ -129,19 +129,21 @@ export function compareParity(options: ParityOptions = {}): ParityReport {
   // 1. Load Node dataset
   let nodeDataset: TestRunDataset | null = options.nodeDataset ?? null;
   if (!nodeDataset) {
-    if (options.nodeCachePath && fs.existsSync(options.nodeCachePath)) {
+    if (options.nodeCachePath) {
+      if (!fs.existsSync(options.nodeCachePath)) {
+        throw new Error(`Explicit nodeCachePath not found: ${options.nodeCachePath}`);
+      }
       try {
         nodeDataset = JSON.parse(fs.readFileSync(options.nodeCachePath, 'utf-8')) as TestRunDataset;
-      } catch {
-        nodeDataset = null;
+      } catch (err) {
+        throw new Error(`Failed to parse explicit nodeCachePath ${options.nodeCachePath}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
     if (!nodeDataset) {
-      const cacheDir = options.nodeCachePath ? path.dirname(options.nodeCachePath) : undefined;
-      nodeDataset = loadDatasetFromCache(cacheDir);
+      nodeDataset = loadDatasetFromCache();
     }
     if (!nodeDataset) {
-      const targetPath = options.nodeCachePath || '.wpt-cache/last-run.json';
+      const targetPath = '.wpt-cache/last-run.json';
       if (fs.existsSync(targetPath)) {
         try {
           nodeDataset = JSON.parse(fs.readFileSync(targetPath, 'utf-8')) as TestRunDataset;

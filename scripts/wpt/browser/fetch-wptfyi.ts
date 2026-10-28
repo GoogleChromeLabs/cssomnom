@@ -78,12 +78,8 @@ export function buildWptFyiApiUrl(options: FetchWptFyiOptions = {}): string {
 export function decompressBuffer(buffer: Buffer): string {
   const isGzip = buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b;
   if (isGzip) {
-    try {
-      const unzipped = zlib.gunzipSync(buffer);
-      return unzipped.toString('utf-8');
-    } catch {
-      return buffer.toString('utf-8');
-    }
+    const unzipped = zlib.gunzipSync(buffer);
+    return unzipped.toString('utf-8');
   }
   return buffer.toString('utf-8');
 }

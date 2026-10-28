@@ -348,7 +348,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
       const syntax = STANDARD_PROPERTIES_SYNTAX[propLower];
       if (syntax) {
         const allowedKeywords = syntax.split('|').map(s => s.trim().toLowerCase()).filter(s => !s.startsWith('<'));
-        if (allowedKeywords.includes(kw) && !(kw in NAMED_COLORS) && kw !== 'transparent') {
+        if (allowedKeywords.includes(kw) && !NAMED_COLORS.has(kw) && kw !== 'transparent') {
           return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
         }
       }

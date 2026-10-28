@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { NAMED_COLORS } from '../data/gen/colors.ts';
+import { NAMED_COLORS_RGB } from '../data/gen/color-values.ts';
 
 /**
  * System color definitions per css-color-4 #css-system-colors.
@@ -191,8 +191,8 @@ export function normalizeComputedColor(val: string): string {
   const lower = trimmed.toLowerCase();
 
   // 1. Named colors
-  if (lower in NAMED_COLORS) {
-    const [r, g, b, a] = NAMED_COLORS[lower];
+  if (lower in NAMED_COLORS_RGB) {
+    const [r, g, b, a] = NAMED_COLORS_RGB[lower];
     if (a !== undefined && a < 1) {
       return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
     }

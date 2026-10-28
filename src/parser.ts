@@ -28,6 +28,7 @@ import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { isGrammaticallyValidSupportsCondition } from './rules/utils.ts';
 import { INTERNAL_RULE_TOKEN } from './internal-token.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
+import { FONT_FEATURE_VALUE_BLOCKS, MARGIN_RULE_NAMES } from './data/gen/property-list.ts';
 
 export interface ParserOptions {
   atRules?: Record<string, string>;
@@ -104,19 +105,8 @@ function splitLeadingDeclarations(blockContents: Rule[]): { declarations: Declar
   return { declarations, nestedRules };
 }
 
-const CSS_WIDE_KEYWORDS = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default']);
-const KEYFRAMES_DISALLOWED_NAMES = new Set(['none', 'initial', 'inherit', 'unset', 'revert', 'default']);
-const FONT_FEATURE_VALUE_BLOCKS: Record<string, 'annotation' | 'ornaments' | 'stylistic' | 'swash' | 'characterVariant' | 'styleset' | 'historicalForms'> = {
-  annotation: 'annotation',
-  ornaments: 'ornaments',
-  stylistic: 'stylistic',
-  swash: 'swash',
-  'character-variant': 'characterVariant',
-  charactervariant: 'characterVariant',
-  styleset: 'styleset',
-  'historical-forms': 'historicalForms',
-  historicalforms: 'historicalForms',
-};
+const CSS_WIDE_KEYWORDS = /* @__PURE__ */ new Set('initial,inherit,unset,revert,revert-layer,default'.split(','));
+const KEYFRAMES_DISALLOWED_NAMES = /* @__PURE__ */ new Set('none,initial,inherit,unset,revert,default'.split(','));
 
 export function isValidDashedIdent(name: string): boolean {
   return typeof name === 'string' && name.startsWith('--') && name !== '--' && !/\s/.test(name);
@@ -147,15 +137,6 @@ export class Parser {
   public errors: ParseError[] = [];
   private declaredNamespaces = new Set<string>();
 
-
-
-  private static readonly MARGIN_RULE_NAMES = new Set([
-    'top-left-corner', 'top-left', 'top-center', 'top-right', 'top-right-corner',
-    'bottom-left-corner', 'bottom-left', 'bottom-center', 'bottom-right', 'bottom-right-corner',
-    'left-top', 'left-middle', 'left-bottom',
-    'right-top', 'right-middle', 'right-bottom'
-  ]);
-
   private static readonly AT_RULE_HANDLERS: Record<string, (parser: Parser, rule: ASTAtRule, block?: SimpleBlock, nested?: boolean) => Rule | null> = {
     media: (parser, rule, block, nested) => parser.handleGroupingAtRule(rule, block, nested || false, CSSMediaRule),
     'font-face': (parser, rule, block) => block ? parser.handleFontFaceRule(rule, block) : null,
@@ -179,7 +160,7 @@ export class Parser {
   };
 
   private getAtRuleHandler(name: string): ((parser: Parser, rule: ASTAtRule, block?: SimpleBlock, nested?: boolean) => Rule | null) | undefined {
-    if (Parser.MARGIN_RULE_NAMES.has(name)) {
+    if (MARGIN_RULE_NAMES.has(name)) {
       return (parser, rule, block) => block ? parser.handleMarginRule(rule, block) : null;
     }
     if (name === 'keyframes' || name.endsWith('-keyframes')) {
@@ -188,10 +169,7 @@ export class Parser {
     return Parser.AT_RULE_HANDLERS[name];
   }
 
-  private static readonly NESTED_GROUP_AT_RULES = new Set([
-    'media', 'supports', 'container', 'layer', 'scope', 'starting-style',
-    'keyframes', 'property', 'counter-style', 'font-feature-values', 'view-transition'
-  ]);
+  private static readonly NESTED_GROUP_AT_RULES = /* @__PURE__ */ new Set('media,supports,container,layer,scope,starting-style,keyframes,property,counter-style,font-feature-values,view-transition'.split(','));
 
   // css-nesting-1 #conditionals
   // css-syntax-3 #charset-rule & #consume-at-rule
@@ -200,7 +178,7 @@ export class Parser {
     if (lower === 'charset') return false;
     if (lower === 'mediaall') return false;
     if (lower.startsWith('--')) return false;
-    if (Parser.MARGIN_RULE_NAMES.has(lower)) return true;
+    if (MARGIN_RULE_NAMES.has(lower)) return true;
     if (nested) {
       if (lower.endsWith('-keyframes')) return true;
       return Parser.NESTED_GROUP_AT_RULES.has(lower);

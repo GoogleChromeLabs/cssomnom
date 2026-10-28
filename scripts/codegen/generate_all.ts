@@ -23,11 +23,15 @@ const CODEGEN_DIR = import.meta.dirname;
 function main() {
     console.log('Starting full code generation...');
     
+    const priorityOrder = ['generate_standard_syntax.ts', 'generate_properties.ts'];
     const scripts = fs.readdirSync(CODEGEN_DIR)
         .filter(file => file.endsWith('.ts') && file !== 'generate_all.ts')
         .sort((a, b) => {
-            if (a === 'generate_standard_syntax.ts') return -1;
-            if (b === 'generate_standard_syntax.ts') return 1;
+            const ia = priorityOrder.indexOf(a);
+            const ib = priorityOrder.indexOf(b);
+            if (ia !== -1 && ib !== -1) return ia - ib;
+            if (ia !== -1) return -1;
+            if (ib !== -1) return 1;
             return a.localeCompare(b);
         });
 

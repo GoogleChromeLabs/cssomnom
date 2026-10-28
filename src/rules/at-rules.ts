@@ -28,6 +28,7 @@ import { serializeGroupingRule } from './utils.ts';
 import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
 import { hideInternalFields, applyWebIDLInterface } from '../webidl.ts';
 import { parseStyleAttribute, consumeListOfRules, consumeRule, parseComponentValues } from '../parser.ts';
+import { COUNTER_STYLE_DESCRIPTORS, COUNTER_STYLE_PROP_BY_DESCRIPTOR, FONT_FEATURE_VALUE_MAP_DEFS } from '../data/gen/property-list.ts';
 
 // css-conditional-3 #the-cssconditionrule-interface
 export class CSSConditionRule extends CSSGroupingRule {
@@ -117,7 +118,7 @@ export class CSSSupportsRule extends CSSConditionRule {
   set cssText(_value: string) {}
 }
 
-const CONTAINER_KEYWORDS = new Set(['not', 'and', 'or', 'none']);
+const CONTAINER_KEYWORDS = /* @__PURE__ */ new Set('not,and,or,none'.split(','));
 
 function parseContainerPrelude(containerQuery: string, containerName: string): { name: string; query: string } {
   if (containerName || !containerQuery) {
@@ -300,7 +301,7 @@ function normalizeKeyframeSelector(selector: string): string {
   return normalized.join(', ');
 }
 
-const DISALLOWED_KEYFRAME_NAMES = new Set(['none', 'initial', 'inherit', 'unset', 'revert', 'default']);
+const DISALLOWED_KEYFRAME_NAMES = /* @__PURE__ */ new Set('none,initial,inherit,unset,revert,default'.split(','));
 
 export class CSSKeyframesRule extends CSSRule {
   [index: number]: CSSKeyframeRule;
@@ -679,7 +680,7 @@ export class CSSNamespaceRule extends CSSRule {
   set cssText(_value: string) {}
 }
 
-const VALID_PAGE_PSEUDOS = new Set(['left', 'right', 'first', 'blank']);
+const VALID_PAGE_PSEUDOS = /* @__PURE__ */ new Set('left,right,first,blank'.split(','));
 
 function parsePageSelectorList(text: string): string[] | null {
   if (text.trim() === '') return [''];
@@ -866,21 +867,6 @@ export class CSSAtRule extends CSSRule {
   }
 }
 
-const COUNTER_STYLE_DESCRIPTORS: ReadonlyArray<readonly [string, string]> = [
-  ['system', 'system'],
-  ['symbols', 'symbols'],
-  ['additive-symbols', 'additiveSymbols'],
-  ['negative', 'negative'],
-  ['prefix', 'prefix'],
-  ['suffix', 'suffix'],
-  ['range', 'range'],
-  ['pad', 'pad'],
-  ['speak-as', 'speakAs'],
-  ['fallback', 'fallback'],
-];
-
-const COUNTER_STYLE_PROP_BY_DESCRIPTOR = new Map<string, string>(COUNTER_STYLE_DESCRIPTORS);
-
 // css-counter-styles-3 #the-csscounterstylerule-interface
 export class CSSCounterStyleRule extends CSSRule {
   /** @internal */ _name: string;
@@ -969,16 +955,6 @@ export class CSSFontFeatureValuesMap {
   [Symbol.iterator](): IterableIterator<[string, number[]]> { return this._map[Symbol.iterator](); }
   get [Symbol.toStringTag]() { return 'CSSFontFeatureValuesMap'; }
 }
-
-const FONT_FEATURE_VALUE_MAP_DEFS = [
-  ['annotation', 'annotation'],
-  ['ornaments', 'ornaments'],
-  ['stylistic', 'stylistic'],
-  ['swash', 'swash'],
-  ['character-variant', 'characterVariant'],
-  ['styleset', 'styleset'],
-  ['historical-forms', 'historicalForms'],
-] as const;
 
 // css-fonts-4 #om-fontfeaturevalues
 export class CSSFontFeatureValuesRule extends CSSRule {

@@ -25,7 +25,7 @@ import {
   SVG_PRESENTATION_ATTRIBUTES,
   DEFAULT_PROPERTY_VALUES,
 } from '../data/gen/cascade-data.ts';
-import { NAMED_COLORS } from '../data/gen/colors.ts';
+import { NAMED_COLORS_RGB } from '../data/gen/color-values.ts';
 import { camelToDashed } from '../utils.ts';
 import type { Declaration, CSSFunction, ComponentValue } from '../types.ts';
 import { INHERITED_PROPERTIES } from './types.ts';
@@ -291,8 +291,8 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
             const [r, g, b] = SYSTEM_COLORS[lower];
             return `rgb(${r}, ${g}, ${b})`;
           }
-          if (lower in NAMED_COLORS) {
-            const [r, g, b, a] = NAMED_COLORS[lower];
+          if (lower in NAMED_COLORS_RGB) {
+            const [r, g, b, a] = NAMED_COLORS_RGB[lower];
             if (a !== undefined && a < 1) return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
             return `rgb(${r}, ${g}, ${b})`;
           }

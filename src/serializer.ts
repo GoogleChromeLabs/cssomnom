@@ -18,6 +18,7 @@ import type { Token, ComponentValue, Declaration, CSSFunction, SimpleBlock, Sele
 import { SHORTHANDS, ALL_SHORTHAND_LONGHANDS, isInitialBorderImage } from './shorthands.ts';
 import { formatNumber } from './utils/format.ts';
 import { parseAnPlusB } from './SelectorParser.ts';
+import { GENERIC_FONT_FAMILIES } from './data/gen/property-list.ts';
 
 /**
  * Determines whether two consecutive tokens require an empty comment separator
@@ -531,10 +532,7 @@ function checkIntervening(decls: Declaration[], allDecls: Declaration[], declInd
   return false;
 }
 
-const BOX_SHORTHAND_NAMES = new Set([
-  'margin', 'padding', 'border-width', 'border-style', 'border-color',
-  'scroll-margin', 'scroll-padding', 'inset', 'overflow-clip-margin', 'border-radius',
-]);
+const BOX_SHORTHAND_NAMES = /* @__PURE__ */ new Set('margin,padding,border-width,border-style,border-color,scroll-margin,scroll-padding,inset,overflow-clip-margin,border-radius'.split(','));
 
 const BOX_SHORTHAND_ENTRIES = Object.entries(SHORTHANDS).filter(
   ([shorthand, def]) => BOX_SHORTHAND_NAMES.has(shorthand) && def.logicalLonghands?.length === 4,
@@ -732,14 +730,7 @@ function tryCombineNamedShorthand(
   return null;
 }
 
-const GENERIC_FONT_FAMILIES = new Set([
-  'serif', 'sans-serif', 'cursive', 'fantasy', 'monospace',
-  'system-ui', 'math', 'emoji', 'fangsong', 'ui-serif', 'ui-sans-serif', 'ui-monospace', 'ui-rounded'
-]);
-
-const CSS_WIDE_AND_DEFAULT = new Set([
-  'initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default'
-]);
+const CSS_WIDE_AND_DEFAULT = /* @__PURE__ */ new Set('initial,inherit,unset,revert,revert-layer,default'.split(','));
 
 function serializeFontFamilyItem(tokens: ComponentValue[]): string {
   const nonWs = tokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');
@@ -973,7 +964,7 @@ function formatSelectorNamespacePrefix(
   return `${serializeIdentifier(namespace)}|`;
 }
 
-const NTH_PSEUDO_CLASSES = new Set(['nth-child', 'nth-last-child', 'nth-of-type', 'nth-last-of-type']);
+const NTH_PSEUDO_CLASSES = /* @__PURE__ */ new Set('nth-child,nth-last-child,nth-of-type,nth-last-of-type'.split(','));
 
 function serializeSimpleSelector(simple: SimpleSelector, nsContext: { hasDefaultNamespace: boolean; defaultNamespacePrefixes?: Set<string> }): string {
   switch (simple.type) {

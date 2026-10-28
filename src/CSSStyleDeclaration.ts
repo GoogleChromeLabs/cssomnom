@@ -23,10 +23,13 @@ import type { Declaration, ComponentValue } from './types.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
-import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES } from './data/gen/property-list.ts';
+import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES, FONT_FACE_DESCRIPTORS, PAGE_ALLOWED_PROPERTIES, PAGE_DESCRIPTOR_PROPERTIES } from './data/gen/property-list.ts';
 import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface } from './webidl.ts';
+
+const CSS_WIDE_KEYWORDS = /* @__PURE__ */ new Set('inherit,initial,unset,revert,revert-layer'.split(','));
+const LOGICAL_SHORTHANDS = /* @__PURE__ */ new Set('margin,padding,inset,scroll-margin,scroll-padding,border-width,border-style,border-color'.split(','));
 
 function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
   return new Proxy(target, {
@@ -367,11 +370,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 
         if (hasAllLogicals && anyLogical) {
           let res = shorthand.contract(valuesForContractor);
-          const CSS_WIDE_KEYWORDS = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer']);
-          const LOGICAL_SHORTHANDS = new Set([
-            'margin', 'padding', 'inset', 'scroll-margin', 'scroll-padding',
-            'border-width', 'border-style', 'border-color'
-          ]);
           if (res && !res.startsWith('logical') && LOGICAL_SHORTHANDS.has(property) && !CSS_WIDE_KEYWORDS.has(res.trim().toLowerCase())) {
             res = 'logical ' + res;
           }
@@ -709,10 +707,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     const shorthand = SHORTHANDS[property];
     if (shorthand) {
       const value = this.getPropertyValue(property);
-      const allLh = new Set([
-        ...shorthand.longhands,
-        ...(shorthand.logicalLonghands || [])
-      ]);
+      const allLh = shorthand.logicalLonghands
+        ? [...shorthand.longhands, ...shorthand.logicalLonghands]
+        : shorthand.longhands;
       let changed = false;
       for (const lh of allLh) {
         if (this._declMap.has(lh)) {
@@ -842,13 +839,6 @@ export class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
   }
 }
 
-const FONT_FACE_DESCRIPTORS = new Set([
-  'ascent-override', 'descent-override', 'font-display', 'font-family',
-  'font-stretch', 'font-style', 'font-weight', 'font-feature-settings',
-  'font-variation-settings', 'line-gap-override', 'size-adjust', 'src',
-  'unicode-range'
-]);
-
 // css-fonts-4 #om-fontface
 export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   declare src?: string;
@@ -865,17 +855,6 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
     return super._isPropertySupported(property) || FONT_FACE_DESCRIPTORS.has(property);
   }
 }
-
-// css-page-3 #page-properties
-const PAGE_ALLOWED_PROPERTIES = new Set<string>([
-  'size', 'page-orientation', 'marks', 'bleed', 'page-margin-safety', 'margin',
-  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'margin-block', 'margin-block-start', 'margin-block-end',
-  'margin-inline', 'margin-inline-start', 'margin-inline-end',
-  'page-break-before', 'page-break-after', 'page-break-inside',
-  'break-before', 'break-after', 'break-inside', 'orphans', 'widows',
-  'page', 'counter-increment', 'counter-reset', 'counter-set', 'quotes',
-]);
 
 export const PAGE_DESCRIPTORS_INTERNAL = Symbol('CSSPageDescriptors.internal');
 
@@ -917,12 +896,6 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
     return 'CSSPageDescriptors';
   }
 }
-
-const PAGE_DESCRIPTOR_PROPERTIES = [
-  'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-  'size', 'pageOrientation', 'page-orientation', 'marks', 'bleed',
-] as const;
 
 // WebIDL #es-attributes
 for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {

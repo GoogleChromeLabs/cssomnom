@@ -48,53 +48,55 @@ export function loadReferenceBaselineStats(reportPath?: string): ReferenceBaseli
     return null;
   }
 
+  let data: Record<string, unknown>;
   try {
-    const data = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8'));
-    const rawBrowser = typeof data.browser === 'string' ? data.browser : 'Chrome';
-    const browserStr = rawBrowser.replace(/^upstream\s+/i, '').replace(/^chrome\b/i, 'Chrome');
-    const milestoneMatch = browserStr.match(/(?:chrome|chromium)\s+(\d+)/i);
-    const milestone = milestoneMatch ? milestoneMatch[1] : '';
+    data = JSON.parse(fs.readFileSync(resolvedPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 
-    const specs: Record<string, { pass: number; total: number }> = {};
-    for (const s of SPEC_ORDER) {
-      specs[s] = { pass: 0, total: 0 };
-    }
+  const rawBrowser = typeof data.browser === 'string' ? data.browser : 'Chrome';
+  const browserStr = rawBrowser.replace(/^upstream\s+/i, '').replace(/^chrome\b/i, 'Chrome');
+  const milestoneMatch = browserStr.match(/(?:chrome|chromium)\s+(\d+)/i);
+  const milestone = milestoneMatch ? milestoneMatch[1] : '';
 
-    if (Array.isArray(data.results)) {
-      for (const r of data.results) {
-        const testPath = r.test ? r.test.replace(/^\//, '') : '';
-        const clean = testPath.replace(/^css\//, '');
-        let matchedSpec: string | null = null;
-        for (const spec of SPEC_ORDER) {
-          if (clean === spec || clean.startsWith(`${spec}/`) || testPath === spec || testPath.startsWith(`${spec}/`)) {
-            matchedSpec = spec;
-            break;
-          }
+  const specs: Record<string, { pass: number; total: number }> = {};
+  for (const s of SPEC_ORDER) {
+    specs[s] = { pass: 0, total: 0 };
+  }
+
+  if (Array.isArray(data.results)) {
+    for (const r of data.results as Array<{ test?: string; subtests?: Array<{ status?: string }>; status?: string }>) {
+      const testPath = r.test ? r.test.replace(/^\//, '') : '';
+      const clean = testPath.replace(/^css\//, '');
+      let matchedSpec: string | null = null;
+      for (const spec of SPEC_ORDER) {
+        if (clean === spec || clean.startsWith(`${spec}/`) || testPath === spec || testPath.startsWith(`${spec}/`)) {
+          matchedSpec = spec;
+          break;
         }
-        if (matchedSpec && specs[matchedSpec]) {
-          if (Array.isArray(r.subtests) && r.subtests.length > 0) {
-            for (const st of r.subtests) {
-              specs[matchedSpec].total++;
-              if (st && st.status === 'PASS') {
-                specs[matchedSpec].pass++;
-              }
-            }
-          } else {
+      }
+      if (matchedSpec && specs[matchedSpec]) {
+        if (Array.isArray(r.subtests) && r.subtests.length > 0) {
+          for (const st of r.subtests) {
             specs[matchedSpec].total++;
-            if (r.status === 'OK' || r.status === 'PASS') {
+            if (st && st.status === 'PASS') {
               specs[matchedSpec].pass++;
             }
+          }
+        } else {
+          specs[matchedSpec].total++;
+          if (r.status === 'OK' || r.status === 'PASS') {
+            specs[matchedSpec].pass++;
           }
         }
       }
     }
+  }
 
-    const hasData = Object.values(specs).some(s => s.total > 0);
-    if (hasData) {
-      return { browser: browserStr, milestone, specs };
-    }
-  } catch {
-    // Return null on read/parse failure
+  const hasData = Object.values(specs).some(s => s.total > 0);
+  if (hasData) {
+    return { browser: browserStr, milestone, specs };
   }
 
   return null;

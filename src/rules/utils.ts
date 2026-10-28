@@ -18,9 +18,7 @@
 import type { Rule, ComponentValue, SimpleBlock, Token } from '../types.ts';
 import type { CSSRule, CSSStyleSheet } from '../CSSOM.ts';
 
-export const FONT_FACE_DESCRIPTORS = new Set<string>([
-  'font-family', 'src', 'font-display', 'unicode-range', 'font-weight', 'font-style', 'font-stretch', 'font-variant', 'font-feature-settings', 'font-variation-settings'
-]);
+export { FONT_FACE_DESCRIPTORS } from '../data/gen/property-list.ts';
 
 export function isImportRule(r: Rule): boolean {
   return r.type === 3; // CSSRule.IMPORT_RULE

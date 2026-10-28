@@ -17,6 +17,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { SUPPORTED_PROPERTIES } from '../../src/data/gen/property-list.ts';
+import { STANDARD_PROPERTIES_SYNTAX } from '../../src/data/gen/standard-syntax.ts';
 
 const WEBREF_CSS_PATH = 'node_modules/@webref/css/css.json';
 const MDN_PROPERTIES_PATH = 'node_modules/mdn-data/css/properties.json';
@@ -126,7 +128,7 @@ function main() {
   const colorPropertySet = new Set<string>();
 
   for (const prop of webref.properties) {
-    if (prop.name.startsWith('-')) continue;
+    if (prop.name.startsWith('-') && !SUPPORTED_PROPERTIES.has(prop.name)) continue;
     const syntax = prop.syntax || '';
     if (syntax.includes('<color>') || syntax.includes('<color-property>') || syntax.includes('<paint>')) {
       colorPropertySet.add(prop.name);
@@ -134,9 +136,16 @@ function main() {
   }
 
   for (const [name, prop] of Object.entries(mdn)) {
-    if (name.startsWith('-')) continue;
+    if (name.startsWith('-') && !SUPPORTED_PROPERTIES.has(name)) continue;
     const syntax = prop.syntax || '';
     if (syntax.includes('<color>') || syntax.includes('<color-property>') || syntax.includes('<paint>')) {
+      colorPropertySet.add(name);
+    }
+  }
+
+  for (const [name, syntax] of Object.entries(STANDARD_PROPERTIES_SYNTAX)) {
+    if (name.startsWith('-') && !SUPPORTED_PROPERTIES.has(name)) continue;
+    if (syntax.includes('<color>') && !syntax.includes('<length') && !syntax.includes('<line-width>')) {
       colorPropertySet.add(name);
     }
   }
@@ -148,9 +157,9 @@ function main() {
 
   for (const prop of webref.properties) {
     if (
-      prop.name.startsWith('-') ||
+      (prop.name.startsWith('-') && !SUPPORTED_PROPERTIES.has(prop.name)) ||
       !prop.initial ||
-      prop.initial.includes('see individual') ||
+      prop.initial.toLowerCase().includes('see individual') ||
       prop.initial.includes('N/A') ||
       prop.initial.includes('depends on')
     ) {
@@ -161,11 +170,14 @@ function main() {
 
   for (const [name, prop] of Object.entries(mdn)) {
     if (
-      name.startsWith('-') ||
+      (name.startsWith('-') && !SUPPORTED_PROPERTIES.has(name)) ||
       !prop.initial ||
       typeof prop.initial !== 'string' ||
+      prop.initial.toLowerCase().includes('see individual') ||
       prop.initial.includes('seeProse') ||
-      prop.initial.includes('dependsOnUserAgent')
+      prop.initial.includes('dependsOnUserAgent') ||
+      prop.initial.includes('noneButOverriddenInUserAgentCSS') ||
+      prop.initial.includes('noPracticalInitialValue')
     ) {
       continue;
     }
@@ -192,9 +204,6 @@ function main() {
     '-webkit-mask-box-image-slice': '0 fill',
     '-webkit-mask-box-image-source': 'none',
     '-webkit-mask-box-image-width': 'auto',
-    '-webkit-text-fill-color': 'currentcolor',
-    '-webkit-text-stroke-color': 'currentcolor',
-    '-webkit-text-stroke-width': '0px',
     'background-tbd': 'none',
     'font-presentation': 'auto',
     'stop-opacity': '1',

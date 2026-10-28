@@ -18,7 +18,7 @@ import { tokenize } from './tokenizer.ts';
 import { Parser } from './parser.ts';
 import { serialize, getMirrorToken, serializeIdentifier } from './serializer.ts';
 import type { ComponentValue, Token, SimpleBlock, CSSFunction, GeneralEnclosed, MediaFeature, MediaCondition, MediaQuery, MediaEnvironment } from './types.ts';
-import { unitToBase } from './data/gen/units.ts';
+import { unitToBase, LENGTH_UNIT_TO_PX, RESOLUTION_UNIT_TO_DPI } from './data/gen/units.ts';
 import { parseMathFunction, simplify } from './math-parser.ts';
 import { CSSUnitValue } from './typed-om.ts';
 import { ParseHooks } from './parse-hooks.ts';
@@ -149,9 +149,7 @@ export class MediaParser {
           if (simp instanceof CSSUnitValue) {
             let val = simp;
             if (val.unit === 'dpi' || val.unit === 'dpcm' || val.unit === 'dppx' || val.unit === 'x') {
-              try {
-                val = val.to('dppx');
-              } catch {}
+              val = val.to('dppx');
             }
             let unit: string = val.unit;
             if (unit === 'x') unit = 'dppx';
@@ -749,31 +747,7 @@ function evalOr3(vals: EvalResult[]): EvalResult {
   return 'unknown';
 }
 
-const NEGATIVE_RANGE_FEATURES = new Set([
-  'width', 'height', 'device-width', 'device-height', 'resolution',
-  'color', 'color-index', 'monochrome',
-  'horizontal-viewport-segments', 'vertical-viewport-segments',
-]);
-
-const LENGTH_UNIT_TO_PX: Record<string, number> = {
-  px: 1,
-  em: 16,
-  rem: 16,
-  ex: 8,
-  ch: 8,
-  ic: 16,
-  in: 96,
-  cm: 96 / 2.54,
-  mm: 96 / 25.4,
-  pt: 96 / 72,
-  pc: 96 / 6,
-  vw: 800 / 100,
-  vh: 600 / 100,
-  vi: 800 / 100,
-  vb: 600 / 100,
-  vmin: 600 / 100,
-  vmax: 800 / 100,
-};
+const NEGATIVE_RANGE_FEATURES = /* @__PURE__ */ new Set('width,height,device-width,device-height,resolution,color,color-index,monochrome,horizontal-viewport-segments,vertical-viewport-segments'.split(','));
 
 function parseLengthToPx(tokens: ComponentValue[]): number | null {
   const filtered = filterSignificant(tokens);
@@ -800,13 +774,6 @@ function parseLengthToPx(tokens: ComponentValue[]): number | null {
   }
   return null;
 }
-
-const RESOLUTION_UNIT_TO_DPI: Record<string, number> = {
-  dpi: 1,
-  dpcm: 2.54,
-  dppx: 96,
-  x: 96,
-};
 
 function parseResolutionToDpi(tokens: ComponentValue[]): number | null {
   const filtered = filterSignificant(tokens);

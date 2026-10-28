@@ -217,19 +217,7 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
           }
           if (t.type === 'ident') {
             const val = (t as Token).value.toString().toLowerCase();
-            const SYSTEM_COLORS = new Set([
-              'canvas', 'canvastext', 'linktext', 'visitedtext', 'activetext',
-              'buttonface', 'buttontext', 'buttonborder', 'field', 'fieldtext',
-              'highlight', 'highlighttext', 'selecteditem', 'selecteditemtext',
-              'mark', 'marktext', 'graytext', 'accentcolor', 'accentcolortext',
-              'activeborder', 'activecaption', 'appworkspace', 'background',
-              'buttonhighlight', 'buttonshadow', 'captiontext', 'inactiveborder',
-              'inactivecaption', 'inactivecaptiontext', 'infobackground', 'infotext',
-              'menu', 'menutext', 'scrollbar', 'threeddarkshadow', 'threedface',
-              'threedhighlight', 'threedlightshadow', 'threedshadow', 'window',
-              'windowframe', 'windowtext', 'currentcolor'
-            ]);
-            return val in NAMED_COLORS || SYSTEM_COLORS.has(val);
+            return NAMED_COLORS.has(val);
           }
           return false;
         }

@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const SPEC_PATH = 'submodules/csswg-drafts/css-color-4/Overview.bs';
+const WEBREF_CSS_PATH = 'node_modules/@webref/css/css.json';
 const OUTPUT_PATH = 'src/data/gen/colors.ts';
+const OUTPUT_VALUES_PATH = 'src/data/gen/color-values.ts';
 
 function main() {
   const absoluteSpecPath = path.resolve(SPEC_PATH);
@@ -59,6 +61,33 @@ function main() {
       return acc;
     }, {} as Record<string, [number, number, number, number?]>);
 
+  // Extract system colors from @webref/css
+  const systemColors = new Set<string>(['currentcolor']);
+  if (fs.existsSync(WEBREF_CSS_PATH)) {
+    const webref = JSON.parse(fs.readFileSync(WEBREF_CSS_PATH, 'utf8')) as {
+      types?: Array<{ name: string; syntax?: string }>;
+    };
+    for (const t of webref.types || []) {
+      if (t.name === 'system-color' || t.name === 'deprecated-color') {
+        if (t.syntax) {
+          for (const part of t.syntax.split('|')) {
+            const clean = part.trim().toLowerCase();
+            if (clean && !clean.startsWith('<')) {
+              systemColors.add(clean);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const allNamedColors = new Set<string>([
+    ...Object.keys(sortedColors),
+    ...systemColors,
+    'transparent',
+    'currentcolor',
+  ]);
+
   let fileContent = `/**
  * @license
  * Copyright 2026 Google LLC
@@ -83,10 +112,16 @@ function main() {
   }
   colorsStr += '}';
 
-  fileContent += `export const NAMED_COLORS: Record<string, [number, number, number, number?]> = ${colorsStr};\n`;
+  let valuesContent = fileContent;
+  valuesContent += `export const NAMED_COLORS_RGB: Record<string, [number, number, number, number?]> = ${colorsStr};\n\n`;
+  valuesContent += `export const SYSTEM_COLORS: ReadonlySet<string> = /* @__PURE__ */ new Set(\n  '${Array.from(systemColors).sort().join(',')}'\n    .split(',')\n);\n`;
 
-  fs.writeFileSync(OUTPUT_PATH, fileContent, 'utf8');
-  console.log(`Generated ${OUTPUT_PATH} with ${Object.keys(sortedColors).length} color mappings (parsed ${count} from spec).`);
+  let namesContent = fileContent;
+  namesContent += `export const NAMED_COLORS: ReadonlySet<string> = /* @__PURE__ */ new Set(\n  '${Array.from(allNamedColors).sort().join(',')}'\n    .split(',')\n);\n`;
+
+  fs.writeFileSync(OUTPUT_VALUES_PATH, valuesContent, 'utf8');
+  fs.writeFileSync(OUTPUT_PATH, namesContent, 'utf8');
+  console.log(`Generated ${OUTPUT_PATH} and ${OUTPUT_VALUES_PATH} with ${Object.keys(sortedColors).length} color mappings and ${systemColors.size} system colors.`);
 }
 
 main();

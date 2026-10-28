@@ -20,20 +20,9 @@ import { CSSColorValue } from './CSSColorValue.ts';
 import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
 import { CSSRGB, CSSColor, COLOR_REIFIERS, parseColorArgs } from './color-spaces.ts';
-import { NAMED_COLORS } from '../../data/gen/colors.ts';
+import { SYSTEM_COLORS, NAMED_COLORS_RGB } from '../../data/gen/color-values.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { parseComponentValues } from '../../parser.ts';
-
-const SYSTEM_COLORS = new Set([
-  'canvas', 'canvastext', 'linktext', 'visitedtext', 'activetext',
-  'buttonface', 'buttontext', 'buttonborder', 'field', 'fieldtext',
-  'highlight', 'highlighttext', 'mark', 'marktext', 'graytext',
-  'currentcolor',
-  'activeborder', 'activecaption', 'appworkspace', 'background', 'buttonhighlight', 'buttonshadow',
-  'inactiveborder', 'inactivecaption', 'inactivecaptiontext', 'infobackground', 'infotext',
-  'menu', 'menutext', 'scrollbar', 'threeddarkshadow', 'threedface', 'threedhighlight',
-  'threedlightshadow', 'threedshadow', 'window', 'windowframe', 'windowtext'
-]);
 
 export function reifyColor(v: ComponentValue): CSSColorValue | CSSKeywordValue | null {
   if (v.type === 'hash') {
@@ -72,8 +61,8 @@ export function reifyColor(v: ComponentValue): CSSColorValue | CSSKeywordValue |
 
   if (v.type === 'ident') {
     const name = (v as IdentToken).value.toLowerCase();
-    if (name in NAMED_COLORS) {
-      const parts = NAMED_COLORS[name];
+    if (name in NAMED_COLORS_RGB) {
+      const parts = NAMED_COLORS_RGB[name];
       const r = parts[0];
       const g = parts[1];
       const b = parts[2];

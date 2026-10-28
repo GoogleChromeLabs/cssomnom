@@ -83,15 +83,8 @@ export const POSITION_PROPERTIES = new Set([
   '-webkit-mask-position',
 ]);
 
-export const COLOR_PROPERTIES = new Set([
-  'color', 'background-color',
-  'border-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
-  'border-inline-color', 'border-inline-start-color', 'border-inline-end-color',
-  'border-block-color', 'border-block-start-color', 'border-block-end-color',
-  'outline-color', 'text-decoration-color', 'column-rule-color', 'caret-color',
-  'fill', 'stroke',
-  'accent-color', 'fill-color', 'flood-color', 'lighting-color', 'stop-color', 'text-emphasis-color'
-]);
+import { COLOR_PROPERTIES } from '../../data/gen/cascade-data.ts';
+export { COLOR_PROPERTIES };
 
 export function getPropertyValueSafe(style: unknown, property: string): string {
   if (!style || typeof style !== 'object') return '';
@@ -127,16 +120,12 @@ const styleCache = new WeakMap<object, Map<string, CSSStyleValue[]>>();
 
 export function getStyleCache(style: unknown): Map<string, CSSStyleValue[]> {
   if (!style || typeof style !== 'object') return new Map();
-  try {
-    let cache = styleCache.get(style as object);
-    if (!cache) {
-      cache = new Map<string, CSSStyleValue[]>();
-      styleCache.set(style as object, cache);
-    }
-    return cache;
-  } catch (e) {
-    return new Map();
+  let cache = styleCache.get(style as object);
+  if (!cache) {
+    cache = new Map<string, CSSStyleValue[]>();
+    styleCache.set(style as object, cache);
   }
+  return cache;
 }
 
 export function isEquivalent(a: string, b: string): boolean {
@@ -226,14 +215,7 @@ function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propKey: 
     if (parts.includes(kw)) return true;
 
     if (syntax.includes('<color>')) {
-      const SYSTEM_COLORS = new Set([
-        'canvas', 'canvastext', 'linktext', 'visitedtext', 'activeborder', 'activecaption', 'appworkspace',
-        'background', 'buttonface', 'buttonhighlight', 'buttonshadow', 'buttontext', 'captiontext', 'graytext',
-        'highlight', 'highlighttext', 'inactiveborder', 'inactivecaption', 'inactivecaptiontext', 'infobackground',
-        'infotext', 'menu', 'menutext', 'scrollbar', 'threeddarkshadow', 'threedface', 'threedhighlight',
-        'threedlightshadow', 'threedshadow', 'window', 'windowframe', 'windowtext', 'currentcolor'
-      ]);
-      if (kw in NAMED_COLORS || SYSTEM_COLORS.has(kw) || kw === 'currentcolor') {
+      if (NAMED_COLORS.has(kw)) {
         return true;
       }
     }

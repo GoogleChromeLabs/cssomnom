@@ -20,72 +20,7 @@
 
 import type { CSSNumericType } from '../../typed-om.ts';
 
-export const UNITS = [
-  'cap',
-  'ch',
-  'cm',
-  'cqb',
-  'cqh',
-  'cqi',
-  'cqmax',
-  'cqmin',
-  'cqw',
-  'deg',
-  'dpcm',
-  'dpi',
-  'dppx',
-  'dvb',
-  'dvh',
-  'dvi',
-  'dvmax',
-  'dvmin',
-  'dvw',
-  'em',
-  'ex',
-  'fr',
-  'grad',
-  'hz',
-  'ic',
-  'in',
-  'khz',
-  'lh',
-  'lvb',
-  'lvh',
-  'lvi',
-  'lvmax',
-  'lvmin',
-  'lvw',
-  'mm',
-  'ms',
-  'number',
-  'pc',
-  'percent',
-  'pt',
-  'px',
-  'q',
-  'rad',
-  'rcap',
-  'rch',
-  'rem',
-  'rex',
-  'ric',
-  'rlh',
-  's',
-  'svb',
-  'svh',
-  'svi',
-  'svmax',
-  'svmin',
-  'svw',
-  'turn',
-  'vb',
-  'vh',
-  'vi',
-  'vmax',
-  'vmin',
-  'vw',
-  'x',
-] as const;
+export const UNITS = ['cap', 'ch', 'cm', 'cqb', 'cqh', 'cqi', 'cqmax', 'cqmin', 'cqw', 'deg', 'dpcm', 'dpi', 'dppx', 'dvb', 'dvh', 'dvi', 'dvmax', 'dvmin', 'dvw', 'em', 'ex', 'fr', 'grad', 'hz', 'ic', 'in', 'khz', 'lh', 'lvb', 'lvh', 'lvi', 'lvmax', 'lvmin', 'lvw', 'mm', 'ms', 'number', 'pc', 'percent', 'pt', 'px', 'q', 'rad', 'rcap', 'rch', 'rem', 'rex', 'ric', 'rlh', 's', 'svb', 'svh', 'svi', 'svmax', 'svmin', 'svw', 'turn', 'vb', 'vh', 'vi', 'vmax', 'vmin', 'vw', 'x'] as const;
 
 export type CSSUnit = typeof UNITS[number];
 
@@ -176,5 +111,34 @@ export const unitToRadians: Record<string, number> = {
 export const unitToSeconds: Record<string, number> = {
   'ms': 0.001,
   's': 1,
+};
+
+export const LENGTH_UNITS: ReadonlySet<string> = /* @__PURE__ */ new Set('cap,ch,cm,cqb,cqh,cqi,cqmax,cqmin,cqw,dvb,dvh,dvi,dvmax,dvmin,dvw,em,ex,ic,in,lh,lvb,lvh,lvi,lvmax,lvmin,lvw,mm,pc,pt,px,q,rcap,rch,rem,rex,ric,rlh,svb,svh,svi,svmax,svmin,svw,vb,vh,vi,vmax,vmin,vw,%'.split(','));
+
+export const LENGTH_UNIT_TO_PX: Record<string, number> = {
+  px: 1,
+  em: 16,
+  rem: 16,
+  ex: 8,
+  ch: 8,
+  ic: 16,
+  in: 96,
+  cm: 96 / 2.54,
+  mm: 96 / 25.4,
+  pt: 96 / 72,
+  pc: 96 / 6,
+  vw: 800 / 100,
+  vh: 600 / 100,
+  vi: 800 / 100,
+  vb: 600 / 100,
+  vmin: 600 / 100,
+  vmax: 800 / 100,
+};
+
+export const RESOLUTION_UNIT_TO_DPI: Record<string, number> = {
+  dpi: 1,
+  dpcm: 2.54,
+  dppx: 96,
+  x: 96,
 };
 
