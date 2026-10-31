@@ -45,7 +45,7 @@ import {
   CSSNestedDeclarations,
   MediaList,
   StyleSheetList,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 test('CSSRuleList indexing, length, iteration, and boundaries', () => {
   const css = `

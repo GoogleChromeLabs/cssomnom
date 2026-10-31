@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet } from '../src/index.ts';
+import { CSSStyleSheet } from '../src/entry/index.ts';
 
 describe('Legacy CSSStyleSheet members', () => {
   test('sheet.rules is an alias for sheet.cssRules', () => {

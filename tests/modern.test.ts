@@ -20,7 +20,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
-import { CSSStyleRule, CSSLayerBlockRule } from '../src/index.ts';
+import { CSSStyleRule, CSSLayerBlockRule } from '../src/entry/index.ts';
 
 test('parse modern CSS and verify content', () => {
   const filePath = path.resolve(process.cwd(), 'tests/fixtures/modern.css');

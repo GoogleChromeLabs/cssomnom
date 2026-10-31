@@ -18,7 +18,7 @@
 import path from 'path';
 import fs from 'fs';
 
-const cssomnomIndex = path.resolve(__dirname, '../../src/index.ts');
+const cssomnomIndex = path.resolve(__dirname, '../../src/entry/index.ts');
 const testsDir = path.resolve(__dirname, '../../submodules/css-typed-om-polyfill/tests/unit');
 
 // Exclude clamp.test.ts because cssomnom eagerly simplifies math functions (spec-compliant),

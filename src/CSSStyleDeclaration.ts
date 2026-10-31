@@ -23,7 +23,7 @@ import type { Declaration, ComponentValue } from './types.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
-import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES, FONT_FACE_DESCRIPTORS, PAGE_ALLOWED_PROPERTIES, PAGE_DESCRIPTOR_PROPERTIES, POSITION_TRY_ALLOWED_PROPERTIES, POSITION_TRY_DESCRIPTOR_PROPERTIES } from './data/gen/property-list.ts';
+import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES, FONT_FACE_DESCRIPTORS, PAGE_ALLOWED_PROPERTIES, PAGE_DESCRIPTOR_PROPERTIES, POSITION_TRY_ALLOWED_PROPERTIES } from './data/gen/property-list.ts';
 import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface } from './webidl.ts';
@@ -920,10 +920,10 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
 }
 
 // WebIDL #es-attributes
-function defineDescriptorProperties(proto: CSSStyleDeclaration, props: readonly string[]) {
-  for (const prop of props) {
-    const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
-    Object.defineProperty(proto, prop, {
+function defineDescriptorProperties(proto: CSSStyleDeclaration, dashedProps: Iterable<string>, skip?: string) {
+  for (const cssProp of dashedProps) {
+    if (cssProp === skip) continue;
+    const desc: PropertyDescriptor = {
       get(this: CSSStyleDeclaration): string {
         return this.getPropertyValue(cssProp);
       },
@@ -932,7 +932,12 @@ function defineDescriptorProperties(proto: CSSStyleDeclaration, props: readonly 
       },
       enumerable: true,
       configurable: true,
-    });
+    };
+    Object.defineProperty(proto, cssProp, desc);
+    if (cssProp.includes('-')) {
+      const camelProp = cssProp.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+      Object.defineProperty(proto, camelProp, desc);
+    }
   }
 }
 
@@ -960,7 +965,7 @@ export class CSSPositionTryDescriptors extends CSSStyleDeclaration {
   }
 }
 
-defineDescriptorProperties(CSSPositionTryDescriptors.prototype, POSITION_TRY_DESCRIPTOR_PROPERTIES);
+defineDescriptorProperties(CSSPositionTryDescriptors.prototype, POSITION_TRY_ALLOWED_PROPERTIES, 'inset-area');
 
 export class CSSMarginDescriptors extends CSSStyleDeclaration {}
 

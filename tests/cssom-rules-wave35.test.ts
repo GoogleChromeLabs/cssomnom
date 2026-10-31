@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { CSS, CSSStyleSheet, CSSStyleRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSNamespaceRule, CSSImportRule, parse } from '../src/index.ts';
+import { CSS, CSSStyleSheet, CSSStyleRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSNamespaceRule, CSSImportRule, parse } from '../src/entry/index.ts';
 
 describe('Phase 83 - CSSOM Rules, Serialization & CSS.escape', () => {
   describe('CSS.escape', () => {

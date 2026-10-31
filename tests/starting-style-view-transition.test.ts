@@ -18,7 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule, CSSStartingStyleRule, CSSViewTransitionRule } from '../src/index.ts';
+import { CSSStyleRule, CSSStartingStyleRule, CSSViewTransitionRule } from '../src/entry/index.ts';
 
 test('Support @starting-style rule', () => {
   // css-transitions-2 #at-ruledef-starting-style

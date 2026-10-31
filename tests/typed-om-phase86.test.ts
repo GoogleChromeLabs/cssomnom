@@ -26,7 +26,7 @@ import {
   CSSNumericValue,
   CSSStyleValue,
   CSSKeywordValue,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 test('Phase 86: CSSPositionValue Constructor & Validation', () => {
   // css-typed-om § 3.3 #positionvalue-objects

@@ -132,7 +132,7 @@ export interface SelectorParserOptions {
   strictSupports?: boolean;
   /** Allows any `^-[a-zA-Z0-9]+-` vendor-prefixed pseudo-class or pseudo-element (`:-moz-*`, `::-moz-*`, `:-ms-*`). */
   allowVendorPseudos?: boolean;
-  /** Allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`, `:global(...)`, `:local(...)`) without throwing `SyntaxError`. */
+  /** Allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`) without throwing `SyntaxError`. */
   allowUnknownPseudos?: boolean;
 }
 
@@ -686,7 +686,7 @@ export class SelectorParser {
       }
       
       // For functional pseudo-classes, some take selector lists
-      if (['is', 'not', 'has', 'where', 'matches', 'global', 'local'].includes(lowerName)) {
+      if (['is', 'not', 'has', 'where', 'matches'].includes(lowerName)) {
         // selectors-4 #relational: :has() cannot be nested within :has() and forbids pseudo-elements
         const isHas = lowerName === 'has';
         if (isHas && this.insideHas) {

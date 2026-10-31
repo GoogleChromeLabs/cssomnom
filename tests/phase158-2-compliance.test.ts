@@ -17,7 +17,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { MediaList, CSSStyleDeclaration, CSSPropertyRule } from '../src/index.ts';
+import { MediaList, CSSStyleDeclaration, CSSPropertyRule } from '../src/entry/index.ts';
 import { Parser, validateDeclarationValue, assembleUnicodeRanges } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import { serializeToken } from '../src/serializer.ts';

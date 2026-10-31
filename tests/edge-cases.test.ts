@@ -19,7 +19,7 @@ import assert from 'node:assert';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
 
-import { CSSStyleDeclaration, CSSStyleSheet, CSSStyleRule, CSSNestedDeclarations } from '../src/index.ts';
+import { CSSStyleDeclaration, CSSStyleSheet, CSSStyleRule, CSSNestedDeclarations } from '../src/entry/index.ts';
 import type { Token, SimpleBlock } from '../src/types.ts';
 
 interface TestParser {

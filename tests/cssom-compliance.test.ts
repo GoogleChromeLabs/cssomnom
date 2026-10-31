@@ -16,7 +16,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet, CSSStyleRule } from '../src/index.ts';
+import { CSSStyleSheet, CSSStyleRule } from '../src/entry/index.ts';
 import { parseRule } from '../src/parser.ts';
 
 describe('CSSStyleSheet Constructed Restrictions', () => {

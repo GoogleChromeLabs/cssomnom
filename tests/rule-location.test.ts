@@ -24,7 +24,7 @@ import {
   CSSKeyframesRule,
   CSSFontFaceRule,
   CSSNestedDeclarations,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 describe('CSSRule.prototype.location: Source position tracking', () => {
   it('tracks character offsets on simple style rules', () => {

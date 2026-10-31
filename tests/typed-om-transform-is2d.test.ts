@@ -30,7 +30,7 @@ import {
   CSSMathSum,
   CSSKeywordValue,
   DOMMatrix,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 describe('CSSPerspective is2D Immutability and Validation', () => {
   test('CSSPerspective is always 3D (is2D === false)', () => {

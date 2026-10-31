@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration } from '../src/index.ts';
+import { CSSStyleDeclaration } from '../src/entry/index.ts';
 
 test('logical border-radius individual resolution in vertical-rl', () => {
   const styleDecl = new CSSStyleDeclaration();

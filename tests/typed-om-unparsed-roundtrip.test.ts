@@ -22,7 +22,7 @@ import {
   CSSVariableReferenceValue,
   CSSStyleDeclaration,
   StylePropertyMap,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 describe('CSSUnparsedValue String Serialization Roundtrip', () => {
   test('CSSUnparsedValue serializes string tokens verbatim with comment separators between idents', () => {

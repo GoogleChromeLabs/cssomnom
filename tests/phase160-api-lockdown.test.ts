@@ -20,9 +20,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import * as RootExports from '../src/index.ts';
-import * as SpecExports from '../src/spec.ts';
-import * as ToolsExports from '../src/tools.ts';
+import * as RootExports from '../src/entry/index.ts';
+import * as SpecExports from '../src/entry/spec.ts';
+import * as ToolsExports from '../src/entry/tools.ts';
 import * as ParseExports from '../src/parse-entry.ts';
 import * as ParserApiExports from '../src/parser-api.ts';
 import {
@@ -32,7 +32,7 @@ import {
   CSSStyleDeclaration,
   CSSKeyframesRule,
   CSSKeyframeRule,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 describe('Phase 160: Public API Lockdown, ./parse Bundle Diet & Code Quality', () => {
 
@@ -88,7 +88,7 @@ describe('Phase 160: Public API Lockdown, ./parse Bundle Diet & Code Quality', (
       for (const key of parseKeys) {
         assert.ok(
           rootKeys.has(key),
-          `Export "${key}" from src/parse-entry.ts must also exist in src/index.ts`
+          `Export "${key}" from src/parse-entry.ts must also exist in src/entry/index.ts`
         );
       }
 

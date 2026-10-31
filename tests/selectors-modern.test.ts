@@ -19,7 +19,7 @@ import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import type { CompoundSelector, PseudoClassSelector, ClassSelector, ComplexSelector, InvalidSelector, Combinator } from '../src/types.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule } from '../src/index.ts';
+import { CSSStyleRule } from '../src/entry/index.ts';
 
 test('parseSelector with :has() and :popover-open', () => {
   // selectors-4 #has-pseudo

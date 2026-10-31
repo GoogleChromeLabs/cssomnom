@@ -18,7 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule, resolveVariables } from '../src/index.ts';
+import { CSSStyleRule, resolveVariables } from '../src/entry/index.ts';
 
 
 test('resolveValue with var() fallbacks', () => {

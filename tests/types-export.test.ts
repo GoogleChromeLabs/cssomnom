@@ -23,7 +23,7 @@ import type {
   CSSPageRule,
   CSSMarginRule,
   CSSNestedDeclarations
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 // This is just to use the types so they are not unused
 const _importRule: CSSImportRule | null = null;

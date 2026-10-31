@@ -25,7 +25,7 @@ import {
   CSSVariableReferenceValue,
   StylePropertyMap,
   CSSStyleDeclaration
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from '../src/data/gen/standard-syntax.ts';
 
 describe('Typed OM Standard Property Syntax & Validation (Phase 85)', () => {

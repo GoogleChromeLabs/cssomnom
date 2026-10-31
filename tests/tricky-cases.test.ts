@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule, CSSLayerBlockRule, CSSSupportsRule } from '../src/index.ts';
+import { CSSStyleRule, CSSLayerBlockRule, CSSSupportsRule } from '../src/entry/index.ts';
 
 interface TestRule {
   type: string | number;

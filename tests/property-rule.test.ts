@@ -18,7 +18,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSPropertyRule } from '../src/index.ts';
+import { CSSPropertyRule } from '../src/entry/index.ts';
 
 describe('CSSPropertyRule', () => {
   it('should parse @property rule', () => {

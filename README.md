@@ -254,9 +254,9 @@ Below are the primary entry points and custom utilities:
 
 ## Architecture & Spec Boundaries
 
-This section outlines the boundaries between standard CSSOM specifications (`src/spec.ts`) and standalone Node tooling (`src/tools.ts`).
+This section outlines the boundaries between standard CSSOM specifications (`src/entry/spec.ts`) and standalone Node tooling (`src/entry/tools.ts`).
 
-### 1. Standard CSSOM Layer (`src/spec.ts`)
+### 1. Standard CSSOM Layer (`src/entry/spec.ts`)
 These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification and related module extensions (CSS Conditional Rules, CSS Nesting, CSS Anchor Positioning, CSS Fonts, CSS Animations, CSS Paged Media, CSS View Transitions, and CSS Cascade). They are designed to mirror standard browser CSSOM APIs in Node.js and headless environments, and are verified bidirectionally against W3C WebIDL definitions via `webidl2.js` in [`tests/api-surface.test.ts`](./tests/api-surface.test.ts).
 
 **Interfaces & Classes**
@@ -274,7 +274,7 @@ These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) speci
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
 - **CSSStyleDeclaration Host Integration**: `CSSStyleDeclaration` supports a `(parentRule?, onChange?)` constructor signature and public `onChange` callback hook (temporarily setting `decl.onChange = null` suppresses callbacks when hydrating from host DOM `style` attributes). It also provides a full Proxy supporting camelCase (`style.fontSize`), kebab-case (`style['font-size']`), `style.cssFloat`, `webkit*` prefixes, exact case preservation on `--customProperties`, and WebIDL-compliant `Object.keys(style)` returning only indexed property names `0..length-1`.
 - **CSSSupportsRule Feature Evaluation**: `CSSSupportsRule.prototype.matches` returns a boolean evaluating the condition text via the conditional rules engine per CSS Conditional 4/5.
-- **Single Rule Model (`CSSRule`)**: The public `Rule` type is an alias for `CSSRule`. Custom at-rules parsed via the `atRules` option with `parse()` produce `CSSAtRule` instances (exported in `src/tools.ts`) exposing `.declarations` (for declaration blocks) or `.childRules` (for rule blocks) and standard `.cssText`.
+- **Single Rule Model (`CSSRule`)**: The public `Rule` type is an alias for `CSSRule`. Custom at-rules parsed via the `atRules` option with `parse()` produce `CSSAtRule` instances (exported in `src/entry/tools.ts`) exposing `.declarations` (for declaration blocks) or `.childRules` (for rule blocks) and standard `.cssText`.
 
 ---
 
@@ -325,8 +325,8 @@ These APIs expose low-level parsing, property registration, and typed values def
 
 ---
 
-### 3. Node Static Analysis, Cascade & Tooling Layer (`src/tools.ts`)
-These standalone tree-shakeable functions and classes are exported from `cssomnom` (`src/tools.ts`):
+### 3. Node Static Analysis, Cascade & Tooling Layer (`src/entry/tools.ts`)
+These standalone tree-shakeable functions and classes are exported from `cssomnom` (`src/entry/tools.ts`):
 
 **Functions & Classes**
 - `parse(css, options?)`: Direct parser returning a constructable `CSSStyleSheet` (`cssomnom` and `cssomnom/parse`).

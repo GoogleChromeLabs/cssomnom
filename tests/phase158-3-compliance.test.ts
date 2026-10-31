@@ -23,7 +23,7 @@ import {
   CSSMediaRule,
   CSSStyleRule,
   CSSImportRule,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 import { PropertyRegistry, matchesSyntax } from '../src/PropertyRegistry.ts';
 import { resolveVariables } from '../src/cascade/variable-resolver.ts';
 import { tokenize } from '../src/tokenizer.ts';

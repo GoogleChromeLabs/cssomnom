@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { parseStyleSheet } from '../src/parser.ts';
-import { CSSNestedDeclarations } from '../src/index.ts';
+import { CSSNestedDeclarations } from '../src/entry/index.ts';
 import type { Declaration, Rule } from '../src/types.ts';
 import { resolveNestedSelector, getCascadedStyle } from '../src/cascade.ts';
 

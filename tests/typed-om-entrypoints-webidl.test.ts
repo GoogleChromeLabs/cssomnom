@@ -27,7 +27,7 @@ import assert from 'node:assert';
 import { parseHTML } from 'linkedom';
 import { patchWindowForTypedOM } from './dom-shim/src/index.ts';
 import { CSSStyleRule } from '../src/CSSOM.ts';
-import { parse } from '../src/index.ts';
+import { parse } from '../src/entry/index.ts';
 
 describe('WebIDL Typed OM Entry Points Conformance', () => {
   describe('3a. CSSStyleRule.prototype.styleMap interface attribute', () => {

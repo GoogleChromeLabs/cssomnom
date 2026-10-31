@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSPageRule } from '../src/index.ts';
+import { CSSPageRule } from '../src/entry/index.ts';
 
 test('@page with :recto and :verso', () => {
   const css = '@page :recto { margin: 1in; } @page :verso { margin: 2in; }';

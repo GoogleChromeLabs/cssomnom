@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet, CSSStyleRule } from '../src/index.ts';
+import { CSSStyleSheet, CSSStyleRule } from '../src/entry/index.ts';
 
 test('CSSStyleRule: insertRule with nested selector', () => {
   const sheet = new CSSStyleSheet();

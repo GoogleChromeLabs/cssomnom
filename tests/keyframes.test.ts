@@ -18,7 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSKeyframesRule, CSSKeyframeRule } from '../src/index.ts';
+import { CSSKeyframesRule, CSSKeyframeRule } from '../src/entry/index.ts';
 
 test('Percentage keyframes are preserved and not dropped', () => {
   const css = `@keyframes test {

@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule } from '../src/index.ts';
+import { CSSStyleRule } from '../src/entry/index.ts';
 
 test('Shorthand priority requires all longhands to be important (partially set)', () => {
   const css = `.foo { margin-top: 10px !important; }`;

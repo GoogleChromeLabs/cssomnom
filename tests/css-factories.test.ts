@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { CSS } from '../src/index.ts';
+import { CSS } from '../src/entry/index.ts';
 import { CSSUnitValue } from '../src/typed-om.ts';
 
 test('CSS factory methods exist for standard units', () => {

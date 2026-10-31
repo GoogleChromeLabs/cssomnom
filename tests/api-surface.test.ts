@@ -19,9 +19,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import * as CSSOM from '../src/index.ts';
-import * as SpecExports from '../src/spec.ts';
-import * as ToolsExports from '../src/tools.ts';
+import * as CSSOM from '../src/entry/index.ts';
+import * as SpecExports from '../src/entry/spec.ts';
+import * as ToolsExports from '../src/entry/tools.ts';
 import * as ParseEntry from '../src/parse-entry.ts';
 import * as ParserApiEntry from '../src/parser-api.ts';
 
@@ -52,7 +52,7 @@ function loadWebIDLParser(webidl2Path: string): (idl: string) => WebIDLDefinitio
 }
 
 /**
- * Explicit, reason-annotated registry of intentional deviations between `src/spec.ts`
+ * Explicit, reason-annotated registry of intentional deviations between `src/entry/spec.ts`
  * and the vendored W3C WebIDL definitions in `submodules/web-platform-tests/interfaces/*.idl`.
  */
 const INTENTIONAL_WEBIDL_DEVIATIONS = {
@@ -119,12 +119,12 @@ test('Root Entrypoint: cssomnom (.)', (t) => {
   t.assert.snapshot(exports);
 });
 
-test('W3C WebIDL Barrel: src/spec.ts', (t) => {
+test('W3C WebIDL Barrel: src/entry/spec.ts', (t) => {
   const exports = Object.keys(SpecExports).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
 
-test('Static Analysis & Cascade Tools Barrel: src/tools.ts', (t) => {
+test('Static Analysis & Cascade Tools Barrel: src/entry/tools.ts', (t) => {
   const exports = Object.keys(ToolsExports).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
@@ -155,7 +155,7 @@ test('CSSStyleDeclaration prototype does not leak internal helpers as enumerable
   );
 });
 
-test('W3C WebIDL conformance: src/spec.ts matches submodules/web-platform-tests/interfaces/*.idl via webidl2.js', (t) => {
+test('W3C WebIDL conformance: src/entry/spec.ts matches submodules/web-platform-tests/interfaces/*.idl via webidl2.js', (t) => {
   const idlDir = path.resolve(import.meta.dirname, '../submodules/web-platform-tests/interfaces');
   const webidl2Path = path.resolve(
     import.meta.dirname,
@@ -279,14 +279,14 @@ test('W3C WebIDL conformance: src/spec.ts matches submodules/web-platform-tests/
       continue;
     }
 
-    assert.equal(typeof exportedVal, 'function', `Expected ${name} in src/spec.ts to be a class constructor`);
+    assert.equal(typeof exportedVal, 'function', `Expected ${name} in src/entry/spec.ts to be a class constructor`);
     const ctor = exportedVal as Function & { prototype: object };
     const idl = interfaces.get(name);
 
     if (!idl) {
       assert.ok(
         name in INTENTIONAL_WEBIDL_DEVIATIONS.interfaces,
-        `Exported class "${name}" in src/spec.ts does not exist in W3C .idl files and is not in INTENTIONAL_WEBIDL_DEVIATIONS.interfaces`
+        `Exported class "${name}" in src/entry/spec.ts does not exist in W3C .idl files and is not in INTENTIONAL_WEBIDL_DEVIATIONS.interfaces`
       );
       continue;
     }

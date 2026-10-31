@@ -215,7 +215,7 @@ exports[`Root Entrypoint: cssomnom (.) 1`] = `
 ]
 `;
 
-exports[`Static Analysis & Cascade Tools Barrel: src/tools.ts 1`] = `
+exports[`Static Analysis & Cascade Tools Barrel: src/entry/tools.ts 1`] = `
 [
   "CSSAtRule",
   "StreamingTokenizer",
@@ -237,7 +237,7 @@ exports[`Static Analysis & Cascade Tools Barrel: src/tools.ts 1`] = `
 ]
 `;
 
-exports[`W3C WebIDL Barrel: src/spec.ts 1`] = `
+exports[`W3C WebIDL Barrel: src/entry/spec.ts 1`] = `
 [
   "CSS",
   "CSSColor",

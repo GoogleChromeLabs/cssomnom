@@ -34,7 +34,7 @@ import {
   StylePropertyMap,
   StylePropertyMapReadOnly,
   CSS,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 import { simplify } from '../src/math-parser.ts';
 
 test('Phase 91: Same-Unit Literal Combining in min() / max() (css-values-4 § 10.7 #calc-simplification)', () => {

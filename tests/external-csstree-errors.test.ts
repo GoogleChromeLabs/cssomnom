@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import * as fs from 'fs';
 import * as path from 'path';
-import { CSSStyleSheet } from '../src/index.ts';
+import { CSSStyleSheet } from '../src/entry/index.ts';
 import { Parser } from '../src/parser.ts';
 
 const fixturesPath = path.resolve(import.meta.dirname, 'fixtures/external/csstree-errors.json');

@@ -20,7 +20,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
-import { CSSStyleRule } from '../src/index.ts';
+import { CSSStyleRule } from '../src/entry/index.ts';
 
 const fixturesPath = path.resolve(import.meta.dirname, 'fixtures/external/nv-tests.json');
 const tests = JSON.parse(fs.readFileSync(fixturesPath, 'utf8'));

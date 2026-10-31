@@ -16,7 +16,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { CSSRule } from '../src/index.ts';
+import { CSSRule } from '../src/entry/index.ts';
 
 describe('CSSRule static constants', () => {
   it('exposes all 13 legacy CSSOM rule type constants on CSSRule constructor', () => {

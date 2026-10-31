@@ -24,7 +24,7 @@ import {
   CSSMathMin,
   CSSMathClamp,
   CSSStyleValue
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 describe('Linkedom Integration Tests', () => {
   test('Custom Properties Case-Preservation', () => {

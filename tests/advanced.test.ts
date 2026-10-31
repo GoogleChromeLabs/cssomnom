@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
-import { CSSMediaRule, CSSStyleRule, CSSKeyframesRule, CSSKeyframeRule } from '../src/index.ts';
+import { CSSMediaRule, CSSStyleRule, CSSKeyframesRule, CSSKeyframeRule } from '../src/entry/index.ts';
 
 test('parse @media rule', () => {
   const input = '@media screen { div { color: red; } }';

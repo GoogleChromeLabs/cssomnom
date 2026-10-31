@@ -29,7 +29,7 @@ import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
 import { createIndexedProxy, deleteRuleFromArray } from '../utils.ts';
 import { hideInternalFields, applyWebIDLInterface } from '../webidl.ts';
 import { parseStyleAttribute, consumeListOfRules, consumeRule, parseComponentValues } from '../parser.ts';
-import { COUNTER_STYLE_DESCRIPTORS, COUNTER_STYLE_PROP_BY_DESCRIPTOR, FONT_FEATURE_VALUE_MAP_DEFS } from '../data/gen/property-list.ts';
+import { COUNTER_STYLE_PROP_BY_DESCRIPTOR, FONT_FEATURE_VALUE_MAP_DEFS } from '../data/gen/property-list.ts';
 
 // css-conditional-3 #the-cssconditionrule-interface
 export class CSSConditionRule extends CSSGroupingRule {
@@ -869,7 +869,7 @@ export class CSSCounterStyleRule extends CSSRule {
   set cssText(_value: string) {}
 }
 
-for (const [, prop] of COUNTER_STYLE_DESCRIPTORS) {
+for (const prop of COUNTER_STYLE_PROP_BY_DESCRIPTOR.values()) {
   Object.defineProperty(CSSCounterStyleRule.prototype, prop, {
     get(this: CSSCounterStyleRule): string { return this._descriptors[prop]; },
     set(this: CSSCounterStyleRule, value: string) { this._descriptors[prop] = value; },

@@ -18,7 +18,7 @@ import test from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSNestedDeclarations } from '../src/index.ts';
+import { CSSStyleRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSNestedDeclarations } from '../src/entry/index.ts';
 
 test('Nested @supports rule', () => {
   const css = `

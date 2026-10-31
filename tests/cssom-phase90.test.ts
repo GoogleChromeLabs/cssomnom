@@ -27,7 +27,7 @@ import {
   CSSStyleDeclaration,
   getCascadedStyle,
   parse
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 import { INTERNAL_RULE_TOKEN } from '../src/internal-token.ts';
 
 describe('Phase 90: CSSOM Core Rules, Constructable Sheets & SelectorText Invalidation', () => {

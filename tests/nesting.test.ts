@@ -20,7 +20,7 @@ import { getCascadedStyle } from '../src/cascade.ts';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import type { Rule, Declaration, ElementLike } from '../src/types.ts';
-import { CSSStyleRule, CSSNestedDeclarations, CSSMediaRule, CSSScopeRule } from '../src/index.ts';
+import { CSSStyleRule, CSSNestedDeclarations, CSSMediaRule, CSSScopeRule } from '../src/entry/index.ts';
 
 function createMockElement(matches: (sel: string) => boolean): ElementLike {
   return {

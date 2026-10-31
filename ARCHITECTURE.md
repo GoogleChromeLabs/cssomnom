@@ -31,9 +31,9 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 
 ## Directory & Module Ownership
 
-- [`src/index.ts`](./src/index.ts): Main public entry point combining [`src/spec.ts`](./src/spec.ts) and [`src/tools.ts`](./src/tools.ts).
-- [`src/spec.ts`](./src/spec.ts): Pure W3C WebIDL surface barrel exporting only standard CSSOM, Typed OM, and Geometry classes plus the `CSS` namespace (verified bidirectionally against W3C `.idl` files in `tests/api-surface.test.ts`).
-- [`src/tools.ts`](./src/tools.ts): Standalone Node static-analysis, selector AST, cascade, and tokenizer barrel (`parse`, `parseSelectorAST`, `getRules`, `closestRule`, `resolveSelector`, `getDeclaredProperties`, `calculateSpecificity`, `getCascadedStyle`, `resolveVariables`, `matches`, `querySelector`, `querySelectorAll`, `tokenize`, `serialize`, `StreamingTokenizer`, `CSSAtRule`, and AST types).
+- [`src/entry/index.ts`](./src/entry/index.ts): Main public entry point combining [`src/entry/spec.ts`](./src/entry/spec.ts) and [`src/entry/tools.ts`](./src/entry/tools.ts).
+- [`src/entry/spec.ts`](./src/entry/spec.ts): Pure W3C WebIDL surface barrel exporting only standard CSSOM, Typed OM, and Geometry classes plus the `CSS` namespace (verified bidirectionally against W3C `.idl` files in `tests/api-surface.test.ts`).
+- [`src/entry/tools.ts`](./src/entry/tools.ts): Standalone Node static-analysis, selector AST, cascade, and tokenizer barrel (`parse`, `parseSelectorAST`, `getRules`, `closestRule`, `resolveSelector`, `getDeclaredProperties`, `calculateSpecificity`, `getCascadedStyle`, `resolveVariables`, `matches`, `querySelector`, `querySelectorAll`, `tokenize`, `serialize`, `StreamingTokenizer`, `CSSAtRule`, and AST types).
 - [`src/parse-entry.ts`](./src/parse-entry.ts): Minimal `./parse` subpath entry point for `linkedom` exporting `parse`, `CSSStyleSheet`, `CSSStyleDeclaration`, and standard `CSSRule` subclasses without pulling in `walk.ts`, the cascade engine, or Typed OM.
 - [`src/browser-entry.ts`](./src/browser-entry.ts): Browser polyfill bundle entry exposing CSSOM/Typed OM onto `window` with WebIDL constructor arities.
 - [`src/tokenizer.ts`](./src/tokenizer.ts) & [`src/AbstractTokenizer.ts`](./src/AbstractTokenizer.ts): CSS Syntax 3 tokenization engine and character preprocessing.
@@ -98,7 +98,7 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - **Math Simplification Ownership**:
   `src/math-parser.ts` owns math expression parsing (`parseMathFunction()`) and canonical algebraic simplification (`simplify()`). Typed OM (`src/typed-om/numeric/numeric-methods.ts`, `style-value-factory.ts`) delegates `calc()` tree parsing and reduction to `src/math-parser.ts`, while wrapping simplified results into `CSSMathValue` or `CSSUnitValue` trees.
 - **Public Entry Points**:
-  - `src/index.ts`: Primary library entry point (`cssomnom`) re-exporting `src/spec.ts` (W3C WebIDL interfaces) and `src/tools.ts` (static analysis, traversal, and cascade helpers).
+  - `src/entry/index.ts`: Primary library entry point (`cssomnom`) re-exporting `src/entry/spec.ts` (W3C WebIDL interfaces) and `src/entry/tools.ts` (static analysis, traversal, and cascade helpers).
   - `src/parse-entry.ts`: Lightweight parser + CSSOM subpath (`cssomnom/parse`) excluding Cascade, UA stylesheet, and Typed OM.
   - `src/parser-api.ts`: WICG CSS Parser API subpath (`cssomnom/parser-api`).
   - `src/browser-entry.ts`: Browser environment entry point exposing globals with WebIDL property descriptors.

@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet, MediaList } from '../src/index.ts';
+import { CSSStyleSheet, MediaList } from '../src/entry/index.ts';
 
 describe('Constructable CSSStyleSheet', () => {
   test('new CSSStyleSheet()', () => {

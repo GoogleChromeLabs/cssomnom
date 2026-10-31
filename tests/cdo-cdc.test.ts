@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import * as assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule } from '../src/index.ts';
+import { CSSStyleRule } from '../src/entry/index.ts';
 
 test('Parser: consumeListOfRules with topLevel=false treats CDO/CDC as part of qualified rule (making it invalid)', () => {
   const tokens = tokenize('<!-- .foo { color: red; } -->');

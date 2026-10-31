@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import * as vm from 'node:vm';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as TypedOM from '../../../src/index.ts';
+import * as TypedOM from '../../../src/entry/index.ts';
 
 export interface WptTest {
   name: string;

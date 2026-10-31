@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSS, parse, CSSAtRule, CSSStyleRule } from '../src/index.ts';
+import { CSS, parse, CSSAtRule, CSSStyleRule } from '../src/entry/index.ts';
 import {
   parseStylesheet,
   parseRuleList,

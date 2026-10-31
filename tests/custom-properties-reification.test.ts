@@ -1,8 +1,8 @@
 /** @license Copyright 2026 Google LLC. SPDX-License-Identifier: Apache-2.0 */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration } from '../src/index.ts';
-import { StylePropertyMap, StylePropertyMapReadOnly, CSSUnparsedValue } from '../src/index.ts';
+import { CSSStyleDeclaration } from '../src/entry/index.ts';
+import { StylePropertyMap, StylePropertyMapReadOnly, CSSUnparsedValue } from '../src/entry/index.ts';
 
 describe('Custom Properties Reification', () => {
   test('StylePropertyMapReadOnly.get() and getAll() for custom properties', () => {

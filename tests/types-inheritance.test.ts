@@ -16,8 +16,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { parse, CSSStyleDeclaration, CSSStyleRule } from '../src/index.ts';
-import type { CSSStyleProperties } from '../src/index.ts';
+import { parse, CSSStyleDeclaration, CSSStyleRule } from '../src/entry/index.ts';
+import type { CSSStyleProperties } from '../src/entry/index.ts';
 
 test('CSSStyleDeclaration should extend CSSStyleProperties', () => {
   const decl = new CSSStyleDeclaration();

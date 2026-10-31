@@ -23,7 +23,7 @@ import {
   CSSContainerRule,
   CSSMediaRule,
   CSSConditionRule,
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 import { parseRule } from '../src/parser.ts';
 
 describe('Constructable CSSStyleSheet & adoptedStyleSheets Guards (CSSOM § 6.5 & § 7.3)', () => {

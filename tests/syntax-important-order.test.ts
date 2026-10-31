@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
-import { CSSStyleRule } from '../src/index.ts';
+import { CSSStyleRule } from '../src/entry/index.ts';
 
 test('Parser: !important after {} block in declaration', () => {
   const css = `div { color: { var(--x) } !important; }`;

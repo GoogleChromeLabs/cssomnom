@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleRule, CSSStyleDeclaration } from '../src/index.ts';
+import { CSSStyleRule, CSSStyleDeclaration } from '../src/entry/index.ts';
 import { SHORTHANDS, type ShorthandDefinition } from '../src/shorthands.ts';
 import { serialize } from '../src/serializer.ts';
 

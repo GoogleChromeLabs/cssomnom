@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
-import { CSSPageRule, CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSFontFaceRule, CSSCounterStyleRule, CSSFontFeatureValuesRule } from '../src/index.ts';
+import { CSSPageRule, CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSFontFaceRule, CSSCounterStyleRule, CSSFontFeatureValuesRule } from '../src/entry/index.ts';
 import { INTERNAL_RULE_TOKEN } from '../src/internal-token.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import {
@@ -29,9 +29,9 @@ import {
   CSSStyleDeclaration,
   CSSStyleSheet,
   StylePropertyMap
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 import { CSSStyleProperties } from '../src/data/gen/properties.ts';
-import type { StyleSheet } from '../src/index.ts';
+import type { StyleSheet } from '../src/entry/index.ts';
 
 test('CSSRule interface and inheritance', () => {
   // https://drafts.csswg.org/cssom-1/#the-cssrule-interface

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { CSSStyleValue, CSSColorValue, tokenize } from '../../src/index.ts';
+import { CSSStyleValue, CSSColorValue, tokenize } from '../../src/entry/index.ts';
 
 export function parseCSSValue(property: string, value: string) {
   return CSSStyleValue.parse(property, value);

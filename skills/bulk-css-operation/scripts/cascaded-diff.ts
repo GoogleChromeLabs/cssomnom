@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { CSSStyleSheet, getCascadedStyle, type CSSStyleDeclaration } from '../../../src/index.ts';
+import { CSSStyleSheet, getCascadedStyle, type CSSStyleDeclaration } from '../../../src/entry/index.ts';
 import { isElement, type DOMElement } from '../../../src/matcher.ts';
 import { parseHTML } from 'linkedom';
 

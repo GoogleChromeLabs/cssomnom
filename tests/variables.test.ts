@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration, CSS, resolveVariables } from '../src/index.ts';
+import { CSSStyleDeclaration, CSS, resolveVariables } from '../src/entry/index.ts';
 
 describe('Properties & Variables', () => {
     test('harden var() validation', () => {

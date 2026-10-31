@@ -19,7 +19,7 @@ import { defineConfig } from 'tsdown';
 export default defineConfig([
   {
     entry: {
-      index: 'src/index.ts',
+      index: 'src/entry/index.ts',
       parse: 'src/parse-entry.ts',
       'parser-api': 'src/parser-api.ts',
     },
@@ -32,7 +32,7 @@ export default defineConfig([
     },
   },
   ...([
-    ['index', 'index'],
+    ['index', 'entry/index'],
     ['parse', 'parse-entry'],
     ['parser-api', 'parser-api'],
   ] as const).map(([outName, srcName]) => ({

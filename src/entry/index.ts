@@ -15,8 +15,7 @@
  * limitations under the License.
  */
 
-export * from './CSSOM.ts';
-export { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
-export * from './typed-om.ts';
-export type { DOMPointInit, DOMMatrixInit } from './DOMMatrix.ts';
-export type { PropertyDefinition } from './PropertyRegistry.ts';
+import '../cascade.ts';
+
+export * from './spec.ts';
+export * from './tools.ts';

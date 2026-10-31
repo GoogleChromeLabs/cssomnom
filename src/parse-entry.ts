@@ -24,7 +24,7 @@
 //    `src/typed-om/index.ts` registers `ParseHooks.createStylePropertyMap` and prototype descriptors via
 //    top-level side effects, so bundlers cannot tree-shake Typed OM out of `CSSStyleRule` in the root entry.
 // 2. Cascade & Computed Style engine (`src/cascade.ts`, `getCascadedStyle`, `resolveVariables`, UA stylesheet).
-// 3. Static analysis & selector query tools (`src/tools.ts`, `src/walk.ts`, `src/matcher.ts`).
+// 3. Static analysis & selector query tools (`src/entry/tools.ts`, `src/walk.ts`, `src/matcher.ts`).
 export { parse } from './parser.ts';
 export type { ParserOptions, SelectorASTOptions } from './parser.ts';
 export * from './CSSOM.ts';

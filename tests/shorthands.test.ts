@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration } from '../src/index.ts';
+import { CSSStyleDeclaration } from '../src/entry/index.ts';
 
 describe('CSSStyleDeclaration Shorthands', () => {
   test('margin expansion', () => {

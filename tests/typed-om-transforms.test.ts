@@ -31,7 +31,7 @@ import {
   CSSMatrixComponent,
   CSSTransformValue,
   DOMMatrix
-} from '../src/index.ts';
+} from '../src/entry/index.ts';
 
 describe('CSS Typed OM Transforms toMatrix()', () => {
   describe('CSSTranslate.toMatrix()', () => {

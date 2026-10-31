@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { CSSStyleSheet } from '../../../src/index.ts';
+import { CSSStyleSheet } from '../../../src/entry/index.ts';
 import { calculateSpecificity, compareSpecificity } from '../../../src/specificity.ts';
 import type { ComplexSelector } from '../../../src/types.ts';
 import { extractRuleRecords, type RuleRecord } from './ast-diff.ts';

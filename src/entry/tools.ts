@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-export { parse } from './parser.ts';
-export type { ParserOptions, SelectorASTOptions } from './parser.ts';
+export { parse } from '../parser.ts';
+export type { ParserOptions, SelectorASTOptions } from '../parser.ts';
 export {
   getRules,
   closestRule,
@@ -24,15 +24,15 @@ export {
   parseSelectorAST,
   getDeclaredProperties,
   getPropertyValues,
-} from './walk.ts';
-export type { RuleRoot, AnyRuleConstructor, DeclaredPropertiesOptions, PropertyValueOptions } from './walk.ts';
-export { calculateSpecificity } from './specificity.ts';
-export { getCascadedStyle, resolveVariables } from './cascade.ts';
-export { matches, querySelectorAll, querySelector } from './matcher.ts';
-export { tokenize } from './tokenizer.ts';
-export { serialize } from './serializer.ts';
-export { StreamingTokenizer } from './streaming-tokenizer.ts';
-export { CSSAtRule } from './rules/at-rules.ts';
+} from '../walk.ts';
+export type { RuleRoot, AnyRuleConstructor, DeclaredPropertiesOptions, PropertyValueOptions } from '../walk.ts';
+export { calculateSpecificity } from '../specificity.ts';
+export { getCascadedStyle, resolveVariables } from '../cascade.ts';
+export { matches, querySelectorAll, querySelector } from '../matcher.ts';
+export { tokenize } from '../tokenizer.ts';
+export { serialize } from '../serializer.ts';
+export { StreamingTokenizer } from '../streaming-tokenizer.ts';
+export { CSSAtRule } from '../rules/at-rules.ts';
 export type {
   Token,
   TokenType,
@@ -61,4 +61,4 @@ export type {
   MediaFeature,
   GeneralEnclosed,
   MediaEnvironment,
-} from './types.ts';
+} from '../types.ts';

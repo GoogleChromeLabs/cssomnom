@@ -38,7 +38,7 @@ export interface ParserOptions {
   atRules?: Record<string, string>;
   /** When `true`, allows non-`-webkit-` vendor-prefixed pseudo-classes and pseudo-elements (such as `:-moz-*`, `::-moz-*`, `:-ms-*`) in selector lists instead of rejecting them as invalid selectors. */
   allowVendorPseudos?: boolean;
-  /** When `true`, allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`, `:global(...)`, `:local(...)`) in selector lists instead of rejecting them as invalid selectors. */
+  /** When `true`, allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`) in selector lists instead of rejecting them as invalid selectors. */
   allowUnknownPseudos?: boolean;
   /** Original CSS source text used to lazily compute 1-based `line` and `column` offsets on `rule.location`. Automatically populated by `parse(css)`. */
   source?: string;
@@ -54,7 +54,7 @@ export type SelectorASTOptions = {
   allowRelative?: boolean;
   /** When `true`, allows non-`-webkit-` vendor-prefixed pseudo-classes and pseudo-elements (such as `:-moz-*` and `:-ms-*`). */
   allowVendorPseudos?: boolean;
-  /** When `true`, allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`, `:global(...)`, `:local(...)`). */
+  /** When `true`, allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`). */
   allowUnknownPseudos?: boolean;
   /** When `input` is a `CSSRule`, resolves nested `&` and relative selectors against enclosing ancestor rules before parsing (defaults to `true`). */
   resolveNesting?: boolean;

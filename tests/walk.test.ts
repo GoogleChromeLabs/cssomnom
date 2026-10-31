@@ -42,7 +42,8 @@ import {
   getDeclaredProperties,
   getPropertyValues,
   getCascadedStyle,
-} from '../src/index.ts';
+  matches,
+} from '../src/entry/index.ts';
 import { parseHTML } from 'linkedom';
 
 describe('src/walk.ts: Pure-CSSOM Traversal, Selector Resolution, and Property Queries', () => {
@@ -367,26 +368,28 @@ describe('src/walk.ts: Pure-CSSOM Traversal, Selector Resolution, and Property Q
     assert.equal(getDeclaredProperties(sheet).has('border-color'), true);
   });
 
-  it('allowUnknownPseudos permits :tool-form-active and :global(...) selectors and cascade matching', () => {
+  it('rejects non-standard :global(...) and :local(...) selectors and supports allowUnknownPseudos opt-in', () => {
     const css = `
       form:tool-form-active { outline: 2px solid blue; }
       :global(.card) > .title { color: green; }
+      :local(.card) > .title { color: red; }
     `;
     assert.equal(getRules(parse(css), CSSStyleRule).length, 0);
-
-    const sheet = parse(css, { allowUnknownPseudos: true });
-    const rules = getRules(sheet, CSSStyleRule);
-    assert.equal(rules.length, 2);
-    assert.equal(rules[0].selectorText, 'form:tool-form-active');
-    assert.equal(rules[1].selectorText, ':global(.card) > .title');
-
-    const ast = parseSelectorAST(rules[0], { allowUnknownPseudos: true });
-    assert.ok(ast);
+    assert.equal(parseSelectorAST(':global(.card)'), null);
+    assert.equal(parseSelectorAST(':local(.card)'), null);
 
     const { document } = parseHTML('<div class="card"><h2 class="title">Hello</h2></div>');
     const titleEl = document.querySelector('.title');
-    const cascaded = getCascadedStyle(titleEl, sheet);
-    assert.equal(cascaded.getPropertyValue('color'), 'rgb(0, 128, 0)');
+    assert.equal(matches(titleEl, ':global(.title)'), false);
+    assert.equal(matches(titleEl, ':local(.title)'), false);
+
+    const sheet = parse('form:tool-form-active { outline: 2px solid blue; }', { allowUnknownPseudos: true });
+    const rules = getRules(sheet, CSSStyleRule);
+    assert.equal(rules.length, 1);
+    assert.equal(rules[0].selectorText, 'form:tool-form-active');
+
+    const ast = parseSelectorAST(rules[0], { allowUnknownPseudos: true });
+    assert.ok(ast);
   });
 
   it('parses @position-try into CSSPositionTryRule with CSSPositionTryDescriptors', () => {

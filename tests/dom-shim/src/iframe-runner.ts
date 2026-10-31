@@ -7,7 +7,7 @@ import { parseHTML, DOMParser } from 'linkedom';
 import { HarnessError, messageOf } from './wpt-assertions.ts';
 import { createWptContext, type WindowType, type DocumentType, type WptSandboxTest } from './testharness-bridge.ts';
 import { styleSheetMap } from './dom-stubs.ts';
-import { CSSStyleSheet } from '../../../src/index.ts';
+import { CSSStyleSheet } from '../../../src/entry/index.ts';
 import { parseRule } from '../../../src/parser.ts';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');

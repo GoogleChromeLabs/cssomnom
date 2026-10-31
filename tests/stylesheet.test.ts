@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
-import { CSSStyleRule, StyleSheet, CSSImportRule } from '../src/index.ts';
+import { CSSStyleRule, StyleSheet, CSSImportRule } from '../src/entry/index.ts';
 
 
 test('parse simple stylesheet', () => {

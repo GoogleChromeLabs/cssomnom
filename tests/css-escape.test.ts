@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { CSS } from '../src/index.ts';
+import { CSS } from '../src/entry/index.ts';
 
 describe('CSS.escape', () => {
   it('throws TypeError when called with no arguments', () => {

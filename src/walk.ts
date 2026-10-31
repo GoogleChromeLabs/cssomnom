@@ -260,23 +260,6 @@ export function getDeclaredProperties(
   return properties;
 }
 
-const LOGICAL_SHORTHAND_EQUIVALENTS: Record<string, readonly string[]> = {
-  'margin-inline': ['margin-inline-start', 'margin-inline-end', 'margin-left', 'margin-right'],
-  'margin-block': ['margin-block-start', 'margin-block-end', 'margin-top', 'margin-bottom'],
-  'padding-inline': ['padding-inline-start', 'padding-inline-end', 'padding-left', 'padding-right'],
-  'padding-block': ['padding-block-start', 'padding-block-end', 'padding-top', 'padding-bottom'],
-  'inset-inline': ['inset-inline-start', 'inset-inline-end', 'left', 'right'],
-  'inset-block': ['inset-block-start', 'inset-block-end', 'top', 'bottom'],
-  'border-inline': ['border-inline-start', 'border-inline-end', 'border-left', 'border-right'],
-  'border-block': ['border-block-start', 'border-block-end', 'border-top', 'border-bottom'],
-  'border-inline-width': ['border-inline-start-width', 'border-inline-end-width', 'border-left-width', 'border-right-width'],
-  'border-block-width': ['border-block-start-width', 'border-block-end-width', 'border-top-width', 'border-bottom-width'],
-  'border-inline-style': ['border-inline-start-style', 'border-inline-end-style', 'border-left-style', 'border-right-style'],
-  'border-block-style': ['border-block-start-style', 'border-block-end-style', 'border-top-style', 'border-bottom-style'],
-  'border-inline-color': ['border-inline-start-color', 'border-inline-end-color', 'border-left-color', 'border-right-color'],
-  'border-block-color': ['border-block-start-color', 'border-block-end-color', 'border-top-color', 'border-bottom-color'],
-};
-
 /**
  * Returns all authored values for `property` in declaration order on a `CSSRule` or `CSSStyleDeclaration`.
  *
@@ -307,9 +290,13 @@ export function getPropertyValues(
     if (logs) {
       for (const l of logs) targetProps.add(l);
     }
-    const eq = LOGICAL_SHORTHAND_EQUIVALENTS[p];
-    if (eq) {
-      for (const item of eq) targetProps.add(item);
+    const sh = SHORTHANDS[p];
+    if (sh) {
+      for (const lh of sh.longhands) {
+        targetProps.add(lh);
+        const lhPhys = (LOGICAL_MAPPING as Record<string, string>)[lh];
+        if (lhPhys) targetProps.add(lhPhys);
+      }
     }
   };
 

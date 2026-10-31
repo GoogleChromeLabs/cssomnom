@@ -16,7 +16,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet, CSSFontFaceRule, CSSPageRule, CSSMarginRule, CSSFontFaceDescriptors, CSSPageDescriptors, CSSMarginDescriptors } from '../src/index.ts';
+import { CSSStyleSheet, CSSFontFaceRule, CSSPageRule, CSSMarginRule, CSSFontFaceDescriptors, CSSPageDescriptors, CSSMarginDescriptors } from '../src/entry/index.ts';
 
 test('CSSFontFaceRule.style returns CSSFontFaceDescriptors', () => {
   const sheet = new CSSStyleSheet();

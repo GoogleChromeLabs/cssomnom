@@ -16,7 +16,7 @@
  */
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration } from '../src/index.ts';
+import { CSSStyleDeclaration } from '../src/entry/index.ts';
 import { StylePropertyMap, StylePropertyMapReadOnly, CSSTranslate, CSSScale, CSSRotate, CSSTransformValue, CSS, CSSStyleValue, CSSUnparsedValue, CSSVariableReferenceValue, CSSUnitValue } from '../src/typed-om.ts';
 import { tokenize } from '../src/tokenizer.ts';
 

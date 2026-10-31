@@ -17,7 +17,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser, parseRuleInBlock, isCustomPropertyDeclaration } from '../src/parser.ts';
-import { CSSStyleRule, CSSMediaRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations } from '../src/index.ts';
+import { CSSStyleRule, CSSMediaRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations } from '../src/entry/index.ts';
 import { tokenize } from '../src/tokenizer.ts';
 
 // https://drafts.csswg.org/css-syntax-3/#parse-rule

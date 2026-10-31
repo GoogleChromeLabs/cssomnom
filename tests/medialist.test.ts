@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { MediaList } from '../src/index.ts';
+import { MediaList } from '../src/entry/index.ts';
 
 test('MediaList.appendMedium normalization', () => {
   const ml = new MediaList('screen');

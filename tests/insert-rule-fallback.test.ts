@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleSheet, CSSMediaRule, CSSNestedDeclarations, CSSStyleRule } from '../src/index.ts';
+import { CSSStyleSheet, CSSMediaRule, CSSNestedDeclarations, CSSStyleRule } from '../src/entry/index.ts';
 
 test('CSSGroupingRule: insertRule fallback to declaration', () => {
   const sheet = new CSSStyleSheet();

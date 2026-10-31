@@ -19,7 +19,7 @@ import * as assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
 import type { ParseError, ComponentValue } from '../src/types.ts';
-import { CSSStyleRule } from '../src/index.ts';
+import { CSSStyleRule } from '../src/entry/index.ts';
 import { ArrayComponentValueStream } from '../src/TokenStream.ts';
 
 test('Parser reports error on unexpected EOF in qualified rule', () => {

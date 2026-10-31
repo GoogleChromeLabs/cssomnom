@@ -18,7 +18,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseHTML } from 'linkedom';
-import { matches } from '../src/index.ts';
+import { matches } from '../src/entry/index.ts';
 import { parseStyleSheet, Parser } from '../src/parser.ts';
 import { SelectorParser } from '../src/SelectorParser.ts';
 import { tokenize } from '../src/tokenizer.ts';

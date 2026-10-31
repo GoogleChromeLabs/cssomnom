@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSKeyframesRule, CSSKeyframeRule, parse } from '../src/index.ts';
+import { CSSStyleSheet, CSSStyleRule, CSSMediaRule, CSSKeyframesRule, CSSKeyframeRule, parse } from '../src/entry/index.ts';
 
 test('CSSStyleSheet.insertRule and deleteRule', () => {
   const parser = new Parser([]);

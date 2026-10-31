@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { CSSScopeRule, CSSGroupingRule, CSSStyleRule } from '../src/index.ts';
+import { CSSScopeRule, CSSGroupingRule, CSSStyleRule } from '../src/entry/index.ts';
 import type { Rule } from '../src/types.ts';
 import { parseStyleSheet } from '../src/parser.ts';
 

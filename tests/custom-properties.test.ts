@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { CSSStyleDeclaration, CSSPropertyRule, CSSStyleSheet, CSSStyleRule, resolveVariables } from '../src/index.ts';
+import { CSSStyleDeclaration, CSSPropertyRule, CSSStyleSheet, CSSStyleRule, resolveVariables } from '../src/entry/index.ts';
 import { CSSStyleValue, CSSUnparsedValue, CSSVariableReferenceValue } from '../src/typed-om.ts';
 import { PropertyRegistry } from '../src/PropertyRegistry.ts';
 

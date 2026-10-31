@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { tokenize } from '../src/tokenizer.ts';
 import { Parser } from '../src/parser.ts';
-import { CSSStyleRule, CSSStyleDeclaration } from '../src/index.ts';
+import { CSSStyleRule, CSSStyleDeclaration } from '../src/entry/index.ts';
 
 test('Tokenizer absorbs comments', () => {
   const css = 'a { color: /* comment */ red; } /* another comment */';

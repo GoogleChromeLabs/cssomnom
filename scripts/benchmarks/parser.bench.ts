@@ -21,7 +21,7 @@ import { performance, PerformanceObserver } from 'node:perf_hooks';
 import { parseHTML } from 'linkedom';
 
 // Root-relative imports (ensuring ParseHooks and all prototypes are initialized)
-import '../../src/index.ts';
+import '../../src/entry/index.ts';
 import { tokenize } from '../../src/tokenizer.ts';
 import { Parser, parseStyleSheet } from '../../src/parser.ts';
 import { CSSStyleDeclaration } from '../../src/CSSStyleDeclaration.ts';

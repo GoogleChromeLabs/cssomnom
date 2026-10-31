@@ -26,7 +26,7 @@ import assert from 'node:assert';
  * C = number of type selectors and pseudo-elements
  */
 
-import { calculateSpecificity } from '../src/index.ts';
+import { calculateSpecificity } from '../src/entry/index.ts';
 
 test('Specificity: Parser.calculateSpecificity', () => {
   assert.deepStrictEqual(calculateSpecificity('#id.class'), [[1, 1, 0]]);

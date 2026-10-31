@@ -77,13 +77,12 @@ async function main() {
     ]);
     const sortedPageAllowedProperties = Array.from(pageAllowedProperties).sort();
     const pageDescriptorProperties = [
-        'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
-        'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-        'size', 'pageOrientation', 'page-orientation', 'marks', 'bleed'
+        'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+        'size', 'page-orientation', 'marks', 'bleed'
     ];
 
     // 2b. @position-try allowed properties & descriptors (css-anchor-position-1)
-    const positionTryDashedProperties = [
+    const positionTryAllowedProperties = [
         'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
         'margin-block', 'margin-block-start', 'margin-block-end',
         'margin-inline', 'margin-inline-start', 'margin-inline-end',
@@ -94,12 +93,8 @@ async function main() {
         'block-size', 'min-block-size', 'max-block-size',
         'inline-size', 'min-inline-size', 'max-inline-size',
         'place-self', 'align-self', 'justify-self',
-        'position-anchor', 'position-area',
-    ];
-    const positionTryAllowedProperties = [...positionTryDashedProperties, 'inset-area'].sort();
-    const positionTryDescriptorProperties = Array.from(new Set(
-        positionTryDashedProperties.flatMap(p => [toCamelCase(p), p])
-    ));
+        'position-anchor', 'position-area', 'inset-area',
+    ].sort();
 
     // 3. @counter-style descriptors
     const counterStyleAtRule = css.atrules.find((a: AtRuleDef) => a.name === '@counter-style');
@@ -208,9 +203,7 @@ async function main() {
     listContent += `export const PAGE_ALLOWED_PROPERTIES: ReadonlySet<string> = /* @__PURE__ */ new Set('${sortedPageAllowedProperties.join(',')}'.split(','));\n\n`;
     listContent += `export const PAGE_DESCRIPTOR_PROPERTIES = ${JSON.stringify(pageDescriptorProperties)} as const;\n\n`;
     listContent += `export const POSITION_TRY_ALLOWED_PROPERTIES: ReadonlySet<string> = /* @__PURE__ */ new Set('${positionTryAllowedProperties.join(',')}'.split(','));\n\n`;
-    listContent += `export const POSITION_TRY_DESCRIPTOR_PROPERTIES = ${JSON.stringify(positionTryDescriptorProperties)} as const;\n\n`;
-    listContent += `export const COUNTER_STYLE_DESCRIPTORS: ReadonlyArray<readonly [string, string]> = ${JSON.stringify(counterStyleDescriptors)};\n\n`;
-    listContent += `export const COUNTER_STYLE_PROP_BY_DESCRIPTOR: ReadonlyMap<string, string> = /* @__PURE__ */ new Map(COUNTER_STYLE_DESCRIPTORS);\n\n`;
+    listContent += `export const COUNTER_STYLE_PROP_BY_DESCRIPTOR: ReadonlyMap<string, string> = /* @__PURE__ */ new Map(${JSON.stringify(counterStyleDescriptors)});\n\n`;
     listContent += `export const FONT_FEATURE_VALUE_MAP_DEFS = ${JSON.stringify(fontFeatureValueMapDefs)} as const;\n\n`;
     listContent += `export const FONT_FEATURE_VALUE_BLOCKS: Record<string, 'annotation' | 'ornaments' | 'stylistic' | 'swash' | 'characterVariant' | 'styleset' | 'historicalForms'> = ${JSON.stringify(fontFeatureValueBlocks)};\n\n`;
     listContent += `export const MARGIN_RULE_NAMES: ReadonlySet<string> = /* @__PURE__ */ new Set('${marginRuleNames.join(',')}'.split(','));\n\n`;

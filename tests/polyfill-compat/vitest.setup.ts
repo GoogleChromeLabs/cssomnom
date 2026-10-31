@@ -16,7 +16,7 @@
  */
 
 /* eslint-disable */
-import { CSS, CSSRGB, CSSMathProduct, StylePropertyMap, StylePropertyMapReadOnly, CSSUnitValue } from '../../src/index.ts';
+import { CSS, CSSRGB, CSSMathProduct, StylePropertyMap, StylePropertyMapReadOnly, CSSUnitValue } from '../../src/entry/index.ts';
 
 // Expose global CSS object expected by polyfill tests
 (globalThis as any).CSS = CSS;

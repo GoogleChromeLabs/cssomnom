@@ -16,7 +16,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { calculateSpecificity } from '../src/index.ts';
+import { calculateSpecificity } from '../src/entry/index.ts';
 
 test('Top-level specificity should return an array of specificities', () => {
   const spec = calculateSpecificity('a, .b, #c');

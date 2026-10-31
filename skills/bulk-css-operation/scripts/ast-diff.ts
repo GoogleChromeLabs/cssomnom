@@ -21,7 +21,7 @@ import {
   getRules,
   parseSelectorAST,
   type CSSRuleList,
-} from '../../../src/index.ts';
+} from '../../../src/entry/index.ts';
 import type { SelectorList } from '../../../src/types.ts';
 import { getRuleHeader } from './coverage-prune.ts';
 

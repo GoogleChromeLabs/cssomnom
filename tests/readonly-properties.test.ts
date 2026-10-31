@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSKeyframesRule, CSSLayerStatementRule, CSSGroupingRule, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSViewTransitionRule } from '../src/index.ts';
+import { CSSImportRule, CSSNamespaceRule, CSSMarginRule, CSSKeyframesRule, CSSLayerStatementRule, CSSGroupingRule, CSSStyleRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSViewTransitionRule } from '../src/entry/index.ts';
 import { INTERNAL_RULE_TOKEN } from '../src/internal-token.ts';
 import { describe, it } from 'node:test';
 import assert from 'node:assert';

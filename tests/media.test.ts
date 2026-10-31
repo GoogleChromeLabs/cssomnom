@@ -18,7 +18,7 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import { Parser } from '../src/parser.ts';
 import { tokenize } from '../src/tokenizer.ts';
-import { CSSMediaRule } from '../src/index.ts';
+import { CSSMediaRule } from '../src/entry/index.ts';
 
 test('MediaList behavior', () => {
   const css = '@media screen, print { body { color: red; } }';

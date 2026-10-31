@@ -5,7 +5,7 @@
  */
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { parse, CSSStyleSheet, CSSStyleRule, CSSMediaRule } from "../src/index.ts";
+import { parse, CSSStyleSheet, CSSStyleRule, CSSMediaRule } from "../src/entry/index.ts";
 import { getCascadedStyle } from "../src/cascade.ts";
 
 describe("Phase 93: CSS Nesting 1 Conformance & CSSNestedDeclarations Lifecycle", () => {
