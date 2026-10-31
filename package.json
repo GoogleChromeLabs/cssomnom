@@ -54,10 +54,6 @@
       "types": "./dist/parser-api.d.ts",
       "import": "./dist/parser-api.js",
       "default": "./dist/parser-api.js"
-    },
-    "./ts": {
-      "types": "./src/entry/index.ts",
-      "import": "./src/entry/index.ts"
     }
   },
   "main": "./dist/index.js",

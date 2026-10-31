@@ -27,7 +27,7 @@ import {
 } from './rules/at-rules.ts';
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
-import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from './shorthands.ts';
+import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { LOGICAL_MAPPING, PHYSICAL_TO_LOGICAL } from './data/gen/LogicalMapping.ts';
 import { serialize } from './serializer.ts';
 import { resolveNestedSelector } from './nesting.ts';
@@ -283,40 +283,16 @@ export function getPropertyValues(
   const useShorthands = options?.shorthands !== false && !prop.startsWith('--');
 
   const targetProps = new Set<string>([prop]);
-  const addLogicalEquivalents = (p: string) => {
-    const phys = (LOGICAL_MAPPING as Record<string, string>)[p];
-    if (phys) targetProps.add(phys);
-    const logs = PHYSICAL_TO_LOGICAL[p];
-    if (logs) {
-      for (const l of logs) targetProps.add(l);
-    }
-    const sh = SHORTHANDS[p];
-    if (sh) {
-      for (const lh of sh.longhands) {
-        targetProps.add(lh);
-        const lhPhys = (LOGICAL_MAPPING as Record<string, string>)[lh];
-        if (lhPhys) targetProps.add(lhPhys);
-      }
-    }
-  };
-
   if (useLogical) {
-    addLogicalEquivalents(prop);
-  }
-
-  const parentShorthands = new Set<string>();
-  if (useShorthands) {
-    for (const tp of Array.from(targetProps)) {
-      for (const sh of LONGHAND_TO_SHORTHAND[tp] ?? []) parentShorthands.add(sh);
-      const shDef = SHORTHANDS[tp];
-      if (shDef) {
-        for (const lh of shDef.longhands) {
-          if (useLogical) addLogicalEquivalents(lh);
-          for (const sh of LONGHAND_TO_SHORTHAND[lh] ?? []) {
-            if (sh !== tp) parentShorthands.add(sh);
-          }
-        }
-      }
+    const addLogical = (p: string) => {
+      const phys = (LOGICAL_MAPPING as Record<string, string>)[p];
+      if (phys) targetProps.add(phys);
+      for (const l of PHYSICAL_TO_LOGICAL[p] ?? []) targetProps.add(l);
+    };
+    addLogical(prop);
+    for (const lh of SHORTHANDS[prop]?.longhands ?? []) {
+      targetProps.add(lh);
+      addLogical(lh);
     }
   }
 
@@ -330,34 +306,28 @@ export function getPropertyValues(
       if (v) values.push(v);
       continue;
     }
-    if (!useShorthands) continue;
+    if (!useShorthands || d.name === 'all') continue;
     const shDef = SHORTHANDS[d.name];
-    if (!shDef || d.name === 'all') continue;
+    if (!shDef) continue;
 
-    const rawText = serialize(d.value).trim();
-    const hasVar = rawText.includes('var(') || rawText.includes('env(');
-    const expanded = !hasVar ? shDef.expand(d.value) : null;
-    if (expanded) {
-      let matched = false;
-      for (const tp of targetProps) {
-        if (tp in expanded) {
-          const v = serialize(expanded[tp]).trim();
-          if (v) {
-            values.push(v);
-            matched = true;
-            break;
-          }
-        }
+    const shLonghands = getShorthandAllLonghands(shDef);
+    if (!shLonghands.some(lh => targetProps.has(lh) || (SHORTHANDS[prop]?.longhands.includes(lh) ?? false))) {
+      continue;
+    }
+
+    const singleDeclStyle = new CSSStyleDeclaration([d]);
+    let matched = false;
+    for (const tp of targetProps) {
+      const v = singleDeclStyle.getPropertyValue(tp).trim();
+      if (v) {
+        values.push(v);
+        matched = true;
+        break;
       }
-      if (!matched && SHORTHANDS[prop]) {
-        const subSh = SHORTHANDS[prop];
-        if (subSh.longhands.every(lh => lh in expanded)) {
-          const contracted = subSh.contract(expanded);
-          if (contracted) values.push(contracted.trim());
-        }
-      }
-    } else if (parentShorthands.has(d.name) && rawText) {
-      values.push(rawText);
+    }
+    if (!matched) {
+      const rawText = serialize(d.value).trim();
+      if (rawText) values.push(rawText);
     }
   }
 

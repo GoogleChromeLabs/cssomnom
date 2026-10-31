@@ -37,9 +37,6 @@ import { parse, CSSStyleSheet, CSSStyleDeclaration } from 'cssomnom/parse';
 
 // 3. WICG CSS Parser API Draft ("cssomnom/parser-api")
 import { parseStylesheet, parseRule, CSSParserAtRule, CSSParserQualifiedRule } from 'cssomnom/parser-api';
-
-// 4. Direct TypeScript Source ("cssomnom/ts" — Node 24.11.0+ erasable syntax)
-import { parse } from 'cssomnom/ts';
 ```
 
 ### Basic CSS Parsing & Rule Traversal
