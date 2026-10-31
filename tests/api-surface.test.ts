@@ -213,27 +213,27 @@ const INTENTIONAL_WEBIDL_DEVIATIONS = {
   } as Record<string, { reason: string }>,
 };
 
-test('Cupboard 1: cssomnom (.)', (t) => {
+test('Root Entrypoint: cssomnom (.)', (t) => {
   const exports = Object.keys(CSSOM).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
 
-test('Cupboard 1a: src/spec.ts (W3C WebIDL Barrel)', (t) => {
+test('W3C WebIDL Barrel: src/spec.ts', (t) => {
   const exports = Object.keys(SpecExports).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
 
-test('Cupboard 1b: src/tools.ts (Standalone Node & AST Tools Barrel)', (t) => {
+test('Static Analysis & Cascade Tools Barrel: src/tools.ts', (t) => {
   const exports = Object.keys(ToolsExports).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
 
-test('Cupboard 2: cssomnom/parse (./parse)', (t) => {
+test('Lightweight Parse Subpath: cssomnom/parse (./parse)', (t) => {
   const exports = Object.keys(ParseEntry).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
 
-test('Cupboard 3: cssomnom/parser-api (./parser-api)', (t) => {
+test('WICG Parser API Subpath: cssomnom/parser-api (./parser-api)', (t) => {
   const exports = Object.keys(ParserApiEntry).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });

@@ -70,7 +70,50 @@ exports[`CSS namespace methods 1`] = `
 ]
 `;
 
-exports[`Cupboard 1: cssomnom (.) 1`] = `
+exports[`Lightweight Parse Subpath: cssomnom/parse (./parse) 1`] = `
+[
+  "CSSConditionRule",
+  "CSSContainerRule",
+  "CSSCounterStyleRule",
+  "CSSCustomMediaRule",
+  "CSSFontFaceDescriptors",
+  "CSSFontFaceRule",
+  "CSSFontFeatureValuesMap",
+  "CSSFontFeatureValuesRule",
+  "CSSGroupingRule",
+  "CSSImportRule",
+  "CSSKeyframeRule",
+  "CSSKeyframesRule",
+  "CSSLayerBlockRule",
+  "CSSLayerStatementRule",
+  "CSSMarginDescriptors",
+  "CSSMarginRule",
+  "CSSMediaRule",
+  "CSSNamespaceRule",
+  "CSSNestedDeclarations",
+  "CSSPageDescriptors",
+  "CSSPageRule",
+  "CSSPositionTryDescriptors",
+  "CSSPositionTryRule",
+  "CSSPropertyRule",
+  "CSSRule",
+  "CSSRuleList",
+  "CSSScopeRule",
+  "CSSStartingStyleRule",
+  "CSSStyleDeclaration",
+  "CSSStyleProperties",
+  "CSSStyleRule",
+  "CSSStyleSheet",
+  "CSSSupportsRule",
+  "CSSViewTransitionRule",
+  "MediaList",
+  "StyleSheet",
+  "StyleSheetList",
+  "parse"
+]
+`;
+
+exports[`Root Entrypoint: cssomnom (.) 1`] = `
 [
   "CSS",
   "CSSAtRule",
@@ -172,7 +215,29 @@ exports[`Cupboard 1: cssomnom (.) 1`] = `
 ]
 `;
 
-exports[`Cupboard 1a: src/spec.ts (W3C WebIDL Barrel) 1`] = `
+exports[`Static Analysis & Cascade Tools Barrel: src/tools.ts 1`] = `
+[
+  "CSSAtRule",
+  "StreamingTokenizer",
+  "calculateSpecificity",
+  "closestRule",
+  "getCascadedStyle",
+  "getDeclaredProperties",
+  "getPropertyValues",
+  "getRules",
+  "matches",
+  "parse",
+  "parseSelectorAST",
+  "querySelector",
+  "querySelectorAll",
+  "resolveSelector",
+  "resolveVariables",
+  "serialize",
+  "tokenize"
+]
+`;
+
+exports[`W3C WebIDL Barrel: src/spec.ts 1`] = `
 [
   "CSS",
   "CSSColor",
@@ -257,72 +322,7 @@ exports[`Cupboard 1a: src/spec.ts (W3C WebIDL Barrel) 1`] = `
 ]
 `;
 
-exports[`Cupboard 1b: src/tools.ts (Standalone Node & AST Tools Barrel) 1`] = `
-[
-  "CSSAtRule",
-  "StreamingTokenizer",
-  "calculateSpecificity",
-  "closestRule",
-  "getCascadedStyle",
-  "getDeclaredProperties",
-  "getPropertyValues",
-  "getRules",
-  "matches",
-  "parse",
-  "parseSelectorAST",
-  "querySelector",
-  "querySelectorAll",
-  "resolveSelector",
-  "resolveVariables",
-  "serialize",
-  "tokenize"
-]
-`;
-
-exports[`Cupboard 2: cssomnom/parse (./parse) 1`] = `
-[
-  "CSSConditionRule",
-  "CSSContainerRule",
-  "CSSCounterStyleRule",
-  "CSSCustomMediaRule",
-  "CSSFontFaceDescriptors",
-  "CSSFontFaceRule",
-  "CSSFontFeatureValuesMap",
-  "CSSFontFeatureValuesRule",
-  "CSSGroupingRule",
-  "CSSImportRule",
-  "CSSKeyframeRule",
-  "CSSKeyframesRule",
-  "CSSLayerBlockRule",
-  "CSSLayerStatementRule",
-  "CSSMarginDescriptors",
-  "CSSMarginRule",
-  "CSSMediaRule",
-  "CSSNamespaceRule",
-  "CSSNestedDeclarations",
-  "CSSPageDescriptors",
-  "CSSPageRule",
-  "CSSPositionTryDescriptors",
-  "CSSPositionTryRule",
-  "CSSPropertyRule",
-  "CSSRule",
-  "CSSRuleList",
-  "CSSScopeRule",
-  "CSSStartingStyleRule",
-  "CSSStyleDeclaration",
-  "CSSStyleProperties",
-  "CSSStyleRule",
-  "CSSStyleSheet",
-  "CSSSupportsRule",
-  "CSSViewTransitionRule",
-  "MediaList",
-  "StyleSheet",
-  "StyleSheetList",
-  "parse"
-]
-`;
-
-exports[`Cupboard 3: cssomnom/parser-api (./parser-api) 1`] = `
+exports[`WICG Parser API Subpath: cssomnom/parser-api (./parser-api) 1`] = `
 [
   "CSSParserAtRule",
   "CSSParserBlock",

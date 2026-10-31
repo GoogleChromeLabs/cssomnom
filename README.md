@@ -25,7 +25,7 @@ It is uniquely suited for **static analysis** and **automated grading** where yo
 
 ### Subpath Exports & Import Options
 
-`cssomnom` organizes its public API into three distinct cupboards plus a direct TypeScript entrypoint:
+`cssomnom` provides focused subpath entrypoints depending on what you need:
 
 ```typescript
 // 1. Full Package ("cssomnom"): Browser CSSOM, Typed OM, W3C CSS namespace, Cascade & Node AST tools

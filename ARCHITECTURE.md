@@ -98,7 +98,9 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - **Math Simplification Ownership**:
   `src/math-parser.ts` owns math expression parsing (`parseMathFunction()`) and canonical algebraic simplification (`simplify()`). Typed OM (`src/typed-om/numeric/numeric-methods.ts`, `style-value-factory.ts`) delegates `calc()` tree parsing and reduction to `src/math-parser.ts`, while wrapping simplified results into `CSSMathValue` or `CSSUnitValue` trees.
 - **Public Entry Points**:
-  - `src/index.ts`: Primary library entry point for Node.js and bundlers.
+  - `src/index.ts`: Primary library entry point (`cssomnom`) re-exporting `src/spec.ts` (W3C WebIDL interfaces) and `src/tools.ts` (static analysis, traversal, and cascade helpers).
+  - `src/parse-entry.ts`: Lightweight parser + CSSOM subpath (`cssomnom/parse`) excluding Cascade, UA stylesheet, and Typed OM.
+  - `src/parser-api.ts`: WICG CSS Parser API subpath (`cssomnom/parser-api`).
   - `src/browser-entry.ts`: Browser environment entry point exposing globals with WebIDL property descriptors.
 - **UA Stylesheet Entry into Cascade**:
   The HTML User Agent stylesheet text is generated into `src/data/gen/ua-stylesheet.ts` from WHATWG HTML. In `src/cascade/index.ts` within `getCascadedStyle()`, it is lazily parsed via `consumeListOfRules(tokenize(HTML_UA_STYLESHEET_TEXT), true)` and collected under `'user-agent'` origin with default (empty) layer ordering, running before author rules.
