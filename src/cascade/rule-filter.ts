@@ -50,6 +50,7 @@ import type {
   InternalRuleMetadata,
   ElementLike,
   DocumentLike,
+  MediaEnvironment,
 } from '../types.ts';
 import type { MatchedDeclaration, Specificity } from './types.ts';
 
@@ -65,7 +66,7 @@ function getEffectiveParent(node: unknown): unknown {
  */
 export function collectStyleSheetsAndRules(
   element: ElementLike | DocumentLike | null | undefined,
-  rules?: Rule[] | CSSRuleList
+  rules?: CSSStyleSheet | Rule[] | CSSRuleList | null
 ): Rule[] | null {
   if (!element || typeof element !== 'object') {
     return null;
@@ -96,7 +97,7 @@ export function collectStyleSheetsAndRules(
   }
 
   if (rules) {
-    return Array.from(rules as ArrayLike<Rule>);
+    return rules instanceof CSSStyleSheet ? Array.from(rules.cssRules) : Array.from(rules as ArrayLike<Rule>);
   }
 
   const ruleList: Rule[] = [];
@@ -608,7 +609,8 @@ export function collectMatchedDeclarations(
   ruleList: Rule[],
   layerDeclarationOrder: Map<string, number>,
   pseudoElement?: string | null,
-  origin: 'user-agent' | 'author' = 'author'
+  origin: 'user-agent' | 'author' = 'author',
+  envOverride?: Partial<MediaEnvironment>
 ): { matchedDeclarations: MatchedDeclaration[]; sourceOrderCounter: number } {
   const matchedDeclarations: MatchedDeclaration[] = [];
   let sourceOrderCounter = 0;
@@ -716,14 +718,14 @@ export function collectMatchedDeclarations(
         // css-cascade-5 #filtering
         // mediaqueries-4 #mq-list
         const mediaText = rule.media.mediaText;
-        const env = resolveMediaEnvironment(element);
+        const env = envOverride ?? resolveMediaEnvironment(element);
         if (MediaParser.evaluate(mediaText, env) && rule.cssRules) {
           walkRules(rule.cssRules, parentSelector, currentLayer, scopeNode, scopeProximity);
         }
       } else if (rule instanceof CSSImportRule) {
         // css-cascade-6 #at-import
         const mediaText = rule.media?.mediaText;
-        const env = resolveMediaEnvironment(element);
+        const env = envOverride ?? resolveMediaEnvironment(element);
         if (mediaText && !MediaParser.evaluate(mediaText, env)) {
           continue;
         }

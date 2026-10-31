@@ -82,6 +82,25 @@ async function main() {
         'size', 'pageOrientation', 'page-orientation', 'marks', 'bleed'
     ];
 
+    // 2b. @position-try allowed properties & descriptors (css-anchor-position-1)
+    const positionTryDashedProperties = [
+        'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+        'margin-block', 'margin-block-start', 'margin-block-end',
+        'margin-inline', 'margin-inline-start', 'margin-inline-end',
+        'inset', 'inset-block', 'inset-block-start', 'inset-block-end',
+        'inset-inline', 'inset-inline-start', 'inset-inline-end',
+        'top', 'left', 'right', 'bottom',
+        'width', 'min-width', 'max-width', 'height', 'min-height', 'max-height',
+        'block-size', 'min-block-size', 'max-block-size',
+        'inline-size', 'min-inline-size', 'max-inline-size',
+        'place-self', 'align-self', 'justify-self',
+        'position-anchor', 'position-area',
+    ];
+    const positionTryAllowedProperties = [...positionTryDashedProperties, 'inset-area'].sort();
+    const positionTryDescriptorProperties = Array.from(new Set(
+        positionTryDashedProperties.flatMap(p => [toCamelCase(p), p])
+    ));
+
     // 3. @counter-style descriptors
     const counterStyleAtRule = css.atrules.find((a: AtRuleDef) => a.name === '@counter-style');
     const counterStyleDescriptors = (counterStyleAtRule?.descriptors || []).map((d: { name: string }) => [
@@ -188,6 +207,8 @@ async function main() {
     listContent += `export const FONT_FACE_DESCRIPTORS: ReadonlySet<string> = /* @__PURE__ */ new Set('${sortedFontFaceDescriptors.join(',')}'.split(','));\n\n`;
     listContent += `export const PAGE_ALLOWED_PROPERTIES: ReadonlySet<string> = /* @__PURE__ */ new Set('${sortedPageAllowedProperties.join(',')}'.split(','));\n\n`;
     listContent += `export const PAGE_DESCRIPTOR_PROPERTIES = ${JSON.stringify(pageDescriptorProperties)} as const;\n\n`;
+    listContent += `export const POSITION_TRY_ALLOWED_PROPERTIES: ReadonlySet<string> = /* @__PURE__ */ new Set('${positionTryAllowedProperties.join(',')}'.split(','));\n\n`;
+    listContent += `export const POSITION_TRY_DESCRIPTOR_PROPERTIES = ${JSON.stringify(positionTryDescriptorProperties)} as const;\n\n`;
     listContent += `export const COUNTER_STYLE_DESCRIPTORS: ReadonlyArray<readonly [string, string]> = ${JSON.stringify(counterStyleDescriptors)};\n\n`;
     listContent += `export const COUNTER_STYLE_PROP_BY_DESCRIPTOR: ReadonlyMap<string, string> = /* @__PURE__ */ new Map(COUNTER_STYLE_DESCRIPTORS);\n\n`;
     listContent += `export const FONT_FEATURE_VALUE_MAP_DEFS = ${JSON.stringify(fontFeatureValueMapDefs)} as const;\n\n`;

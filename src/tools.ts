@@ -23,8 +23,9 @@ export {
   resolveSelector,
   parseSelectorAST,
   getDeclaredProperties,
+  getPropertyValues,
 } from './walk.ts';
-export type { RuleRoot, AnyRuleConstructor, DeclaredPropertiesOptions } from './walk.ts';
+export type { RuleRoot, AnyRuleConstructor, DeclaredPropertiesOptions, PropertyValueOptions } from './walk.ts';
 export { calculateSpecificity } from './specificity.ts';
 export { getCascadedStyle, resolveVariables } from './cascade.ts';
 export { matches, querySelectorAll, querySelector } from './matcher.ts';

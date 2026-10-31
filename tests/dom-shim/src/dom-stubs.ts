@@ -24,13 +24,15 @@ import {
   CSSKeyframesRule,
   CSSKeyframeRule,
   CSSPageRule,
+  CSSPositionTryRule,
   CSSPropertyRule,
   CSSNamespaceRule,
   CSSMarginRule,
   CSSStyleRule,
   StyleSheetList,
   CSSRuleList,
-  CSSPageDescriptors
+  CSSPageDescriptors,
+  CSSPositionTryDescriptors
 } from '../../../src/CSSOM.ts';
 import { CSSStyleProperties } from '../../../src/data/gen/properties.ts';
 import { CSSStyleDeclaration } from '../../../src/CSSStyleDeclaration.ts';
@@ -2332,6 +2334,7 @@ function patchWindowGlobals(window: WindowType): void {
     CSSKeyframesRule,
     CSSKeyframeRule,
     CSSPageRule,
+    CSSPositionTryRule,
     CSSPropertyRule,
     CSSNamespaceRule,
     CSSMarginRule,
@@ -2341,6 +2344,7 @@ function patchWindowGlobals(window: WindowType): void {
     CSSRuleList,
     CSSStyleProperties,
     CSSPageDescriptors,
+    CSSPositionTryDescriptors,
     SVGStyleElement: globalSVGStyleElement || win.SVGStyleElement,
     MathMLElement: globalMathMLElement || win.MathMLElement,
     ProcessingInstruction: globalProcessingInstruction || win.ProcessingInstruction,

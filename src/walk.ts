@@ -27,7 +27,9 @@ import {
 } from './rules/at-rules.ts';
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
-import { LONGHAND_TO_SHORTHAND } from './shorthands.ts';
+import { SHORTHANDS, LONGHAND_TO_SHORTHAND } from './shorthands.ts';
+import { LOGICAL_MAPPING, PHYSICAL_TO_LOGICAL } from './data/gen/LogicalMapping.ts';
+import { serialize } from './serializer.ts';
 import { resolveNestedSelector } from './nesting.ts';
 import { tokenize } from './tokenizer.ts';
 import { parseSelectorAST as parseSelectorStringAST, type SelectorASTOptions } from './parser.ts';
@@ -49,6 +51,16 @@ export type AnyRuleConstructor<T extends CSSRule = CSSRule> = abstract new (...a
 export interface DeclaredPropertiesOptions {
   /** When `true` (default), includes CSS property names referenced inside `@supports (...)` conditions. */
   includeSupports?: boolean;
+}
+
+/**
+ * Options for `getPropertyValues()`.
+ */
+export interface PropertyValueOptions {
+  /** When `true` (default), matches logical and physical property equivalents (e.g. `margin-inline-start` ↔ `margin-left` in horizontal-tb LTR). */
+  logical?: boolean;
+  /** When `true` (default), extracts or falls back to parent shorthands (including unexpanded `var()` shorthands like `border: 1px solid var(--c)`). */
+  shorthands?: boolean;
 }
 
 /**
@@ -171,6 +183,7 @@ export function parseSelectorAST(
     input instanceof CSSStyleRule &&
     input._selectorAST &&
     !options?.allowVendorPseudos &&
+    !options?.allowUnknownPseudos &&
     !options?.declaredNamespaces &&
     (raw || (input.parentRule === null && !input.selectorText.includes('&')))
   ) {
@@ -207,6 +220,16 @@ export function getDeclaredProperties(
             if (style.getPropertyValue(sh) !== '') properties.add(sh.toLowerCase());
           }
         }
+        const shorthandDef = SHORTHANDS[prop];
+        if (shorthandDef && prop !== 'all') {
+          for (const lh of shorthandDef.longhands) {
+            properties.add(lh);
+            const parentShs = LONGHAND_TO_SHORTHAND[lh];
+            if (parentShs) {
+              for (const sh of parentShs) properties.add(sh);
+            }
+          }
+        }
       }
     }
     if (options?.includeSupports !== false && rule instanceof CSSSupportsRule && rule.conditionText) {
@@ -235,4 +258,131 @@ export function getDeclaredProperties(
     }
   }
   return properties;
+}
+
+const LOGICAL_SHORTHAND_EQUIVALENTS: Record<string, readonly string[]> = {
+  'margin-inline': ['margin-inline-start', 'margin-inline-end', 'margin-left', 'margin-right'],
+  'margin-block': ['margin-block-start', 'margin-block-end', 'margin-top', 'margin-bottom'],
+  'padding-inline': ['padding-inline-start', 'padding-inline-end', 'padding-left', 'padding-right'],
+  'padding-block': ['padding-block-start', 'padding-block-end', 'padding-top', 'padding-bottom'],
+  'inset-inline': ['inset-inline-start', 'inset-inline-end', 'left', 'right'],
+  'inset-block': ['inset-block-start', 'inset-block-end', 'top', 'bottom'],
+  'border-inline': ['border-inline-start', 'border-inline-end', 'border-left', 'border-right'],
+  'border-block': ['border-block-start', 'border-block-end', 'border-top', 'border-bottom'],
+  'border-inline-width': ['border-inline-start-width', 'border-inline-end-width', 'border-left-width', 'border-right-width'],
+  'border-block-width': ['border-block-start-width', 'border-block-end-width', 'border-top-width', 'border-bottom-width'],
+  'border-inline-style': ['border-inline-start-style', 'border-inline-end-style', 'border-left-style', 'border-right-style'],
+  'border-block-style': ['border-block-start-style', 'border-block-end-style', 'border-top-style', 'border-bottom-style'],
+  'border-inline-color': ['border-inline-start-color', 'border-inline-end-color', 'border-left-color', 'border-right-color'],
+  'border-block-color': ['border-block-start-color', 'border-block-end-color', 'border-top-color', 'border-bottom-color'],
+};
+
+/**
+ * Returns all authored values for `property` in declaration order on a `CSSRule` or `CSSStyleDeclaration`.
+ *
+ * Preserves multiple declarations of the same property within a single rule (such as progressive-enhancement
+ * fallbacks like `grid-template-rows: auto; grid-template-rows: subgrid;`), resolves logical↔physical
+ * property aliases (`logical: true` by default), and inspects expanded or `var()`-bearing parent shorthands
+ * (`shorthands: true` by default).
+ */
+export function getPropertyValues(
+  target: CSSRule | CSSStyleDeclaration | null | undefined,
+  property: string,
+  options?: PropertyValueOptions,
+): string[] {
+  const style = target instanceof CSSStyleDeclaration
+    ? target
+    : (target && 'style' in target && target.style instanceof CSSStyleDeclaration ? target.style : null);
+  if (!style) return [];
+
+  const prop = property.startsWith('--') ? property : property.toLowerCase();
+  const useLogical = options?.logical !== false && !prop.startsWith('--');
+  const useShorthands = options?.shorthands !== false && !prop.startsWith('--');
+
+  const targetProps = new Set<string>([prop]);
+  const addLogicalEquivalents = (p: string) => {
+    const phys = (LOGICAL_MAPPING as Record<string, string>)[p];
+    if (phys) targetProps.add(phys);
+    const logs = PHYSICAL_TO_LOGICAL[p];
+    if (logs) {
+      for (const l of logs) targetProps.add(l);
+    }
+    const eq = LOGICAL_SHORTHAND_EQUIVALENTS[p];
+    if (eq) {
+      for (const item of eq) targetProps.add(item);
+    }
+  };
+
+  if (useLogical) {
+    addLogicalEquivalents(prop);
+  }
+
+  const parentShorthands = new Set<string>();
+  if (useShorthands) {
+    for (const tp of Array.from(targetProps)) {
+      for (const sh of LONGHAND_TO_SHORTHAND[tp] ?? []) parentShorthands.add(sh);
+      const shDef = SHORTHANDS[tp];
+      if (shDef) {
+        for (const lh of shDef.longhands) {
+          if (useLogical) addLogicalEquivalents(lh);
+          for (const sh of LONGHAND_TO_SHORTHAND[lh] ?? []) {
+            if (sh !== tp) parentShorthands.add(sh);
+          }
+        }
+      }
+    }
+  }
+
+  const values: string[] = [];
+  for (const d of style._rawDeclarations) {
+    const isCustom = d.name.startsWith('--');
+    if (targetProps.has(d.name)) {
+      const v = isCustom && d.raw !== undefined && d.raw.includes('/*')
+        ? d.raw.trim()
+        : serialize(d.value, isCustom).trim();
+      if (v) values.push(v);
+      continue;
+    }
+    if (!useShorthands) continue;
+    const shDef = SHORTHANDS[d.name];
+    if (!shDef || d.name === 'all') continue;
+
+    const rawText = serialize(d.value).trim();
+    const hasVar = rawText.includes('var(') || rawText.includes('env(');
+    const expanded = !hasVar ? shDef.expand(d.value) : null;
+    if (expanded) {
+      let matched = false;
+      for (const tp of targetProps) {
+        if (tp in expanded) {
+          const v = serialize(expanded[tp]).trim();
+          if (v) {
+            values.push(v);
+            matched = true;
+            break;
+          }
+        }
+      }
+      if (!matched && SHORTHANDS[prop]) {
+        const subSh = SHORTHANDS[prop];
+        if (subSh.longhands.every(lh => lh in expanded)) {
+          const contracted = subSh.contract(expanded);
+          if (contracted) values.push(contracted.trim());
+        }
+      }
+    } else if (parentShorthands.has(d.name) && rawText) {
+      values.push(rawText);
+    }
+  }
+
+  if (values.length === 0) {
+    for (const tp of targetProps) {
+      const v = style.getPropertyValue(tp).trim();
+      if (v) {
+        values.push(v);
+        break;
+      }
+    }
+  }
+
+  return values;
 }

@@ -60,7 +60,8 @@ export function calculateSpecificity(selector: string | SelectorList, parentSpec
     const tokens = tokenize(selector);
     const parser = new Parser(tokens);
     const componentValues = parser.parseComponentValues();
-    const selectorParser = new SelectorParser(componentValues, { allowRelative: true });
+    const allowUnknownPseudos = selector.includes(':global(') || selector.includes(':local(');
+    const selectorParser = new SelectorParser(componentValues, { allowRelative: true, allowUnknownPseudos });
     list = selectorParser.parse();
   } else {
     list = selector;
@@ -144,7 +145,7 @@ function calculatePseudoClassSpecificity(pseudo: PseudoClassSelector, parentSpec
   
   // selectors-4 #specificity-rules: replaced by specificity of most specific complex selector in argument
   // selectors-4 #matches, #negation, #relational
-  if (['is', 'not', 'has', 'matches'].includes(name)) {
+  if (['is', 'not', 'has', 'matches', 'global', 'local'].includes(name)) {
     return getArgumentSpecificity(pseudo, parentSpecificity);
   }
   

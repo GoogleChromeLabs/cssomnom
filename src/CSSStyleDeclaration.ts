@@ -23,7 +23,7 @@ import type { Declaration, ComponentValue } from './types.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
-import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES, FONT_FACE_DESCRIPTORS, PAGE_ALLOWED_PROPERTIES, PAGE_DESCRIPTOR_PROPERTIES } from './data/gen/property-list.ts';
+import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES, FONT_FACE_DESCRIPTORS, PAGE_ALLOWED_PROPERTIES, PAGE_DESCRIPTOR_PROPERTIES, POSITION_TRY_ALLOWED_PROPERTIES, POSITION_TRY_DESCRIPTOR_PROPERTIES } from './data/gen/property-list.ts';
 import { camelToDashed } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface } from './webidl.ts';
@@ -46,7 +46,7 @@ function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
         }
 
         if (prop.startsWith('--')) {
-          return t.getPropertyValue(prop);
+          return t._allowCustomProperties ? t.getPropertyValue(prop) : undefined;
         }
 
         const isCustomProp = prop.startsWith('--');
@@ -75,7 +75,7 @@ function createStyleProxy<T extends CSSStyleDeclaration>(target: T): T {
         }
 
         if (prop.startsWith('--')) {
-          t.setProperty(prop, value);
+          if (t._allowCustomProperties) t.setProperty(prop, value);
           return true;
         }
 
@@ -128,6 +128,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
   [index: number]: string;
   [property: string]: unknown;
   /** @internal */ _declarations: Declaration[];
+  /** @internal */ _rawDeclarations: Declaration[];
   /** @internal */ _declMap: Map<string, Declaration>;
   /** @internal */ _readonly: boolean = false;
   /** @internal */ _parentRule: CSSRule | null = null;
@@ -142,12 +143,23 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     return false;
   }
 
+  /** @internal */
+  get _allowCustomProperties(): boolean {
+    return true;
+  }
+
+  /** @internal */
+  protected get _allowImportant(): boolean {
+    return true;
+  }
+
   constructor(
     parentRuleOrDeclarations?: CSSRule | Declaration[] | null,
     onChangeOrReadonly?: ((force?: boolean) => void) | boolean | null
   ) {
     super();
     this._declarations = [];
+    this._rawDeclarations = [];
     this._declMap = new Map();
 
     let declarations: Declaration[] = [];
@@ -165,13 +177,18 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       }
     }
 
-    const addDeclarationRecursive = (decl: Declaration) => {
+    const addDeclarationRecursive = (decl: Declaration, isTopLevel = false) => {
       if (decl.name === '--') return;
+      if (decl.important && !this._allowImportant) return;
       const normalizedName = decl.name.startsWith('--') ? decl.name : decl.name.toLowerCase();
+      if (normalizedName.startsWith('--') && !this._allowCustomProperties) return;
       if (this._filterDeclarationsInConstructor && !normalizedName.startsWith('--') && !this._isPropertySupported(normalizedName)) {
         return;
       }
       decl.name = normalizedName;
+      if (isTopLevel) {
+        this._rawDeclarations.push(decl);
+      }
       const shorthand = SHORTHANDS[decl.name];
       if (shorthand) {
         const hasVar = serialize(decl.value).includes('var(') || serialize(decl.value).includes('env(');
@@ -195,7 +212,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     };
 
     for (const d of declarations) {
-      addDeclarationRecursive(d);
+      addDeclarationRecursive(d, true);
     }
     
     return createStyleProxy(this);
@@ -536,6 +553,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       throw new DOMException('Modification is disallowed', 'NoModificationAllowedError');
     }
     if (property === '--') return;
+    if (property.startsWith('--') && !this._allowCustomProperties) return;
     if (!property.startsWith('--')) property = property.toLowerCase();
     // 2. If property is not a custom property and not a supported CSS property, return.
     if (!property.startsWith('--') && !this._isPropertySupported(property)) {
@@ -548,6 +566,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       return;
     }
     const isImportant = normalizedPriority === 'important';
+    if (isImportant && !this._allowImportant) return;
 
     // 3. If value is the empty string (or null), invoke removeProperty(property) and return.
     if (value === null || value === '') {
@@ -614,6 +633,9 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
             this._setPropertyInternal(lh, serialize(val), normalizedPriority, false, property === 'all' || fromAll);
           }
           if (notify) {
+            const allLh = getShorthandAllLonghands(shorthand);
+            this._rawDeclarations = this._rawDeclarations.filter(d => d.name !== property && !allLh.includes(d.name));
+            this._rawDeclarations.push({ type: 'declaration', name: property, value: compVals, important: isImportant });
             this._onChange?.();
           }
           return;
@@ -677,6 +699,14 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     }
 
     if (notify) {
+      this._rawDeclarations = this._rawDeclarations.filter(d => d.name !== property);
+      this._rawDeclarations.push({
+        type: 'declaration',
+        name: property,
+        value: componentValues,
+        important: isImportant,
+        raw: property.startsWith('--') ? (valueStr ?? undefined) : undefined,
+      });
       this._onChange?.();
     }
   }
@@ -690,6 +720,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     if (property === 'all') {
       const value = this.getPropertyValue('all');
       let changed = false;
+      this._rawDeclarations = this._rawDeclarations.filter(d => d.name === 'direction' || d.name === 'unicode-bidi' || d.name.startsWith('--'));
       for (let i = this._declarations.length - 1; i >= 0; i--) {
         const d = this._declarations[i];
         if (d.name !== 'direction' && d.name !== 'unicode-bidi' && !d.name.startsWith('--')) {
@@ -710,6 +741,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
       const allLh = shorthand.logicalLonghands
         ? [...shorthand.longhands, ...shorthand.logicalLonghands]
         : shorthand.longhands;
+      this._rawDeclarations = this._rawDeclarations.filter(d => d.name !== property && !allLh.includes(d.name));
       let changed = false;
       for (const lh of allLh) {
         if (this._declMap.has(lh)) {
@@ -734,6 +766,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     }
 
     const value = this.getPropertyValue(property);
+    this._rawDeclarations = this._rawDeclarations.filter(d => d.name !== property);
     const index = this._declarations.findIndex(d => d.name === property);
     if (index !== -1) {
       this._declarations.splice(index, 1);
@@ -760,11 +793,18 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
     if (!newStyle) return false;
 
     this._declarations.length = 0;
+    this._rawDeclarations = newStyle._rawDeclarations.filter(d => {
+      if (d.important && !this._allowImportant) return false;
+      if (d.name.startsWith('--')) return this._allowCustomProperties;
+      return this._isPropertySupported(d.name.toLowerCase());
+    });
     this._declMap.clear();
 
     for (const d of newStyle._declarations) {
       if (d.name === '--') continue;
+      if (d.important && !this._allowImportant) continue;
       const normalizedName = d.name.startsWith('--') ? d.name : d.name.toLowerCase();
+      if (normalizedName.startsWith('--') && !this._allowCustomProperties) continue;
       if (!normalizedName.startsWith('--') && !this._isPropertySupported(normalizedName)) {
         continue;
       }
@@ -880,23 +920,52 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
 }
 
 // WebIDL #es-attributes
-for (const prop of PAGE_DESCRIPTOR_PROPERTIES) {
-  const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
-  Object.defineProperty(CSSPageDescriptors.prototype, prop, {
-    get(this: unknown): string {
-      return (this as CSSPageDescriptors).getPropertyValue(cssProp);
-    },
-    set(this: unknown, val: unknown): void {
-      (this as CSSPageDescriptors).setProperty(cssProp, val === null || val === undefined ? '' : String(val));
-    },
-    enumerable: true,
-    configurable: true,
-  });
+function defineDescriptorProperties(proto: CSSStyleDeclaration, props: readonly string[]) {
+  for (const prop of props) {
+    const cssProp = prop.replace(/([A-Z])/g, '-$1').toLowerCase();
+    Object.defineProperty(proto, prop, {
+      get(this: CSSStyleDeclaration): string {
+        return this.getPropertyValue(cssProp);
+      },
+      set(this: CSSStyleDeclaration, val: unknown): void {
+        this.setProperty(cssProp, val === null || val === undefined ? '' : String(val));
+      },
+      enumerable: true,
+      configurable: true,
+    });
+  }
 }
+
+defineDescriptorProperties(CSSPageDescriptors.prototype, PAGE_DESCRIPTOR_PROPERTIES);
+
+// css-anchor-position-1 #om-position-try
+export class CSSPositionTryDescriptors extends CSSStyleDeclaration {
+  /** @internal */
+  protected override get _filterDeclarationsInConstructor(): boolean { return true; }
+  /** @internal */
+  override get _allowCustomProperties(): boolean { return false; }
+  /** @internal */
+  protected override get _allowImportant(): boolean { return false; }
+
+  constructor(declarations?: Declaration[], internalToken?: symbol) {
+    if (internalToken !== PAGE_DESCRIPTORS_INTERNAL) {
+      throw new TypeError('Illegal constructor');
+    }
+    super(declarations);
+  }
+
+  /** @internal */
+  override _isPropertySupported(property: string): boolean {
+    return POSITION_TRY_ALLOWED_PROPERTIES.has(property);
+  }
+}
+
+defineDescriptorProperties(CSSPositionTryDescriptors.prototype, POSITION_TRY_DESCRIPTOR_PROPERTIES);
 
 export class CSSMarginDescriptors extends CSSStyleDeclaration {}
 
 applyWebIDLInterface(CSSFontFaceDescriptors);
 applyWebIDLInterface(CSSPageDescriptors);
+applyWebIDLInterface(CSSPositionTryDescriptors);
 applyWebIDLInterface(CSSMarginDescriptors);
 

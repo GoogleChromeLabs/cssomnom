@@ -132,6 +132,8 @@ export interface SelectorParserOptions {
   strictSupports?: boolean;
   /** Allows any `^-[a-zA-Z0-9]+-` vendor-prefixed pseudo-class or pseudo-element (`:-moz-*`, `::-moz-*`, `:-ms-*`). */
   allowVendorPseudos?: boolean;
+  /** Allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`, `:global(...)`, `:local(...)`) without throwing `SyntaxError`. */
+  allowUnknownPseudos?: boolean;
 }
 
 /**
@@ -154,6 +156,7 @@ export class SelectorParser {
   private declaredNamespaces?: Set<string>;
   private strictSupports: boolean;
   private allowVendorPseudos: boolean;
+  private allowUnknownPseudos: boolean;
 
   constructor(values: ComponentValue[], options: SelectorParserOptions = {}) {
     this.cursor = new ComponentValueCursor(values);
@@ -164,6 +167,7 @@ export class SelectorParser {
     this.declaredNamespaces = options.declaredNamespaces;
     this.strictSupports = options.strictSupports ?? false;
     this.allowVendorPseudos = options.allowVendorPseudos ?? false;
+    this.allowUnknownPseudos = options.allowUnknownPseudos ?? false;
   }
 
 
@@ -611,7 +615,7 @@ export class SelectorParser {
         // selectors-4 #pseudo-elements
         // selectors-4 Appendix B Quirks: -webkit- prefixed pseudo-elements
         const isAllowedVendor = (this.allowVendorPseudos && isVendorPrefixed) || (!this.strictSupports && effectiveLowerName.startsWith('-webkit-'));
-        if (!PSEUDO_ELEMENTS.has(effectiveLowerName) && !isAllowedVendor) {
+        if (!PSEUDO_ELEMENTS.has(effectiveLowerName) && !isAllowedVendor && !this.allowUnknownPseudos) {
           throw new DOMException(`Unknown pseudo-element ::${name}`, 'SyntaxError');
         }
         return { type: 'pseudo-element-selector', name };
@@ -629,7 +633,7 @@ export class SelectorParser {
       // selectors-4 #pseudo-classes
       // selectors-4 Appendix B Quirks: -webkit- prefixed pseudo-classes
       const isAllowedVendor = (this.allowVendorPseudos && isVendorPrefixed) || (!this.strictSupports && effectiveLowerName.startsWith('-webkit-'));
-      if (!PSEUDO_CLASSES.has(effectiveLowerName) && !isAllowedVendor) {
+      if (!PSEUDO_CLASSES.has(effectiveLowerName) && !isAllowedVendor && !this.allowUnknownPseudos) {
         throw new DOMException(`Unknown pseudo-class :${name}`, 'SyntaxError');
       }
       return { type: 'pseudo-class-selector', name };
@@ -644,7 +648,7 @@ export class SelectorParser {
           throw new DOMException('Pseudo-elements are not allowed in this context', 'SyntaxError');
         }
         // selectors-4 #pseudo-elements
-        if (!PSEUDO_ELEMENTS.has(lowerName) && !(this.allowVendorPseudos && isVendorPrefixed)) {
+        if (!PSEUDO_ELEMENTS.has(lowerName) && !(this.allowVendorPseudos && isVendorPrefixed) && !this.allowUnknownPseudos) {
           throw new DOMException(`Unknown pseudo-element ::${name}()`, 'SyntaxError');
         }
         
@@ -654,7 +658,8 @@ export class SelectorParser {
             forbidPseudo: true,
             declaredNamespaces: this.declaredNamespaces,
             strictSupports: this.strictSupports,
-            allowVendorPseudos: this.allowVendorPseudos
+            allowVendorPseudos: this.allowVendorPseudos,
+            allowUnknownPseudos: this.allowUnknownPseudos
           });
           subParser.cursor.skipWhitespace();
           const compound = subParser.consumeCompoundSelector();
@@ -676,12 +681,12 @@ export class SelectorParser {
       }
       
       // selectors-4 #pseudo-classes
-      if (!PSEUDO_CLASSES.has(lowerName) && lowerName !== 'matches' && !(this.allowVendorPseudos && isVendorPrefixed)) {
+      if (!PSEUDO_CLASSES.has(lowerName) && lowerName !== 'matches' && !(this.allowVendorPseudos && isVendorPrefixed) && !this.allowUnknownPseudos) {
         throw new DOMException(`Unknown pseudo-class :${name}()`, 'SyntaxError');
       }
       
       // For functional pseudo-classes, some take selector lists
-      if (['is', 'not', 'has', 'where', 'matches'].includes(lowerName)) {
+      if (['is', 'not', 'has', 'where', 'matches', 'global', 'local'].includes(lowerName)) {
         // selectors-4 #relational: :has() cannot be nested within :has() and forbids pseudo-elements
         const isHas = lowerName === 'has';
         if (isHas && this.insideHas) {
@@ -696,7 +701,8 @@ export class SelectorParser {
           forbidPseudo: isLogicalPseudo || isHas || this.forbidPseudo,
           declaredNamespaces: this.declaredNamespaces,
           strictSupports: this.strictSupports,
-          allowVendorPseudos: this.allowVendorPseudos
+          allowVendorPseudos: this.allowVendorPseudos,
+          allowUnknownPseudos: this.allowUnknownPseudos
         });
         return { type: 'pseudo-class-selector', name, argument: subParser.parse() };
       }
@@ -707,7 +713,8 @@ export class SelectorParser {
           forbidPseudo: true,
           declaredNamespaces: this.declaredNamespaces,
           strictSupports: this.strictSupports,
-          allowVendorPseudos: this.allowVendorPseudos
+          allowVendorPseudos: this.allowVendorPseudos,
+          allowUnknownPseudos: this.allowUnknownPseudos
         });
         subParser.cursor.skipWhitespace();
         const compound = subParser.consumeCompoundSelector();
@@ -747,7 +754,8 @@ export class SelectorParser {
             allowRelative: false,
             declaredNamespaces: this.declaredNamespaces,
             strictSupports: this.strictSupports,
-            allowVendorPseudos: this.allowVendorPseudos
+            allowVendorPseudos: this.allowVendorPseudos,
+            allowUnknownPseudos: this.allowUnknownPseudos
           });
           return { type: 'pseudo-class-selector', name, argument: subParserOf.parse(), nth };
         } else {

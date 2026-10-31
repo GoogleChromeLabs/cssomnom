@@ -16,6 +16,7 @@
  */
 
 import { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
+import { CSSStyleSheet } from '../CSSOM.ts';
 import { tokenize } from '../tokenizer.ts';
 import { serialize } from '../serializer.ts';
 import { isElement } from '../matcher.ts';
@@ -24,7 +25,7 @@ import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapp
 import { COLOR_PROPERTIES } from '../data/gen/cascade-data.ts';
 import { HTML_UA_STYLESHEET_TEXT } from '../data/gen/ua-stylesheet.ts';
 import { consumeListOfRules, parseComponentValues } from '../parser.ts';
-import type { Rule, Declaration, InternalStyleDeclaration, ElementLike } from '../types.ts';
+import type { Rule, Declaration, InternalStyleDeclaration, ElementLike, MediaEnvironment } from '../types.ts';
 import type { CSSRuleList } from '../rules/collections.ts';
 import type { MatchedDeclaration } from './types.ts';
 
@@ -136,12 +137,18 @@ const emptyLayerOrder = new Map<string, number>();
  */
 export function getCascadedStyle(
   element?: ElementLike | null,
-  rules?: Rule[] | CSSRuleList,
-  pseudoElement?: string | null
+  rules?: CSSStyleSheet | Rule[] | CSSRuleList | null,
+  pseudoElementOrEnv?: string | null | Partial<MediaEnvironment>,
+  envOptions?: Partial<MediaEnvironment>
 ): CSSStyleDeclaration {
   if (!element || typeof element !== 'object') {
     return new CSSStyleDeclaration([], true);
   }
+
+  const pseudoElement = typeof pseudoElementOrEnv === 'string' ? pseudoElementOrEnv : null;
+  const effectiveEnvOptions = (typeof pseudoElementOrEnv === 'object' && pseudoElementOrEnv !== null)
+    ? pseudoElementOrEnv
+    : envOptions;
 
   let normalizedPseudoStr: string | null = null;
   if (typeof pseudoElement === 'string' && pseudoElement !== '') {
@@ -164,7 +171,23 @@ export function getCascadedStyle(
   }
 
   // 2. Discover @layer ordering (css-cascade-5 #layer-ordering)
-  const env = resolveMediaEnvironment(element);
+  const baseEnv = resolveMediaEnvironment(element);
+  let env = baseEnv;
+  if (effectiveEnvOptions) {
+    const w = effectiveEnvOptions.width ?? baseEnv?.width ?? 800;
+    const h = effectiveEnvOptions.height ?? baseEnv?.height ?? 600;
+    env = {
+      ...baseEnv,
+      width: w,
+      height: h,
+      deviceWidth: effectiveEnvOptions.deviceWidth ?? w,
+      deviceHeight: effectiveEnvOptions.deviceHeight ?? h,
+      aspectRatio: effectiveEnvOptions.aspectRatio ?? [w, h],
+      deviceAspectRatio: effectiveEnvOptions.deviceAspectRatio ?? [w, h],
+      orientation: effectiveEnvOptions.orientation ?? (w > h ? 'landscape' : 'portrait'),
+      ...effectiveEnvOptions,
+    };
+  }
   const layerDeclarationOrder = getLayerDeclarationOrder(ruleList, env);
   const { activeProperties, activeKeyframes } = collectActiveAtRules(ruleList, layerDeclarationOrder, env);
 
@@ -178,7 +201,8 @@ export function getCascadedStyle(
     cachedUaRules,
     emptyLayerOrder,
     normalizedPseudoStr,
-    'user-agent'
+    'user-agent',
+    env
   );
 
   // 3b. Author origin rules
@@ -187,7 +211,8 @@ export function getCascadedStyle(
     ruleList,
     layerDeclarationOrder,
     normalizedPseudoStr,
-    'author'
+    'author',
+    env
   );
 
   const matchedDeclarations: MatchedDeclaration[] = [...uaDeclarations, ...authorDeclarations];
@@ -212,7 +237,7 @@ export function getCascadedStyle(
 
   const parentNode = element.parentElement ?? (element.parentNode && isElement(element.parentNode) ? element.parentNode : null);
   const rootNode = element.ownerDocument?.documentElement;
-  const parentCascaded = parentNode ? getCascadedStyle(parentNode, rules) : null;
+  const parentCascaded = parentNode ? getCascadedStyle(parentNode, rules, null, effectiveEnvOptions) : null;
 
   if (parentCascaded) {
     const pWm = parentCascaded.getPropertyValue('writing-mode');
@@ -248,7 +273,7 @@ export function getCascadedStyle(
       }
     }
   } else if (rootNode && rootNode !== element) {
-    const rootCascaded = getCascadedStyle(rootNode, rules);
+    const rootCascaded = getCascadedStyle(rootNode, rules, null, effectiveEnvOptions);
     for (let i = 0; i < rootCascaded.length; i++) {
       const name = rootCascaded.item(i);
       if (name.startsWith('--')) {

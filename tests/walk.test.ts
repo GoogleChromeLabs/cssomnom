@@ -32,13 +32,18 @@ import {
   CSSKeyframeRule,
   CSSNestedDeclarations,
   CSSPageRule,
+  CSSPositionTryRule,
+  CSSPositionTryDescriptors,
   CSSAtRule,
   getRules,
   closestRule,
   resolveSelector,
   parseSelectorAST,
   getDeclaredProperties,
+  getPropertyValues,
+  getCascadedStyle,
 } from '../src/index.ts';
+import { parseHTML } from 'linkedom';
 
 describe('src/walk.ts: Pure-CSSOM Traversal, Selector Resolution, and Property Queries', () => {
   it('collects all rules in depth-first pre-order and filters by ruleClass when specified', () => {
@@ -333,5 +338,105 @@ describe('src/walk.ts: Pure-CSSOM Traversal, Selector Resolution, and Property Q
     assert.equal(cFirst.location?.column, 1);
     assert.equal(cSecond.location?.line, 5);
     assert.equal(cSecond.location?.column, 1);
+  });
+
+  it('getPropertyValues returns same-rule fallbacks, logical/physical aliases, and var() shorthands', () => {
+    const sheet = parse(`
+      .subgrid {
+        grid-template-rows: auto;
+        grid-template-rows: subgrid;
+      }
+      .logical {
+        margin-inline-start: 1rem;
+        padding-block: 8px 16px;
+      }
+      .var-shorthand {
+        border: 1px solid var(--border-color);
+      }
+    `);
+    const [subgridRule, logicalRule, varRule] = getRules(sheet, CSSStyleRule);
+
+    assert.deepEqual(getPropertyValues(subgridRule, 'grid-template-rows'), ['auto', 'subgrid']);
+    assert.deepEqual(getPropertyValues(logicalRule, 'margin-left'), ['1rem']);
+    assert.deepEqual(getPropertyValues(logicalRule, 'margin-inline-start'), ['1rem']);
+    assert.deepEqual(getPropertyValues(logicalRule, 'padding-top'), ['8px']);
+    assert.deepEqual(getPropertyValues(logicalRule, 'padding-bottom'), ['16px']);
+    assert.deepEqual(getPropertyValues(logicalRule, 'margin-left', { logical: false }), []);
+    assert.deepEqual(getPropertyValues(varRule, 'border-color'), ['1px solid var(--border-color)']);
+    assert.deepEqual(getPropertyValues(varRule, 'border-top-color'), ['1px solid var(--border-color)']);
+    assert.equal(getDeclaredProperties(sheet).has('border-color'), true);
+  });
+
+  it('allowUnknownPseudos permits :tool-form-active and :global(...) selectors and cascade matching', () => {
+    const css = `
+      form:tool-form-active { outline: 2px solid blue; }
+      :global(.card) > .title { color: green; }
+    `;
+    assert.equal(getRules(parse(css), CSSStyleRule).length, 0);
+
+    const sheet = parse(css, { allowUnknownPseudos: true });
+    const rules = getRules(sheet, CSSStyleRule);
+    assert.equal(rules.length, 2);
+    assert.equal(rules[0].selectorText, 'form:tool-form-active');
+    assert.equal(rules[1].selectorText, ':global(.card) > .title');
+
+    const ast = parseSelectorAST(rules[0], { allowUnknownPseudos: true });
+    assert.ok(ast);
+
+    const { document } = parseHTML('<div class="card"><h2 class="title">Hello</h2></div>');
+    const titleEl = document.querySelector('.title');
+    const cascaded = getCascadedStyle(titleEl, sheet);
+    assert.equal(cascaded.getPropertyValue('color'), 'rgb(0, 128, 0)');
+  });
+
+  it('parses @position-try into CSSPositionTryRule with CSSPositionTryDescriptors', () => {
+    const sheet = parse(`
+      @position-try --bottom-right {
+        top: anchor(bottom);
+        left: anchor(right);
+        margin: 4px;
+        position-area: bottom right;
+        color: red;
+        --disallowed: 1;
+        width: 100px !important;
+      }
+    `);
+    const rules = getRules(sheet, CSSPositionTryRule);
+    assert.equal(rules.length, 1);
+    const rule = rules[0];
+    assert.equal(rule.name, '--bottom-right');
+    assert.equal(rule.style instanceof CSSPositionTryDescriptors, true);
+    assert.equal(rule.style.top, 'anchor(bottom)');
+    assert.equal(rule.style.left, 'anchor(right)');
+    assert.equal(rule.style.positionArea, 'bottom right');
+    assert.equal(rule.style.getPropertyValue('color'), '');
+    assert.equal(rule.style.getPropertyValue('--disallowed'), '');
+    assert.equal(rule.style.getPropertyValue('width'), '');
+  });
+
+  it('getCascadedStyle accepts CSSStyleSheet directly and MediaEnvironment overrides', () => {
+    const sheet = parse(`
+      .box {
+        width: 200px;
+        transition: opacity 0.3s;
+      }
+      @media (max-width: 600px) {
+        .box { width: 100px; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .box { transition: none; }
+      }
+    `);
+    const { document } = parseHTML('<div class="box"></div>');
+    const box = document.querySelector('.box');
+
+    const defaultStyle = getCascadedStyle(box, sheet);
+    assert.equal(defaultStyle.getPropertyValue('width'), '200px');
+
+    const mobileStyle = getCascadedStyle(box, sheet, { width: 480 });
+    assert.equal(mobileStyle.getPropertyValue('width'), '100px');
+
+    const reducedMotionStyle = getCascadedStyle(box, sheet, { prefersReducedMotion: 'reduce' });
+    assert.equal(reducedMotionStyle.getPropertyValue('transition'), 'none');
   });
 });

@@ -16,8 +16,8 @@
  */
 
 import { CSSRule, CSSGroupingRule } from './base.ts';
-import { CSSStyleDeclaration, CSSKeyframeStyleDeclaration, CSSFontFaceDescriptors, CSSPageDescriptors, PAGE_DESCRIPTORS_INTERNAL, CSSMarginDescriptors } from '../CSSStyleDeclaration.ts';
-export { CSSFontFaceDescriptors, CSSPageDescriptors, CSSMarginDescriptors } from '../CSSStyleDeclaration.ts';
+import { CSSStyleDeclaration, CSSKeyframeStyleDeclaration, CSSFontFaceDescriptors, CSSPageDescriptors, CSSPositionTryDescriptors, PAGE_DESCRIPTORS_INTERNAL, CSSMarginDescriptors } from '../CSSStyleDeclaration.ts';
+export { CSSFontFaceDescriptors, CSSPageDescriptors, CSSPositionTryDescriptors, CSSMarginDescriptors } from '../CSSStyleDeclaration.ts';
 import { ParseHooks } from '../parse-hooks.ts';
 import { serialize, serializeString, serializeIdentifier } from '../serializer.ts';
 import { tokenize } from '../tokenizer.ts';
@@ -955,11 +955,40 @@ for (const [, prop] of FONT_FEATURE_VALUE_MAP_DEFS) {
   });
 }
 
+// css-anchor-position-1 #om-position-try
+export class CSSPositionTryRule extends CSSRule {
+  /** @internal */ _name: string;
+  /** @internal */ _style: CSSPositionTryDescriptors;
+
+  constructor(name: string, declarations: Declaration[], internalToken?: symbol) {
+    if (internalToken !== INTERNAL_RULE_TOKEN) {
+      throw new TypeError('Illegal constructor');
+    }
+    super();
+    this._name = name;
+    this._style = new CSSPositionTryDescriptors(declarations, PAGE_DESCRIPTORS_INTERNAL);
+    this._style._parentRule = this;
+    hideInternalFields(this);
+  }
+
+  get name(): string { return serializeIdentifier(this._name); }
+  get style(): CSSPositionTryDescriptors { return this._style; }
+  set style(value: string) { this._style.cssText = value; }
+
+  get cssText(): string {
+    const body = this._style.cssText.trim();
+    return `@position-try ${this.name} { ${body ? body + ' ' : ''}}`;
+  }
+
+  set cssText(_value: string) {}
+}
+
 for (const ctor of [
   CSSAtRule, CSSConditionRule, CSSFontFeatureValuesMap, CSSMediaRule, CSSSupportsRule, CSSContainerRule,
   CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule,
   CSSKeyframeRule, CSSNestedDeclarations, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule,
   CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule, CSSFontFaceRule, CSSPageRule,
+  CSSPositionTryRule,
 ]) {
   applyWebIDLInterface(ctor as Function);
 }

@@ -23,7 +23,7 @@ import { tokenize } from './tokenizer.ts';
 import { CSSRule, CSSGroupingRule } from './rules/base.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { MediaList } from './rules/collections.ts';
-import { CSSFontFaceRule, CSSPageRule, CSSAtRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule } from './rules/at-rules.ts';
+import { CSSFontFaceRule, CSSPageRule, CSSPositionTryRule, CSSAtRule, CSSMediaRule, CSSSupportsRule, CSSContainerRule, CSSLayerBlockRule, CSSLayerStatementRule, CSSStartingStyleRule, CSSViewTransitionRule, CSSKeyframesRule, CSSKeyframeRule, CSSNestedDeclarations, CSSMarginRule, CSSImportRule, CSSNamespaceRule, CSSPropertyRule, CSSScopeRule, CSSCounterStyleRule, CSSFontFeatureValuesRule, CSSCustomMediaRule } from './rules/at-rules.ts';
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { isGrammaticallyValidSupportsCondition } from './rules/utils.ts';
 import { INTERNAL_RULE_TOKEN } from './internal-token.ts';
@@ -38,6 +38,8 @@ export interface ParserOptions {
   atRules?: Record<string, string>;
   /** When `true`, allows non-`-webkit-` vendor-prefixed pseudo-classes and pseudo-elements (such as `:-moz-*`, `::-moz-*`, `:-ms-*`) in selector lists instead of rejecting them as invalid selectors. */
   allowVendorPseudos?: boolean;
+  /** When `true`, allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`, `:global(...)`, `:local(...)`) in selector lists instead of rejecting them as invalid selectors. */
+  allowUnknownPseudos?: boolean;
   /** Original CSS source text used to lazily compute 1-based `line` and `column` offsets on `rule.location`. Automatically populated by `parse(css)`. */
   source?: string;
 }
@@ -52,6 +54,8 @@ export type SelectorASTOptions = {
   allowRelative?: boolean;
   /** When `true`, allows non-`-webkit-` vendor-prefixed pseudo-classes and pseudo-elements (such as `:-moz-*` and `:-ms-*`). */
   allowVendorPseudos?: boolean;
+  /** When `true`, allows unknown or emerging pseudo-classes and pseudo-elements (e.g. `:tool-form-active`, `:global(...)`, `:local(...)`). */
+  allowUnknownPseudos?: boolean;
   /** When `input` is a `CSSRule`, resolves nested `&` and relative selectors against enclosing ancestor rules before parsing (defaults to `true`). */
   resolveNesting?: boolean;
 };
@@ -111,7 +115,7 @@ function splitLeadingDeclarations(blockContents: Rule[]): { declarations: Declar
   for (let i = 0; i < blockContents.length; i++) {
     const item = blockContents[i];
     if (i === 0 && item instanceof CSSNestedDeclarations) {
-      declarations.push(...item.style._declarations);
+      declarations.push(...item.style._rawDeclarations);
     } else {
       nestedRules.push(item);
     }
@@ -171,6 +175,7 @@ export class Parser {
     'counter-style': (parser, rule, block) => block ? parser.handleCounterStyleRule(rule, block) : null,
     'font-feature-values': (parser, rule, block) => block ? parser.handleFontFeatureValuesRule(rule, block) : null,
     'custom-media': (parser, rule) => parser.handleCustomMediaRule(rule),
+    'position-try': (parser, rule, block) => block ? parser.handlePositionTryRule(rule, block) : null,
   };
 
   private getAtRuleHandler(name: string): ((parser: Parser, rule: ASTAtRule, block?: SimpleBlock, nested?: boolean) => Rule | null) | undefined {
@@ -183,7 +188,7 @@ export class Parser {
     return Parser.AT_RULE_HANDLERS[name];
   }
 
-  private static readonly NESTED_GROUP_AT_RULES = /* @__PURE__ */ new Set('media,supports,container,layer,scope,starting-style,keyframes,property,counter-style,font-feature-values,view-transition'.split(','));
+  private static readonly NESTED_GROUP_AT_RULES = /* @__PURE__ */ new Set('media,supports,container,layer,scope,starting-style,keyframes,property,counter-style,font-feature-values,view-transition,position-try'.split(','));
 
   // css-nesting-1 #conditionals
   // css-syntax-3 #charset-rule & #consume-at-rule
@@ -731,6 +736,15 @@ export class Parser {
     return new CSSPropertyRule(name, syntax, inherits, initialValue);
   }
 
+  // css-anchor-position-1 #fallback-rule
+  private handlePositionTryRule(rule: ASTAtRule, block: SimpleBlock): Rule | null {
+    const nonWsPrelude = trimComponentValues(rule.prelude, true);
+    if (nonWsPrelude.length !== 1 || nonWsPrelude[0].type !== 'ident') return null;
+    const name = nonWsPrelude[0].value;
+    if (!isValidDashedIdent(name)) return null;
+    return new CSSPositionTryRule(name, this.consumeDeclarationsFromBlockContents(block.value), INTERNAL_RULE_TOKEN);
+  }
+
   private parseImportScopeArgs(scopeArgs: ComponentValue[]): { scopeStart: string | null; scopeEnd: string | null } {
     let scopeStart: string | null = null;
     let scopeEnd: string | null = null;
@@ -1024,7 +1038,10 @@ export class Parser {
         }
         if (next.type === 'simple-block' && (next as SimpleBlock).associatedToken?.type === '{') {
           const selectorCandidate = serialize(lookaheadTokens).trim();
-          return Parser.parseSelectorAST(selectorCandidate) === null;
+          return Parser.parseSelectorAST(selectorCandidate, {
+            allowVendorPseudos: Boolean(this.options.allowVendorPseudos),
+            allowUnknownPseudos: Boolean(this.options.allowUnknownPseudos),
+          }) === null;
         }
         lookaheadTokens.push(stream.next());
       }
@@ -1222,7 +1239,8 @@ export class Parser {
       selectorAST = Parser.parseSelectorAST(selectorText, {
         declaredNamespaces: this.declaredNamespaces,
         allowRelative: true,
-        allowVendorPseudos: Boolean(this.options.allowVendorPseudos)
+        allowVendorPseudos: Boolean(this.options.allowVendorPseudos),
+        allowUnknownPseudos: Boolean(this.options.allowUnknownPseudos),
       });
       if (selectorAST === null) return null;
     } else {
@@ -1231,7 +1249,8 @@ export class Parser {
         selectorAST = new SelectorParser(prelude, {
           declaredNamespaces: this.declaredNamespaces,
           allowRelative,
-          allowVendorPseudos: Boolean(this.options.allowVendorPseudos)
+          allowVendorPseudos: Boolean(this.options.allowVendorPseudos),
+          allowUnknownPseudos: Boolean(this.options.allowUnknownPseudos),
         }).parse();
       } catch {
         return null;
@@ -1257,7 +1276,7 @@ export class Parser {
 
   public static parseSelectorAST(
     text: string,
-    options?: { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean }
+    options?: { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean; allowUnknownPseudos?: boolean }
   ): SelectorList | null;
   public static parseSelectorAST(
     text: string,
@@ -1267,7 +1286,7 @@ export class Parser {
   ): SelectorList | null;
   public static parseSelectorAST(
     text: string,
-    declaredNamespacesOrOptions?: Set<string> | { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean },
+    declaredNamespacesOrOptions?: Set<string> | { declaredNamespaces?: Set<string>; allowRelative?: boolean; allowVendorPseudos?: boolean; allowUnknownPseudos?: boolean },
     allowRelative = false,
     allowVendorPseudos = false
   ): SelectorList | null {
@@ -1275,8 +1294,9 @@ export class Parser {
     const declaredNamespaces = isOptionsObj ? declaredNamespacesOrOptions.declaredNamespaces : declaredNamespacesOrOptions;
     const isRelative = isOptionsObj ? (declaredNamespacesOrOptions.allowRelative ?? false) : allowRelative;
     const vendorPseudos = isOptionsObj ? (declaredNamespacesOrOptions.allowVendorPseudos ?? false) : allowVendorPseudos;
+    const unknownPseudos = isOptionsObj ? (declaredNamespacesOrOptions.allowUnknownPseudos ?? false) : false;
 
-    const parser = new Parser(tokenize(text), { allowVendorPseudos: vendorPseudos });
+    const parser = new Parser(tokenize(text), { allowVendorPseudos: vendorPseudos, allowUnknownPseudos: unknownPseudos });
     const prelude = Parser.#consumeSelectorTokens(parser);
     if (prelude === null) return null;
 
@@ -1284,7 +1304,8 @@ export class Parser {
       return new SelectorParser(prelude, {
         allowRelative: isRelative,
         declaredNamespaces,
-        allowVendorPseudos: vendorPseudos
+        allowVendorPseudos: vendorPseudos,
+        allowUnknownPseudos: unknownPseudos,
       }).parse();
     } catch {
       return null;

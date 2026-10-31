@@ -607,6 +607,7 @@ for (const ctor of cssomClasses) {
 export {
   CSSFontFaceDescriptors,
   CSSPageDescriptors,
+  CSSPositionTryDescriptors,
   CSSMarginDescriptors,
   CSSConditionRule,
   CSSMediaRule,
@@ -626,6 +627,7 @@ export {
   CSSImportRule,
   CSSNamespaceRule,
   CSSPageRule,
+  CSSPositionTryRule,
   CSSPropertyRule,
   CSSCounterStyleRule,
   CSSFontFeatureValuesMap,

@@ -117,7 +117,8 @@ function parseSelector(selector: string | ComplexSelector | SelectorList): Selec
     const tokens = tokenize(selector);
     const parser = new Parser(tokens);
     const componentValues = parser.parseComponentValues();
-    const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false });
+    const allowUnknownPseudos = selector.includes(':global(') || selector.includes(':local(');
+    const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: false, allowUnknownPseudos });
     const result = selectorParser.parse();
     if (selectorCache.size >= SELECTOR_CACHE_MAX_SIZE) {
       const oldestKey = selectorCache.keys().next().value;
@@ -523,7 +524,7 @@ function matchPseudoClassSelector(element: DOMElement, pseudo: PseudoClassSelect
   }
 
   // selectors-4 #matches (:is, :matches) & #zero-matches (:where)
-  if (name === 'is' || name === 'where' || name === 'matches') {
+  if (name === 'is' || name === 'where' || name === 'matches' || name === 'global' || name === 'local') {
     if (pseudo.argument && typeof pseudo.argument === 'object' && 'type' in pseudo.argument && pseudo.argument.type === 'selector-list') {
       for (const complex of pseudo.argument.selectors) {
         if (complex.type === 'invalid-selector') continue;
