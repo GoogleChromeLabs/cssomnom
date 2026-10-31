@@ -37,10 +37,6 @@ export class StyleSheetList {
     return this._sheets[index] || null;
   }
 
-  get [Symbol.toStringTag](): string {
-    return 'StyleSheetList';
-  }
-
   *[Symbol.iterator](): Iterator<CSSStyleSheet> {
     for (let i = 0; i < this.length; i++) {
       yield this._sheets[i];
@@ -61,10 +57,6 @@ export class MediaList {
   constructor(mediaText: string = '') {
     this.mediaText = mediaText;
     return createIndexedProxy(this, (t) => t._mediaQueries.map(q => ParseHooks.serializeMediaQuery(q)));
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'MediaList';
   }
 
   get mediaText(): string {
@@ -149,10 +141,6 @@ export class CSSRuleList {
 
   item(index: number): CSSRule | null {
     return (this._getRules()[index] as CSSRule) || null;
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSRuleList';
   }
 
   *[Symbol.iterator](): Iterator<CSSRule> {

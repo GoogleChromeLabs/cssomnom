@@ -17,6 +17,8 @@
 
 import {
   parse,
+  getRules,
+  closestRule,
   parseSelectorAST,
   CSSRule,
   CSSStyleRule,
@@ -138,13 +140,6 @@ export function stripStatefulPseudos(complex: ComplexSelector): ComplexSelector 
   return items.length > 0 ? { type: 'complex-selector', items, tokens: [] } : null;
 }
 
-function getEnclosingRuleContext(rule: CSSRule): CSSStyleRule | CSSScopeRule | null {
-  for (let curr = rule.parentRule; curr; curr = curr.parentRule) {
-    if (curr instanceof CSSStyleRule || curr instanceof CSSScopeRule) return curr;
-  }
-  return null;
-}
-
 function getStrippedBaseSelectors(rule: CSSStyleRule): string[] {
   const bases: string[] = [];
   const ast = parseSelectorAST(rule, { resolveNesting: false });
@@ -222,33 +217,23 @@ function extractFontFamilies(tokens: { type: string; value?: unknown }[]): strin
 }
 
 function collectActiveAssetReferences(
-  rules: CSSRule[],
+  rules: Iterable<CSSRule>,
   isRetained: (r: CSSRule) => boolean
 ): { animations: Set<string>; fonts: Set<string> } {
   const animations = new Set<string>();
   const fonts = new Set<string>();
-
-  function walk(rule: CSSRule) {
-    if (isRetained(rule) && rule instanceof CSSStyleRule) {
-      for (const d of rule.style._declarations) {
-        if (d.name === 'animation-name' || d.name === 'animation') {
-          for (const t of d.value) {
-            if (t.type === 'ident' || t.type === 'string') animations.add(String(t.value));
-          }
-        } else if (d.name === 'font-family' || d.name === 'font') {
-          for (const f of extractFontFamilies(d.value)) fonts.add(f);
+  for (const rule of getRules(rules, CSSStyleRule)) {
+    if (!isRetained(rule)) continue;
+    for (const d of rule.style._declarations) {
+      if (d.name === 'animation-name' || d.name === 'animation') {
+        for (const t of d.value) {
+          if (t.type === 'ident' || t.type === 'string') animations.add(String(t.value));
         }
+      } else if (d.name === 'font-family' || d.name === 'font') {
+        for (const f of extractFontFamilies(d.value)) fonts.add(f);
       }
     }
-    if (rule instanceof CSSGroupingRule) {
-      for (let i = 0; i < rule.cssRules.length; i++) walk(rule.cssRules[i]);
-    }
   }
-
-  for (const r of rules) {
-    walk(r);
-  }
-
   return { animations, fonts };
 }
 
@@ -291,7 +276,7 @@ export function pruneUnusedCss(
     if (rule instanceof CSSStyleRule) {
       if (isCovered(loc.start, loc.end, coverageRanges, parentSpan)) {
         activeContextRules.add(rule);
-        const ctx = getEnclosingRuleContext(rule);
+        const ctx = closestRule(rule, CSSStyleRule, CSSScopeRule);
         let scopedSet = activeScopedSelectors.get(ctx);
         if (!scopedSet) {
           scopedSet = new Set<string>();
@@ -319,7 +304,7 @@ export function pruneUnusedCss(
 
   // Pre-scan for active animation and font references
   const activeAssets = collectActiveAssetReferences(
-    Array.from(sheet.cssRules),
+    sheet.cssRules,
     (r) => {
       const loc = r.location;
       if (!loc) return false;
@@ -445,7 +430,7 @@ export function pruneUnusedCss(
       const isDynamicState = hasPseudoClass(ast, DYNAMIC_STATE_PSEUDOS);
 
       if (isInteractive || isDynamicState) {
-        const ctx = getEnclosingRuleContext(rule);
+        const ctx = closestRule(rule, CSSStyleRule, CSSScopeRule);
         const bases = getStrippedBaseSelectors(rule);
         const baseActive = bases.some(
           b =>

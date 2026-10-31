@@ -57,11 +57,7 @@ export class StyleSheet {
   _media: MediaList;
   /** @internal */
   _disabledFlag = false;
-
-  // cssom-1 #the-stylesheet-interface
-  get [Symbol.toStringTag](): string {
-    return 'StyleSheet';
-  }
+  declare readonly [Symbol.toStringTag]: string;
 
   get type(): string {
     return this._type;
@@ -154,10 +150,6 @@ export class CSSStyleSheet extends StyleSheet {
       return this._ownerRule.parentStyleSheet;
     }
     return super.parentStyleSheet as CSSStyleSheet | null;
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSStyleSheet';
   }
 
   get cssRules(): CSSRuleList {
@@ -470,10 +462,6 @@ export class CSSStyleRule extends CSSGroupingRule {
     this._style.cssText = value;
   }
 
-  get [Symbol.toStringTag]() {
-    return 'CSSStyleRule';
-  }
-
   private _getNamespaceContext(): { hasDefaultNamespace: boolean; defaultNamespacePrefixes: Set<string> } {
     let hasDefaultNamespace = false;
     const defaultNamespacePrefixes = new Set<string>();
@@ -615,15 +603,6 @@ for (const ctor of cssomClasses) {
     applyWebIDLInterface(ctor as Function);
   }
 }
-
-// cssom-1 #the-cssstyledeclaration-interface
-// WebIDL #interface-prototype-object
-Object.defineProperty(CSSStyleProperties.prototype, Symbol.toStringTag, {
-  value: 'CSSStyleProperties',
-  configurable: true,
-  writable: false,
-  enumerable: false
-});
 
 export {
   CSSFontFaceDescriptors,

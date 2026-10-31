@@ -155,6 +155,7 @@ describe('src/walk.ts: Pure-CSSOM Traversal, Selector Resolution, and Property Q
     const scopeRule = closestRule(styleRules[4], CSSScopeRule);
     assert.equal(scopeRule?.start, '.card');
     assert.equal(scopeRule?.end, '.content');
+    assert.equal(closestRule(styleRules[4], CSSStyleRule, CSSScopeRule) instanceof CSSScopeRule, true);
   });
 
   it('resolves selectors for CSSNestedDeclarations, relative nested rules, and CSSPageRule', () => {

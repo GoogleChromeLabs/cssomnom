@@ -23,8 +23,6 @@ import {
   CSSKeyframesRule,
   CSSKeyframeRule,
   CSSPageRule,
-  CSSFontFaceRule,
-  CSSMarginRule,
   CSSAtRule,
 } from './rules/at-rules.ts';
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
@@ -51,17 +49,6 @@ export type AnyRuleConstructor<T extends CSSRule = CSSRule> = abstract new (...a
 export interface DeclaredPropertiesOptions {
   /** When `true` (default), includes CSS property names referenced inside `@supports (...)` conditions. */
   includeSupports?: boolean;
-}
-
-function getRuleStyle(rule: CSSRule): CSSStyleDeclaration | null {
-  return (
-    rule instanceof CSSStyleRule ||
-    rule instanceof CSSNestedDeclarations ||
-    rule instanceof CSSKeyframeRule ||
-    rule instanceof CSSPageRule ||
-    rule instanceof CSSFontFaceRule ||
-    rule instanceof CSSMarginRule
-  ) ? rule.style : null;
 }
 
 /**
@@ -105,14 +92,14 @@ export function getRules<T extends CSSRule>(root: RuleRoot, ruleClass?: AnyRuleC
 
 /**
  * Walks strict ancestors of `rule` (`rule.parentRule`) and returns the nearest enclosing
- * rule matching `ruleClass`, or `null` if none matches.
+ * rule matching any of `ruleClasses`, or `null` if none matches.
  */
-export function closestRule<T extends CSSRule>(
+export function closestRule<C extends readonly AnyRuleConstructor[]>(
   rule: CSSRule | null | undefined,
-  ruleClass: AnyRuleConstructor<T>,
-): T | null {
+  ...ruleClasses: C
+): InstanceType<C[number]> | null {
   for (let curr = rule?.parentRule ?? null; curr; curr = curr.parentRule) {
-    if (curr instanceof ruleClass) return curr;
+    if (ruleClasses.some(cls => curr instanceof cls)) return curr as InstanceType<C[number]>;
   }
   return null;
 }
@@ -141,8 +128,8 @@ export function resolveSelector(rule: CSSRule): string | null {
   if (!(rule instanceof CSSStyleRule) && !(rule instanceof CSSNestedDeclarations)) return null;
 
   const chain: (CSSStyleRule | CSSScopeRule)[] = [];
-  for (let p = rule.parentRule; p; p = p.parentRule) {
-    if (p instanceof CSSStyleRule || p instanceof CSSScopeRule) chain.push(p);
+  for (let p = closestRule(rule, CSSStyleRule, CSSScopeRule); p; p = closestRule(p, CSSStyleRule, CSSScopeRule)) {
+    chain.push(p);
   }
 
   let parentSelector: string | null = null;
@@ -179,31 +166,21 @@ export function parseSelectorAST(
   if (typeof input === 'string') {
     return parseSelectorStringAST(input, options);
   }
-  if (options?.resolveNesting === false) {
-    if (input instanceof CSSStyleRule) {
-      if (!options.allowVendorPseudos && !options.declaredNamespaces && input._selectorAST) {
-        return input._selectorAST;
-      }
-      return parseSelectorStringAST(input.selectorText, {
-        allowRelative: input.parentRule !== null,
-        ...options,
-      });
-    }
-    return null;
-  }
+  const raw = options?.resolveNesting === false;
   if (
     input instanceof CSSStyleRule &&
-    input.parentRule === null &&
-    !input.selectorText.includes('&') &&
+    input._selectorAST &&
     !options?.allowVendorPseudos &&
     !options?.declaredNamespaces &&
-    input._selectorAST
+    (raw || (input.parentRule === null && !input.selectorText.includes('&')))
   ) {
     return input._selectorAST;
   }
-  const resolved = resolveSelector(input);
-  if (!resolved) return null;
-  return parseSelectorStringAST(resolved, {
+  const selector = raw
+    ? (input instanceof CSSStyleRule ? input.selectorText : null)
+    : resolveSelector(input);
+  if (!selector) return null;
+  return parseSelectorStringAST(selector, {
     allowRelative: input.parentRule !== null,
     ...options,
   });
@@ -219,8 +196,8 @@ export function getDeclaredProperties(
 ): Set<string> {
   const properties = new Set<string>();
   for (const rule of getRules(root)) {
-    const style = getRuleStyle(rule);
-    if (style) {
+    if ('style' in rule && rule.style instanceof CSSStyleDeclaration) {
+      const { style } = rule;
       for (const d of style._declarations) {
         const prop = d.name.startsWith('--') ? d.name : d.name.toLowerCase();
         properties.add(prop);

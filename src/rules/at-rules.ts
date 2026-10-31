@@ -26,6 +26,7 @@ import { CSSStyleSheet } from '../CSSOM.ts';
 import { MediaList, CSSRuleList } from './collections.ts';
 import { serializeGroupingRule } from './utils.ts';
 import { INTERNAL_RULE_TOKEN } from '../internal-token.ts';
+import { createIndexedProxy, deleteRuleFromArray } from '../utils.ts';
 import { hideInternalFields, applyWebIDLInterface } from '../webidl.ts';
 import { parseStyleAttribute, consumeListOfRules, consumeRule, parseComponentValues } from '../parser.ts';
 import { COUNTER_STYLE_DESCRIPTORS, COUNTER_STYLE_PROP_BY_DESCRIPTOR, FONT_FEATURE_VALUE_MAP_DEFS } from '../data/gen/property-list.ts';
@@ -54,10 +55,6 @@ export class CSSMediaRule extends CSSConditionRule {
 
   set media(val: unknown) {
     this._media.mediaText = val === null ? '' : String(val);
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSMediaRule';
   }
 
   override get conditionText(): string {
@@ -90,7 +87,6 @@ export class CSSCustomMediaRule extends CSSRule {
 
   get name(): string { return this._name; }
   get query(): CustomMediaQuery { return this._query; }
-  get [Symbol.toStringTag](): string { return 'CSSCustomMediaRule'; }
 
   get cssText(): string {
     const queryStr = typeof this._query === 'boolean' ? String(this._query) : this._query.mediaText;
@@ -112,7 +108,6 @@ export class CSSSupportsRule extends CSSConditionRule {
 
   override get conditionText(): string { return this._conditionText; }
   get matches(): boolean { return ParseHooks.supports(this._conditionText); }
-  get [Symbol.toStringTag](): string { return 'CSSSupportsRule'; }
   get type() { return 12; }
   get cssText() { return serializeGroupingRule('supports', this._conditionText, this._rules); }
   set cssText(_value: string) {}
@@ -160,10 +155,6 @@ export class CSSContainerRule extends CSSConditionRule {
     return this._containerQuery;
   }
 
-  get [Symbol.toStringTag]() {
-    return 'CSSContainerRule';
-  }
-
   get cssText() {
     return serializeGroupingRule('container', this.conditionText, this._rules);
   }
@@ -191,7 +182,6 @@ export class CSSLayerBlockRule extends CSSGroupingRule {
   }
 
   get name(): string { return this._name; }
-  get [Symbol.toStringTag]() { return 'CSSLayerBlockRule'; }
   get cssText() { return serializeGroupingRule('layer', serializeLayerName(this._name), this._rules); }
   set cssText(_value: string) {}
 }
@@ -210,7 +200,6 @@ export class CSSLayerStatementRule extends CSSRule {
   }
 
   get nameList(): readonly string[] { return this._nameList; }
-  get [Symbol.toStringTag]() { return 'CSSLayerStatementRule'; }
   get cssText() { return `@layer ${this._nameList.map(serializeLayerName).join(', ')};`; }
   set cssText(_value: string) {}
 }
@@ -238,7 +227,6 @@ export class CSSScopeRule extends CSSGroupingRule {
 
   get startSelector(): string | null { return this._startSelector; }
   get endSelector(): string | null { return this._endSelector; }
-  get [Symbol.toStringTag]() { return 'CSSScopeRule'; }
 
   get start(): string | null {
     return this._startSelector ? (this._startSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
@@ -270,7 +258,6 @@ export class CSSViewTransitionRule extends CSSRule {
   }
 
   get navigation(): string { return this._navigation; }
-  get [Symbol.toStringTag]() { return 'CSSViewTransitionRule'; }
   get cssText() { return `@view-transition { navigation: ${this._navigation}; }`; }
   set cssText(_value: string) {}
 }
@@ -308,40 +295,13 @@ export class CSSKeyframesRule extends CSSRule {
   /** @internal */ _name: string;
   /** @internal */ _rules: CSSKeyframeRule[];
   /** @internal */ _cssRules: CSSRuleList;
-  /** @internal */ _self!: CSSKeyframesRule;
 
   constructor(name: string, rules: CSSKeyframeRule[]) {
     super();
     this._name = name;
     this._rules = rules;
     this._cssRules = new CSSRuleList(() => this._rules);
-
-    const proxy = new Proxy(this, {
-      get(target, prop) {
-        if (typeof prop === 'string') {
-          const index = Number(prop);
-          if (Number.isInteger(index) && index >= 0) {
-            return target._rules[index];
-          }
-        }
-        const val = Reflect.get(target, prop, target);
-        if (typeof val === 'function') {
-          return val.bind(target);
-        }
-        return val;
-      },
-      set(target, prop, value) {
-        return Reflect.set(target, prop, value, target);
-      },
-      ownKeys() {
-        return [];
-      },
-      getOwnPropertyDescriptor() {
-        return undefined;
-      }
-    });
-    this._self = proxy;
-    hideInternalFields(this);
+    const proxy = createIndexedProxy(this, t => t._rules);
     for (const rule of rules) {
       if (rule instanceof CSSRule) {
         rule._parentRule = proxy;
@@ -355,11 +315,6 @@ export class CSSKeyframesRule extends CSSRule {
   get cssRules(): CSSRuleList { return this._cssRules; }
 
   get type() { return 7; }
-
-  // css-animations-1 #interface-csskeyframesrule
-  get [Symbol.toStringTag](): string {
-    return 'CSSKeyframesRule';
-  }
 
   get length(): number {
     return this._rules.length;
@@ -424,16 +379,14 @@ export class CSSKeyframesRule extends CSSRule {
     const bodyTokens = tokens.slice(openIdx + 1, closeIdx);
     const styleDecl = parseStyleAttribute(bodyTokens);
     const keyframe = new CSSKeyframeRule(keyText, styleDecl._declarations);
-    keyframe._parentRule = this._self;
+    keyframe._parentRule = this;
     this._rules.push(keyframe);
   }
 
   deleteRule(select: string): void {
     const idx = this._findRuleIndex(select);
     if (idx !== -1) {
-      const removed = this._rules[idx];
-      if (removed instanceof CSSRule) removed._parentRule = null;
-      this._rules.splice(idx, 1);
+      deleteRuleFromArray(this._rules, idx);
     }
   }
 }
@@ -459,11 +412,6 @@ export class CSSKeyframeRule extends CSSRule {
 
   get type() { return 8; }
 
-  // css-animations-1 #interface-csskeyframerule
-  get [Symbol.toStringTag](): string {
-    return 'CSSKeyframeRule';
-  }
-
   get cssText() {
     return formatInlineStyleBlock(this.keyText, this._style);
   }
@@ -474,10 +422,6 @@ export class CSSKeyframeRule extends CSSRule {
 // css-nesting-1 #the-cssnestrule
 export class CSSNestedDeclarations extends CSSRule {
   /** @internal */ _style: CSSStyleDeclaration;
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSNestedDeclarations';
-  }
 
   constructor(styleDeclarations: Declaration[]) {
     super();
@@ -512,10 +456,6 @@ export class CSSFontFaceRule extends CSSRule {
   get style(): CSSStyleDeclaration { return this._style; }
   set style(value: string) { this._style.cssText = value; }
 
-  get [Symbol.toStringTag](): string {
-    return 'CSSFontFaceRule';
-  }
-
   get type() { return 5; }
 
   get cssText() {
@@ -548,10 +488,6 @@ export class CSSMarginRule extends CSSRule {
   get name(): string { return this._name; }
   get style(): CSSMarginDescriptors { return this._style; }
   set style(value: string) { this._style.cssText = value; }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSMarginRule';
-  }
 
   get type() { return 9; } // CSSRule.MARGIN_RULE
 
@@ -636,7 +572,6 @@ export class CSSImportRule extends CSSRule {
   get scopeEnd(): string | null { return this._scopeEnd; }
   get isScoped(): boolean { return this._isScoped; }
 
-  get [Symbol.toStringTag]() { return 'CSSImportRule'; }
   get type() { return 3; } // CSSRule.IMPORT_RULE
 
   get cssText() {
@@ -681,7 +616,6 @@ export class CSSNamespaceRule extends CSSRule {
 
   get namespaceURI(): string { return this._namespaceURI; }
   get prefix(): string { return this._prefix; }
-  get [Symbol.toStringTag]() { return 'CSSNamespaceRule'; }
   get type() { return 10; } // CSSRule.NAMESPACE_RULE
 
   get cssText() {
@@ -764,7 +698,6 @@ export class CSSPageRule extends CSSGroupingRule {
   get style(): CSSPageDescriptors { return this._style; }
   set style(value: string) { this._style.cssText = value; }
 
-  get [Symbol.toStringTag](): string { return 'CSSPageRule'; }
   get type() { return 6; }
 
   get cssText() {
@@ -800,10 +733,6 @@ export class CSSPropertyRule extends CSSRule {
   get syntax(): string { return this._syntax; }
   get inherits(): boolean { return this._inherits; }
   get initialValue(): string | null { return this._initialValue; }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSPropertyRule';
-  }
 
   get cssText() {
     let body = `syntax: ${serializeString(this._syntax)}; inherits: ${this._inherits};`;
@@ -933,7 +862,6 @@ export class CSSCounterStyleRule extends CSSRule {
   get name(): string { return this._name; }
   set name(value: string) { this._name = value; }
 
-  get [Symbol.toStringTag]() { return 'CSSCounterStyleRule'; }
   get type() { return 11; }
 
   // css-counter-styles-3 #the-csscounterstylerule-interface
@@ -977,7 +905,6 @@ export class CSSFontFeatureValuesMap {
   keys(): IterableIterator<string> { return this._map.keys(); }
   values(): IterableIterator<number[]> { return this._map.values(); }
   [Symbol.iterator](): IterableIterator<[string, number[]]> { return this._map[Symbol.iterator](); }
-  get [Symbol.toStringTag]() { return 'CSSFontFeatureValuesMap'; }
 }
 
 // css-fonts-4 #om-fontfeaturevalues
@@ -1003,7 +930,6 @@ export class CSSFontFeatureValuesRule extends CSSRule {
 
   get fontFamily(): string { return this._fontFamily; }
   set fontFamily(value: string) { this._fontFamily = value; }
-  get [Symbol.toStringTag]() { return 'CSSFontFeatureValuesRule'; }
   get type() { return 14; }
 
   get cssText(): string {

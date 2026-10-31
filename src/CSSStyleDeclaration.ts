@@ -817,15 +817,6 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
 // WebIDL § 3.6, § 3.7
 applyWebIDLInterface(CSSStyleDeclaration);
 
-// cssom-1 #the-cssstyledeclaration-interface
-// WebIDL #interface-prototype-object
-Object.defineProperty(CSSStyleDeclaration.prototype, Symbol.toStringTag, {
-  value: 'CSSStyleDeclaration',
-  configurable: true,
-  writable: false,
-  enumerable: false
-});
-
 // css-animations-1 #keyframes
 export class CSSKeyframeStyleDeclaration extends CSSStyleDeclaration {
   /** @internal */
@@ -844,11 +835,6 @@ export class CSSFontFaceDescriptors extends CSSStyleDeclaration {
   declare src?: string;
   declare fontDisplay?: string;
   declare unicodeRange?: string;
-
-  // WebIDL #interface-prototype-object
-  get [Symbol.toStringTag](): string {
-    return 'CSSFontFaceDescriptors';
-  }
 
   /** @internal */
   override _isPropertySupported(property: string): boolean {
@@ -890,10 +876,6 @@ export class CSSPageDescriptors extends CSSStyleDeclaration {
   /** @internal */
   override _isPropertySupported(property: string): boolean {
     return PAGE_ALLOWED_PROPERTIES.has(property);
-  }
-
-  get [Symbol.toStringTag](): string {
-    return 'CSSPageDescriptors';
   }
 }
 

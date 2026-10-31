@@ -18,7 +18,7 @@
 import {
   CSSStyleSheet,
   CSSStyleRule,
-  CSSGroupingRule,
+  getRules,
   parseSelectorAST,
   type CSSRuleList,
 } from '../../../src/index.ts';
@@ -41,50 +41,31 @@ export interface AstDiffResult {
 }
 
 /**
- * Recursively extracts normalized rule records from a CSSRuleList.
+ * Extracts normalized rule records from a CSSRuleList.
  */
-export function extractRuleRecords(
-  rules: CSSRuleList,
-  parentContext = '',
-  counter = { index: 0 }
-): RuleRecord[] {
+export function extractRuleRecords(rules: CSSRuleList): RuleRecord[] {
   const records: RuleRecord[] = [];
-
-  for (let i = 0; i < rules.length; i++) {
-    const rule = rules[i];
-
-    if (rule instanceof CSSStyleRule) {
-      if (rule.style.length > 0 || !rule.cssRules || rule.cssRules.length === 0) {
-        const decls = new Map<string, { value: string; priority: string }>();
-        const style = rule.style;
-        for (const prop of style) {
-          decls.set(prop, {
-            value: style.getPropertyValue(prop).trim(),
-            priority: style.getPropertyPriority(prop).trim(),
-          });
-        }
-
-        records.push({
-          context: parentContext,
-          selector: rule.selectorText.trim(),
-          selectorAST: parseSelectorAST(rule, { resolveNesting: false }),
-          declarations: decls,
-          originalIndex: counter.index++,
-        });
-      }
-
-      if (rule.cssRules && rule.cssRules.length > 0) {
-        const header = getRuleHeader(rule);
-        const nestedContext = parentContext ? `${parentContext} > ${header}` : header;
-        records.push(...extractRuleRecords(rule.cssRules, nestedContext, counter));
-      }
-    } else if (rule instanceof CSSGroupingRule) {
-      const header = getRuleHeader(rule);
-      const nestedContext = parentContext ? `${parentContext} > ${header}` : header;
-      records.push(...extractRuleRecords(rule.cssRules, nestedContext, counter));
+  for (const rule of getRules(rules, CSSStyleRule)) {
+    if (rule.style.length === 0 && rule.cssRules.length > 0) continue;
+    const decls = new Map<string, { value: string; priority: string }>();
+    for (const prop of rule.style) {
+      decls.set(prop, {
+        value: rule.style.getPropertyValue(prop).trim(),
+        priority: rule.style.getPropertyPriority(prop).trim(),
+      });
     }
+    const ancestors: string[] = [];
+    for (let p = rule.parentRule; p; p = p.parentRule) {
+      ancestors.unshift(getRuleHeader(p));
+    }
+    records.push({
+      context: ancestors.join(' > '),
+      selector: rule.selectorText.trim(),
+      selectorAST: parseSelectorAST(rule, { resolveNesting: false }),
+      declarations: decls,
+      originalIndex: records.length,
+    });
   }
-
   return records;
 }
 

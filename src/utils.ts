@@ -28,15 +28,19 @@ export function createIndexedProxy<T extends object, V, R = V>(
 ) {
   hideInternalFields(target);
   return new Proxy(target, {
-    get(t, prop) {
-      if (typeof prop === 'string' && !isNaN(Number(prop))) {
+    get(t, prop, receiver) {
+      if (typeof prop === 'string') {
         const index = Number(prop);
-        const arr = getArray(t);
-        const val = arr[index];
-        return val !== undefined ? (mapValue ? mapValue(val) : val) : undefined;
+        if (Number.isInteger(index) && index >= 0) {
+          const val = getArray(t)[index];
+          return val !== undefined ? (mapValue ? mapValue(val) : val) : undefined;
+        }
       }
-      return (t as Record<string | symbol, unknown>)[prop];
-    }
+      return Reflect.get(t, prop, receiver);
+    },
+    set(t, prop, value) {
+      return Reflect.set(t, prop, value, t);
+    },
   });
 }
 

@@ -78,6 +78,14 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
     configurable: true
   });
 
+  // WebIDL #interface-prototype-object: class string via @@toStringTag
+  Object.defineProperty(proto, Symbol.toStringTag, {
+    value: interfaceName,
+    writable: false,
+    enumerable: false,
+    configurable: true,
+  });
+
   const names = Object.getOwnPropertyNames(proto);
   for (const name of names) {
     if (name === 'constructor' || name.startsWith('_') || excludeSet.has(name)) {

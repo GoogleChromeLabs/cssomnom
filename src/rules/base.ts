@@ -48,9 +48,7 @@ const RULE_CONSTANTS = {
 } as const;
 
 export class CSSRule {
-  get [Symbol.toStringTag](): string {
-    return 'CSSRule';
-  }
+  declare readonly [Symbol.toStringTag]: string;
   /** @internal */
   _parentRule: CSSRule | null = null;
   /** @internal */
@@ -167,14 +165,13 @@ export class CSSGroupingRule extends CSSRule {
     const isStyleRule = (r: CSSRule) => r[Symbol.toStringTag] === 'CSSStyleRule';
     const isNested = isStyleRule(this) || isScopeRule(this) || this.parentRule !== null;
     let isInsideStyleRule = isStyleRule(this);
-    if (!isInsideStyleRule) {
-      let p = this.parentRule;
-      while (p) {
-        if (isStyleRule(p)) {
-          isInsideStyleRule = true;
-          break;
-        }
-        p = p.parentRule;
+    let isDirectlyInScope = isScopeRule(this);
+    for (let p = this.parentRule, seenStyle = isInsideStyleRule; p; p = p.parentRule) {
+      if (isStyleRule(p)) {
+        isInsideStyleRule = true;
+        seenStyle = true;
+      } else if (!seenStyle && isScopeRule(p)) {
+        isDirectlyInScope = true;
       }
     }
 
@@ -195,19 +192,6 @@ export class CSSGroupingRule extends CSSRule {
       // css-nesting-1 #conditionals: style rules only allow conditional group rules; nested conditional rules allow top-level rules
       if (isInsideStyleRule && !(topRule instanceof CSSGroupingRule)) {
         throw new DOMException('HierarchyRequestError: This rule cannot be inserted inside a nested rule', 'HierarchyRequestError');
-      }
-    }
-
-    let isDirectlyInScope = isScopeRule(this);
-    if (!isDirectlyInScope && !isStyleRule(this)) {
-      let parent = this.parentRule;
-      while (parent) {
-        if (isStyleRule(parent)) break;
-        if (isScopeRule(parent)) {
-          isDirectlyInScope = true;
-          break;
-        }
-        parent = parent.parentRule;
       }
     }
 

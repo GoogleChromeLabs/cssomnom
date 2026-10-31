@@ -31,45 +31,23 @@ export default defineConfig([
       banner: '// @ts-nocheck',
     },
   },
-  {
+  ...([
+    ['index', 'index'],
+    ['parse', 'parse-entry'],
+    ['parser-api', 'parser-api'],
+  ] as const).map(([outName, srcName]) => ({
     entry: {
-      index: 'node_modules/.cache/dts-tmp/index.d.ts',
+      [outName]: `node_modules/.cache/dts-tmp/${srcName}.d.ts`,
     },
-    format: ['esm'],
+    format: 'esm' as const,
     fixedExtension: false,
     clean: false,
     dts: {
       dtsInput: true,
       emitDtsOnly: true,
-      generator: 'oxc',
+      generator: 'oxc' as const,
     },
-  },
-  {
-    entry: {
-      parse: 'node_modules/.cache/dts-tmp/parse-entry.d.ts',
-    },
-    format: ['esm'],
-    fixedExtension: false,
-    clean: false,
-    dts: {
-      dtsInput: true,
-      emitDtsOnly: true,
-      generator: 'oxc',
-    },
-  },
-  {
-    entry: {
-      'parser-api': 'node_modules/.cache/dts-tmp/parser-api.d.ts',
-    },
-    format: ['esm'],
-    fixedExtension: false,
-    clean: false,
-    dts: {
-      dtsInput: true,
-      emitDtsOnly: true,
-      generator: 'oxc',
-    },
-  },
+  })),
   {
     entry: {
       'cssomnom.iife.global': 'src/browser-entry.ts',
