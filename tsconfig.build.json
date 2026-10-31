@@ -5,7 +5,7 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "rootDir": "src",
-    "outDir": "dist",
+    "outDir": "node_modules/.cache/dts-tmp",
     "stripInternal": true
   },
   "include": [

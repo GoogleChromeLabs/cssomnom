@@ -33,6 +33,45 @@ export default defineConfig([
   },
   {
     entry: {
+      index: 'node_modules/.cache/dts-tmp/index.d.ts',
+    },
+    format: ['esm'],
+    fixedExtension: false,
+    clean: false,
+    dts: {
+      dtsInput: true,
+      emitDtsOnly: true,
+      generator: 'oxc',
+    },
+  },
+  {
+    entry: {
+      parse: 'node_modules/.cache/dts-tmp/parse-entry.d.ts',
+    },
+    format: ['esm'],
+    fixedExtension: false,
+    clean: false,
+    dts: {
+      dtsInput: true,
+      emitDtsOnly: true,
+      generator: 'oxc',
+    },
+  },
+  {
+    entry: {
+      'parser-api': 'node_modules/.cache/dts-tmp/parser-api.d.ts',
+    },
+    format: ['esm'],
+    fixedExtension: false,
+    clean: false,
+    dts: {
+      dtsInput: true,
+      emitDtsOnly: true,
+      generator: 'oxc',
+    },
+  },
+  {
+    entry: {
       'cssomnom.iife.global': 'src/browser-entry.ts',
     },
     format: ['iife'],
