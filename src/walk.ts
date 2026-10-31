@@ -25,33 +25,32 @@ import {
   CSSPageRule,
   CSSFontFaceRule,
   CSSMarginRule,
+  CSSAtRule,
 } from './rules/at-rules.ts';
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
 import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
 import { LONGHAND_TO_SHORTHAND } from './shorthands.ts';
 import { resolveNestedSelector } from './nesting.ts';
 import { tokenize } from './tokenizer.ts';
+import { parseSelectorAST as parseSelectorStringAST, type SelectorASTOptions } from './parser.ts';
+import type { SelectorList } from './types.ts';
 
-export interface RuleWalkEntry {
-  readonly rule: CSSRule;
-  readonly ancestors: readonly CSSRule[];
-  readonly parentRule: CSSRule | null;
-  readonly parentAtRule: string | null;
-  readonly line: number;
-  readonly column: number;
-  readonly selectorText: string | null;
-  readonly rawSelectorText: string | null;
-  readonly style: CSSStyleDeclaration | null;
-  readonly declarations: readonly { property: string; value: string; important: boolean }[];
-  getPropertyValue(property: string): string | null;
-  hasProperty(property: string): boolean;
-}
+/**
+ * Valid root containers accepted by `getRules()` and `getDeclaredProperties()`.
+ */
+export type RuleRoot = CSSStyleSheet | CSSRule | Iterable<CSSRule>;
 
-export interface StyleRuleWalkEntry extends RuleWalkEntry {
-  readonly rule: CSSStyleRule | CSSNestedDeclarations | CSSKeyframeRule;
-  readonly selectorText: string;
-  readonly rawSelectorText: string;
-  readonly style: CSSStyleDeclaration;
+/**
+ * Constructor type matching any `CSSRule` class or subclass (e.g. `CSSStyleRule`, `CSSMediaRule`).
+ */
+export type AnyRuleConstructor<T extends CSSRule = CSSRule> = abstract new (...args: never[]) => T;
+
+/**
+ * Options for `getDeclaredProperties()`.
+ */
+export interface DeclaredPropertiesOptions {
+  /** When `true` (default), includes CSS property names referenced inside `@supports (...)` conditions. */
+  includeSupports?: boolean;
 }
 
 function getRuleStyle(rule: CSSRule): CSSStyleDeclaration | null {
@@ -65,96 +64,162 @@ function getRuleStyle(rule: CSSRule): CSSStyleDeclaration | null {
   ) ? rule.style : null;
 }
 
-export function* walkRules(
-  root: CSSStyleSheet | CSSGroupingRule | CSSKeyframesRule | Iterable<CSSRule>,
-): Generator<RuleWalkEntry> {
-  function* walkItem(
-    rule: CSSRule,
-    ancestors: readonly CSSRule[],
-    parentRule: CSSRule | null,
-    parentAtRule: string | null,
-    parentSelector: string | null,
-  ): Generator<RuleWalkEntry> {
-    let selectorText: string | null = null, rawSelectorText: string | null = null, childSelector = parentSelector;
+/**
+ * Recursively collects CSS rules in depth-first pre-order across a `CSSStyleSheet`,
+ * `CSSRule` (including nested rules inside `CSSStyleRule`, `CSSGroupingRule`, `CSSKeyframesRule`,
+ * and `CSSAtRule`), or any `Iterable<CSSRule>`.
+ *
+ * When `ruleClass` is provided, filters and narrows the returned array to instances of `ruleClass`
+ * (e.g. `getRules(sheet, CSSStyleRule)` returns `CSSStyleRule[]`).
+ */
+export function getRules(root: RuleRoot): CSSRule[];
+export function getRules<T extends CSSRule>(root: RuleRoot, ruleClass: AnyRuleConstructor<T>): T[];
+export function getRules<T extends CSSRule>(root: RuleRoot, ruleClass?: AnyRuleConstructor<T>): CSSRule[] {
+  const result: CSSRule[] = [];
 
-    if (rule instanceof CSSStyleRule) {
-      rawSelectorText = rule.selectorText;
-      selectorText = childSelector = parentSelector && parentSelector !== ':scope'
-        ? resolveNestedSelector(rule.selectorText, parentSelector)
-        : rule.selectorText;
-    } else if (rule instanceof CSSScopeRule) {
-      childSelector = ':scope';
-    } else if (rule instanceof CSSNestedDeclarations) {
-      selectorText = rawSelectorText = parentSelector ?? '';
-    } else if (rule instanceof CSSKeyframeRule) {
-      selectorText = rawSelectorText = rule.keyText;
-    } else if (rule instanceof CSSPageRule) {
-      selectorText = rawSelectorText = rule.selectorText;
+  function visit(rule: CSSRule): void {
+    if (!ruleClass || rule instanceof ruleClass) {
+      result.push(rule);
     }
-
-    const style = getRuleStyle(rule);
-    let cachedDecls: readonly { property: string; value: string; important: boolean }[] | null = null;
-
-    yield {
-      rule,
-      ancestors,
-      parentRule,
-      parentAtRule,
-      line: rule.location?.line ?? 1,
-      column: rule.location?.column ?? 1,
-      selectorText,
-      rawSelectorText,
-      style,
-      get declarations() {
-        return cachedDecls ??= style
-          ? style._declarations.map(d => ({ property: d.name, value: style.getPropertyValue(d.name), important: d.important }))
-          : [];
-      },
-      getPropertyValue: (p: string) => style ? (style.getPropertyValue(p) || null) : null,
-      hasProperty: (p: string) => {
-        if (!style) return false;
-        const norm = p.startsWith('--') ? p : p.toLowerCase();
-        return style._declarations.some(d => d.name === norm) || style.getPropertyValue(norm) !== '';
-      },
-    };
-
     if (rule instanceof CSSGroupingRule || rule instanceof CSSKeyframesRule) {
-      const brace = rule.cssText.indexOf('{');
-      const childAt = !(rule instanceof CSSStyleRule) && brace !== -1 ? rule.cssText.slice(0, brace).trim() : parentAtRule;
-      const nextAncestors = [...ancestors, rule];
       for (const child of rule.cssRules) {
-        if (child) yield* walkItem(child, nextAncestors, rule, childAt, childSelector);
+        if (child) visit(child);
+      }
+    } else if (rule instanceof CSSAtRule && rule.childRules) {
+      for (const child of rule.childRules) {
+        if (child) visit(child);
       }
     }
   }
 
-  const items = root instanceof CSSStyleSheet || root instanceof CSSGroupingRule || root instanceof CSSKeyframesRule
+  const items = root instanceof CSSStyleSheet
     ? root.cssRules
-    : root instanceof CSSRule ? [root] : root;
+    : root instanceof CSSRule
+      ? [root]
+      : root;
   for (const rule of items) {
-    if (rule) yield* walkItem(rule, [], null, null, null);
+    if (rule) visit(rule);
   }
+  return result;
 }
 
-export function* walkStyleRules(
-  root: CSSStyleSheet | CSSGroupingRule | CSSKeyframesRule | Iterable<CSSRule>,
-): Generator<StyleRuleWalkEntry> {
-  for (const entry of walkRules(root)) {
-    if (
-      (entry.rule instanceof CSSStyleRule || entry.rule instanceof CSSNestedDeclarations || entry.rule instanceof CSSKeyframeRule) &&
-      entry.style && entry.selectorText !== null && entry.rawSelectorText !== null
-    ) {
-      yield entry as StyleRuleWalkEntry;
+/**
+ * Walks strict ancestors of `rule` (`rule.parentRule`) and returns the nearest enclosing
+ * rule matching `ruleClass`, or `null` if none matches.
+ */
+export function closestRule<T extends CSSRule>(
+  rule: CSSRule | null | undefined,
+  ruleClass: AnyRuleConstructor<T>,
+): T | null {
+  for (let curr = rule?.parentRule ?? null; curr; curr = curr.parentRule) {
+    if (curr instanceof ruleClass) return curr;
+  }
+  return null;
+}
+
+function shouldResolveAgainstParent(selector: string, parentSelector: string | null): boolean {
+  if (!parentSelector) return selector.includes('&');
+  if (parentSelector === ':scope') {
+    return selector.includes('&') || /(?:^|,)\s*[>+~]/.test(selector);
+  }
+  return true;
+}
+
+/**
+ * Resolves the effective selector string for a rule by walking its `parentRule` chain,
+ * expanding nested `&` and relative selectors against enclosing `CSSStyleRule` and `@scope` rules.
+ *
+ * - `CSSStyleRule`: returns the resolved selector (e.g. `":is(.card) .title"`).
+ * - `CSSNestedDeclarations`: returns the enclosing style rule's resolved selector (or `":scope"` inside `@scope`).
+ * - `CSSKeyframeRule`: returns `rule.keyText`.
+ * - `CSSPageRule`: returns `rule.selectorText`.
+ * - All other rules: returns `null`.
+ */
+export function resolveSelector(rule: CSSRule): string | null {
+  if (rule instanceof CSSKeyframeRule) return rule.keyText;
+  if (rule instanceof CSSPageRule) return rule.selectorText;
+  if (!(rule instanceof CSSStyleRule) && !(rule instanceof CSSNestedDeclarations)) return null;
+
+  const chain: (CSSStyleRule | CSSScopeRule)[] = [];
+  for (let p = rule.parentRule; p; p = p.parentRule) {
+    if (p instanceof CSSStyleRule || p instanceof CSSScopeRule) chain.push(p);
+  }
+
+  let parentSelector: string | null = null;
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const anc = chain[i];
+    if (anc instanceof CSSScopeRule) {
+      parentSelector = ':scope';
+    } else {
+      parentSelector = shouldResolveAgainstParent(anc.selectorText, parentSelector)
+        ? resolveNestedSelector(anc.selectorText, parentSelector ?? '')
+        : anc.selectorText;
     }
   }
+
+  if (rule instanceof CSSNestedDeclarations) {
+    return parentSelector ?? '';
+  }
+  return shouldResolveAgainstParent(rule.selectorText, parentSelector)
+    ? resolveNestedSelector(rule.selectorText, parentSelector ?? '')
+    : rule.selectorText;
 }
 
+/**
+ * Parses a selector string or `CSSRule` into a structured Selectors Level 4 `SelectorList` AST.
+ *
+ * When passed a `CSSStyleRule` or `CSSNestedDeclarations`, resolves nested `&` selectors against
+ * enclosing ancestor rules by default (`resolveNesting: true`), or returns the rule's own raw
+ * selector AST when `resolveNesting: false`.
+ */
+export function parseSelectorAST(
+  input: string | CSSRule,
+  options?: SelectorASTOptions,
+): SelectorList | null {
+  if (typeof input === 'string') {
+    return parseSelectorStringAST(input, options);
+  }
+  if (options?.resolveNesting === false) {
+    if (input instanceof CSSStyleRule) {
+      if (!options.allowVendorPseudos && !options.declaredNamespaces && input._selectorAST) {
+        return input._selectorAST;
+      }
+      return parseSelectorStringAST(input.selectorText, {
+        allowRelative: input.parentRule !== null,
+        ...options,
+      });
+    }
+    return null;
+  }
+  if (
+    input instanceof CSSStyleRule &&
+    input.parentRule === null &&
+    !input.selectorText.includes('&') &&
+    !options?.allowVendorPseudos &&
+    !options?.declaredNamespaces &&
+    input._selectorAST
+  ) {
+    return input._selectorAST;
+  }
+  const resolved = resolveSelector(input);
+  if (!resolved) return null;
+  return parseSelectorStringAST(resolved, {
+    allowRelative: input.parentRule !== null,
+    ...options,
+  });
+}
+
+/**
+ * Collects a `Set<string>` of all declared CSS property names across `root`, including
+ * parent shorthands (when all constituent longhands are declared) and `@supports` feature queries.
+ */
 export function getDeclaredProperties(
-  root: CSSStyleSheet | CSSGroupingRule | CSSKeyframesRule | Iterable<CSSRule>,
-  options?: { includeSupports?: boolean },
+  root: RuleRoot,
+  options?: DeclaredPropertiesOptions,
 ): Set<string> {
   const properties = new Set<string>();
-  for (const { rule, style } of walkRules(root)) {
+  for (const rule of getRules(root)) {
+    const style = getRuleStyle(rule);
     if (style) {
       for (const d of style._declarations) {
         const prop = d.name.startsWith('--') ? d.name : d.name.toLowerCase();

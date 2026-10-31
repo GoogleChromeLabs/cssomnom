@@ -14977,6 +14977,10 @@
   "submodules/web-platform-tests/css/cssom/CSSKeyframesRule-appendRule-multiple.html": [
     "appendRule with a single keyframe rule works"
   ],
+  "submodules/web-platform-tests/css/cssom/CSSKeyframesRule-deleteRule-detach.html": [
+    "deleteRule() does not detach rules that were not removed",
+    "deleteRule() nullifies parentRule and parentStyleSheet on the removed keyframe rule"
+  ],
   "submodules/web-platform-tests/css/cssom/CSSKeyframesRule-indexed-getter.html": [
     "indexed getter returns the last rule",
     "indexed getter returns the rule at the given index",

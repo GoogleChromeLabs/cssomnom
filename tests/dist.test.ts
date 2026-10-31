@@ -68,5 +68,7 @@ test('Validate built file works', async (t) => {
 
   // Test 4: ParseEntry exports
   assert.ok(ParseEntry.parse, 'parse should be exported from ./parse');
-  assert.strictEqual(typeof ParseEntry.calculateSpecificity, 'function', 'calculateSpecificity in ./parse');
+  assert.strictEqual(typeof ParseEntry.CSSStyleSheet, 'function', 'CSSStyleSheet in ./parse');
+  assert.strictEqual(typeof ParseEntry.CSSStyleDeclaration, 'function', 'CSSStyleDeclaration in ./parse');
+  assert.strictEqual('calculateSpecificity' in ParseEntry, false, 'calculateSpecificity should not be in ./parse');
 });

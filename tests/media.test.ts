@@ -66,7 +66,7 @@ test('Media parsing with unknown functions preserved in general-enclosed', () =>
   assert.strictEqual(mediaRule.media.item(1), '(unknown-prop: val)');
 
   // Preserved in AST
-  const ast = (mediaRule.media as unknown as { mediaQueriesAST: import('../src/types.ts').MediaQuery[] }).mediaQueriesAST;
+  const ast = mediaRule.media._mediaQueries;
   assert.ok(ast);
   assert.strictEqual(ast.length, 2);
   

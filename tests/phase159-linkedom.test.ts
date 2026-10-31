@@ -30,12 +30,11 @@ import {
 
 import {
   parse,
-  walkRules,
-  resolveNestedSelector,
   CSSStyleDeclaration,
   CSSStyleSheet,
   CSSStyleRule,
 } from '../src/parse-entry.ts';
+import { getRules, resolveSelector } from '../src/walk.ts';
 import * as ParseEntry from '../src/parse-entry.ts';
 import { parseRule, parseStyleSheet } from '../src/parser.ts';
 
@@ -77,15 +76,12 @@ describe('Phase 159: linkedom Integration & Tree-Shakeable Bundle Readiness', ()
       );
     });
 
-    it('walkRules and resolveNestedSelector work without cascade engine', () => {
+    it('getRules and resolveSelector work on stylesheets parsed via parse-entry', () => {
       const sheet = parse('article { color: black; & h2 { color: blue; } }');
-      const entries = Array.from(walkRules(sheet));
-      assert.equal(entries.length, 2);
-      assert.equal(entries[0].selectorText, 'article');
-      assert.equal(entries[1].selectorText, ':is(article) h2');
-
-      const resolved = resolveNestedSelector('& > span', '.card');
-      assert.equal(resolved, ':is(.card) > span');
+      const rules = getRules(sheet, CSSStyleRule);
+      assert.equal(rules.length, 2);
+      assert.equal(resolveSelector(rules[0]), 'article');
+      assert.equal(resolveSelector(rules[1]), ':is(article) h2');
     });
   });
 

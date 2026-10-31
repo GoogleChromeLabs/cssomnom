@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 import type { Rule } from './types.ts';
+import { hideInternalFields } from './webidl.ts';
 
 export function camelToDashed(str: string): string {
   return str.replace(/[A-Z]/g, m => '-' + m.toLowerCase()).replace(/^ms-/, '-ms-');
@@ -25,6 +26,7 @@ export function createIndexedProxy<T extends object, V, R = V>(
   getArray: (t: T) => V[],
   mapValue?: (v: V) => R
 ) {
+  hideInternalFields(target);
   return new Proxy(target, {
     get(t, prop) {
       if (typeof prop === 'string' && !isNaN(Number(prop))) {

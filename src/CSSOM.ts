@@ -23,9 +23,15 @@ import type { StylePropertyMap } from './typed-om.ts';
 import type { Declaration, Rule, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
 import { deleteRuleFromArray } from './utils.ts';
 
+/**
+ * Initialization options for constructable stylesheets (`new CSSStyleSheet(options)`).
+ */
 export interface CSSStyleSheetInit {
+  /** Base URL used to resolve relative URLs within the stylesheet. */
   baseURL?: string | null;
+  /** Initial media query list or media string for the stylesheet. */
   media?: MediaList | string;
+  /** When `true`, marks the stylesheet as disabled upon construction. */
   disabled?: boolean;
 }
 import { StyleSheetList, type LinkStyle, MediaList, CSSRuleList } from './rules/collections.ts';
@@ -228,7 +234,7 @@ export class CSSStyleSheet extends StyleSheet {
 
   private _replaceRulesFromText(text: string): void {
     const tokens = tokenize(text);
-    const rules = consumeListOfRules(tokens, true);
+    const rules = consumeListOfRules(tokens, true, { source: text });
 
     const filteredRules = rules.filter(rule => {
       if (isImportRule(rule)) {
@@ -550,11 +556,6 @@ export class CSSStyleRule extends CSSGroupingRule {
     }
   }
 
-  get selectorAST(): import('./types.ts').SelectorList | null {
-    return this._selectorAST;
-  }
-
-
   get type() { return 1; }
 
   // cssom-1 #serialize-a-css-rule
@@ -624,4 +625,30 @@ Object.defineProperty(CSSStyleProperties.prototype, Symbol.toStringTag, {
   enumerable: false
 });
 
-export * from './rules/at-rules.ts';
+export {
+  CSSFontFaceDescriptors,
+  CSSPageDescriptors,
+  CSSMarginDescriptors,
+  CSSConditionRule,
+  CSSMediaRule,
+  CSSCustomMediaRule,
+  CSSSupportsRule,
+  CSSContainerRule,
+  CSSLayerBlockRule,
+  CSSLayerStatementRule,
+  CSSStartingStyleRule,
+  CSSScopeRule,
+  CSSViewTransitionRule,
+  CSSKeyframesRule,
+  CSSKeyframeRule,
+  CSSNestedDeclarations,
+  CSSFontFaceRule,
+  CSSMarginRule,
+  CSSImportRule,
+  CSSNamespaceRule,
+  CSSPageRule,
+  CSSPropertyRule,
+  CSSCounterStyleRule,
+  CSSFontFeatureValuesMap,
+  CSSFontFeatureValuesRule,
+} from './rules/at-rules.ts';

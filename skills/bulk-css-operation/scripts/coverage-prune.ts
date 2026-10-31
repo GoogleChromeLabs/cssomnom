@@ -17,6 +17,7 @@
 
 import {
   parse,
+  parseSelectorAST,
   CSSRule,
   CSSStyleRule,
   CSSGroupingRule,
@@ -146,7 +147,8 @@ function getEnclosingRuleContext(rule: CSSRule): CSSStyleRule | CSSScopeRule | n
 
 function getStrippedBaseSelectors(rule: CSSStyleRule): string[] {
   const bases: string[] = [];
-  for (const sel of rule.selectorAST?.selectors ?? []) {
+  const ast = parseSelectorAST(rule, { resolveNesting: false });
+  for (const sel of ast?.selectors ?? []) {
     if (sel.type !== 'complex-selector') continue;
     const stripped = stripStatefulPseudos(sel);
     if (stripped) bases.push(serializeSelectorList({ type: 'selector-list', selectors: [stripped] }));
@@ -163,7 +165,7 @@ function hasEnvironmentalFeature(node?: MediaCondition | MediaFeature | GeneralE
 }
 
 export function isEnvironmentalMediaRule(rule: CSSMediaRule): boolean {
-  return Boolean(rule.media.mediaQueriesAST?.some(
+  return Boolean(rule.media._mediaQueries.some(
     q => (q.mediaType?.toLowerCase() === 'print' && q.modifier?.toLowerCase() !== 'not') || hasEnvironmentalFeature(q.condition)
   ));
 }
@@ -326,7 +328,8 @@ export function pruneUnusedCss(
   );
 
   function isRootOrHtmlRule(rule: CSSStyleRule): boolean {
-    return Boolean(rule.selectorAST?.selectors.some(s =>
+    const ast = parseSelectorAST(rule, { resolveNesting: false });
+    return Boolean(ast?.selectors.some(s =>
       s.type === 'complex-selector' && s.items[0]?.type === 'compound-selector' &&
       s.items[0].selectors.some(p =>
         (p.type === 'pseudo-class-selector' && (p.name === 'root' || p.name === 'host')) ||
@@ -437,8 +440,9 @@ export function pruneUnusedCss(
 
     // 6. Interactive & Dynamic State Pseudo-Classes
     if (rule instanceof CSSStyleRule) {
-      const isInteractive = hasPseudoClass(rule.selectorAST, INTERACTIVE_PSEUDOS);
-      const isDynamicState = hasPseudoClass(rule.selectorAST, DYNAMIC_STATE_PSEUDOS);
+      const ast = parseSelectorAST(rule, { resolveNesting: false });
+      const isInteractive = hasPseudoClass(ast, INTERACTIVE_PSEUDOS);
+      const isDynamicState = hasPseudoClass(ast, DYNAMIC_STATE_PSEUDOS);
 
       if (isInteractive || isDynamicState) {
         const ctx = getEnclosingRuleContext(rule);

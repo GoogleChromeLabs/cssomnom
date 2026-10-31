@@ -31,9 +31,9 @@ It is uniquely suited for **static analysis** and **automated grading** where yo
 // 1. Full Package ("cssomnom"): Browser CSSOM, Typed OM, W3C CSS namespace, Cascade & Node AST tools
 import { parse, getCascadedStyle, CSSNumericValue, CSS } from 'cssomnom';
 
-// 2. Lightweight Parser & AST Subset ("cssomnom/parse" — ~340 KB, >60% smaller bundle!)
-// Strict subset of "cssomnom" excluding Cascade, UA Stylesheet, and Typed OM; ideal for workers, DOM shims (LinkeDOM), and linters
-import { parse, CSSStyleSheet, CSSStyleDeclaration, walkStyleRules } from 'cssomnom/parse';
+// 2. Lightweight Parser & CSSOM Subset ("cssomnom/parse" — ~338 KB, >60% smaller bundle!)
+// Minimal subset of "cssomnom" excluding Cascade, UA Stylesheet, and Typed OM; ideal for DOM shims (LinkeDOM) and workers
+import { parse, CSSStyleSheet, CSSStyleDeclaration } from 'cssomnom/parse';
 
 // 3. WICG CSS Parser API Draft ("cssomnom/parser-api")
 import { parseStylesheet, parseRule, CSSParserAtRule, CSSParserQualifiedRule } from 'cssomnom/parser-api';
@@ -71,12 +71,21 @@ const nestedBodyRule = mediaRule.cssRules[0] as CSSStyleRule;
 console.log(nestedBodyRule.style.getPropertyValue('margin')); // '0'
 ```
 
-### Static Analysis Traversal & Property Indexing (`walkStyleRules`, `walkRules`, `getDeclaredProperties`)
+### Static Analysis Traversal & Property Indexing (`getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, `getDeclaredProperties`)
 
-Use `walkStyleRules`, `walkRules`, and `getDeclaredProperties` to inspect stylesheets without hand-rolling recursive visitors, selector resolution, or shorthand expansion maps:
+Use `getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, and `getDeclaredProperties` to inspect stylesheets using standard CSSOM instances without custom wrapper objects or hand-rolled recursive visitors:
 
 ```typescript
-import { parse, walkStyleRules, walkRules, getDeclaredProperties } from 'cssomnom';
+import {
+  parse,
+  getRules,
+  closestRule,
+  resolveSelector,
+  parseSelectorAST,
+  getDeclaredProperties,
+  CSSStyleRule,
+  CSSMediaRule,
+} from 'cssomnom';
 
 const css = `
   .card {
@@ -93,16 +102,15 @@ const css = `
 
 const sheet = parse(css);
 
-// 1. Walk all style-bearing rules (CSSStyleRule, CSSNestedDeclarations, CSSKeyframeRule)
-for (const entry of walkStyleRules(sheet)) {
+// 1. Collect all CSSStyleRule instances (or omit the filter class to get all CSSRule instances)
+for (const rule of getRules(sheet, CSSStyleRule)) {
   console.log({
-    selector: entry.selectorText,       // '.card', '.card' (inherited on CSSNestedDeclarations), ':is(.card) .title', ':root'
-    rawSelector: entry.rawSelectorText, // '.card', '.card', '& .title', ':root'
-    parentAtRule: entry.parentAtRule,   // null, '@media (min-width: 600px)', '@supports (interpolate-size: allow-keywords)'
-    line: entry.line,                   // 1-based line number from rule.location.line
-    column: entry.column,               // 1-based column number from rule.location.column
-    hasBorder: entry.hasProperty('border'),             // true on .card (shorthand-aware!)
-    borderColor: entry.getPropertyValue('border-color') // 'red' (contracts longhands!)
+    rawSelector: rule.selectorText,                    // '.card', '& .title', ':root'
+    resolvedSelector: resolveSelector(rule),           // '.card', ':is(.card) .title', ':root'
+    selectorAST: parseSelectorAST(rule),               // Selectors Level 4 SelectorList AST (with '&' resolved)
+    media: closestRule(rule, CSSMediaRule)?.conditionText ?? null, // null, '(min-width: 600px)', null
+    line: rule.location?.line,                         // 1-based line number
+    borderColor: rule.style.getPropertyValue('border-color'), // 'red' on .card (contracts longhands!)
   });
 }
 
@@ -227,38 +235,38 @@ Below are the primary entry points and custom utilities:
 *   **`tokenize(css: string): Token[]`** — Synchronous low-level tokenizer.
 *   **`serialize(nodes: ComponentValue[] | Token[]): string`** — Serializes component values or tokens back to CSS text.
 *   **`new StreamingTokenizer()`** — Class for processing chunked CSS streams.
-*   **`walkRules(root)`** — Recursively traverses CSS rules yielding depth-first pre-order entries with ancestor hierarchy, resolved selectors, 1-based source lines, and shorthand-aware property queries.
-*   **`walkStyleRules(root)`** — Filtered traversal yielding only style-bearing rules (`CSSStyleRule`, `CSSNestedDeclarations`, `CSSKeyframeRule`) with resolved selectors and declaration maps.
+*   **`getRules(root, RuleClass?)`** — Recursively collects rules in depth-first pre-order across a `CSSStyleSheet`, `CSSRule`, or `Iterable<CSSRule>`, optionally narrowed to instances of `RuleClass` (e.g. `getRules(sheet, CSSStyleRule)`).
+*   **`closestRule(rule, RuleClass)`** — Walks strict ancestors via `rule.parentRule` and returns the nearest enclosing rule matching `RuleClass` (e.g. `closestRule(rule, CSSMediaRule)`).
+*   **`resolveSelector(rule)`** — Resolves CSS Nesting `&` combinators and relative selectors across enclosing `CSSStyleRule` and `@scope` ancestors into a canonical selector string.
+*   **`parseSelectorAST(input, options?)`** — Parses a selector string or `CSSRule` into a Selectors Level 4 `SelectorList` AST (resolving nested `&` selectors by default when given a `CSSRule`).
 *   **`getDeclaredProperties(root, options?)`** — Collects all declared CSS property names across the rule tree, including parent shorthands and `@supports` feature queries.
-*   **`resolveNestedSelector(parentSelector, nestedSelector)`** — Resolves CSS Nesting `&` combinators and relative selectors into canonical selector strings.
 *   **`calculateSpecificity(selector: string | SelectorList)`** — Calculates selector specificity tuple `[a, b, c]`.
 *   **`getCascadedStyle(element: MatchableElement, rules: Rule[]): CSSStyleDeclaration`** — Computes cascaded styles against a DOM/linkedom element.
 *   **`resolveVariables(style: CSSStyleDeclaration, property: string, envMap?)`** — Resolves `var()` and `env()` substitutions on a `CSSStyleDeclaration`.
 
 ## Architecture & Spec Boundaries
 
-This section outlines the boundaries between standard CSSOM specifications and custom extensions in this library.
+This section outlines the boundaries between standard CSSOM specifications (`src/spec.ts`) and standalone Node tooling (`src/tools.ts`).
 
-### 1. Standard CSSOM Layer
-These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification and related module extensions (CSS Conditional Rules, CSS Nesting, CSS Fonts, CSS Animations, CSS Paged Media, CSS View Transitions, and CSS Cascade). They are designed to mirror standard browser CSSOM APIs in Node.js and headless environments.
+### 1. Standard CSSOM Layer (`src/spec.ts`)
+These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification and related module extensions (CSS Conditional Rules, CSS Nesting, CSS Fonts, CSS Animations, CSS Paged Media, CSS View Transitions, and CSS Cascade). They are designed to mirror standard browser CSSOM APIs in Node.js and headless environments, and are verified bidirectionally against W3C WebIDL definitions via `webidl2.js` in [`tests/api-surface.test.ts`](./tests/api-surface.test.ts).
 
 **Interfaces & Classes**
 - **Base Hierarchy & Collections**: `StyleSheet`, `CSSStyleSheet`, `StyleSheetList`, `CSSRule`, `CSSRuleList`, `CSSGroupingRule`, `MediaList`, `LinkStyle` (TypeScript interface)
 - **Style Rules & Nesting**: `CSSStyleRule`, `CSSNestedDeclarations`
-- **Conditional & Grouping Rules**: `CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSScopeRule`, `CSSStartingStyleRule`
-- **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSCustomMediaRule`, `CSSAtRule`
-- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSKeyframeStyleDeclaration`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
+- **Conditional & Grouping Rules**: `CSSConditionRule`, `CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSScopeRule`, `CSSStartingStyleRule`
+- **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSCustomMediaRule`
+- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
 
 **Deviations & Extensions**
-- **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. We allow direct instantiation of rule classes with explicit rule and token parameters (e.g., `new CSSStyleRule(selector, decls, rules)`) for headless manipulation. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
-- **Structured Tree Accessors**: `CSSStyleRule.prototype.selectorAST` and `MediaList.prototype.mediaQueriesAST` expose parsed selector and media query structures directly on CSSOM objects for tooling integration.
+- **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
 - **Synchronous `CSSStyleSheet.prototype.replace()`**: While the CSSOM-1 specification specifies parallel parsing for `replace()`, our implementation executes parsing synchronously via `replaceSync()` and returns `Promise.resolve(this)`.
 - **`CSSImportRule.styleSheet`**: Evaluates to `null` because the library operates as a static, offline parser without network or disk I/O to load external stylesheets.
 - **Source Location Tracking (`CSSRule.prototype.location`)**: Parsed CSS rules expose their source offsets (`{ start: number, end: number, line: number, column: number, bodyStart?: number, bodyEnd?: number }`) relative to the original source text via a non-enumerable `location` property on `CSSRule.prototype` (with 1-based `line` and `column` numbers), enabling source maps, DevTools coverage pruning, and refactoring tools without breaking standard IDL enumeration or serialization.
 - **Legacy `CSSRule.type` Constants**: Numeric type constants (`STYLE_RULE = 1`, `MEDIA_RULE = 4`, etc.) are retained on `CSSRule` instances and static constructors for backward compatibility, with modern rule types evaluating to `0`.
 - **CSSStyleDeclaration Host Integration**: `CSSStyleDeclaration` supports a `(parentRule?, onChange?)` constructor signature and public `onChange` callback hook (temporarily setting `decl.onChange = null` suppresses callbacks when hydrating from host DOM `style` attributes). It also provides a full Proxy supporting camelCase (`style.fontSize`), kebab-case (`style['font-size']`), `style.cssFloat`, `webkit*` prefixes, exact case preservation on `--customProperties`, and WebIDL-compliant `Object.keys(style)` returning only indexed property names `0..length-1`.
 - **CSSSupportsRule Feature Evaluation**: `CSSSupportsRule.prototype.matches` returns a boolean evaluating the condition text via the conditional rules engine per CSS Conditional 4/5.
-- **Single Rule Model (`CSSRule`)**: The public `Rule` type is an alias for `CSSRule`. The parser-private `ASTAtRule` scratch type is internal and not exported. Custom at-rules parsed via the `atRules` option with `parse()` produce standard `CSSAtRule` instances exposing `.declarations` (for declaration blocks) or `.childRules` (for rule blocks) and standard `.cssText`.
+- **Single Rule Model (`CSSRule`)**: The public `Rule` type is an alias for `CSSRule`. Custom at-rules parsed via the `atRules` option with `parse()` produce `CSSAtRule` instances (exported in `src/tools.ts`) exposing `.declarations` (for declaration blocks) or `.childRules` (for rule blocks) and standard `.cssText`.
 
 ---
 
@@ -278,7 +286,7 @@ These APIs expose low-level parsing, property registration, and typed values def
     - Structure classes: `CSSParserValue`, `CSSParserToken`, `CSSParserBlock`, `CSSParserFunction`, `CSSParserRule`, `CSSParserAtRule`, `CSSParserQualifiedRule`, `CSSParserDeclaration`
 - **Typed OM Values & Math (`import { ... } from 'cssomnom'`)**:
     - `CSSStyleValue` (base class, `CSSStyleValue.parse()`, `CSSStyleValue.parseAll()`)
-    - `CSSKeywordValue`, `CSSUnparsedValue`, `CSSVariableReferenceValue`, `CSSPositionValue`, `CSSImageValue`, `CSSNumericArray`, `createCSSStyleValue`
+    - `CSSKeywordValue`, `CSSUnparsedValue`, `CSSVariableReferenceValue`, `CSSPositionValue`, `CSSImageValue`, `CSSNumericArray`
     - `CSSNumericValue`, `CSSUnitValue`, `CSSMathValue`
     - Math subclasses: `CSSMathSum`, `CSSMathProduct`, `CSSMathNegate`, `CSSMathInvert`, `CSSMathMin`, `CSSMathMax`, `CSSMathClamp`, `CSSMathRound`, `CSSMathFunction`
     - Unit factory methods on `CSS` (`CSS.px()`, `CSS.em()`, `CSS.rem()`, `CSS.deg()`, `CSS.s()`, `CSS.Hz()`, `CSS.kHz()`, `CSS.Q()`, etc.)
@@ -309,23 +317,24 @@ These APIs expose low-level parsing, property registration, and typed values def
 
 ---
 
-### 3. Node Static Analysis, Cascade & Tooling Layer
-These standalone tree-shakeable functions are exported from `cssomnom` (and the non-cascade subset from `cssomnom/parse`):
+### 3. Node Static Analysis, Cascade & Tooling Layer (`src/tools.ts`)
+These standalone tree-shakeable functions and classes are exported from `cssomnom` (`src/tools.ts`):
 
-**Functions**
-- `parse(css, options?)`: Direct parser returning a constructable `CSSStyleSheet`.
-- `walkRules(root)`: Pre-order generator yielding [`RuleWalkEntry`](./src/walk.ts) (`rule`, `ancestors`, `parentRule`, `parentAtRule`, `line`, `column`, `selectorText`, `rawSelectorText`, `style`, `declarations`, `getPropertyValue()`, `hasProperty()`).
-- `walkStyleRules(root)`: Filtered generator yielding [`StyleRuleWalkEntry`](./src/walk.ts) for style-bearing rules (`CSSStyleRule`, `CSSNestedDeclarations`, `CSSKeyframeRule`).
+**Functions & Classes**
+- `parse(css, options?)`: Direct parser returning a constructable `CSSStyleSheet` (`cssomnom` and `cssomnom/parse`).
+- `getRules(root, RuleClass?)`: Depth-first pre-order collector returning `CSSRule[]` (or narrowed `T[]` when `RuleClass` is passed).
+- `closestRule(rule, RuleClass)`: Walks strict `rule.parentRule` ancestors to find the nearest enclosing `RuleClass` instance.
+- `resolveSelector(rule)`: Resolves CSS Nesting `&` combinators and relative selectors across enclosing `CSSStyleRule` and `@scope` ancestors into a canonical selector string.
+- `parseSelectorAST(input, options?)`: Parses a selector string or `CSSRule` into a Selectors Level 4 `SelectorList` AST.
 - `getDeclaredProperties(root, options?)`: Collects a `Set<string>` of all declared CSS property names across the stylesheet, including parent shorthands (`border`, `border-color`, `outline`, `overflow`, `padding`, `margin`, `line-clamp`, etc.) and `@supports` feature queries (`{ includeSupports?: boolean }`, default `true`).
-- `resolveNestedSelector(parentSelector, nestedSelector)`: Resolves CSS Nesting `&` combinators and relative selectors into canonical compound/complex selector strings.
 - `calculateSpecificity(selector)`: Calculates selector specificity tuple `[a, b, c]`.
 - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
 - `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
 - `getCascadedStyle(element, rules, pseudoElement?, options?)`: Computes cascaded styles against a DOM element.
 - `resolveVariables(style, property, envMap?)`: Resolves `var()` and `env()` substitutions with fallback handling.
 - `matches(element, selector)` / `querySelector(root, selector)` / `querySelectorAll(root, selector)`: Static selector matchers and DOM query utilities (featuring a 1,000-entry bounded LRU selector AST cache and RFC 4647 `:lang()` extended language range matching).
-- `escape(ident)` / `supports(conditionText)`: Standalone top-level exports matching `CSS.escape()` and `CSS.supports()`.
 - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
+- `CSSAtRule`: Custom at-rule representation created when `ParserOptions.atRules` is passed to `parse()`.
 
 **API Surface Verification**
 The public API surface area is locked down and verified by [api-surface.test.ts](./tests/api-surface.test.ts). Any additions or removals of public exports must be reflected in that test to ensure intentional API changes.
@@ -354,20 +363,20 @@ The core parser (`src/parser.ts`) exports standalone pure functions (`parseStyle
 `cssomnom` is evaluated against the official [W3C Web Platform Tests (WPT)](https://github.com/web-platform-tests/wpt) in pure Node.js across 8 major specification suites (CSSOM, Syntax, Nesting, Variables, Selectors, Media Queries, Cascade, and Typed OM).
 
 <!-- WPT_PROGRESS_SUMMARY_START -->
-* **W3C Standards Conformance**: **93.5%** (21,652 / 23,157 passed assertions across 1,882 test files).
+* **W3C Standards Conformance**: **93.5%** (21,654 / 23,157 passed assertions across 1,882 test files).
 * **Chrome 154 Parity**: **93.5%** pass rate across 28,773 common subtests evaluated against official [`wpt.fyi`](https://wpt.fyi) runs.
 
 | Specification Suite | In-Scope Tests | **cssomnom** | Pass Rate | Parity vs Chrome 154 |
 | :--- | :---: | :---: | :---: | :---: |
 | **`Typed OM`** | 12,768 | 12,187 | **95.4%** | 🟢 **+1.9%** (ahead of Chrome) |
-| **`CSSOM`** | 2,527 | 2,345 | **92.8%** | -4.3% |
+| **`CSSOM`** | 2,527 | 2,347 | **92.9%** | -4.3% |
 | **`Nesting`** | 126 | 126 | **100.0%** | 🟢 **+0.7%** (ahead of Chrome) |
 | **`Syntax`** | 418 | 412 | **98.6%** | 🟢 **+0.2%** (ahead of Chrome) |
 | **`Cascade`** | 556 | 528 | **95.0%** | -4.9% |
 | **`Variables`** | 501 | 466 | **93.0%** | 🟢 **+2.5%** (ahead of Chrome) |
 | **`Selectors`** | 5,842 | 5,178 | **88.6%** | 🟢 **+2.7%** (ahead of Chrome) |
 | **`Media Queries`** | 419 | 410 | **97.9%** | -0.7% |
-| **OVERALL** | **23,157** | **21,652** | **93.5%** | 🟢 **+0.4%** |
+| **OVERALL** | **23,157** | **21,654** | **93.5%** | 🟢 **+0.4%** |
 <!-- WPT_PROGRESS_SUMMARY_END -->
 
 > See [wpt-progress.md](./wpt-progress.md) for the live historical progress log and [scripts/wpt/node/README.md](./scripts/wpt/node/README.md) for feasibility architecture and capability boundaries.

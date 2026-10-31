@@ -31,8 +31,10 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 
 ## Directory & Module Ownership
 
-- [`src/index.ts`](./src/index.ts): Main public entry point exporting `parse`, `tokenize`, `serialize`, `getCascadedStyle`, `matches`, `CSSStyleDeclaration`, and CSSOM classes.
-- [`src/parse-entry.ts`](./src/parse-entry.ts): Lightweight, tree-shakeable `./parse` subpath entry point exporting `parse`, `Parser`, `CSSStyleSheet`, `CSSStyleDeclaration`, `CSSRule` subclasses, `walkRules`, and `resolveNestedSelector` without pulling in the cascade engine or Typed OM.
+- [`src/index.ts`](./src/index.ts): Main public entry point combining [`src/spec.ts`](./src/spec.ts) and [`src/tools.ts`](./src/tools.ts).
+- [`src/spec.ts`](./src/spec.ts): Pure W3C WebIDL surface barrel exporting only standard CSSOM, Typed OM, and Geometry classes plus the `CSS` namespace (verified bidirectionally against W3C `.idl` files in `tests/api-surface.test.ts`).
+- [`src/tools.ts`](./src/tools.ts): Standalone Node static-analysis, selector AST, cascade, and tokenizer barrel (`parse`, `parseSelectorAST`, `getRules`, `closestRule`, `resolveSelector`, `getDeclaredProperties`, `calculateSpecificity`, `getCascadedStyle`, `resolveVariables`, `matches`, `querySelector`, `querySelectorAll`, `tokenize`, `serialize`, `StreamingTokenizer`, `CSSAtRule`, and AST types).
+- [`src/parse-entry.ts`](./src/parse-entry.ts): Minimal `./parse` subpath entry point for `linkedom` exporting `parse`, `CSSStyleSheet`, `CSSStyleDeclaration`, and standard `CSSRule` subclasses without pulling in `walk.ts`, the cascade engine, or Typed OM.
 - [`src/browser-entry.ts`](./src/browser-entry.ts): Browser polyfill bundle entry exposing CSSOM/Typed OM onto `window` with WebIDL constructor arities.
 - [`src/tokenizer.ts`](./src/tokenizer.ts) & [`src/AbstractTokenizer.ts`](./src/AbstractTokenizer.ts): CSS Syntax 3 tokenization engine and character preprocessing.
 - [`src/streaming-tokenizer.ts`](./src/streaming-tokenizer.ts): Incremental streaming tokenizer emitting tokens chunk-by-chunk.
@@ -63,8 +65,8 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - [`src/internal-token.ts`](./src/internal-token.ts): Internal symbol token guarding non-constructible CSSOM rule constructors per WebIDL § 3.6.3.
 - [`src/utils.ts`](./src/utils.ts): Common helper utilities (`camelToDashed`, `createIndexedProxy`, `deleteRuleFromArray`).
 - [`src/utils/format.ts`](./src/utils/format.ts): Number formatting utility using `Intl.NumberFormat` with spec float precision.
-- [`src/walk.ts`](./src/walk.ts): Static analysis traversal helpers (`walkRules`, `walkStyleRules`, `getDeclaredProperties`) providing ancestor hierarchy, resolved selectors, shorthand-aware property queries, and 1-based source lines.
-- [`src/nesting.ts`](./src/nesting.ts): Standalone CSS Nesting selector resolution (`resolveNestedSelector`, `splitSelectorList`) shared by `src/walk.ts`, `src/parse-entry.ts`, and `src/cascade/rule-filter.ts`.
+- [`src/walk.ts`](./src/walk.ts): Pure-CSSOM traversal and query helpers (`getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, `getDeclaredProperties`) operating directly on standard `CSSRule` and `CSSStyleSheet` instances.
+- [`src/nesting.ts`](./src/nesting.ts): Standalone CSS Nesting selector resolution (`resolveNestedSelector`, `splitSelectorList`) shared by `src/walk.ts` and `src/cascade/rule-filter.ts`.
 - [`src/cascade/`](./src/cascade/): Cascade resolution and computed style engine:
   - [`cascade/index.ts`](./src/cascade/index.ts): Main pipeline orchestration for `getCascadedStyle()`.
   - [`cascade/rule-filter.ts`](./src/cascade/rule-filter.ts): Rule harvesting, media query filtering, and selector matching.

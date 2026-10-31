@@ -21,7 +21,8 @@ import { createIndexedProxy } from '../utils.ts';
 import type { CSSStyleSheet, CSSRule } from '../CSSOM.ts';
 
 export class StyleSheetList {
-  private _sheets: CSSStyleSheet[];
+  /** @internal */
+  _sheets: CSSStyleSheet[];
 
   constructor(sheets: CSSStyleSheet[]) {
     this._sheets = sheets;
@@ -54,7 +55,8 @@ export interface LinkStyle {
 // cssom-1 #the-medialist-interface
 export class MediaList {
   [index: number]: string;
-  private _mediaQueries: MediaQuery[] = [];
+  /** @internal */
+  _mediaQueries: MediaQuery[] = [];
 
   constructor(mediaText: string = '') {
     this.mediaText = mediaText;
@@ -88,10 +90,6 @@ export class MediaList {
 
   toString(): string {
     return this.mediaText;
-  }
-
-  get mediaQueriesAST(): MediaQuery[] {
-    return this._mediaQueries;
   }
 
   // cssom-1 #dom-medialist-appendmedium
@@ -137,7 +135,8 @@ export class MediaList {
 
 export class CSSRuleList {
   [index: number]: CSSRule;
-  private _getRules: () => CSSRule[];
+  /** @internal */
+  _getRules: () => CSSRule[];
 
   constructor(rulesOrGetter: CSSRule[] | (() => CSSRule[])) {
     this._getRules = typeof rulesOrGetter === 'function' ? rulesOrGetter : () => rulesOrGetter;

@@ -308,15 +308,15 @@ export class CSSKeyframesRule extends CSSRule {
   /** @internal */ _name: string;
   /** @internal */ _rules: CSSKeyframeRule[];
   /** @internal */ _cssRules: CSSRuleList;
+  /** @internal */ _self!: CSSKeyframesRule;
 
   constructor(name: string, rules: CSSKeyframeRule[]) {
     super();
     this._name = name;
     this._rules = rules;
     this._cssRules = new CSSRuleList(() => this._rules);
-    hideInternalFields(this);
 
-    return new Proxy(this, {
+    const proxy = new Proxy(this, {
       get(target, prop) {
         if (typeof prop === 'string') {
           const index = Number(prop);
@@ -340,6 +340,14 @@ export class CSSKeyframesRule extends CSSRule {
         return undefined;
       }
     });
+    this._self = proxy;
+    hideInternalFields(this);
+    for (const rule of rules) {
+      if (rule instanceof CSSRule) {
+        rule._parentRule = proxy;
+      }
+    }
+    return proxy;
   }
 
   get name(): string { return this._name; }
@@ -416,13 +424,17 @@ export class CSSKeyframesRule extends CSSRule {
     const bodyTokens = tokens.slice(openIdx + 1, closeIdx);
     const styleDecl = parseStyleAttribute(bodyTokens);
     const keyframe = new CSSKeyframeRule(keyText, styleDecl._declarations);
-    keyframe._parentRule = this;
+    keyframe._parentRule = this._self;
     this._rules.push(keyframe);
   }
 
   deleteRule(select: string): void {
     const idx = this._findRuleIndex(select);
-    if (idx !== -1) this._rules.splice(idx, 1);
+    if (idx !== -1) {
+      const removed = this._rules[idx];
+      if (removed instanceof CSSRule) removed._parentRule = null;
+      this._rules.splice(idx, 1);
+    }
   }
 }
 
@@ -831,6 +843,13 @@ export class CSSAtRule extends CSSRule {
     this._block = block;
     this._childRules = childRules;
     this._declarations = declarations;
+    if (childRules) {
+      for (const rule of childRules) {
+        if (rule instanceof CSSRule) {
+          rule._parentRule = this;
+        }
+      }
+    }
     hideInternalFields(this);
   }
 
@@ -939,7 +958,12 @@ for (const [, prop] of COUNTER_STYLE_DESCRIPTORS) {
 
 // css-fonts-4 #om-fontfeaturevalues
 export class CSSFontFeatureValuesMap {
-  private _map = new Map<string, number[]>();
+  /** @internal */
+  _map = new Map<string, number[]>();
+
+  constructor() {
+    hideInternalFields(this);
+  }
 
   get size(): number { return this._map.size; }
   get(featureValueName: string): number[] | undefined { return this._map.get(featureValueName); }

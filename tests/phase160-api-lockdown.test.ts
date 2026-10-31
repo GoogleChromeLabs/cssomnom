@@ -21,6 +21,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import * as RootExports from '../src/index.ts';
+import * as SpecExports from '../src/spec.ts';
+import * as ToolsExports from '../src/tools.ts';
 import * as ParseExports from '../src/parse-entry.ts';
 import * as ParserApiExports from '../src/parser-api.ts';
 import {
@@ -35,7 +37,7 @@ import {
 describe('Phase 160: Public API Lockdown, ./parse Bundle Diet & Code Quality', () => {
 
   describe('160.1: 3-Cupboard Package Entrypoint Separation', () => {
-    it('Cupboard 1 (.) exports pure CSS namespace without WICG or resolveNestedSelector', () => {
+    it('Cupboard 1 (.) combines pure spec.ts and tools.ts without redundant top-level aliases', () => {
       assert.equal(typeof CSS, 'object');
       assert.equal(CSS[Symbol.toStringTag], 'CSS');
       assert.equal(typeof CSS.escape, 'function');
@@ -48,14 +50,29 @@ describe('Phase 160: Public API Lockdown, ./parse Bundle Diet & Code Quality', (
       assert.equal('parseStylesheet' in CSS, false, 'parseStylesheet must not be on CSS');
       assert.equal('parseRule' in CSS, false, 'parseRule must not be on CSS');
 
-      // Cupboard 1 top-level exports
-      assert.equal(typeof RootExports.resolveNestedSelector, 'function');
+      // Spec barrel and Tools barrel must be strictly disjoint
+      const specKeys = new Set(Object.keys(SpecExports));
+      for (const toolKey of Object.keys(ToolsExports)) {
+        assert.equal(specKeys.has(toolKey), false, `"${toolKey}" must not appear in both spec.ts and tools.ts`);
+      }
+
+      // Cupboard 1 top-level tool exports
+      assert.equal(typeof RootExports.getRules, 'function');
+      assert.equal(typeof RootExports.closestRule, 'function');
+      assert.equal(typeof RootExports.resolveSelector, 'function');
+      assert.equal(typeof RootExports.parseSelectorAST, 'function');
+      assert.equal(typeof RootExports.getDeclaredProperties, 'function');
       assert.equal(typeof RootExports.calculateSpecificity, 'function');
       assert.equal(typeof RootExports.getCascadedStyle, 'function');
       assert.equal(typeof RootExports.resolveVariables, 'function');
-      assert.equal(typeof RootExports.supports, 'function');
 
-      // Parser must NOT be exported from .
+      // Removed leaks and redundant aliases must NOT be exported from .
+      assert.equal('createCSSStyleValue' in RootExports, false);
+      assert.equal('escape' in RootExports, false);
+      assert.equal('supports' in RootExports, false);
+      assert.equal('resolveNestedSelector' in RootExports, false);
+      assert.equal('walkRules' in RootExports, false);
+      assert.equal('walkStyleRules' in RootExports, false);
       assert.equal('Parser' in RootExports, false, 'Parser must not be exported from .');
 
       // WICG Parser API must NOT be in .
@@ -64,7 +81,7 @@ describe('Phase 160: Public API Lockdown, ./parse Bundle Diet & Code Quality', (
       assert.equal('CSSParserRule' in RootExports, false, 'CSSParserRule must not be in .');
     });
 
-    it('Cupboard 2 (./parse) is a strict subset of . with identical signatures', () => {
+    it('Cupboard 2 (./parse) is a minimal parse + CSSOM subset of . for linkedom', () => {
       const rootKeys = new Set(Object.keys(RootExports));
       const parseKeys = Object.keys(ParseExports);
 
@@ -75,15 +92,14 @@ describe('Phase 160: Public API Lockdown, ./parse Bundle Diet & Code Quality', (
         );
       }
 
-      // Parser and low-level internal helpers must NOT be in parse-entry
+      // Parser and static analysis / streaming tools must NOT be in parse-entry
       assert.equal('Parser' in ParseExports, false, 'Parser must not be in parse-entry');
       assert.equal('parseRule' in ParseExports, false, 'parseRule must not be in parse-entry');
       assert.equal('parseStyleSheet' in ParseExports, false, 'parseStyleSheet must not be in parse-entry');
-      assert.equal('parseRuleInBlock' in ParseExports, false, 'parseRuleInBlock must not be in parse-entry');
-      assert.equal('parseRuleInScopeBlock' in ParseExports, false, 'parseRuleInScopeBlock must not be in parse-entry');
-
-      // calculateSpecificity must be exported
-      assert.equal(typeof ParseExports.calculateSpecificity, 'function');
+      assert.equal('getRules' in ParseExports, false, 'getRules must not be in parse-entry');
+      assert.equal('StreamingTokenizer' in ParseExports, false, 'StreamingTokenizer must not be in parse-entry');
+      assert.equal('calculateSpecificity' in ParseExports, false, 'calculateSpecificity must not be in parse-entry');
+      assert.equal('CSSAtRule' in ParseExports, false, 'CSSAtRule must not be in parse-entry');
     });
 
     it('Cupboard 3 (./parser-api) exports canonical WICG parser API without *Sync duplicates', () => {
@@ -230,6 +246,32 @@ describe('Phase 160: Public API Lockdown, ./parse Bundle Diet & Code Quality', (
         }
       }
       assert.deepEqual(leaks, [], `Found non-private _ declarations in dist/**/*.d.ts:\n${leaks.join('\n')}`);
+    });
+
+    it('dist/*.d.ts files are rolled-up and self-contained, and dist/parse.js does not load walk chunk', () => {
+      const distDir = path.resolve(import.meta.dirname, '../dist');
+      if (!fs.existsSync(distDir)) return;
+
+      const dtsFiles = fs
+        .readdirSync(distDir, { recursive: true })
+        .filter((f): f is string => typeof f === 'string' && f.endsWith('.d.ts'))
+        .sort();
+      assert.deepEqual(dtsFiles, ['index.d.ts', 'parse.d.ts', 'parser-api.d.ts']);
+
+      for (const rel of dtsFiles) {
+        const content = fs.readFileSync(path.join(distDir, rel), 'utf8');
+        assert.equal(
+          /(?:import|export)\s+[^;]*from\s+['"]\.\//.test(content),
+          false,
+          `Expected ${rel} to be self-contained without relative './' imports`
+        );
+      }
+
+      const parseJsPath = path.join(distDir, 'parse.js');
+      if (fs.existsSync(parseJsPath)) {
+        const parseJs = fs.readFileSync(parseJsPath, 'utf8');
+        assert.equal(parseJs.includes('walk-'), false, 'dist/parse.js must not import a walk-*.js chunk');
+      }
     });
   });
 

@@ -47,6 +47,10 @@ function pushCodePoints(target: number[], source: number[]): void {
   }
 }
 
+/**
+ * Incremental streaming CSS tokenizer that accepts arbitrary string chunks via `appendChunk()`,
+ * finalizes at end-of-stream via `close()`, and returns all tokenized `Token`s via `getTokens()`.
+ */
 export class StreamingTokenizer extends AbstractTokenizer {
   private codePoints: number[] = [];
   private pos: number = 0;

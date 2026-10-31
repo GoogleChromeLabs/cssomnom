@@ -15,31 +15,7 @@
  * limitations under the License.
  */
 
-export { CSSRule, CSSGroupingRule } from './rules/base.ts';
 export { parse } from './parser.ts';
-export type { ParserOptions } from './parser.ts';
-export { tokenize } from './tokenizer.ts';
-export { serialize } from './serializer.ts';
-export { StreamingTokenizer } from './streaming-tokenizer.ts';
-export type {
-  Token,
-  TokenType,
-  ComponentValue,
-  SimpleBlock,
-  CSSFunction,
-  Rule,
-  Declaration,
-  RuleSourceLocation,
-  SelectorList,
-  ComplexSelector,
-  CompoundSelector,
-  SimpleSelector,
-} from './types.ts';
-export { escape } from './css-escape.ts';
+export type { ParserOptions, SelectorASTOptions } from './parser.ts';
 export * from './CSSOM.ts';
 export { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
-export { CSSStyleProperties } from './data/gen/properties.ts';
-export { walkRules, walkStyleRules, getDeclaredProperties } from './walk.ts';
-export type { RuleWalkEntry, StyleRuleWalkEntry } from './walk.ts';
-export { resolveNestedSelector } from './nesting.ts';
-export { calculateSpecificity } from './specificity.ts';

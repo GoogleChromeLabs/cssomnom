@@ -114,13 +114,23 @@ const LEGACY_PSEUDO_CLASS_ALIASES: Record<string, string> = {
   '-webkit-autofill': 'autofill',
 };
 
+/**
+ * Options controlling selector grammar validation in `SelectorParser`.
+ */
 export interface SelectorParserOptions {
+  /** Permits leading combinators (`>`, `+`, `~`) for relative selector lists (`:has()`, `@scope`, and nested style rules). */
   allowRelative?: boolean;
+  /** Parses as a `<forgiving-selector-list>` (`:is()`, `:where()`), discarding invalid complex selectors instead of throwing `SyntaxError`. */
   forgiving?: boolean;
+  /** Disallows nested `:has()` and pseudo-elements inside `:has()` arguments. */
   insideHas?: boolean;
+  /** Rejects all pseudo-elements in contexts where pseudo-elements are forbidden (such as `:not()`, `:is()`, `:where()`, `:has()`, and `::slotted()`). */
   forbidPseudo?: boolean;
+  /** Set of declared `@namespace` prefixes valid in the stylesheet; undeclared namespace prefixes throw `SyntaxError`. */
   declaredNamespaces?: Set<string>;
+  /** Enforces strict `CSS.supports("selector(...)")` validation, rejecting `-webkit-` vendor pseudo quirks that are otherwise tolerated in stylesheets. */
   strictSupports?: boolean;
+  /** Allows any `^-[a-zA-Z0-9]+-` vendor-prefixed pseudo-class or pseudo-element (`:-moz-*`, `::-moz-*`, `:-ms-*`). */
   allowVendorPseudos?: boolean;
 }
 

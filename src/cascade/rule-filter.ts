@@ -21,7 +21,6 @@ import { findParentStyleSheet } from '../rules/utils.ts';
 import {
   CSSRule,
   CSSStyleRule,
-  CSSAtRule,
   CSSNestedDeclarations,
   CSSGroupingRule,
   CSSScopeRule,
@@ -31,6 +30,7 @@ import {
   CSSSupportsRule,
   CSSImportRule,
 } from '../CSSOM.ts';
+import { CSSAtRule } from '../rules/at-rules.ts';
 import { supports } from '../css-namespace.ts';
 import { tokenize } from '../tokenizer.ts';
 import { resolveNestedSelector } from '../nesting.ts';

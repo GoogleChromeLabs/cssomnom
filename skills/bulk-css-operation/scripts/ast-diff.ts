@@ -19,6 +19,7 @@ import {
   CSSStyleSheet,
   CSSStyleRule,
   CSSGroupingRule,
+  parseSelectorAST,
   type CSSRuleList,
 } from '../../../src/index.ts';
 import type { SelectorList } from '../../../src/types.ts';
@@ -66,7 +67,7 @@ export function extractRuleRecords(
         records.push({
           context: parentContext,
           selector: rule.selectorText.trim(),
-          selectorAST: rule.selectorAST,
+          selectorAST: parseSelectorAST(rule, { resolveNesting: false }),
           declarations: decls,
           originalIndex: counter.index++,
         });

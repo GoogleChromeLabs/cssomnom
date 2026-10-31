@@ -19,18 +19,29 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parse,
+  CSSStyleSheet,
+  CSSRule,
   CSSStyleRule,
   CSSMediaRule,
+  CSSSupportsRule,
+  CSSContainerRule,
+  CSSStartingStyleRule,
+  CSSLayerBlockRule,
+  CSSScopeRule,
   CSSKeyframesRule,
   CSSKeyframeRule,
   CSSNestedDeclarations,
-  walkRules,
-  walkStyleRules,
+  CSSPageRule,
+  CSSAtRule,
+  getRules,
+  closestRule,
+  resolveSelector,
+  parseSelectorAST,
   getDeclaredProperties,
 } from '../src/index.ts';
 
-describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
-  it('walks rules in depth-first pre-order tracking parentRule, ancestors, and parentAtRule', () => {
+describe('src/walk.ts: Pure-CSSOM Traversal, Selector Resolution, and Property Queries', () => {
+  it('collects all rules in depth-first pre-order and filters by ruleClass when specified', () => {
     const css = [
       '@media (min-width: 600px) {',
       '  .card {',
@@ -47,7 +58,7 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
     ].join('\n');
 
     const sheet = parse(css);
-    const entries = Array.from(walkRules(sheet));
+    const rules = getRules(sheet);
 
     // Order:
     // 0: CSSMediaRule
@@ -56,55 +67,65 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
     // 3: CSSKeyframesRule
     // 4: CSSKeyframeRule (from)
     // 5: CSSKeyframeRule (to)
-    assert.equal(entries.length, 6);
+    assert.equal(rules.length, 6);
 
-    const [mediaEntry, cardEntry, titleEntry, kfEntry, fromEntry, toEntry] = entries;
+    const [mediaRule, cardRule, titleRule, kfRule, fromRule, toRule] = rules;
 
-    // Media rule
-    assert.ok(mediaEntry.rule instanceof CSSMediaRule);
-    assert.equal(mediaEntry.parentRule, null);
-    assert.equal(mediaEntry.parentAtRule, null);
-    assert.deepEqual(mediaEntry.ancestors, []);
+    assert.ok(mediaRule instanceof CSSMediaRule);
+    assert.equal(mediaRule.parentRule, null);
+    assert.equal(resolveSelector(mediaRule), null);
 
     // .card inside @media
-    assert.ok(cardEntry.rule instanceof CSSStyleRule);
-    assert.equal(cardEntry.parentRule, mediaEntry.rule);
-    assert.equal(cardEntry.parentAtRule, '@media (min-width: 600px)');
-    assert.deepEqual(cardEntry.ancestors, [mediaEntry.rule]);
-    assert.equal(cardEntry.selectorText, '.card');
-    assert.equal(cardEntry.rawSelectorText, '.card');
+    assert.ok(cardRule instanceof CSSStyleRule);
+    assert.equal(cardRule.parentRule === mediaRule, true);
+    assert.equal(closestRule(cardRule, CSSMediaRule) === mediaRule, true);
+    assert.equal(closestRule(cardRule, CSSStyleRule), null);
+    assert.equal(cardRule.selectorText, '.card');
+    assert.equal(resolveSelector(cardRule), '.card');
 
     // & .title inside .card inside @media
-    assert.ok(titleEntry.rule instanceof CSSStyleRule);
-    assert.equal(titleEntry.parentRule, cardEntry.rule);
-    assert.equal(titleEntry.parentAtRule, '@media (min-width: 600px)');
-    assert.deepEqual(titleEntry.ancestors, [mediaEntry.rule, cardEntry.rule]);
-    assert.equal(titleEntry.selectorText, ':is(.card) .title');
-    assert.equal(titleEntry.rawSelectorText, '& .title');
+    assert.ok(titleRule instanceof CSSStyleRule);
+    assert.equal(titleRule.parentRule === cardRule, true);
+    assert.equal(closestRule(titleRule, CSSStyleRule) === cardRule, true);
+    assert.equal(closestRule(titleRule, CSSMediaRule) === mediaRule, true);
+    assert.equal(titleRule.selectorText, '& .title');
+    assert.equal(resolveSelector(titleRule), ':is(.card) .title');
 
-    // @keyframes rule
-    assert.ok(kfEntry.rule instanceof CSSKeyframesRule);
-    assert.equal(kfEntry.parentRule, null);
-    assert.equal(kfEntry.parentAtRule, null);
+    // @keyframes and keyframe rules
+    assert.ok(kfRule instanceof CSSKeyframesRule);
+    assert.equal(kfRule.parentRule, null);
 
-    // keyframe from
-    assert.ok(fromEntry.rule instanceof CSSKeyframeRule);
-    assert.equal(fromEntry.parentRule, kfEntry.rule);
-    assert.equal(fromEntry.parentAtRule, '@keyframes fade');
-    assert.equal(fromEntry.selectorText, '0%');
-    assert.equal(fromEntry.rawSelectorText, '0%');
-    assert.equal(fromEntry.getPropertyValue('opacity'), '0');
+    assert.ok(fromRule instanceof CSSKeyframeRule);
+    assert.equal(fromRule.parentRule === kfRule, true);
+    assert.equal(closestRule(fromRule, CSSKeyframesRule) === kfRule, true);
+    assert.equal(resolveSelector(fromRule), '0%');
+    assert.equal(fromRule.style.getPropertyValue('opacity'), '0');
 
-    // keyframe to
-    assert.ok(toEntry.rule instanceof CSSKeyframeRule);
-    assert.equal(toEntry.parentRule, kfEntry.rule);
-    assert.equal(toEntry.parentAtRule, '@keyframes fade');
-    assert.equal(toEntry.selectorText, '100%');
-    assert.equal(toEntry.rawSelectorText, '100%');
-    assert.equal(toEntry.getPropertyValue('opacity'), '1');
+    assert.ok(toRule instanceof CSSKeyframeRule);
+    assert.equal(toRule.parentRule === kfRule, true);
+    assert.equal(closestRule(toRule, CSSKeyframesRule) === kfRule, true);
+    assert.equal(resolveSelector(toRule), '100%');
+    assert.equal(toRule.style.getPropertyValue('opacity'), '1');
+
+    // Dynamically appended keyframe rule preserves proxy identity on parentRule
+    kfRule.appendRule('50% { opacity: 0.5; }');
+    const midRule = kfRule.findRule('50%');
+    assert.ok(midRule instanceof CSSKeyframeRule);
+    assert.equal(midRule.parentRule === kfRule, true);
+    assert.equal(closestRule(midRule, CSSKeyframesRule) === kfRule, true);
+
+    // Filtered getRules(sheet, CSSStyleRule)
+    const styleRules = getRules(sheet, CSSStyleRule);
+    assert.equal(styleRules.length, 2);
+    assert.equal(styleRules[0] === cardRule, true);
+    assert.equal(styleRules[1] === titleRule, true);
+
+    // Subtree traversal starting at mediaRule
+    const mediaStyleRules = getRules(mediaRule, CSSStyleRule);
+    assert.equal(mediaStyleRules.length, 2);
   });
 
-  it('formats parentAtRule for diverse at-rules (@supports, @container, @starting-style, @layer, @scope)', () => {
+  it('closestRule finds enclosing at-rules (@supports, @container, @starting-style, @layer, @scope)', () => {
     const css = [
       '@supports (display: grid) {',
       '  .grid { display: grid; }',
@@ -124,17 +145,19 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
     ].join('\n');
 
     const sheet = parse(css);
-    const styleEntries = Array.from(walkStyleRules(sheet));
-    assert.equal(styleEntries.length, 5);
+    const styleRules = getRules(sheet, CSSStyleRule);
+    assert.equal(styleRules.length, 5);
 
-    assert.equal(styleEntries[0].parentAtRule, '@supports (display: grid)');
-    assert.equal(styleEntries[1].parentAtRule, '@container (min-width: 400px)');
-    assert.equal(styleEntries[2].parentAtRule, '@starting-style');
-    assert.equal(styleEntries[3].parentAtRule, '@layer utilities');
-    assert.equal(styleEntries[4].parentAtRule, '@scope (.card) to (.content)');
+    assert.equal(closestRule(styleRules[0], CSSSupportsRule)?.conditionText, '(display: grid)');
+    assert.equal(closestRule(styleRules[1], CSSContainerRule)?.conditionText, '(min-width: 400px)');
+    assert.equal(closestRule(styleRules[2], CSSStartingStyleRule) instanceof CSSStartingStyleRule, true);
+    assert.equal(closestRule(styleRules[3], CSSLayerBlockRule)?.name, 'utilities');
+    const scopeRule = closestRule(styleRules[4], CSSScopeRule);
+    assert.equal(scopeRule?.start, '.card');
+    assert.equal(scopeRule?.end, '.content');
   });
 
-  it('resolves selectors correctly for CSSNestedDeclarations and relative nested rules', () => {
+  it('resolves selectors for CSSNestedDeclarations, relative nested rules, and CSSPageRule', () => {
     const css = [
       '.card {',
       '  padding: 10px;',
@@ -143,73 +166,107 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
       '    span { font-weight: bold; }',
       '  }',
       '}',
+      '@page :first { margin: 1cm; }',
     ].join('\n');
 
     const sheet = parse(css);
-    const styleEntries = Array.from(walkStyleRules(sheet));
+    const [cardRule, spanRule] = getRules(sheet, CSSStyleRule);
+    const [nestedDecl] = getRules(sheet, CSSNestedDeclarations);
+    const [pageRule] = getRules(sheet, CSSPageRule);
 
-    // 0: .card (CSSStyleRule)
-    // 1: CSSNestedDeclarations inside @media (color: red)
-    // 2: span inside @media inside .card (CSSStyleRule)
-    assert.equal(styleEntries.length, 3);
+    assert.equal(resolveSelector(cardRule), '.card');
+    assert.equal(resolveSelector(nestedDecl), '.card');
+    assert.equal(closestRule(nestedDecl, CSSMediaRule)?.conditionText, '(min-width: 600px)');
+    assert.equal(nestedDecl.style.getPropertyValue('color'), 'red');
 
-    // .card
-    assert.equal(styleEntries[0].selectorText, '.card');
-    assert.equal(styleEntries[0].rawSelectorText, '.card');
-
-    // CSSNestedDeclarations inside @media inherits .card selector
-    assert.ok(styleEntries[1].rule instanceof CSSNestedDeclarations);
-    assert.equal(styleEntries[1].selectorText, '.card');
-    assert.equal(styleEntries[1].rawSelectorText, '.card');
-    assert.equal(styleEntries[1].parentAtRule, '@media (min-width: 600px)');
-    assert.equal(styleEntries[1].getPropertyValue('color'), 'red');
-
-    // span inside .card resolves relative/nested selector to :is(.card) span
-    assert.equal(styleEntries[2].selectorText, ':is(.card) span');
-    assert.equal(styleEntries[2].rawSelectorText, '& span');
-    assert.equal(styleEntries[2].parentAtRule, '@media (min-width: 600px)');
+    assert.equal(spanRule.selectorText, '& span');
+    assert.equal(resolveSelector(spanRule), ':is(.card) span');
+    assert.equal(resolveSelector(pageRule), ':first');
   });
 
-  it('inherits :scope selector for CSSNestedDeclarations inside @scope without enclosing style rule', () => {
-    const css = [
-      '@scope (.article) {',
-      '  color: black;',
-      '}',
-    ].join('\n');
+  it('inherits :scope selector for CSSNestedDeclarations and expands & / relative selectors inside @scope', () => {
+    const sheet1 = parse('@scope (.article) { color: black; & .title { font-weight: bold; } > .direct { margin: 0; } .plain { color: gray; } }');
+    const [decl1] = getRules(sheet1, CSSNestedDeclarations);
+    assert.equal(resolveSelector(decl1), ':scope');
 
-    const sheet = parse(css);
-    const styleEntries = Array.from(walkStyleRules(sheet));
-    assert.equal(styleEntries.length, 1);
-    assert.ok(styleEntries[0].rule instanceof CSSNestedDeclarations);
-    assert.equal(styleEntries[0].selectorText, ':scope');
-    assert.equal(styleEntries[0].rawSelectorText, ':scope');
+    const [ampRule, relRule, plainRule] = getRules(sheet1, CSSStyleRule);
+    assert.equal(resolveSelector(ampRule), ':is(:scope) .title');
+    assert.equal(resolveSelector(relRule), ':is(:scope) > .direct');
+    assert.equal(resolveSelector(plainRule), '.plain');
+
+    const ampAst = parseSelectorAST(ampRule);
+    assert.ok(ampAst);
+    const firstComplex = ampAst.selectors[0];
+    assert.equal(firstComplex.type, 'complex-selector');
+    if (firstComplex.type === 'complex-selector') {
+      const firstCompound = firstComplex.items[0];
+      assert.equal(firstCompound.type, 'compound-selector');
+      if (firstCompound.type === 'compound-selector') {
+        assert.equal(firstCompound.selectors[0].type, 'pseudo-class-selector');
+      }
+    }
+
+    const sheet2 = parse('.card { @scope (.inner) { color: red; } }');
+    const [decl2] = getRules(sheet2, CSSNestedDeclarations);
+    assert.equal(resolveSelector(decl2), ':scope');
+    assert.equal(closestRule(decl2, CSSScopeRule)?.start, '.inner');
+    assert.equal(closestRule(decl2, CSSStyleRule)?.selectorText, '.card');
   });
 
-  it('provides shorthand contraction and presence checks on walk entries', () => {
-    const css = '.box { border: 1px solid red; outline: 2px dashed blue; }';
-    const sheet = parse(css);
-    const [entry] = Array.from(walkStyleRules(sheet));
-    assert.ok(entry);
+  it('recurses into CSSAtRule.childRules when custom atRules are configured', () => {
+    const sheet = parse('@custom-group { .inside { color: green; } }', {
+      atRules: { 'custom-group': 'rule' },
+    });
+    const atRules = getRules(sheet, CSSAtRule);
+    assert.equal(atRules.length, 1);
+    const styleRules = getRules(sheet, CSSStyleRule);
+    assert.equal(styleRules.length, 1);
+    assert.equal(styleRules[0].selectorText, '.inside');
+    assert.equal(closestRule(styleRules[0], CSSAtRule) === atRules[0], true);
+  });
 
-    // Direct and shorthand getPropertyValue
-    assert.equal(entry.getPropertyValue('border-width'), '1px');
-    assert.equal(entry.getPropertyValue('border-color'), 'red');
-    assert.equal(entry.getPropertyValue('border'), '1px solid red');
-    assert.equal(entry.getPropertyValue('outline'), 'blue dashed 2px');
-    assert.equal(entry.getPropertyValue('nonexistent'), null);
+  it('parseSelectorAST parses selector strings and CSSStyleRules (with and without nesting resolution)', () => {
+    const sheet = parse('.card { & > .title:hover { color: blue; } }');
+    const [cardRule, titleRule] = getRules(sheet, CSSStyleRule);
 
-    // hasProperty checks both longhands and parent shorthands
-    assert.equal(entry.hasProperty('border'), true);
-    assert.equal(entry.hasProperty('border-color'), true);
-    assert.equal(entry.hasProperty('outline'), true);
-    assert.equal(entry.hasProperty('outline-style'), true);
-    assert.equal(entry.hasProperty('margin'), false);
-    assert.equal(entry.hasProperty('padding'), false);
+    // Top-level rule returns AST directly
+    const cardAst = parseSelectorAST(cardRule);
+    assert.ok(cardAst);
+    assert.equal(cardAst.selectors.length, 1);
 
-    // declarations extraction
-    assert.ok(entry.declarations.length >= 2);
-    const props = entry.declarations.map(d => d.property);
-    assert.ok(props.some(p => p.startsWith('border-')));
+    // Nested rule resolves & by default (resolveNesting: true)
+    const resolvedTitleAst = parseSelectorAST(titleRule);
+    assert.ok(resolvedTitleAst);
+    const firstComplex = resolvedTitleAst.selectors[0];
+    assert.equal(firstComplex.type, 'complex-selector');
+    if (firstComplex.type === 'complex-selector') {
+      const firstCompound = firstComplex.items[0];
+      assert.equal(firstCompound.type, 'compound-selector');
+      if (firstCompound.type === 'compound-selector') {
+        assert.equal(firstCompound.selectors[0].type, 'pseudo-class-selector');
+        if (firstCompound.selectors[0].type === 'pseudo-class-selector') {
+          assert.equal(firstCompound.selectors[0].name, 'is');
+        }
+      }
+    }
+
+    // Raw selector AST on nested rule (resolveNesting: false) preserves nesting-selector (&)
+    const rawTitleAst = parseSelectorAST(titleRule, { resolveNesting: false });
+    assert.ok(rawTitleAst);
+    const rawComplex = rawTitleAst.selectors[0];
+    assert.equal(rawComplex.type, 'complex-selector');
+    if (rawComplex.type === 'complex-selector') {
+      const firstCompound = rawComplex.items[0];
+      assert.equal(firstCompound.type, 'compound-selector');
+      if (firstCompound.type === 'compound-selector') {
+        assert.equal(firstCompound.selectors[0].type, 'nesting-selector');
+      }
+    }
+
+    // String input
+    const strAst = parseSelectorAST('.btn:focus-visible, .btn:active');
+    assert.ok(strAst);
+    assert.equal(strAst.selectors.length, 2);
   });
 
   it('getDeclaredProperties indexes longhands, parent shorthands, and @supports features', () => {
@@ -229,7 +286,6 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
 
     const sheet = parse(css);
 
-    // Default: includeSupports = true
     const props = getDeclaredProperties(sheet);
     assert.ok(props.has('border'));
     assert.ok(props.has('border-width'));
@@ -242,26 +298,10 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
     assert.ok(props.has('backdrop-filter'));
     assert.ok(props.has('opacity'));
 
-    // Option: includeSupports = false
     const withoutSupports = getDeclaredProperties(sheet, { includeSupports: false });
     assert.ok(withoutSupports.has('border'));
-    assert.ok(withoutSupports.has('interpolate-size')); // because declared in .anim
-    assert.equal(withoutSupports.has('backdrop-filter'), false); // only in @supports condition
-  });
-
-  it('handles @scope nested inside style rule attributing :scope and parentAtRule to CSSNestedDeclarations', () => {
-    const css = '.card { @scope (.inner) { color: red; } }';
-    const sheet = parse(css);
-    const styleEntries = Array.from(walkStyleRules(sheet));
-    assert.equal(styleEntries.length, 2);
-
-    const [cardEntry, scopeNestedEntry] = styleEntries;
-    assert.equal(cardEntry.selectorText, '.card');
-
-    assert.ok(scopeNestedEntry.rule instanceof CSSNestedDeclarations);
-    assert.equal(scopeNestedEntry.selectorText, ':scope');
-    assert.equal(scopeNestedEntry.parentAtRule, '@scope (.inner)');
-    assert.equal(scopeNestedEntry.getPropertyValue('color'), 'red');
+    assert.ok(withoutSupports.has('interpolate-size'));
+    assert.equal(withoutSupports.has('backdrop-filter'), false);
   });
 
   it('tokenizes @supports condition filtering selector() pseudo-functions and non-properties', () => {
@@ -275,16 +315,22 @@ describe('src/walk.ts: Static Analysis Traversal and Property Queries', () => {
     assert.equal(props.has('hover'), false);
   });
 
-  it('computes exact line and column locations with CRLF (\\r\\n) newlines', () => {
+  it('computes 1-based line and column locations on both parse() and replaceSync() with CRLF newlines', () => {
     const css = '/* header */\r\n.first {\r\n  color: red;\r\n}\r\n.second {\r\n  color: blue;\r\n}';
     const sheet = parse(css);
-    const entries = Array.from(walkRules(sheet));
-    assert.equal(entries.length, 2);
+    const [first, second] = getRules(sheet, CSSStyleRule);
 
-    const [first, second] = entries;
-    assert.equal(first.line, 2);
-    assert.equal(first.column, 1);
-    assert.equal(second.line, 5);
-    assert.equal(second.column, 1);
+    assert.equal(first.location?.line, 2);
+    assert.equal(first.location?.column, 1);
+    assert.equal(second.location?.line, 5);
+    assert.equal(second.location?.column, 1);
+
+    const constructed = new CSSStyleSheet();
+    constructed.replaceSync(css);
+    const [cFirst, cSecond] = getRules(constructed, CSSRule);
+    assert.equal(cFirst.location?.line, 2);
+    assert.equal(cFirst.location?.column, 1);
+    assert.equal(cSecond.location?.line, 5);
+    assert.equal(cSecond.location?.column, 1);
   });
 });

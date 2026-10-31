@@ -30,7 +30,8 @@ import { Parser } from './parser.ts';
 import { tokenize } from './tokenizer.ts';
 import type { ComponentValue, SimpleBlock, CSSFunction, Declaration } from './types.ts';
 import { serialize } from './serializer.ts';
-import { CSSAtRule, CSSGroupingRule, CSSImportRule, CSSKeyframesRule, CSSMediaRule, CSSRule, CSSStyleRule } from './CSSOM.ts';
+import { CSSGroupingRule, CSSImportRule, CSSKeyframesRule, CSSMediaRule, CSSRule, CSSStyleRule } from './CSSOM.ts';
+import { CSSAtRule } from './rules/at-rules.ts';
 
 export abstract class CSSParserValue {
   abstract toString(): string;
@@ -213,7 +214,11 @@ async function sourceToString(source: CSSStringSource): Promise<string> {
   return result;
 }
 
+/**
+ * Options for WICG CSS Parser API entry points (`parseStylesheet`, `parseRuleList`, `parseRule`, etc.).
+ */
 export interface CSSParserOptions {
+  /** Custom at-rule grammar descriptors mapping at-rule names (without `@`) to block handling modes (`'declaration'` or `'rule'`). */
   atRules?: Record<string, string>;
 }
 

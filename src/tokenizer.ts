@@ -17,6 +17,9 @@
 import { AbstractTokenizer } from './AbstractTokenizer.ts';
 import type { Token, ParseError } from './types.ts';
 
+/**
+ * Tokenizes a CSS input string into an array of CSS Syntax Level 3 tokens (ending with an `EOF` token).
+ */
 // css-syntax-3 #tokenization
 export function tokenize(input: string, unicodeRangesAllowed: boolean = false, errors?: ParseError[]): Token[] {
   const tokenizer = new Tokenizer(input);

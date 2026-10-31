@@ -153,10 +153,17 @@ export function setParseTransformListHook(hook: (str: string) => { is2D: boolean
   parseTransformListHook = hook;
 }
 
+/**
+ * Dictionary for initializing a `DOMPoint` or `DOMPointReadOnly` via `fromPoint()` or `matrix.transformPoint()`.
+ */
 export interface DOMPointInit {
+  /** X coordinate (defaults to `0`). */
   x?: number;
+  /** Y coordinate (defaults to `0`). */
   y?: number;
+  /** Z coordinate (defaults to `0`). */
   z?: number;
+  /** Perspective W coordinate (defaults to `1`). */
   w?: number;
 }
 
@@ -201,13 +208,30 @@ export class DOMPoint extends DOMPointReadOnly {
   }
 }
 
+/**
+ * Dictionary for initializing a 2D or 3D `DOMMatrix` / `DOMMatrixReadOnly` via `fromMatrix()`.
+ * 2D affine components (`a`..`f`) alias their 4x4 matrix counterparts (`m11`, `m12`, `m21`, `m22`, `m41`, `m42`).
+ */
 export interface DOMMatrixInit {
-  a?: number; b?: number; c?: number; d?: number; e?: number; f?: number;
+  /** 2D horizontal scaling component (aliases `m11`). */
+  a?: number;
+  /** 2D vertical skewing component (aliases `m12`). */
+  b?: number;
+  /** 2D horizontal skewing component (aliases `m21`). */
+  c?: number;
+  /** 2D vertical scaling component (aliases `m22`). */
+  d?: number;
+  /** 2D horizontal translation component (aliases `m41`). */
+  e?: number;
+  /** 2D vertical translation component (aliases `m42`). */
+  f?: number;
   m11?: number; m12?: number; m13?: number; m14?: number;
   m21?: number; m22?: number; m23?: number; m24?: number;
   m31?: number; m32?: number; m33?: number; m34?: number;
   m41?: number; m42?: number; m43?: number; m44?: number;
+  /** Explicitly marks the matrix as 2D (`true`) or 3D (`false`). Throws `TypeError` if `true` while non-default 3D components are set. */
   is2D?: boolean;
+  /** @internal */
   toFloat64Array?: () => number[] | Float64Array;
 }
 

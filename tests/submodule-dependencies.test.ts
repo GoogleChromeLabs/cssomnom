@@ -13,6 +13,7 @@ const FORBIDDEN_PATTERNS = [
 // Files that legitimately mention submodule paths as static string fixtures
 // (e.g. testing WPT CLI path normalization or classifier pattern matching on file paths)
 const EXCLUDED_TEST_FILES = new Set([
+  'tests/api-surface.test.ts',
   'tests/wpt-cli.test.ts',
   'tests/wpt-classifier.test.ts',
   'tests/submodule-dependencies.test.ts',

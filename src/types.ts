@@ -52,12 +52,21 @@ export interface ParseError {
   token?: Token;
 }
 
+/**
+ * Source span and 1-based line/column position of a parsed `CSSRule` within the input stylesheet (`rule.location`).
+ */
 export interface RuleSourceLocation {
+  /** 0-based UTF-16 code unit start offset of the rule in the source string. */
   start: number;
+  /** 0-based UTF-16 code unit end offset (exclusive) of the rule in the source string. */
   end: number;
+  /** 1-based line number corresponding to `start`. */
   line: number;
+  /** 1-based column number corresponding to `start`. */
   column: number;
+  /** 0-based start offset of the rule's `{ ... }` block body content (immediately after `{`), if the rule has a block. */
   bodyStart?: number;
+  /** 0-based end offset of the rule's `{ ... }` block body content (immediately before `}`), if the rule has a block. */
   bodyEnd?: number;
 }
 

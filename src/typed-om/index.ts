@@ -42,7 +42,6 @@ export { CSSKeywordValue } from './values/CSSKeywordValue.ts';
 export { CSSImageValue } from './values/CSSImageValue.ts';
 export { CSSVariableReferenceValue } from './values/CSSVariableReferenceValue.ts';
 export { CSSUnparsedValue } from './values/CSSUnparsedValue.ts';
-export { createCSSStyleValue } from './values/style-value-factory.ts';
 
 // 3. Colors
 export { CSSColorValue } from './color/CSSColorValue.ts';

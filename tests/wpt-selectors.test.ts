@@ -57,8 +57,8 @@ describe('WPT Selectors parsing and serialization', () => {
         }
 
         const styleRule = lastRule as CSSStyleRule;
-        assert.ok(styleRule.selectorAST, 'Expected AST to be present');
-        const actual = serializeSelectorList(styleRule.selectorAST, hasDefaultNamespace);
+        assert.ok(styleRule._selectorAST, 'Expected AST to be present');
+        const actual = serializeSelectorList(styleRule._selectorAST, hasDefaultNamespace);
         assert.strictEqual(actual, expected);
       }
     });

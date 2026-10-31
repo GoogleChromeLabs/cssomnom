@@ -141,6 +141,10 @@ function getLastToken(node: ComponentValue): Token | null {
   return t;
 }
 
+/**
+ * Serializes an array of CSS component values or tokens back into a CSS string,
+ * inserting `/** /` comment separators between adjacent tokens that would otherwise merge.
+ */
 export function serialize(nodes: ComponentValue[], preserveCase: boolean = false, propertyName?: string): string {
   if (propertyName === 'font-family') {
     return serializeFontFamily(nodes);

@@ -448,7 +448,11 @@ export class CSSPerspective extends CSSTransformComponent {
   }
 }
 
+/**
+ * Options for constructing a `CSSMatrixComponent` (`new CSSMatrixComponent(matrix, options)`).
+ */
 export interface CSSMatrixComponentOptions {
+  /** Overrides whether the matrix component serializes as 2D `matrix(...)` (`true`) or 3D `matrix3d(...)` (`false`). Defaults to `matrix.is2D`. */
   is2D?: boolean;
 }
 

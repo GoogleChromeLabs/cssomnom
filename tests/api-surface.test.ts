@@ -16,12 +16,215 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
 import * as CSSOM from '../src/index.ts';
+import * as SpecExports from '../src/spec.ts';
+import * as ToolsExports from '../src/tools.ts';
 import * as ParseEntry from '../src/parse-entry.ts';
 import * as ParserApiEntry from '../src/parser-api.ts';
 
+interface WebIDLMember {
+  type: string;
+  name?: string;
+  special?: string;
+  readonly?: boolean;
+}
+
+interface WebIDLDefinition {
+  type: string;
+  name: string;
+  partial?: boolean;
+  inheritance?: string | null;
+  members?: WebIDLMember[];
+  target?: string;
+  includes?: string;
+}
+
+function loadWebIDLParser(webidl2Path: string): (idl: string) => WebIDLDefinition[] {
+  const sandbox: { WebIDL2?: { parse: (idl: string) => WebIDLDefinition[] } } = {};
+  vm.runInNewContext(fs.readFileSync(webidl2Path, 'utf8'), sandbox);
+  if (!sandbox.WebIDL2?.parse) {
+    throw new Error(`Failed to load WebIDL2.parse from ${webidl2Path}`);
+  }
+  return sandbox.WebIDL2.parse;
+}
+
+/**
+ * Explicit, reason-annotated registry of intentional deviations between `src/spec.ts`
+ * and the vendored W3C WebIDL definitions in `submodules/web-platform-tests/interfaces/*.idl`.
+ */
+const INTENTIONAL_WEBIDL_DEVIATIONS = {
+  interfaces: {
+    CSSCustomMediaRule: {
+      reason: 'Media Queries Level 5 @custom-media rule interface (submodules/csswg-drafts/mediaqueries-5/Overview.bs).',
+    },
+    CSSMarginDescriptors: {
+      reason: 'CSSOM 1 / CSS Page 3 margin rule style descriptor subclass of CSSStyleDeclaration.',
+    },
+    CSSMathFunction: {
+      reason: 'CSS Values 4 math functions (sin, cos, abs, sign, etc.) represented as a CSSMathValue subclass.',
+    },
+    CSSMathRound: {
+      reason: 'CSS Values 4 round() math operation represented as a CSSMathValue subclass.',
+    },
+    CSSPositionValue: {
+      reason: 'CSS Typed OM Level 1 <position> value class retained for Typed OM 1 grammar reification.',
+    },
+  } as Record<string, { reason: string }>,
+
+  inheritance: {
+    CSSStyleDeclaration: {
+      expected: 'CSSStyleProperties',
+      reason: 'Extends generated CSSStyleProperties base class to inherit TypeScript camelCase/kebab-case property declarations and cssFloat.',
+    },
+    CSSStyleProperties: {
+      expected: null,
+      reason: 'Generated base class holding standard CSS property declarations.',
+    },
+    CSSTransformComponent: {
+      expected: 'CSSStyleValue',
+      reason: 'Inherits from CSSStyleValue per README § Intentional Spec Deviations to align with Blink/WebKit reification.',
+    },
+  } as Record<string, { expected: string | null; reason: string }>,
+
+  extraMembers: {
+    'CSS.x': {
+      reason: 'CSS Typed OM Level 1 resolution unit factory (submodules/css-houdini-drafts/css-typed-om/Overview.bs).',
+    },
+    'CSSRule.prototype.location': {
+      reason: 'Non-enumerable 1-based line/column/offset source location for static analysis and coverage pruning.',
+    },
+    'CSSStyleDeclaration.prototype.onChange': {
+      reason: 'Host DOM style attribute synchronization callback required by linkedom.',
+    },
+    'CSSScopeRule.prototype.startSelector': {
+      reason: 'Raw parenthesized prelude accessor alongside standard CSSScopeRule.prototype.start.',
+    },
+    'CSSScopeRule.prototype.endSelector': {
+      reason: 'Raw parenthesized prelude accessor alongside standard CSSScopeRule.prototype.end.',
+    },
+    'CSSImportRule.prototype.scopeStart': {
+      reason: 'CSS Cascade 6 scoped @import start selector accessor.',
+    },
+    'CSSImportRule.prototype.scopeEnd': {
+      reason: 'CSS Cascade 6 scoped @import end selector accessor.',
+    },
+    'CSSImportRule.prototype.isScoped': {
+      reason: 'CSS Cascade 6 scoped @import boolean flag.',
+    },
+    'CSSKeywordValue.prototype.serialize': {
+      reason: 'Typed OM internal/public serialization hook backing CSSStyleValue.prototype.toString.',
+    },
+    'CSSUnitValue.prototype.serialize': {
+      reason: 'Typed OM serialization hook backing CSSStyleValue.prototype.toString.',
+    },
+    'CSSUnparsedValue.prototype.serialize': {
+      reason: 'Typed OM serialization hook backing CSSStyleValue.prototype.toString.',
+    },
+    'CSSUnparsedValue.prototype.type': {
+      reason: 'Typed OM value type descriptor method.',
+    },
+    'CSSUnparsedValue.prototype.item': {
+      reason: 'Indexed collection item(index) helper alongside indexed getter.',
+    },
+    'CSSTransformValue.prototype.item': {
+      reason: 'Indexed collection item(index) helper alongside indexed getter.',
+    },
+    'CSSNumericArray.prototype.item': {
+      reason: 'Indexed collection item(index) helper alongside indexed getter.',
+    },
+    'CSSNumericArray.prototype.map': {
+      reason: 'Array-like convenience helper on CSSNumericArray.',
+    },
+    'CSSNumericArray.prototype.every': {
+      reason: 'Array-like convenience helper on CSSNumericArray.',
+    },
+    'CSSMathSum.prototype.serialize': {
+      reason: 'Typed OM math serialization hook.',
+    },
+    'CSSMathProduct.prototype.serialize': {
+      reason: 'Typed OM math serialization hook.',
+    },
+    'CSSMathNegate.prototype.serialize': {
+      reason: 'Typed OM math serialization hook.',
+    },
+    'CSSMathInvert.prototype.serialize': {
+      reason: 'Typed OM math serialization hook.',
+    },
+    'CSSMathMin.prototype.serialize': {
+      reason: 'Typed OM math serialization hook.',
+    },
+    'CSSMathMax.prototype.serialize': {
+      reason: 'Typed OM math serialization hook.',
+    },
+    'CSSMathClamp.prototype.serialize': {
+      reason: 'Typed OM math serialization hook.',
+    },
+    'CSSVariableReferenceValue.prototype.toString': {
+      reason: 'Serializes fallback-bearing var() reference to CSS text.',
+    },
+    'DOMMatrixReadOnly.prototype.rotate3d': {
+      reason: 'Legacy WebKit/Geometry 3D rotation alias.',
+    },
+    'DOMMatrix.prototype.rotate3dSelf': {
+      reason: 'Legacy WebKit/Geometry mutating 3D rotation alias.',
+    },
+    'DOMMatrix.prototype.scaleNonUniformSelf': {
+      reason: 'Legacy Geometry 1 mutating non-uniform scale alias.',
+    },
+  } as Record<string, { reason: string }>,
+
+  instanceBackedMembers: new Set([
+    'CSSUnitValue.prototype.value',
+    'CSSUnitValue.prototype.unit',
+    'CSSMathSum.prototype.values',
+    'CSSMathProduct.prototype.values',
+    'CSSMathMin.prototype.values',
+    'CSSMathMax.prototype.values',
+    'CSSMathNegate.prototype.value',
+    'CSSMathInvert.prototype.value',
+    'CSSMathClamp.prototype.lower',
+    'CSSMathClamp.prototype.value',
+    'CSSMathClamp.prototype.upper',
+    'CSSMatrixComponent.prototype.matrix',
+  ]),
+
+  unimplementedMembers: {
+    'CSSContainerRule.prototype.conditions': {
+      reason: 'CSS Conditional 5 draft FrozenArray<CSSContainerCondition> not yet implemented.',
+    },
+    'CSSViewTransitionRule.prototype.types': {
+      reason: 'CSS View Transitions 2 FrozenArray<CSSOMString> types descriptor not yet implemented.',
+    },
+    'CSSMediaRule.prototype.matches': {
+      reason: 'CSS Conditional 4 live viewport media match boolean requires a browser window.',
+    },
+    'CSSFontFeatureValuesMap.prototype.forEach': {
+      reason: 'Maplike forEach helper not yet added to CSSFontFeatureValuesMap.',
+    },
+    'CSSNumericValue.prototype.type': {
+      reason: 'Implemented on concrete subclasses (CSSUnitValue, CSSMathValue).',
+    },
+    'CSSMathValue.prototype.operator': {
+      reason: 'Implemented on concrete CSSMathValue subclasses.',
+    },
+  } as Record<string, { reason: string }>,
+};
+
 test('Cupboard 1: cssomnom (.)', (t) => {
   const exports = Object.keys(CSSOM).filter(k => k !== 'default').sort();
+  t.assert.snapshot(exports);
+});
+
+test('Cupboard 1a: src/spec.ts (W3C WebIDL Barrel)', (t) => {
+  const exports = Object.keys(SpecExports).filter(k => k !== 'default').sort();
+  t.assert.snapshot(exports);
+});
+
+test('Cupboard 1b: src/tools.ts (Standalone Node & AST Tools Barrel)', (t) => {
+  const exports = Object.keys(ToolsExports).filter(k => k !== 'default').sort();
   t.assert.snapshot(exports);
 });
 
@@ -49,4 +252,192 @@ test('CSSStyleDeclaration prototype does not leak internal helpers as enumerable
     false,
     'declarations is an internal helper and must not be enumerable on CSSStyleDeclaration.prototype per CSSOM 1 § 6.6'
   );
+});
+
+test('W3C WebIDL conformance: src/spec.ts matches submodules/web-platform-tests/interfaces/*.idl via webidl2.js', (t) => {
+  const idlDir = path.resolve(import.meta.dirname, '../submodules/web-platform-tests/interfaces');
+  const webidl2Path = path.resolve(
+    import.meta.dirname,
+    '../submodules/web-platform-tests/resources/webidl2/lib/webidl2.js'
+  );
+  if (!fs.existsSync(idlDir) || !fs.existsSync(webidl2Path)) {
+    t.skip('submodules/web-platform-tests not initialized');
+    return;
+  }
+  const parseWebIDL = loadWebIDLParser(webidl2Path);
+  const idlFiles = fs
+    .readdirSync(idlDir)
+    .filter(f => f.startsWith('css') || f === 'geometry.idl' || f === 'web-animations.idl');
+
+  const interfaces = new Map<
+    string,
+    {
+      name: string;
+      inheritance: string | null;
+      members: Set<string>;
+      constants: Set<string>;
+    }
+  >();
+  const mixins = new Map<string, Set<string>>();
+  const includes: { target: string; includes: string }[] = [];
+  const cssNamespaceMembers = new Set<string>();
+  const requiredCssNamespaceSpecs = new Set([
+    'cssom.idl',
+    'css-conditional.idl',
+    'css-properties-values-api.idl',
+    'css-typed-om.idl',
+  ]);
+  const requiredCssNamespaceMembers = new Set<string>();
+
+  for (const file of idlFiles) {
+    const text = fs.readFileSync(path.join(idlDir, file), 'utf8');
+    const ast = parseWebIDL(text);
+    for (const def of ast) {
+      if (def.type === 'interface') {
+        let entry = interfaces.get(def.name);
+        if (!entry) {
+          entry = { name: def.name, inheritance: null, members: new Set(), constants: new Set() };
+          interfaces.set(def.name, entry);
+        }
+        if (!def.partial && def.inheritance) {
+          entry.inheritance = def.inheritance;
+        }
+        for (const m of def.members ?? []) {
+          if (m.type === 'attribute' || m.type === 'operation') {
+            if (m.name && m.special !== 'static') entry.members.add(m.name);
+            if (m.special === 'stringifier') entry.members.add('toString');
+          } else if (m.type === 'stringifier') {
+            entry.members.add('toString');
+          } else if (m.type === 'const' && m.name) {
+            entry.constants.add(m.name);
+          } else if (m.type === 'iterable') {
+            for (const k of ['entries', 'keys', 'values', 'forEach']) entry.members.add(k);
+          } else if (m.type === 'maplike') {
+            for (const k of ['size', 'get', 'has', 'entries', 'keys', 'values', 'forEach']) entry.members.add(k);
+            if (!m.readonly) {
+              for (const k of ['set', 'delete', 'clear']) entry.members.add(k);
+            }
+          }
+        }
+      } else if (def.type === 'interface mixin') {
+        let mixinMembers = mixins.get(def.name);
+        if (!mixinMembers) {
+          mixinMembers = new Set();
+          mixins.set(def.name, mixinMembers);
+        }
+        for (const m of def.members ?? []) {
+          if (m.name) mixinMembers.add(m.name);
+        }
+      } else if (def.type === 'includes' && def.target && def.includes) {
+        includes.push({ target: def.target, includes: def.includes });
+      } else if (def.type === 'namespace' && def.name === 'CSS') {
+        for (const m of def.members ?? []) {
+          if (m.name) {
+            cssNamespaceMembers.add(m.name);
+            if (requiredCssNamespaceSpecs.has(file)) {
+              requiredCssNamespaceMembers.add(m.name);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  for (const inc of includes) {
+    const iface = interfaces.get(inc.target);
+    const mixin = mixins.get(inc.includes);
+    if (iface && mixin) {
+      for (const m of mixin) iface.members.add(m);
+    }
+  }
+
+  function hasIdlMemberInChain(ifaceName: string, member: string): boolean {
+    let curr = interfaces.get(ifaceName);
+    while (curr) {
+      if (curr.members.has(member) || curr.constants.has(member)) return true;
+      curr = curr.inheritance ? interfaces.get(curr.inheritance) : undefined;
+    }
+    return false;
+  }
+
+  for (const [name, exportedVal] of Object.entries(SpecExports)) {
+    if (name === 'CSS') {
+      for (const fnName of Object.keys(CSSOM.CSS)) {
+        const qualified = `CSS.${fnName}`;
+        assert.ok(
+          cssNamespaceMembers.has(fnName) || qualified in INTENTIONAL_WEBIDL_DEVIATIONS.extraMembers,
+          `${qualified} is exported on CSS namespace but missing from W3C CSS namespace IDL`
+        );
+      }
+      for (const idlFn of requiredCssNamespaceMembers) {
+        assert.ok(
+          idlFn in CSSOM.CSS,
+          `W3C CSS namespace member CSS.${idlFn} is missing from implementation`
+        );
+      }
+      continue;
+    }
+
+    assert.equal(typeof exportedVal, 'function', `Expected ${name} in src/spec.ts to be a class constructor`);
+    const ctor = exportedVal as Function & { prototype: object };
+    const idl = interfaces.get(name);
+
+    if (!idl) {
+      assert.ok(
+        name in INTENTIONAL_WEBIDL_DEVIATIONS.interfaces,
+        `Exported class "${name}" in src/spec.ts does not exist in W3C .idl files and is not in INTENTIONAL_WEBIDL_DEVIATIONS.interfaces`
+      );
+      continue;
+    }
+
+    // 1. Check prototype inheritance chain
+    const parentProto = Object.getPrototypeOf(ctor.prototype);
+    const actualParent = parentProto === Object.prototype ? null : parentProto.constructor.name;
+    const expectedParent =
+      name in INTENTIONAL_WEBIDL_DEVIATIONS.inheritance
+        ? INTENTIONAL_WEBIDL_DEVIATIONS.inheritance[name].expected
+        : idl.inheritance;
+    assert.equal(
+      actualParent,
+      expectedParent,
+      `Inheritance mismatch on ${name}: extends ${actualParent}, expected ${expectedParent} per WebIDL`
+    );
+
+    // 2. Outward check: every own property on prototype must be in WebIDL or allowlisted (and _ fields must be non-enumerable)
+    for (const prop of Object.getOwnPropertyNames(ctor.prototype)) {
+      if (prop === 'constructor') continue;
+      const desc = Object.getOwnPropertyDescriptor(ctor.prototype, prop);
+      if (prop.startsWith('_')) {
+        assert.equal(
+          desc?.enumerable,
+          false,
+          `Internal method ${name}.prototype.${prop} must not be enumerable`
+        );
+        continue;
+      }
+      const qualified = `${name}.prototype.${prop}`;
+      if (!hasIdlMemberInChain(name, prop)) {
+        assert.ok(
+          qualified in INTENTIONAL_WEBIDL_DEVIATIONS.extraMembers,
+          `Non-standard member ${qualified} is not in W3C WebIDL and not in INTENTIONAL_WEBIDL_DEVIATIONS.extraMembers`
+        );
+      }
+    }
+
+    // 3. Inward check: every IDL member on this interface must be implemented on prototype (or Proxy-backed descriptor / allowlisted)
+    if (name === 'CSSFontFaceDescriptors' || name === 'CSSPageDescriptors') {
+      // Descriptor properties on CSSStyleDeclaration subclasses are handled by CSSStyleDeclaration's Proxy
+      continue;
+    }
+    for (const member of idl.members) {
+      const qualified = `${name}.prototype.${member}`;
+      if (
+        !(member in ctor.prototype) &&
+        !INTENTIONAL_WEBIDL_DEVIATIONS.instanceBackedMembers.has(qualified) &&
+        !(qualified in INTENTIONAL_WEBIDL_DEVIATIONS.unimplementedMembers)
+      ) {
+        assert.fail(`W3C WebIDL member ${qualified} is missing from implementation`);
+      }
+    }
+  }
 });

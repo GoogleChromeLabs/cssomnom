@@ -761,6 +761,24 @@ Result: Tree-shakeable `cssomnom/parse` subpath export reduces standalone parsin
 
 Result (`f1ec04e74`): `src/` (excluding `src/data/gen`) net **−4 lines** (`911 insertions, 915 deletions`), 0 `oxlint` warnings/errors, zero non-private `_` declarations across all emitted `dist/**/*.d.ts` files, `cssomnom/parse` bundle down to **340 KB** (`linkedom/worker.js` down **−81.7 KB** to **685.8 KB**), and WPT **21,652 / 23,157** (**+1** pass, **0** regressions).
 
+## Phase 161: W3C WebIDL Surface Discipline, Export Separation & Pure-CSSOM Traversal [x]
+**Objective**: Separate standard W3C WebIDL interfaces (`src/spec.ts`) from standalone Node static-analysis/AST/cascade tools (`src/tools.ts`), enforce bidirectional W3C WebIDL conformance in `tests/api-surface.test.ts` via `webidl2.js`, replace `walkRules`/`walkStyleRules` wrapper objects with pure-CSSOM standalone functions (`getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`), and emit rolled-up self-contained `.d.ts` files with full JSDoc coverage.
+
+### Tasks
+- [x] **161.1 — Pure-CSSOM Replacement for `src/walk.ts`**:
+  - Delete `walkRules`, `walkStyleRules`, `RuleWalkEntry`, and `StyleRuleWalkEntry`.
+  - Implement `getRules(root, RuleClass?)`, `closestRule(rule, RuleClass)`, `resolveSelector(rule)`, `parseSelectorAST(input, options?)`, and `getDeclaredProperties(root, options?)` operating directly on standard `CSSRule` and `CSSStyleSheet` instances.
+  - Fix `CSSKeyframesRule` constructor/appendRule/deleteRule and `CSSAtRule` constructor to maintain `_parentRule` on child rules, and pass `{ source: text }` in `CSSStyleSheet._replaceRulesFromText` so `replaceSync()` populates 1-based `rule.location`.
+- [x] **161.2 — Internal Barrel Split (`src/spec.ts` + `src/tools.ts`) & Slimmed `cssomnom/parse`**:
+  - Create `src/spec.ts` (74 standard W3C WebIDL classes + `CSS` namespace) and `src/tools.ts` (standalone static-analysis/AST/cascade tools + `CSSAtRule`), re-exported by `src/index.ts`.
+  - Remove `createCSSStyleValue` from `src/typed-om/index.ts`, remove `selectorAST` from `CSSStyleRule.prototype` and `mediaQueriesAST` from `MediaList.prototype`, call `hideInternalFields(target)` inside `createIndexedProxy`, and remove redundant top-level `escape`, `supports`, and `resolveNestedSelector` exports.
+  - Slim `src/parse-entry.ts` (`cssomnom/parse`) to `parse` + `CSSOM.ts` + `CSSStyleDeclaration.ts`, eliminating the `walk-*.js` chunk from `dist/`.
+- [x] **161.3 — Automated W3C WebIDL Verification (`tests/api-surface.test.ts`)**:
+  - Parse W3C `.idl` files in `submodules/web-platform-tests/interfaces/` using vendored `webidl2.js` and verify `src/spec.ts` bidirectionally (exported classes, inheritance chains, prototype members, non-enumerable `_` internals, and `CSS` namespace methods) against an explicit, reason-annotated `INTENTIONAL_WEBIDL_DEVIATIONS` allowlist.
+- [x] **161.4 — JSDoc Coverage & Rolled-Up Self-Contained `.d.ts` Bundling (`tsdown.config.ts`, `tsconfig.build.json`)**:
+  - Add `/** ... */` JSDoc comments across all option/init/location interfaces (`ParserOptions`, `SelectorASTOptions`, `SelectorParserOptions`, `CSSStyleSheetInit`, `CSSParserOptions`, `PropertyDefinition`, `RuleSourceLocation`, `CSSMatrixComponentOptions`, `DOMPointInit`, `DOMMatrixInit`, `DeclaredPropertiesOptions`) and standalone functions.
+  - Configure `tsconfig.build.json` + `tsdown.config.ts` to emit rolled-up, self-contained `dist/index.d.ts`, `dist/parse.d.ts`, and `dist/parser-api.d.ts`.
+
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
 

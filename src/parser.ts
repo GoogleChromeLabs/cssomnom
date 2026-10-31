@@ -30,16 +30,30 @@ import { INTERNAL_RULE_TOKEN } from './internal-token.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
 import { FONT_FEATURE_VALUE_BLOCKS, MARGIN_RULE_NAMES } from './data/gen/property-list.ts';
 
+/**
+ * Configuration options for `parse()` and `Parser`.
+ */
 export interface ParserOptions {
+  /** Custom at-rule syntax descriptors mapping at-rule names (without `@`) to block types (`'declaration'` or `'rule'`, e.g. `{ tailwind: 'declaration' }`), parsed into `CSSAtRule` instances. */
   atRules?: Record<string, string>;
+  /** When `true`, allows non-`-webkit-` vendor-prefixed pseudo-classes and pseudo-elements (such as `:-moz-*`, `::-moz-*`, `:-ms-*`) in selector lists instead of rejecting them as invalid selectors. */
   allowVendorPseudos?: boolean;
+  /** Original CSS source text used to lazily compute 1-based `line` and `column` offsets on `rule.location`. Automatically populated by `parse(css)`. */
   source?: string;
 }
 
+/**
+ * Options for parsing a selector string or `CSSRule` into a `SelectorList` AST via `parseSelectorAST()`.
+ */
 export type SelectorASTOptions = {
+  /** Set of declared XML/CSS `@namespace` prefixes valid within the enclosing stylesheet. When omitted, all namespace prefixes are permitted. */
   declaredNamespaces?: Set<string>;
+  /** When `true`, permits relative selectors (e.g. `> .child`, `+ .sibling`) as used in nested style rules, `@scope`, and `:has()`. */
   allowRelative?: boolean;
+  /** When `true`, allows non-`-webkit-` vendor-prefixed pseudo-classes and pseudo-elements (such as `:-moz-*` and `:-ms-*`). */
   allowVendorPseudos?: boolean;
+  /** When `input` is a `CSSRule`, resolves nested `&` and relative selectors against enclosing ancestor rules before parsing (defaults to `true`). */
+  resolveNesting?: boolean;
 };
 import { SelectorParser } from './SelectorParser.ts';
 import { ParseHooks } from './parse-hooks.ts';
@@ -1615,8 +1629,8 @@ export function consumeRule(tokens: Token[]): Rule | null {
   return new Parser(tokens).consumeRule();
 }
 
-export function consumeListOfRules(tokens: Token[], topLevel: boolean): Rule[] {
-  return new Parser(tokens).consumeListOfRules(topLevel);
+export function consumeListOfRules(tokens: Token[], topLevel: boolean, options?: ParserOptions): Rule[] {
+  return new Parser(tokens, options).consumeListOfRules(topLevel);
 }
 
 export function parseComponentValues(tokens: TokenStream | Token[], errors?: ParseError[]): ComponentValue[] {
@@ -1635,6 +1649,10 @@ export function validateCustomPropertyValue(values: ComponentValue[]): boolean {
   return validateDeclarationValue(values, true, true);
 }
 
+/**
+ * Parses a CSS stylesheet string into a standard `CSSStyleSheet` instance,
+ * populating 1-based `rule.location` offsets on all parsed rules.
+ */
 export function parse(css: string, options?: ParserOptions): CSSStyleSheet {
   return new Parser(tokenize(css), { source: css, ...options }).parseStyleSheet();
 }

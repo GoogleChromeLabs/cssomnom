@@ -22,12 +22,21 @@ import { parseComponentValues, validateCustomPropertyValue } from './parser.ts';
 import type { ComponentValue, Token, SimpleBlock, CSSFunction, ParseError } from './types.ts';
 import { ArrayTokenStream } from './TokenStream.ts';
 
+/**
+ * Descriptor dictionary for registering a custom property via `CSS.registerProperty(definition)`.
+ */
 export interface PropertyDefinition {
+  /** Custom property name starting with `--` (e.g. `'--theme-color'`). */
   name: string;
+  /** Supported CSS syntax string (e.g. `'<color>'`, `'<length> | auto'`, or `'*'`). Defaults to `'*'`. */
   syntax?: string;
+  /** Whether the custom property inherits down the DOM tree by default. */
   inherits: boolean;
+  /** Computationally independent initial value matching `syntax` (required unless `syntax` is `'*'`). */
   initialValue?: string;
+  /** @internal */
   origin?: 'js' | 'css';
+  /** @internal */
   parsedInitialValue?: ComponentValue[];
 }
 
