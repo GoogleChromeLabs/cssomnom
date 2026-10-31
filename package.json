@@ -22,12 +22,7 @@
   ],
   "type": "module",
   "sideEffects": [
-    "./dist/index.js",
-    "./src/cascade.ts",
-    "./src/css-namespace.ts",
-    "./src/MediaParser.ts",
-    "./src/PropertyRegistry.ts",
-    "./src/typed-om/**"
+    "./dist/index.js"
   ],
   "publishConfig": {
     "access": "public"
@@ -35,9 +30,7 @@
   "files": [
     "dist",
     "!dist/cssomnom.iife.global.js",
-    "!dist/browser-entry.d.ts",
-    "src",
-    "!src/browser-entry.ts"
+    "!dist/browser-entry.d.ts"
   ],
   "exports": {
     ".": {
