@@ -458,7 +458,7 @@ export interface CSSMatrixComponentOptions {
 
 // css-typed-om #cssmatrixcomponent
 export class CSSMatrixComponent extends CSSTransformComponent {
-  public matrix: DOMMatrix;
+  private _matrix: DOMMatrix;
   constructor(matrix: DOMMatrixReadOnly, options?: CSSMatrixComponentOptions) {
     if (arguments.length < 1) {
       throw new TypeError("Failed to construct 'CSSMatrixComponent': 1 argument required, but only 0 present.");
@@ -467,13 +467,18 @@ export class CSSMatrixComponent extends CSSTransformComponent {
       throw new TypeError("Failed to construct 'CSSMatrixComponent': parameter 1 is not of type 'DOMMatrixReadOnly'.");
     }
     super();
-    this.matrix = new DOMMatrix(matrix);
+    this._matrix = new DOMMatrix(matrix);
     if (options && options.is2D !== undefined) {
       this.is2D = options.is2D;
     } else {
       this.is2D = matrix.is2D;
     }
   }
+
+  // Prototype getters/setters used purely for WPT idlharness conformance even though instance fields have better ergonomics.
+  // TODO: reconsider this if perf or ergonomics make the test failures worth it.
+  get matrix(): DOMMatrix { return this._matrix; }
+  set matrix(val: DOMMatrix) { this._matrix = val; }
 
   toString(): string {
     if (this.is2D) {

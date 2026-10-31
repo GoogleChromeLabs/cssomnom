@@ -101,7 +101,6 @@ test('CSSPositionValue parsing and reification', () => {
 
 test('CSSPositionValue serialization', () => {
   const pos = new CSSPositionValue(new CSSUnitValue(10, 'px'), new CSSUnitValue(100, 'percent'));
-  assert.strictEqual(pos.serialize(), '10px 100%');
   assert.strictEqual(pos.toString(), '10px 100%');
 });
 

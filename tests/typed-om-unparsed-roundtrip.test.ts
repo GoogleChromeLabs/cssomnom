@@ -64,7 +64,6 @@ describe('CSSUnparsedValue String Serialization Roundtrip', () => {
 
   test('CSSVariableReferenceValue with escaped identifier roundtrips properly', () => {
     const varRef = new CSSVariableReferenceValue('--a,fail');
-    assert.strictEqual(varRef.toString(), 'var(--a\\,fail)');
 
     const unparsed = new CSSUnparsedValue([varRef]);
     assert.strictEqual(unparsed.toString(), 'var(--a\\,fail)');

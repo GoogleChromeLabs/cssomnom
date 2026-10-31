@@ -58,10 +58,6 @@ export class CSSPositionValue extends CSSStyleValue {
     this._y = val;
   }
 
-  serialize(): string {
-    return `${this._x.serialize()} ${this._y.serialize()}`;
-  }
-
   override toString(): string {
     return `${this._x.toString()} ${this._y.toString()}`;
   }

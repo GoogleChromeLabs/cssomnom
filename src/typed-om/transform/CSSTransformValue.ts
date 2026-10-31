@@ -29,11 +29,18 @@ import {
   parsePerspective,
   parseMatrix
 } from './transform-parser.ts';
+import { applyValueIterable } from '../../webidl.ts';
 
 // css-typed-om #transformvalue-objects
 export class CSSTransformValue extends CSSStyleValue {
   [index: number]: CSSTransformComponent;
   public components: CSSTransformComponent[];
+  declare [Symbol.iterator]: () => IterableIterator<CSSTransformComponent>;
+  declare entries: () => IterableIterator<[number, CSSTransformComponent]>;
+  declare keys: () => IterableIterator<number>;
+  declare values: () => IterableIterator<CSSTransformComponent>;
+  declare forEach: (callback: (value: CSSTransformComponent, index: number, parent: CSSTransformValue) => void, thisArg?: unknown) => void;
+
   constructor(components: CSSTransformComponent[]) {
     super();
     if (components.length === 0) {
@@ -47,6 +54,13 @@ export class CSSTransformValue extends CSSStyleValue {
           return target.components[index];
         }
         return Reflect.get(target, prop, receiver);
+      },
+      has(target, prop) {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = parseInt(prop, 10);
+          return index >= 0 && index < target.components.length;
+        }
+        return Reflect.has(target, prop);
       },
       set(target, prop, value, receiver) {
         if (typeof prop === 'string' && /^\d+$/.test(prop)) {
@@ -66,14 +80,6 @@ export class CSSTransformValue extends CSSStyleValue {
   }
 
   get length(): number { return this.components.length; }
-  [Symbol.iterator](): IterableIterator<CSSTransformComponent> { return this.components[Symbol.iterator](); }
-  entries(): IterableIterator<[number, CSSTransformComponent]> { return this.components.entries(); }
-  keys(): IterableIterator<number> { return this.components.keys(); }
-  values(): IterableIterator<CSSTransformComponent> { return this.components.values(); }
-  forEach(callback: (value: CSSTransformComponent, index: number, array: CSSTransformComponent[]) => void, thisArg?: unknown): void {
-    this.components.forEach(callback, thisArg);
-  }
-  item(index: number): CSSTransformComponent | undefined { return this.components[index]; }
   get is2D(): boolean {
     return this.components.every(c => c.is2D);
   }
@@ -141,3 +147,5 @@ export class CSSTransformValue extends CSSStyleValue {
     return new CSSTransformValue(components);
   }
 }
+
+applyValueIterable(CSSTransformValue);

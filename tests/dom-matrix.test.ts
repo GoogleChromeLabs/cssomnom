@@ -498,7 +498,7 @@ describe('DOMMatrixReadOnly & DOMMatrix', () => {
             assert.strictEqual(m.e, 25);
             assert.strictEqual(m.f, 95);
 
-            const m2 = new DOMMatrix().scaleNonUniformSelf(3, 5);
+            const m2 = new DOMMatrix().scaleNonUniform(3, 5);
             assert.strictEqual(m2.is2D, true);
             assert.strictEqual(m2.a, 3);
             assert.strictEqual(m2.d, 5);

@@ -406,11 +406,8 @@ export interface MediaEnvironment {
 export interface InternalRuleMetadata {
   /** @internal */ _assignedLayerName?: string;
   /** @internal */ _isScoped?: boolean;
-  isScoped?: boolean;
   /** @internal */ _scopeStart?: string | null;
-  scopeStart?: string | null;
   /** @internal */ _scopeEnd?: string | null;
-  scopeEnd?: string | null;
   /** @internal */ _parentStyleSheet?: CSSStyleSheet | null;
 }
 

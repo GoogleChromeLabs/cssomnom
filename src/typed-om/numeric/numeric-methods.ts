@@ -149,7 +149,7 @@ function createSumValue(node: CSSNumericValue): SumValue | null {
   }
 
   if (node instanceof CSSMathMin || node instanceof CSSMathMax) {
-    const args = node.values.map(v => createSumValue(v));
+    const args = Array.from(node.values, v => createSumValue(v));
     if (args.some(a => !a || a.length > 1)) return null;
     const firstMap = args[0]![0].unitMap;
     if (args.some(a => !areUnitMapsEqual(a![0].unitMap, firstMap))) return null;
@@ -191,7 +191,7 @@ function isStandardCSSNumericValue(node: CSSNumericValue): boolean {
     return true;
   }
   if (node instanceof CSSMathSum || node instanceof CSSMathProduct || node instanceof CSSMathMin || node instanceof CSSMathMax) {
-    return node.values.every(isStandardCSSNumericValue);
+    return Array.from(node.values).every(isStandardCSSNumericValue);
   }
   if (node instanceof CSSMathClamp) {
     const lowerStandard = !(node.lower instanceof CSSNumericValue) || isStandardCSSNumericValue(node.lower);
@@ -221,10 +221,10 @@ export function numericTo(self: CSSNumericValue, unit: string): CSSUnitValue {
   }
   const sum = createSumValue(self);
   if (!sum || sum.length > 1) {
-    throw new TypeError(`Cannot convert ${self.serialize()} to ${unit}`);
+    throw new TypeError(`Cannot convert ${self._serialize()} to ${unit}`);
   }
   const item = createCSSUnitValueFromSumValueItem(sum[0]);
-  if (!item) throw new TypeError(`Cannot convert ${self.serialize()} to ${unit}`);
+  if (!item) throw new TypeError(`Cannot convert ${self._serialize()} to ${unit}`);
   return item.to(unit);
 }
 
@@ -235,11 +235,11 @@ export function numericToSum(self: CSSNumericValue, ...units: string[]): CSSMath
 
   const sum = createSumValue(self);
   if (!sum) {
-    throw new TypeError(`Cannot create sum value from ${self.serialize()}`);
+    throw new TypeError(`Cannot create sum value from ${self._serialize()}`);
   }
 
   const values = sum.map(item => createCSSUnitValueFromSumValueItem(item));
-  if (values.some(v => v === null)) throw new TypeError(`Cannot create sum value from ${self.serialize()}`);
+  if (values.some(v => v === null)) throw new TypeError(`Cannot create sum value from ${self._serialize()}`);
 
   let unitValues = values as CSSUnitValue[];
 
@@ -499,17 +499,13 @@ function equalsInternal(a: CSSNumericValue, other: number | CSSNumericValue): bo
     return a.value === other.value && a.unit === other.unit;
   }
 
-  if (a instanceof CSSMathSum && other instanceof CSSMathSum) {
-    return a.values.length === other.values.length && a.values.every((v: CSSNumericValue, i: number) => v.equals(other.values.item(i)!));
-  }
-  if (a instanceof CSSMathProduct && other instanceof CSSMathProduct) {
-    return a.values.length === other.values.length && a.values.every((v: CSSNumericValue, i: number) => v.equals(other.values.item(i)!));
-  }
-  if (a instanceof CSSMathMin && other instanceof CSSMathMin) {
-    return a.values.length === other.values.length && a.values.every((v: CSSNumericValue, i: number) => v.equals(other.values.item(i)!));
-  }
-  if (a instanceof CSSMathMax && other instanceof CSSMathMax) {
-    return a.values.length === other.values.length && a.values.every((v: CSSNumericValue, i: number) => v.equals(other.values.item(i)!));
+  if (
+    (a instanceof CSSMathSum && other instanceof CSSMathSum) ||
+    (a instanceof CSSMathProduct && other instanceof CSSMathProduct) ||
+    (a instanceof CSSMathMin && other instanceof CSSMathMin) ||
+    (a instanceof CSSMathMax && other instanceof CSSMathMax)
+  ) {
+    return a.values.length === other.values.length && Array.from(a.values).every((v, i) => v.equals(other.values[i]!));
   }
   if (a instanceof CSSMathClamp && other instanceof CSSMathClamp) {
     const lowerEquals = (a.lower instanceof CSSKeywordValue && other.lower instanceof CSSKeywordValue)
@@ -540,7 +536,7 @@ function equalsInternal(a: CSSNumericValue, other: number | CSSNumericValue): bo
   if (a instanceof CSSMathFunction && other instanceof CSSMathFunction) {
     return a.name === other.name &&
            a.values.length === other.values.length &&
-           a.values.every((v: CSSNumericValue, i: number) => v.equals(other.values.item(i)!));
+           Array.from(a.values).every((v, i) => v.equals(other.values[i]!));
   }
 
   return false;

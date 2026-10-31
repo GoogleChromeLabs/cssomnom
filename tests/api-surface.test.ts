@@ -99,97 +99,7 @@ const INTENTIONAL_WEBIDL_DEVIATIONS = {
     'CSSStyleDeclaration.prototype.onChange': {
       reason: 'Host DOM style attribute synchronization callback required by linkedom.',
     },
-    'CSSScopeRule.prototype.startSelector': {
-      reason: 'Raw parenthesized prelude accessor alongside standard CSSScopeRule.prototype.start.',
-    },
-    'CSSScopeRule.prototype.endSelector': {
-      reason: 'Raw parenthesized prelude accessor alongside standard CSSScopeRule.prototype.end.',
-    },
-    'CSSImportRule.prototype.scopeStart': {
-      reason: 'CSS Cascade 6 scoped @import start selector accessor.',
-    },
-    'CSSImportRule.prototype.scopeEnd': {
-      reason: 'CSS Cascade 6 scoped @import end selector accessor.',
-    },
-    'CSSImportRule.prototype.isScoped': {
-      reason: 'CSS Cascade 6 scoped @import boolean flag.',
-    },
-    'CSSKeywordValue.prototype.serialize': {
-      reason: 'Typed OM internal/public serialization hook backing CSSStyleValue.prototype.toString.',
-    },
-    'CSSUnitValue.prototype.serialize': {
-      reason: 'Typed OM serialization hook backing CSSStyleValue.prototype.toString.',
-    },
-    'CSSUnparsedValue.prototype.serialize': {
-      reason: 'Typed OM serialization hook backing CSSStyleValue.prototype.toString.',
-    },
-    'CSSUnparsedValue.prototype.type': {
-      reason: 'Typed OM value type descriptor method.',
-    },
-    'CSSUnparsedValue.prototype.item': {
-      reason: 'Indexed collection item(index) helper alongside indexed getter.',
-    },
-    'CSSTransformValue.prototype.item': {
-      reason: 'Indexed collection item(index) helper alongside indexed getter.',
-    },
-    'CSSNumericArray.prototype.item': {
-      reason: 'Indexed collection item(index) helper alongside indexed getter.',
-    },
-    'CSSNumericArray.prototype.map': {
-      reason: 'Array-like convenience helper on CSSNumericArray.',
-    },
-    'CSSNumericArray.prototype.every': {
-      reason: 'Array-like convenience helper on CSSNumericArray.',
-    },
-    'CSSMathSum.prototype.serialize': {
-      reason: 'Typed OM math serialization hook.',
-    },
-    'CSSMathProduct.prototype.serialize': {
-      reason: 'Typed OM math serialization hook.',
-    },
-    'CSSMathNegate.prototype.serialize': {
-      reason: 'Typed OM math serialization hook.',
-    },
-    'CSSMathInvert.prototype.serialize': {
-      reason: 'Typed OM math serialization hook.',
-    },
-    'CSSMathMin.prototype.serialize': {
-      reason: 'Typed OM math serialization hook.',
-    },
-    'CSSMathMax.prototype.serialize': {
-      reason: 'Typed OM math serialization hook.',
-    },
-    'CSSMathClamp.prototype.serialize': {
-      reason: 'Typed OM math serialization hook.',
-    },
-    'CSSVariableReferenceValue.prototype.toString': {
-      reason: 'Serializes fallback-bearing var() reference to CSS text.',
-    },
-    'DOMMatrixReadOnly.prototype.rotate3d': {
-      reason: 'Legacy WebKit/Geometry 3D rotation alias.',
-    },
-    'DOMMatrix.prototype.rotate3dSelf': {
-      reason: 'Legacy WebKit/Geometry mutating 3D rotation alias.',
-    },
-    'DOMMatrix.prototype.scaleNonUniformSelf': {
-      reason: 'Legacy Geometry 1 mutating non-uniform scale alias.',
-    },
   } as Record<string, { reason: string }>,
-
-  instanceBackedMembers: new Set([
-    'CSSUnitValue.prototype.value',
-    'CSSUnitValue.prototype.unit',
-    'CSSMathSum.prototype.values',
-    'CSSMathProduct.prototype.values',
-    'CSSMathMin.prototype.values',
-    'CSSMathMax.prototype.values',
-    'CSSMathNegate.prototype.value',
-    'CSSMathInvert.prototype.value',
-    'CSSMathClamp.prototype.lower',
-    'CSSMathClamp.prototype.value',
-    'CSSMathClamp.prototype.upper',
-    'CSSMatrixComponent.prototype.matrix',
-  ]),
 
   unimplementedMembers: {
     'CSSContainerRule.prototype.conditions': {
@@ -200,15 +110,6 @@ const INTENTIONAL_WEBIDL_DEVIATIONS = {
     },
     'CSSMediaRule.prototype.matches': {
       reason: 'CSS Conditional 4 live viewport media match boolean requires a browser window.',
-    },
-    'CSSFontFeatureValuesMap.prototype.forEach': {
-      reason: 'Maplike forEach helper not yet added to CSSFontFeatureValuesMap.',
-    },
-    'CSSNumericValue.prototype.type': {
-      reason: 'Implemented on concrete subclasses (CSSUnitValue, CSSMathValue).',
-    },
-    'CSSMathValue.prototype.operator': {
-      reason: 'Implemented on concrete CSSMathValue subclasses.',
     },
   } as Record<string, { reason: string }>,
 };
@@ -433,7 +334,6 @@ test('W3C WebIDL conformance: src/spec.ts matches submodules/web-platform-tests/
       const qualified = `${name}.prototype.${member}`;
       if (
         !(member in ctor.prototype) &&
-        !INTENTIONAL_WEBIDL_DEVIATIONS.instanceBackedMembers.has(qualified) &&
         !(qualified in INTENTIONAL_WEBIDL_DEVIATIONS.unimplementedMembers)
       ) {
         assert.fail(`W3C WebIDL member ${qualified} is missing from implementation`);

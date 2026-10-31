@@ -22,8 +22,8 @@ import { formatNumber } from '../../utils/format.ts';
 
 // css-typed-om #simple-numeric
 export class CSSUnitValue extends CSSNumericValue {
-  value: number;
-  unit: CSSUnit;
+  private _value: number;
+  private _unit: CSSUnit;
 
   constructor(value: number, unit: CSSUnit) {
     super();
@@ -31,31 +31,33 @@ export class CSSUnitValue extends CSSNumericValue {
     if (!unitToBase[normalizedUnit]) {
       throw new TypeError(`Invalid unit: ${unit}`);
     }
-    this.value = value;
-    this.unit = normalizedUnit;
+    this._value = value;
+    this._unit = normalizedUnit;
   }
+
+  // Prototype getters/setters used purely for WPT idlharness conformance even though instance fields have better ergonomics.
+  // TODO: reconsider this if perf or ergonomics make the test failures worth it.
+  get value(): number { return this._value; }
+  set value(val: number) { this._value = Number(val); }
+  get unit(): CSSUnit { return this._unit; }
 
   override toString(): string {
-    if (this.value === Infinity) {
-      return this.unit === 'number' ? 'infinity' : `calc(infinity * 1${this.unit})`;
+    if (this._value === Infinity) {
+      return this._unit === 'number' ? 'infinity' : `calc(infinity * 1${this._unit})`;
     }
-    if (this.value === -Infinity) {
-      return this.unit === 'number' ? '-infinity' : `calc(-infinity * 1${this.unit})`;
+    if (this._value === -Infinity) {
+      return this._unit === 'number' ? '-infinity' : `calc(-infinity * 1${this._unit})`;
     }
-    if (Number.isNaN(this.value)) {
-      return this.unit === 'number' ? 'nan' : `calc(nan * 1${this.unit})`;
+    if (Number.isNaN(this._value)) {
+      return this._unit === 'number' ? 'nan' : `calc(nan * 1${this._unit})`;
     }
-    if (this.unit === 'number') {
-      return formatNumber(this.value);
+    if (this._unit === 'number') {
+      return formatNumber(this._value);
     }
-    if (this.unit === 'percent') {
-      return `${formatNumber(this.value)}%`;
+    if (this._unit === 'percent') {
+      return `${formatNumber(this._value)}%`;
     }
-    return `${formatNumber(this.value)}${this.unit}`;
-  }
-
-  serialize(): string {
-    return this.toString();
+    return `${formatNumber(this._value)}${this._unit}`;
   }
 
   override type(): CSSNumericType {

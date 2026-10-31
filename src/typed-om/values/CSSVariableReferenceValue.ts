@@ -53,7 +53,8 @@ export class CSSVariableReferenceValue {
     return this._fallback;
   }
 
-  toString(): string {
+  /** @internal */
+  _serialize(): string {
     const varName = serializeIdentifier(this._variable);
     if (this._fallback !== null) {
       return `var(${varName},${this._fallback.toString()})`;

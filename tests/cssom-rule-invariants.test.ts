@@ -273,8 +273,8 @@ test('At-rules inheritance, constructors, and specific descriptors', () => {
   // 9. CSSScopeRule
   const scopeRule = rules[8] as CSSScopeRule;
   assert.equal(scopeRule instanceof CSSScopeRule, true);
-  assert.equal(scopeRule.startSelector, '(.card)');
-  assert.equal(scopeRule.endSelector, '(.content)');
+  assert.equal(scopeRule.start, '.card');
+  assert.equal(scopeRule.end, '.content');
 
   // 10. CSSLayerBlockRule & CSSLayerStatementRule
   const layerBlock = rules[9] as CSSLayerBlockRule;

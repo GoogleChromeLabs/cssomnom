@@ -20,12 +20,21 @@ import { CSSStyleValue } from './CSSStyleValue.ts';
 import { CSSVariableReferenceValue } from './CSSVariableReferenceValue.ts';
 import { serialize, getMirrorToken } from '../../serializer.ts';
 import { isCSSFunction, hasVarFunction } from '../utils/validation.ts';
-import type { CSSNumericType } from '../numeric/CSSNumericType.ts';
+import { applyValueIterable } from '../../webidl.ts';
+
+function serializeSegment(seg: string | CSSVariableReferenceValue): string {
+  return seg instanceof CSSVariableReferenceValue ? seg._serialize() : String(seg);
+}
 
 // css-typed-om #unparsedvalue-objects
 export class CSSUnparsedValue extends CSSStyleValue {
   [index: number]: string | CSSVariableReferenceValue;
   private _values: (string | CSSVariableReferenceValue)[];
+  declare [Symbol.iterator]: () => IterableIterator<string | CSSVariableReferenceValue>;
+  declare entries: () => IterableIterator<[number, string | CSSVariableReferenceValue]>;
+  declare keys: () => IterableIterator<number>;
+  declare values: () => IterableIterator<string | CSSVariableReferenceValue>;
+  declare forEach: (callback: (value: string | CSSVariableReferenceValue, index: number, parent: CSSUnparsedValue) => void, thisArg?: unknown) => void;
 
   constructor(values: (string | CSSVariableReferenceValue)[]) {
     super();
@@ -37,6 +46,13 @@ export class CSSUnparsedValue extends CSSStyleValue {
           return target._values[index];
         }
         return Reflect.get(target, prop, receiver);
+      },
+      has(target, prop) {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = parseInt(prop, 10);
+          return index >= 0 && index < target._values.length;
+        }
+        return Reflect.has(target, prop);
       },
       // css-typed-om #unparsedvalue-objects
       set(target, prop, value, receiver) {
@@ -57,28 +73,15 @@ export class CSSUnparsedValue extends CSSStyleValue {
   }
 
   get length(): number { return this._values.length; }
-  [Symbol.iterator](): IterableIterator<string | CSSVariableReferenceValue> { return this._values[Symbol.iterator](); }
-  entries(): IterableIterator<[number, string | CSSVariableReferenceValue]> { return this._values.entries(); }
-  keys(): IterableIterator<number> { return this._values.keys(); }
-  values(): IterableIterator<string | CSSVariableReferenceValue> { return this._values.values(); }
-  forEach(callback: (value: string | CSSVariableReferenceValue, index: number, parent: CSSUnparsedValue) => void, thisArg?: unknown): void {
-    for (let i = 0; i < this._values.length; i++) {
-      callback.call(thisArg, this._values[i], i, this);
-    }
-  }
-  item(index: number): string | CSSVariableReferenceValue | undefined { return this._values[index]; }
 
   override toString(): string {
     let s = '';
     const isIdentChar = (c: string) => /[a-zA-Z0-9_-]/.test(c);
 
     for (let i = 0; i < this._values.length; i++) {
-      const current = this._values[i];
-      const prev = i > 0 ? this._values[i - 1] : null;
-
-      if (prev !== null) {
-        const prevStr = prev.toString();
-        const currentStr = current.toString();
+      const currentStr = serializeSegment(this._values[i]);
+      if (i > 0) {
+        const prevStr = serializeSegment(this._values[i - 1]);
         if (!prevStr.endsWith(' ') && !currentStr.startsWith(' ')) {
           if (prevStr.length > 0 && currentStr.length > 0) {
             if (isIdentChar(prevStr[prevStr.length - 1]) && isIdentChar(currentStr[0])) {
@@ -87,20 +90,13 @@ export class CSSUnparsedValue extends CSSStyleValue {
           }
         }
       }
-
-      s += current.toString();
+      s += currentStr;
     }
     return s;
   }
-
-  serialize(): string {
-    return this.toString();
-  }
-
-  type(): CSSNumericType {
-    return {};
-  }
 }
+
+applyValueIterable(CSSUnparsedValue);
 
 export function tokensToUnparsedSegments(values: ComponentValue[]): (string | CSSVariableReferenceValue)[] {
   const segments: (string | CSSVariableReferenceValue)[] = [];

@@ -23,7 +23,7 @@ test('CSSNumericArray in math functions', () => {
   
   assert.ok(sum.values instanceof CSSNumericArray, 'values should be a CSSNumericArray');
   assert.strictEqual(sum.values.length, 2);
-  assert.strictEqual(sum.values.item(0)!.toString(), '10px');
+  assert.strictEqual(sum.values[0]!.toString(), '10px');
   
   const values = [...sum.values];
   assert.strictEqual(values.length, 2);

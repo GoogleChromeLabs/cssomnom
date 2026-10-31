@@ -119,13 +119,13 @@ test('Phase 86: CSSVariableReferenceValue & Fallback Preservation', () => {
   const refNoFallback = new CSSVariableReferenceValue('--custom');
   assert.equal(refNoFallback.variable, '--custom');
   assert.equal(refNoFallback.fallback, null);
-  assert.equal(refNoFallback.toString(), 'var(--custom)');
+  assert.equal(new CSSUnparsedValue([refNoFallback]).toString(), 'var(--custom)');
 
   const fallback = new CSSUnparsedValue(['red']);
   const refWithFallback = new CSSVariableReferenceValue('--custom', fallback);
   assert.equal(refWithFallback.variable, '--custom');
   assert.equal(refWithFallback.fallback, fallback);
-  assert.equal(refWithFallback.toString(), 'var(--custom,red)');
+  assert.equal(new CSSUnparsedValue([refWithFallback]).toString(), 'var(--custom,red)');
 
   // Validation
   assert.throws(() => new CSSVariableReferenceValue('--'), TypeError);

@@ -27,8 +27,14 @@ export abstract class CSSNumericValue extends CSSStyleValue {
       throw new TypeError("CSSNumericValue cannot be directly constructed");
     }
   }
-  abstract serialize(): string;
-  abstract type(): CSSNumericType;
+  /** @internal */
+  _serialize(): string {
+    return this.toString();
+  }
+
+  type(): CSSNumericType {
+    return {};
+  }
 
   to(_unit: string): CSSUnitValue {
     throw new Error("CSSNumericValue.to not initialized");

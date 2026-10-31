@@ -186,11 +186,25 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
 
 /**
  * Ensures all regular prototype members (attributes and operations) on a WebIDL interface
- * prototype object are enumerable, matching WebIDL specification requirements (WebIDL § 3.6, § 3.7).
+ * prototype object are enumerable, wraps attribute accessors with brand checks, and defines
+ * `@@toStringTag`, matching WebIDL specification requirements (WebIDL § 3.6, § 3.7).
  */
+const appliedPrototypeCtors = new WeakSet<Function>();
+
 export function applyWebIDLPrototypeDescriptors(ctor: Function): void {
   const proto = ctor.prototype;
-  if (!proto) return;
+  if (!proto || appliedPrototypeCtors.has(ctor)) return;
+  appliedPrototypeCtors.add(ctor);
+
+  const interfaceName = ctor.name;
+  if (!Object.hasOwn(proto, Symbol.toStringTag)) {
+    Object.defineProperty(proto, Symbol.toStringTag, {
+      value: interfaceName,
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+  }
 
   const names = Object.getOwnPropertyNames(proto);
   for (const name of names) {
@@ -198,13 +212,67 @@ export function applyWebIDLPrototypeDescriptors(ctor: Function): void {
       continue;
     }
     const desc = Object.getOwnPropertyDescriptor(proto, name);
-    if (desc && !desc.enumerable) {
+    if (!desc) continue;
+
+    if (desc.get || desc.set) {
+      const origGet = desc.get;
+      const origSet = desc.set;
+      const get = origGet
+        ? function (this: unknown) {
+            if (!this || this === proto || !(this instanceof ctor)) {
+              throw new TypeError(
+                `Failed to read the '${name}' property from '${interfaceName}': The provided value is not of type '${interfaceName}'.`
+              );
+            }
+            return origGet.call(this);
+          }
+        : undefined;
+      if (get) Object.defineProperty(get, 'name', { value: `get ${name}`, configurable: true });
+
+      const set = origSet
+        ? function (this: unknown, val: unknown) {
+            if (!this || this === proto || !(this instanceof ctor)) {
+              throw new TypeError(
+                `Failed to set the '${name}' property on '${interfaceName}': The provided value is not of type '${interfaceName}'.`
+              );
+            }
+            return origSet.call(this, val);
+          }
+        : undefined;
+      if (set) Object.defineProperty(set, 'name', { value: `set ${name}`, configurable: true });
+
+      Object.defineProperty(proto, name, {
+        get,
+        set,
+        enumerable: true,
+        configurable: true,
+      });
+    } else if (!desc.enumerable) {
       Object.defineProperty(proto, name, {
         ...desc,
-        enumerable: true
+        enumerable: true,
       });
     }
   }
+}
+
+// WebIDL #es-iterable: value iterator prototype methods equal %Array.prototype% intrinsics
+export function applyValueIterable(ctor: Function): void {
+  const proto = ctor.prototype;
+  for (const name of ['entries', 'keys', 'values', 'forEach'] as const) {
+    Object.defineProperty(proto, name, {
+      value: Array.prototype[name],
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  }
+  Object.defineProperty(proto, Symbol.iterator, {
+    value: Array.prototype[Symbol.iterator],
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
 }
 
 /**

@@ -111,25 +111,25 @@ test('CSSNumericValue.toSum()', () => {
   const sum = val.toSum('px');
   assert.ok(sum instanceof CSSMathSum);
   assert.strictEqual(sum.values.length, 1);
-  assert.ok(sum.values.item(0) instanceof CSSUnitValue);
-  assert.strictEqual((sum.values.item(0) as CSSUnitValue).value, 96);
-  assert.strictEqual((sum.values.item(0) as CSSUnitValue).unit, 'px');
+  assert.ok(sum.values[0] instanceof CSSUnitValue);
+  assert.strictEqual((sum.values[0] as CSSUnitValue).value, 96);
+  assert.strictEqual((sum.values[0] as CSSUnitValue).unit, 'px');
 
   const val2 = new CSSMathSum(new CSSUnitValue(1, 'px'), new CSSUnitValue(1, 'in'));
   
   const sum2 = val2.toSum(); // Simplify
   assert.strictEqual(sum2.values.length, 1);
-  assert.strictEqual((sum2.values.item(0) as CSSUnitValue).value, 97);
-  assert.strictEqual((sum2.values.item(0) as CSSUnitValue).unit, 'px');
+  assert.strictEqual((sum2.values[0] as CSSUnitValue).value, 97);
+  assert.strictEqual((sum2.values[0] as CSSUnitValue).unit, 'px');
 
   const val3 = new CSSMathSum(new CSSUnitValue(10, 'px'), new CSSUnitValue(1, 'em'));
   
   const sum3 = val3.toSum('px', 'em');
   assert.strictEqual(sum3.values.length, 2);
-  assert.strictEqual((sum3.values.item(0) as CSSUnitValue).unit, 'px');
-  assert.strictEqual((sum3.values.item(0) as CSSUnitValue).value, 10);
-  assert.strictEqual((sum3.values.item(1) as CSSUnitValue).unit, 'em');
-  assert.strictEqual((sum3.values.item(1) as CSSUnitValue).value, 1);
+  assert.strictEqual((sum3.values[0] as CSSUnitValue).unit, 'px');
+  assert.strictEqual((sum3.values[0] as CSSUnitValue).value, 10);
+  assert.strictEqual((sum3.values[1] as CSSUnitValue).unit, 'em');
+  assert.strictEqual((sum3.values[1] as CSSUnitValue).value, 1);
 });
 
 test('CSSMathClamp.toSum()', () => {
@@ -140,8 +140,8 @@ test('CSSMathClamp.toSum()', () => {
   
   const sum = clamp.toSum();
   assert.strictEqual(sum.values.length, 1);
-  assert.strictEqual((sum.values.item(0) as CSSUnitValue).value, 20);
-  assert.strictEqual((sum.values.item(0) as CSSUnitValue).unit, 'px');
+  assert.strictEqual((sum.values[0] as CSSUnitValue).value, 20);
+  assert.strictEqual((sum.values[0] as CSSUnitValue).unit, 'px');
 });
 
 test('Subclass Property Renaming', () => {
@@ -253,8 +253,8 @@ test('CSSNumericValue.simplify() handles unit canonicalization for min/max/clamp
   const simplifiedMinMixed = simplify(minMixed);
   assert.ok(simplifiedMinMixed instanceof CSSMathMin);
   assert.strictEqual(simplifiedMinMixed.values.length, 2);
-  assert.strictEqual(simplifiedMinMixed.values.item(0)?.toString(), '10mm');
-  assert.strictEqual(simplifiedMinMixed.values.item(1)?.toString(), '1em');
+  assert.strictEqual(simplifiedMinMixed.values[0]?.toString(), '10mm');
+  assert.strictEqual(simplifiedMinMixed.values[1]?.toString(), '1em');
 
   const max = new CSSMathMax(tenMm, oneCm);
   const simplifiedMax = simplify(max);
@@ -275,27 +275,27 @@ test('CSSMathRound serialization adheres to omission rules', () => {
 
   // Case 1: strategy 'nearest' and step '1' should be omitted
   const round1 = new CSSMathRound('nearest', val, one);
-  assert.strictEqual(round1.serialize(), 'round(5.5)');
+  assert.strictEqual(round1.toString(), 'round(5.5)');
 
   // Case 2: strategy 'up' and step '1' -> strategy kept, step omitted
   const round2 = new CSSMathRound('up', val, one);
-  assert.strictEqual(round2.serialize(), 'round(up, 5.5)');
+  assert.strictEqual(round2.toString(), 'round(up, 5.5)');
 
   // Case 3: strategy 'nearest' and step '2' -> strategy omitted, step kept
   const round3 = new CSSMathRound('nearest', val, two);
-  assert.strictEqual(round3.serialize(), 'round(5.5, 2)');
+  assert.strictEqual(round3.toString(), 'round(5.5, 2)');
 
   // Case 4: strategy 'up' and step '2' -> both kept
   const round4 = new CSSMathRound('up', val, two);
-  assert.strictEqual(round4.serialize(), 'round(up, 5.5, 2)');
+  assert.strictEqual(round4.toString(), 'round(up, 5.5, 2)');
 
   // Case 5: step '1' was NOT omitted in source -> should NOT be omitted in serialization
   const round5 = new CSSMathRound('nearest', val, one, false);
-  assert.strictEqual(round5.serialize(), 'round(5.5, 1)');
+  assert.strictEqual(round5.toString(), 'round(5.5, 1)');
 
   // Case 6: step '1' was omitted in source -> should be omitted in serialization
   const round6 = new CSSMathRound('nearest', val, one, true);
-  assert.strictEqual(round6.serialize(), 'round(5.5)');
+  assert.strictEqual(round6.toString(), 'round(5.5)');
 });
 
 test('CSSMathSum serialization order: Percentages -> Dimensions', () => {
@@ -303,7 +303,7 @@ test('CSSMathSum serialization order: Percentages -> Dimensions', () => {
     new CSSUnitValue(10, 'px'),
     new CSSUnitValue(2, 'percent')
   );
-  assert.strictEqual(sum.serialize(), '(2% + 10px)');
+  assert.strictEqual(sum.toString(), 'calc(2% + 10px)');
 });
 
 test('CSSMathFunction.type() for trig and expo functions', () => {
@@ -356,7 +356,7 @@ test('CSSMathSum serialization sorts dimensions by code point order, ignoring lo
     const sum = new CSSMathSum(new CSSUnitValue(1, 'px'), new CSSUnitValue(1, 'em'));
     // With mocked localeCompare, 'px' < 'em', so it would sort as (1px + 1em) if using localeCompare.
     // But we want code point order where 'em' < 'px', so it should be (1em + 1px).
-    assert.strictEqual(sum.serialize(), '(1em + 1px)');
+    assert.strictEqual(sum.toString(), 'calc(1em + 1px)');
   } finally {
     String.prototype.localeCompare = originalLocaleCompare;
   }
@@ -493,8 +493,8 @@ test('CSSNumericValue.parse preserves calculation tree structure', () => {
   assert.ok(val instanceof CSSMathSum);
   const values = (val as CSSMathSum).values;
   assert.strictEqual(values.length, 2);
-  assert.strictEqual(values.item(0)?.toString(), '1px');
-  assert.strictEqual(values.item(1)?.toString(), '2em');
+  assert.strictEqual(values[0]?.toString(), '1px');
+  assert.strictEqual(values[1]?.toString(), '2em');
 });
 
 test('CSSUnitValue constructor validates unit', () => {

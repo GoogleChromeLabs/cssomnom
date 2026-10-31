@@ -30,10 +30,10 @@ export function normalizeAngleUnits(node: CSSNumericValue): CSSNumericValue {
     return node;
   }
   if (node instanceof CSSMathSum) {
-    return new CSSMathSum(...node.values.map(normalizeAngleUnits));
+    return new CSSMathSum(...Array.from(node.values, normalizeAngleUnits));
   }
   if (node instanceof CSSMathProduct) {
-    return new CSSMathProduct(...node.values.map(normalizeAngleUnits));
+    return new CSSMathProduct(...Array.from(node.values, normalizeAngleUnits));
   }
   if (node instanceof CSSMathNegate) {
     return new CSSMathNegate(normalizeAngleUnits(node.value));

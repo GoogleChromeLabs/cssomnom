@@ -739,9 +739,9 @@ export function collectMatchedDeclarations(
           const assignedLayer = rule._assignedLayerName;
           const layerName = assignedLayer || (rawLayer !== null && rawLayer !== undefined ? (currentLayer ? (rawLayer ? `${currentLayer}.${rawLayer}` : currentLayer) : rawLayer) : currentLayer);
           
-          const isScoped = rule.isScoped;
-          const scopeStart = rule.scopeStart;
-          const scopeEnd = rule.scopeEnd;
+          const isScoped = rule._isScoped;
+          const scopeStart = rule._scopeStart;
+          const scopeEnd = rule._scopeEnd;
 
           if (isScoped) {
             const startStr = scopeStart ? `(${scopeStart})` : null;
@@ -758,8 +758,8 @@ export function collectMatchedDeclarations(
         const childRules = (rule as CSSGroupingRule).cssRules || [];
         const candidateScopeRoots: DOMElement[] = [];
 
-        if (rule.startSelector) {
-          const rawStart = rule.startSelector.replace(/^\(/, '').replace(/\)$/, '').trim();
+        if (rule.start) {
+          const rawStart = rule.start;
           let scopeStart = rawStart;
           if (parentSelector) {
             scopeStart = resolveNestedSelector(rawStart, parentSelector);
@@ -829,7 +829,7 @@ export function collectMatchedDeclarations(
           }
         }
 
-        const rawEnd = rule.endSelector ? rule.endSelector.replace(/^\(/, '').replace(/\)$/, '').trim() : null;
+        const rawEnd = rule.end;
         const normalizedEnd = rawEnd ? normalizeScopeEndSelector(rawEnd) : null;
 
         for (const candRoot of candidateScopeRoots) {

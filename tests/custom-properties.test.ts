@@ -45,12 +45,12 @@ test('CSSOM: Custom property empty serialization', () => {
 test('Typed OM: CSSVariableReferenceValue parsing', () => {
   const v1 = CSSStyleValue.parse('--test', 'var(--foo)') as CSSUnparsedValue;
   assert.ok(v1 instanceof CSSUnparsedValue);
-  const ref1 = v1.item(0) as CSSVariableReferenceValue;
+  const ref1 = v1[0] as CSSVariableReferenceValue;
   assert.strictEqual(ref1.variable, '--foo');
   assert.strictEqual(ref1.fallback, null);
   
   const v2 = CSSStyleValue.parse('--test', 'var(--foo, 10px)') as CSSUnparsedValue;
-  const ref2 = v2.item(0) as CSSVariableReferenceValue;
+  const ref2 = v2[0] as CSSVariableReferenceValue;
   assert.strictEqual(ref2.variable, '--foo');
   assert.ok(ref2.fallback instanceof CSSUnparsedValue);
   assert.strictEqual(ref2.fallback.toString(), ' 10px');
@@ -58,7 +58,7 @@ test('Typed OM: CSSVariableReferenceValue parsing', () => {
 
 test('Typed OM: CSSVariableReferenceValue parsing - validate fallback comma', () => {
   const v = CSSStyleValue.parse('--test', 'var(--foo fallback)') as CSSUnparsedValue;
-  const ref = v.item(0);
+  const ref = v[0];
   assert.ok(!(ref instanceof CSSVariableReferenceValue), 'Should not be a CSSVariableReferenceValue because fallback is not comma-separated');
 });
 
@@ -230,7 +230,7 @@ test('PropertyRegistry: Reject -- as property name', async () => {
 
 test('Typed OM: Reject var(--) with empty ident', () => {
   const v = CSSStyleValue.parse('--test', 'var(--)') as CSSUnparsedValue;
-  const ref = v.item(0);
+  const ref = v[0];
   assert.ok(!(ref instanceof CSSVariableReferenceValue), 'Should not be a CSSVariableReferenceValue because name is "--"');
 });
 

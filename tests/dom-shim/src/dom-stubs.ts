@@ -200,7 +200,7 @@ function convertCanonicalUnits(rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleV
 function simplifyCalcExpression(rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
   if (!(rawVal instanceof TypedOM.CSSMathSum)) return undefined;
 
-  const units = rawVal.values.map(v => (v instanceof TypedOM.CSSUnitValue ? v.unit : null));
+  const units = Array.from(rawVal.values, v => (v instanceof TypedOM.CSSUnitValue ? v.unit : null));
   if (!units.every((u): u is TypedOM.CSSUnit => u !== null)) return undefined;
 
   if (units.every(u => u in unitToPixels || u === 'em' || u === 'rem')) {

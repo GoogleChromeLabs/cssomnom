@@ -443,10 +443,6 @@ export class DOMMatrixReadOnly {
     return DOMMatrix.fromMatrix(this).rotateAxisAngleSelf(x, y, z, angle);
   }
 
-  rotate3d(rx = 0, ry = 0, rz = 0, angle = 0): DOMMatrix {
-    return DOMMatrix.fromMatrix(this).rotate3dSelf(rx, ry, rz, angle);
-  }
-
   skewX(sx = 0): DOMMatrix {
     return DOMMatrix.fromMatrix(this).skewXSelf(sx);
   }
@@ -680,10 +676,6 @@ export class DOMMatrix extends DOMMatrixReadOnly {
     return this;
   }
 
-  scaleNonUniformSelf(sx = 1, sy = 1): DOMMatrix {
-    return this.scaleSelf(sx, sy, 1, 0, 0, 0);
-  }
-
   scale3dSelf(scale = 1, ox = 0, oy = 0, oz = 0): DOMMatrix {
     return this.scaleSelf(scale, scale, scale, ox, oy, oz);
   }
@@ -797,10 +789,6 @@ export class DOMMatrix extends DOMMatrixReadOnly {
     }
 
     return this;
-  }
-
-  rotate3dSelf(rx = 0, ry = 0, rz = 0, angle = 0): DOMMatrix {
-    return this.rotateAxisAngleSelf(rx, ry, rz, angle);
   }
 
   skewXSelf(sx = 0): DOMMatrix {

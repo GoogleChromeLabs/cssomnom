@@ -336,7 +336,7 @@ export function parseMathExpressionTokens(tokenList: ComponentValue[]): CSSNumer
       if (token.value === '-') {
         if (val instanceof CSSMathSum) {
           // Negation distribution over sum (css-values-4 #calc-simplification: step 6.3)
-          const negatedGrandchildren = val.values.map(grandchild => {
+          const negatedGrandchildren = Array.from(val.values, grandchild => {
             if (grandchild instanceof CSSUnitValue) {
               return new CSSUnitValue(-grandchild.value, grandchild.unit);
             }
@@ -748,8 +748,8 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
     const numberNode = otherChildren.find((c): c is CSSUnitValue => c instanceof CSSUnitValue && c.unit === 'number');
     const sumNode = otherChildren.find((c): c is CSSMathSum => c instanceof CSSMathSum);
     
-    if (numberNode && sumNode && otherChildren.length === 2 && sumNode.values.every(c => c instanceof CSSUnitValue)) {
-      const distributedChildren = sumNode.values.map(child => {
+    if (numberNode && sumNode && otherChildren.length === 2 && Array.from(sumNode.values).every(c => c instanceof CSSUnitValue)) {
+      const distributedChildren = Array.from(sumNode.values, child => {
         return simplify(new CSSMathProduct(numberNode, child));
       });
       return simplify(new CSSMathSum(...distributedChildren));
@@ -771,7 +771,7 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
     }
     if (simplifiedChild instanceof CSSMathSum) {
       // css-values-4 #calc-simplification
-      const negatedGrandchildren = simplifiedChild.values.map(grandchild => {
+      const negatedGrandchildren = Array.from(simplifiedChild.values, grandchild => {
         if (grandchild instanceof CSSUnitValue) {
           return new CSSUnitValue(-grandchild.value, grandchild.unit);
         }
@@ -800,12 +800,12 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
   }
   
   if (node instanceof CSSMathMin) {
-    const values = node.values.map(c => simplify(c));
+    const values = Array.from(node.values, c => simplify(c));
     return simplifyMinMax('min', values);
   }
   
   if (node instanceof CSSMathMax) {
-    const values = node.values.map(c => simplify(c));
+    const values = Array.from(node.values, c => simplify(c));
     return simplifyMinMax('max', values);
   }
   
@@ -856,7 +856,7 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
   }
 
   if (node instanceof CSSMathFunction) {
-    const values = node.values.map(v => simplify(v));
+    const values = Array.from(node.values, v => simplify(v));
     
     if (node.name === 'abs' && values.length === 1 && values[0] instanceof CSSUnitValue) {
       return new CSSUnitValue(Math.abs(values[0].value), values[0].unit);

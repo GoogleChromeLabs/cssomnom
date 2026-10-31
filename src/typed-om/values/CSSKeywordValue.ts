@@ -44,8 +44,4 @@ export class CSSKeywordValue extends CSSStyleValue {
   override toString(): string {
     return escape(this._value);
   }
-
-  serialize(): string {
-    return this.toString();
-  }
 }

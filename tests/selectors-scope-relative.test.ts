@@ -180,9 +180,9 @@ describe('Phase 118: :scope, @scope & Complex Relative Selectors', () => {
       const rules = parseStyleSheet('@import url("test.css") scope;');
       assert.equal(rules.length, 1);
       const rule = rules[0] as CSSImportRule;
-      assert.equal(rule.isScoped, true);
-      assert.equal(rule.scopeStart, null);
-      assert.equal(rule.scopeEnd, null);
+      assert.equal(rule._isScoped, true);
+      assert.equal(rule._scopeStart, null);
+      assert.equal(rule._scopeEnd, null);
       assert.equal(rule.cssText, '@import url("test.css") scope;');
     });
 
@@ -190,9 +190,9 @@ describe('Phase 118: :scope, @scope & Complex Relative Selectors', () => {
       const rules = parseStyleSheet('@import url("test.css") scope((.a) to (.b));');
       assert.equal(rules.length, 1);
       const rule = rules[0] as CSSImportRule;
-      assert.equal(rule.isScoped, true);
-      assert.equal(rule.scopeStart, '.a');
-      assert.equal(rule.scopeEnd, '.b');
+      assert.equal(rule._isScoped, true);
+      assert.equal(rule._scopeStart, '.a');
+      assert.equal(rule._scopeEnd, '.b');
       assert.equal(rule.cssText, '@import url("test.css") scope((.a) to (.b));');
     });
 
@@ -200,9 +200,9 @@ describe('Phase 118: :scope, @scope & Complex Relative Selectors', () => {
       const rules = parseStyleSheet('@import url("test.css") scope((.a));');
       assert.equal(rules.length, 1);
       const rule = rules[0] as CSSImportRule;
-      assert.equal(rule.isScoped, true);
-      assert.equal(rule.scopeStart, '.a');
-      assert.equal(rule.scopeEnd, null);
+      assert.equal(rule._isScoped, true);
+      assert.equal(rule._scopeStart, '.a');
+      assert.equal(rule._scopeEnd, null);
       assert.equal(rule.cssText, '@import url("test.css") scope((.a));');
     });
   });

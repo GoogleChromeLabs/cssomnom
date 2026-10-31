@@ -20,18 +20,27 @@ import { stripOuterParens } from '../../utils/formatting.ts';
 
 // css-typed-om #complex-numeric
 export abstract class CSSMathValue extends CSSNumericValue {
+  /** @internal */
+  abstract readonly _operator: string;
+
   constructor() {
     super();
     if (this.constructor === CSSMathValue) {
       throw new TypeError("CSSMathValue cannot be directly constructed");
     }
   }
-  abstract serialize(): string;
+
+  /** @internal */
+  abstract override _serialize(): string;
+
   override toString(): string {
-    const s = this.serialize();
+    const s = this._serialize();
     if (this.operator === 'number') return s;
     if (['min', 'max', 'clamp'].includes(this.operator)) return s;
     return `calc(${stripOuterParens(s)})`;
   }
-  abstract get operator(): string;
+
+  get operator(): string {
+    return this._operator;
+  }
 }

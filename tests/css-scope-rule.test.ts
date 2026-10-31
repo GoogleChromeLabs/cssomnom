@@ -25,10 +25,10 @@ test('CSSScopeRule should be a subclass of CSSGroupingRule', () => {
   assert.ok(rule instanceof CSSGroupingRule);
 });
 
-test('CSSScopeRule should have startSelector and endSelector properties', () => {
+test('CSSScopeRule should have start and end properties', () => {
   const rule = new CSSScopeRule('(.start)', '(.end)', [], (_text: string) => ({} as Rule));
-  assert.strictEqual(rule.startSelector, '(.start)');
-  assert.strictEqual(rule.endSelector, '(.end)');
+  assert.strictEqual(rule.start, '.start');
+  assert.strictEqual(rule.end, '.end');
 });
 
 test('CSSScopeRule should serialize correctly with both selectors', () => {
@@ -53,7 +53,7 @@ test('CSSScopeRule should preserve implied nesting selector in nested @scope', (
   const cardRule = stylesheet[0];
   assert.ok(cardRule instanceof CSSStyleRule);
   const scopeRule = cardRule.cssRules[0] as CSSScopeRule;
-  assert.strictEqual(scopeRule.startSelector, '(.content)');
+  assert.strictEqual(scopeRule.start, '.content');
 });
 
 test('CSSScopeRule should preserve relative selector in nested @scope', () => {
@@ -68,6 +68,6 @@ test('CSSScopeRule should preserve relative selector in nested @scope', () => {
   const cardRule = stylesheet[0];
   assert.ok(cardRule instanceof CSSStyleRule);
   const scopeRule = cardRule.cssRules[0] as CSSScopeRule;
-  assert.strictEqual(scopeRule.startSelector, '(> .content)');
+  assert.strictEqual(scopeRule.start, '> .content');
 });
 

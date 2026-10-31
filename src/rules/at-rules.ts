@@ -225,9 +225,6 @@ export class CSSScopeRule extends CSSGroupingRule {
     hideInternalFields(this);
   }
 
-  get startSelector(): string | null { return this._startSelector; }
-  get endSelector(): string | null { return this._endSelector; }
-
   get start(): string | null {
     return this._startSelector ? (this._startSelector.replace(/^\(/, '').replace(/\)$/, '').trim() || null) : null;
   }
@@ -568,9 +565,6 @@ export class CSSImportRule extends CSSRule {
 
   get layerName(): string | null { return this._layerName; }
   get supportsText(): string | null { return this._supportsText; }
-  get scopeStart(): string | null { return this._scopeStart; }
-  get scopeEnd(): string | null { return this._scopeEnd; }
-  get isScoped(): boolean { return this._isScoped; }
 
   get type() { return 3; } // CSSRule.IMPORT_RULE
 
@@ -904,6 +898,9 @@ export class CSSFontFeatureValuesMap {
   entries(): IterableIterator<[string, number[]]> { return this._map.entries(); }
   keys(): IterableIterator<string> { return this._map.keys(); }
   values(): IterableIterator<number[]> { return this._map.values(); }
+  forEach(callbackfn: (value: number[], key: string, map: this) => void, thisArg?: unknown): void {
+    this._map.forEach((value, key) => callbackfn.call(thisArg, value, key, this));
+  }
   [Symbol.iterator](): IterableIterator<[string, number[]]> { return this._map[Symbol.iterator](); }
 }
 

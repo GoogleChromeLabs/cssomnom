@@ -16,11 +16,17 @@
  */
 
 import type { CSSNumericValue } from './CSSNumericValue.ts';
+import { applyValueIterable } from '../../webidl.ts';
 
 // css-typed-om #cssnumericarray
 export class CSSNumericArray {
   [index: number]: CSSNumericValue;
   private _values: readonly CSSNumericValue[];
+  declare [Symbol.iterator]: () => IterableIterator<CSSNumericValue>;
+  declare entries: () => IterableIterator<[number, CSSNumericValue]>;
+  declare keys: () => IterableIterator<number>;
+  declare values: () => IterableIterator<CSSNumericValue>;
+  declare forEach: (callback: (value: CSSNumericValue, index: number, parent: CSSNumericArray) => void, thisArg?: unknown) => void;
 
   constructor(values: CSSNumericValue[]) {
     this._values = [...values];
@@ -32,23 +38,18 @@ export class CSSNumericArray {
           return target._values[index];
         }
         return Reflect.get(target, prop, receiver);
+      },
+      has(target, prop) {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = parseInt(prop, 10);
+          return index >= 0 && index < target._values.length;
+        }
+        return Reflect.has(target, prop);
       }
     });
   }
 
   get length(): number { return this._values.length; }
-  [Symbol.iterator](): IterableIterator<CSSNumericValue> { return this._values[Symbol.iterator](); }
-  entries(): IterableIterator<[number, CSSNumericValue]> { return this._values.entries(); }
-  keys(): IterableIterator<number> { return this._values.keys(); }
-  values(): IterableIterator<CSSNumericValue> { return this._values.values(); }
-  forEach(callback: (value: CSSNumericValue, index: number) => void, thisArg?: unknown): void {
-    this._values.forEach(callback, thisArg);
-  }
-  item(index: number): CSSNumericValue | undefined { return this._values[index]; }
-  map<U>(callback: (value: CSSNumericValue, index: number) => U): U[] {
-    return this._values.map(callback);
-  }
-  every(callback: (value: CSSNumericValue, index: number) => boolean): boolean {
-    return this._values.every(callback);
-  }
 }
+
+applyValueIterable(CSSNumericArray);
