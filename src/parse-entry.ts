@@ -15,6 +15,16 @@
  * limitations under the License.
  */
 
+// Policy for the `cssomnom/parse` subpath entrypoint:
+// Export ONLY what a DOM implementation (e.g. LinkeDOM) needs to parse `<style>` tags and
+// `style=""` attributes and expose `document.styleSheets`, `cssRules`, and `element.style`.
+//
+// Explicitly EXCLUDE from this entrypoint (and its transitive import graph):
+// 1. Houdini Typed OM, Geometry & `CSS` namespace (`src/typed-om.ts`, `DOMMatrix`, `StylePropertyMap`) —
+//    `src/typed-om/index.ts` registers `ParseHooks.createStylePropertyMap` and prototype descriptors via
+//    top-level side effects, so bundlers cannot tree-shake Typed OM out of `CSSStyleRule` in the root entry.
+// 2. Cascade & Computed Style engine (`src/cascade.ts`, `getCascadedStyle`, `resolveVariables`, UA stylesheet).
+// 3. Static analysis & selector query tools (`src/tools.ts`, `src/walk.ts`, `src/matcher.ts`).
 export { parse } from './parser.ts';
 export type { ParserOptions, SelectorASTOptions } from './parser.ts';
 export * from './CSSOM.ts';
