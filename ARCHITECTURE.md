@@ -65,7 +65,7 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - [`src/internal-token.ts`](./src/internal-token.ts): Internal symbol token guarding non-constructible CSSOM rule constructors per WebIDL § 3.6.3.
 - [`src/utils.ts`](./src/utils.ts): Common helper utilities (`camelToDashed`, `createIndexedProxy`, `deleteRuleFromArray`).
 - [`src/utils/format.ts`](./src/utils/format.ts): Number formatting utility using `Intl.NumberFormat` with spec float precision.
-- [`src/walk.ts`](./src/walk.ts): Pure-CSSOM traversal and query helpers (`getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, `getDeclaredProperties`) operating directly on standard `CSSRule` and `CSSStyleSheet` instances.
+- [`src/walk.ts`](./src/walk.ts): Pure-CSSOM traversal and query helpers (`getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, `getDeclaredProperties`, `getPropertyValues`) operating directly on standard `CSSRule` and `CSSStyleSheet` instances.
 - [`src/nesting.ts`](./src/nesting.ts): Standalone CSS Nesting selector resolution (`resolveNestedSelector`, `splitSelectorList`) shared by `src/walk.ts` and `src/cascade/rule-filter.ts`.
 - [`src/cascade/`](./src/cascade/): Cascade resolution and computed style engine:
   - [`cascade/index.ts`](./src/cascade/index.ts): Main pipeline orchestration for `getCascadedStyle()`.

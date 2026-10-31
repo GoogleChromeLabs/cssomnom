@@ -71,9 +71,9 @@ const nestedBodyRule = mediaRule.cssRules[0] as CSSStyleRule;
 console.log(nestedBodyRule.style.getPropertyValue('margin')); // '0'
 ```
 
-### Static Analysis Traversal & Property Indexing (`getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, `getDeclaredProperties`)
+### Static Analysis Traversal & Property Indexing (`getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, `getDeclaredProperties`, `getPropertyValues`)
 
-Use `getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, and `getDeclaredProperties` to inspect stylesheets using standard CSSOM instances without custom wrapper objects or hand-rolled recursive visitors:
+Use `getRules`, `closestRule`, `resolveSelector`, `parseSelectorAST`, `getDeclaredProperties`, and `getPropertyValues` to inspect stylesheets using standard CSSOM instances without custom wrapper objects or hand-rolled recursive visitors:
 
 ```typescript
 import {
@@ -83,13 +83,17 @@ import {
   resolveSelector,
   parseSelectorAST,
   getDeclaredProperties,
+  getPropertyValues,
   CSSStyleRule,
   CSSMediaRule,
 } from 'cssomnom';
 
 const css = `
   .card {
-    border: 1px solid red;
+    border: 1px solid var(--accent);
+    margin-inline-start: 1rem;
+    grid-template-rows: auto;
+    grid-template-rows: subgrid;
     @media (min-width: 600px) {
       color: blue;
       & .title { font-weight: bold; }
@@ -110,7 +114,9 @@ for (const rule of getRules(sheet, CSSStyleRule)) {
     selectorAST: parseSelectorAST(rule),               // Selectors Level 4 SelectorList AST (with '&' resolved)
     media: closestRule(rule, CSSMediaRule)?.conditionText ?? null, // null, '(min-width: 600px)', null
     line: rule.location?.line,                         // 1-based line number
-    borderColor: rule.style.getPropertyValue('border-color'), // 'red' on .card (contracts longhands!)
+    rows: getPropertyValues(rule, 'grid-template-rows'), // ['auto', 'subgrid'] (preserves fallback order!)
+    marginLeft: getPropertyValues(rule, 'margin-left'),  // ['1rem'] (resolves logical↔physical aliases!)
+    borderColor: getPropertyValues(rule, 'border-color'), // ['1px solid var(--accent)'] (inspects var() shorthands!)
   });
 }
 
@@ -195,7 +201,8 @@ const { document } = parseHTML(html);
 const element = document.querySelector('.box');
 
 const stylesheet = parse(css);
-const style = getCascadedStyle(element, Array.from(stylesheet.cssRules));
+const style = getCascadedStyle(element, stylesheet);
+const mobileStyle = getCascadedStyle(element, stylesheet, { width: 480 });
 
 console.log(style.getPropertyValue('color')); // 'blue'
 ```
@@ -236,12 +243,13 @@ Below are the primary entry points and custom utilities:
 *   **`serialize(nodes: ComponentValue[] | Token[]): string`** — Serializes component values or tokens back to CSS text.
 *   **`new StreamingTokenizer()`** — Class for processing chunked CSS streams.
 *   **`getRules(root, RuleClass?)`** — Recursively collects rules in depth-first pre-order across a `CSSStyleSheet`, `CSSRule`, or `Iterable<CSSRule>`, optionally narrowed to instances of `RuleClass` (e.g. `getRules(sheet, CSSStyleRule)`).
-*   **`closestRule(rule, RuleClass)`** — Walks strict ancestors via `rule.parentRule` and returns the nearest enclosing rule matching `RuleClass` (e.g. `closestRule(rule, CSSMediaRule)`).
+*   **`closestRule(rule, ...RuleClasses)`** — Walks strict ancestors via `rule.parentRule` and returns the nearest enclosing rule matching any of `RuleClasses` (e.g. `closestRule(rule, CSSMediaRule)`).
 *   **`resolveSelector(rule)`** — Resolves CSS Nesting `&` combinators and relative selectors across enclosing `CSSStyleRule` and `@scope` ancestors into a canonical selector string.
 *   **`parseSelectorAST(input, options?)`** — Parses a selector string or `CSSRule` into a Selectors Level 4 `SelectorList` AST (resolving nested `&` selectors by default when given a `CSSRule`).
 *   **`getDeclaredProperties(root, options?)`** — Collects all declared CSS property names across the rule tree, including parent shorthands and `@supports` feature queries.
+*   **`getPropertyValues(target, property, options?)`** — Returns all authored values for `property` in declaration order on a `CSSRule` or `CSSStyleDeclaration`, resolving logical↔physical property aliases, unexpanded `var()` shorthands, and same-rule progressive-enhancement fallbacks.
 *   **`calculateSpecificity(selector: string | SelectorList)`** — Calculates selector specificity tuple `[a, b, c]`.
-*   **`getCascadedStyle(element: MatchableElement, rules: Rule[]): CSSStyleDeclaration`** — Computes cascaded styles against a DOM/linkedom element.
+*   **`getCascadedStyle(element, rulesOrSheet?, pseudoOrEnv?, envOptions?)`** — Computes cascaded styles against a DOM/linkedom element (accepting a `CSSStyleSheet` or rule list, plus optional `Partial<MediaEnvironment>` overrides).
 *   **`resolveVariables(style: CSSStyleDeclaration, property: string, envMap?)`** — Resolves `var()` and `env()` substitutions on a `CSSStyleDeclaration`.
 
 ## Architecture & Spec Boundaries
@@ -249,14 +257,14 @@ Below are the primary entry points and custom utilities:
 This section outlines the boundaries between standard CSSOM specifications (`src/spec.ts`) and standalone Node tooling (`src/tools.ts`).
 
 ### 1. Standard CSSOM Layer (`src/spec.ts`)
-These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification and related module extensions (CSS Conditional Rules, CSS Nesting, CSS Fonts, CSS Animations, CSS Paged Media, CSS View Transitions, and CSS Cascade). They are designed to mirror standard browser CSSOM APIs in Node.js and headless environments, and are verified bidirectionally against W3C WebIDL definitions via `webidl2.js` in [`tests/api-surface.test.ts`](./tests/api-surface.test.ts).
+These APIs are defined in the [CSSOM-1](https://drafts.csswg.org/cssom-1/) specification and related module extensions (CSS Conditional Rules, CSS Nesting, CSS Anchor Positioning, CSS Fonts, CSS Animations, CSS Paged Media, CSS View Transitions, and CSS Cascade). They are designed to mirror standard browser CSSOM APIs in Node.js and headless environments, and are verified bidirectionally against W3C WebIDL definitions via `webidl2.js` in [`tests/api-surface.test.ts`](./tests/api-surface.test.ts).
 
 **Interfaces & Classes**
 - **Base Hierarchy & Collections**: `StyleSheet`, `CSSStyleSheet`, `StyleSheetList`, `CSSRule`, `CSSRuleList`, `CSSGroupingRule`, `MediaList`, `LinkStyle` (TypeScript interface)
 - **Style Rules & Nesting**: `CSSStyleRule`, `CSSNestedDeclarations`
 - **Conditional & Grouping Rules**: `CSSConditionRule`, `CSSMediaRule`, `CSSSupportsRule`, `CSSContainerRule`, `CSSLayerBlockRule`, `CSSLayerStatementRule`, `CSSScopeRule`, `CSSStartingStyleRule`
-- **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSCustomMediaRule`
-- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
+- **Specialized Rules**: `CSSFontFaceRule`, `CSSPageRule`, `CSSPositionTryRule`, `CSSMarginRule`, `CSSKeyframesRule`, `CSSKeyframeRule`, `CSSNamespaceRule`, `CSSImportRule`, `CSSPropertyRule`, `CSSCounterStyleRule`, `CSSFontFeatureValuesRule`, `CSSViewTransitionRule`, `CSSCustomMediaRule`
+- **Declarations & Descriptors**: `CSSStyleDeclaration`, `CSSStyleProperties`, `CSSFontFaceDescriptors`, `CSSPageDescriptors`, `CSSPositionTryDescriptors`, `CSSMarginDescriptors`, `CSSFontFeatureValuesMap`
 
 **Deviations & Extensions**
 - **Rule Constructors**: Standard CSSOM rules are typically instantiated via `insertRule()` or stylesheet parsing. `CSSStyleSheet` supports standard `CSSStyleSheetInit` options (`new CSSStyleSheet({ baseURL, media, disabled })`).
@@ -327,10 +335,11 @@ These standalone tree-shakeable functions and classes are exported from `cssomno
 - `resolveSelector(rule)`: Resolves CSS Nesting `&` combinators and relative selectors across enclosing `CSSStyleRule` and `@scope` ancestors into a canonical selector string.
 - `parseSelectorAST(input, options?)`: Parses a selector string or `CSSRule` into a Selectors Level 4 `SelectorList` AST.
 - `getDeclaredProperties(root, options?)`: Collects a `Set<string>` of all declared CSS property names across the stylesheet, including parent shorthands (`border`, `border-color`, `outline`, `overflow`, `padding`, `margin`, `line-clamp`, etc.) and `@supports` feature queries (`{ includeSupports?: boolean }`, default `true`).
+- `getPropertyValues(target, property, options?)`: Returns all authored values for `property` in declaration order on a `CSSRule` or `CSSStyleDeclaration`, resolving logical↔physical property aliases, unexpanded `var()` shorthands, and same-rule progressive-enhancement fallbacks.
 - `calculateSpecificity(selector)`: Calculates selector specificity tuple `[a, b, c]`.
 - `tokenize(text)`: Low-level tokenizer returning `Token[]`.
 - `serialize(nodes)`: Low-level serializer turning component values or tokens into CSS text.
-- `getCascadedStyle(element, rules, pseudoElement?, options?)`: Computes cascaded styles against a DOM element.
+- `getCascadedStyle(element, rulesOrSheet?, pseudoOrEnv?, envOptions?)`: Computes cascaded styles against a DOM element.
 - `resolveVariables(style, property, envMap?)`: Resolves `var()` and `env()` substitutions with fallback handling.
 - `matches(element, selector)` / `querySelector(root, selector)` / `querySelectorAll(root, selector)`: Static selector matchers and DOM query utilities (featuring a 1,000-entry bounded LRU selector AST cache and RFC 4647 `:lang()` extended language range matching).
 - `StreamingTokenizer`: Memory-efficient streaming generator tokenizer.
