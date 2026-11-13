@@ -28,6 +28,7 @@ import { CSSStyleDeclaration } from '../../src/CSSStyleDeclaration.ts';
 import { matches } from '../../src/matcher.ts';
 import { CSSStyleValue, CSSNumericValue } from '../../src/typed-om.ts';
 import { getCascadedStyle } from '../../src/cascade.ts';
+import { getDeclaredProperties } from '../../src/walk.ts';
 
 // --- Fixture Loader ---
 function loadFixtures() {
@@ -224,6 +225,7 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
 
   // Pre-tokenize / pre-parse fixtures for isolated benchmarks
   const syntheticTokens = tokenize(fixtures.syntheticLarge);
+  const syntheticSheet = new Parser(syntheticTokens).parseStyleSheet();
   const modernTokens = tokenize(fixtures.modernCss);
   const modernSheet = new Parser(modernTokens).parseStyleSheet();
 
@@ -443,6 +445,18 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
           sink(CSSNumericValue.parse('clamp(10px, 5vw, 50px)'));
         },
         { warmupRounds: 5, samples: 10, iterations: 200 }
+      ),
+    },
+
+    // 15. walk: getDeclaredProperties() on Large Synthetic CSS (163KB)
+    {
+      name: 'walk: getDeclaredProperties() (163KB)',
+      run: () => runBench(
+        'walk: getDeclaredProperties() (163KB)',
+        () => {
+          sink(getDeclaredProperties(syntheticSheet));
+        },
+        { warmupRounds: 3, samples: 10, iterations: 10 }
       ),
     },
   ];

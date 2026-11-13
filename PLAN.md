@@ -779,6 +779,26 @@ Result (`f1ec04e74`): `src/` (excluding `src/data/gen`) net **−4 lines** (`911
   - Add `/** ... */` JSDoc comments across all option/init/location interfaces (`ParserOptions`, `SelectorASTOptions`, `SelectorParserOptions`, `CSSStyleSheetInit`, `CSSParserOptions`, `PropertyDefinition`, `RuleSourceLocation`, `CSSMatrixComponentOptions`, `DOMPointInit`, `DOMMatrixInit`, `DeclaredPropertiesOptions`) and standalone functions.
   - Configure `tsconfig.build.json` + `tsdown.config.ts` to emit rolled-up, self-contained `dist/index.d.ts`, `dist/parse.d.ts`, and `dist/parser-api.d.ts`.
 
+## Phase 162: `getDeclaredProperties` & `CSSStyleDeclaration.prototype.getPropertyValue` Performance Optimization [x]
+**Objective**: Optimize `getDeclaredProperties(sheet)` in `src/walk.ts` and `CSSStyleDeclaration.prototype.getPropertyValue` / `_getWinningDeclaration` / `_getExactWinningDeclaration` in `src/CSSStyleDeclaration.ts` so `getDeclaredProperties` is an order of magnitude faster than `parse(css)` without changing behavior or public API surface.
+
+### Tasks
+- [x] **162.1 — Deduplicate Shorthand Contraction Checks in `getDeclaredProperties` (`src/walk.ts`)**:
+  - Track shorthands already present in `properties` and shorthands already checked within the current rule (`checkedInRule` Set) before calling `style.getPropertyValue(sh)` when iterating `LONGHAND_TO_SHORTHAND[prop]`.
+  - Expand `SHORTHANDS[prop]` longhands and their parent shorthands before checking `LONGHAND_TO_SHORTHAND[prop]` so unexpanded shorthands immediately populate `properties`.
+- [x] **162.2 — O(1) `_declMap` Lookup & Fast-Fail Shorthand Contraction in `src/CSSStyleDeclaration.ts`**:
+  - Unwrap the `CSSStyleDeclaration` Proxy target via `unwrapStyle` (`proxyToTarget` WeakMap) inside `getPropertyValue`, `getPropertyPriority`, `_getLonghandForContraction`, `_getWinningDeclaration`, and `_getExactWinningDeclaration` so internal loops and `_declMap` / `_declarations` reads do not repeatedly fire the Proxy `get` trap.
+  - Replace the linear backward scan in `_getExactWinningDeclaration(property)` with O(1) `this._declMap.get(property)` (and `this._declMap.get('all')` when covered by `all`), only checking `_declarations.indexOf` when both `property` and `all` exist with equal `!important` priority.
+  - In `_getWinningDeclaration(property)`, return `null` immediately when `exact` is `null` instead of scanning `LONGHAND_TO_SHORTHAND[property]`, and lazily compute `exactIdx` only when an unexpanded shorthand declaration exists with equal priority.
+  - In `getPropertyValue(property)`:
+    - For base `CSSStyleDeclaration` instances (where `_getLonghandForContraction === CSSStyleDeclaration.prototype._getLonghandForContraction`) without `all` in `_declMap`, fast-fail shorthand contraction when neither `shorthand.longhands` (allowing nested shorthands in `SHORTHANDS`) nor `shorthand.logicalLonghands` (nor `max-lines` for `line-clamp` / `-webkit-line-clamp`) are all present in `_declMap`, jumping straight to the direct unexpanded shorthand check (`map.has(property)`).
+    - In the CSS-wide keyword loop (`shorthandLonghands`), fast-fail when `map && !map.has('all') && !map.has(lh) && !SHORTHANDS[lh] && !(lh in SHORTHANDS_DATA)`, and defer `this.getPropertyPriority(lh)` until after verifying the value is a CSS-wide keyword.
+    - In shorthand contraction (`anySet && consistentImportant`), only resolve `writing-mode`, `direction`, and `physicalToLogicalSet` when at least one present longhand key is in `LOGICAL_MAPPING`.
+- [x] **162.3 — Benchmark & Verification (`scripts/benchmarks/parser.bench.ts`, `scripts/benchmarks/compare.ts`, `tests/walk.test.ts`)**:
+  - Add a `walk: getDeclaredProperties() (synthetic 163KB)` benchmark to `scripts/benchmarks/parser.bench.ts` and register it in `scripts/benchmarks/compare.ts`.
+  - Add regression unit tests in `tests/walk.test.ts` verifying 0 diffs in `getDeclaredProperties(sheet)` across multi-rule stylesheets heavy on `border`, `margin`, `padding`, `background`, logical shorthands, `all`, CSS-wide keywords, and `var()` shorthands.
+  - Run `pnpm run preflight`.
+
 ## Potential Roadmap (Needs Discussion)
 Candidates from a read-only deletion audit and a code-organization investigation (Sep 24), including a comparison with Blink (`third_party/blink/renderer/core/css/`), csstree, postcss, and lightningcss. Line estimates are the auditors' and unverified. **Not approved; discuss before scheduling.**
 

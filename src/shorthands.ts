@@ -92,7 +92,9 @@ function tryExpandCssWide(
 
 function checkUniformCssWide(serializedVals: string[], checkVar = false): string | null | undefined {
   if (serializedVals.some(v => CSS_WIDE_KEYWORDS.has(v.toLowerCase()) || (checkVar && v.toLowerCase().startsWith('var(')))) {
-    return serializedVals.every(v => v.toLowerCase() === serializedVals[0].toLowerCase()) ? serializedVals[0] : null;
+    const firstLower = serializedVals[0].toLowerCase();
+    if (!serializedVals.every(v => v.toLowerCase() === firstLower)) return null;
+    return CSS_WIDE_KEYWORDS.has(firstLower) ? firstLower : serializedVals[0];
   }
   return undefined;
 }
@@ -367,6 +369,11 @@ function contractBackground(longhands: Record<string, ComponentValue[]>): string
   if (!image || !position || !size || !repeat || !attachment || !origin || !clip || !color) {
     return null;
   }
+
+  const wide = checkUniformCssWide(
+    [image, position, size, repeat, attachment, origin, clip, color].map(v => serialize(v).trim()),
+  );
+  if (wide !== undefined) return wide;
 
   const imageLayers = splitTokensByComma(image);
   const positionLayers = splitTokensByComma(position);
@@ -999,9 +1006,6 @@ function contractFont(values: Record<string, ComponentValue[]>): string | null {
   for (const lh of FONT_PRIMARY_LONGHANDS) {
     if (!values[lh]) return null;
   }
-  for (const lh of FONT_OTHER_VARIANTS) {
-    if (values[lh] && serialize(values[lh]).trim().toLowerCase() !== 'normal') return null;
-  }
 
   const sStyle = serialize(values['font-style']).trim();
   const sCaps = serialize(values['font-variant-caps']).trim();
@@ -1011,8 +1015,15 @@ function contractFont(values: Record<string, ComponentValue[]>): string | null {
   const sLineHeight = serialize(values['line-height']).trim();
   const sFamily = serialize(values['font-family'], false, 'font-family').trim();
 
-  const wide = checkUniformCssWide([sStyle, sCaps, sWeight, sStretch, sSize, sLineHeight, sFamily]);
+  const wide = checkUniformCssWide([
+    sStyle, sCaps, sWeight, sStretch, sSize, sLineHeight, sFamily,
+    ...FONT_OTHER_VARIANTS.map(lh => values[lh] ? serialize(values[lh]).trim() : sStyle),
+  ]);
   if (wide !== undefined) return wide;
+
+  for (const lh of FONT_OTHER_VARIANTS) {
+    if (values[lh] && serialize(values[lh]).trim().toLowerCase() !== 'normal') return null;
+  }
   if (!sSize || !sFamily) return null;
 
   const parts: string[] = [];
@@ -1232,6 +1243,9 @@ function contractLineClamp(values: Record<string, ComponentValue[]>): string | n
   const lines = values['max-lines'];
   if (!lines) return null;
   const sLines = serialize(lines).trim();
+  const otherVals = [values['block-ellipsis'], values['continue']].filter(Boolean).map(v => serialize(v!).trim());
+  const wide = checkUniformCssWide([sLines, ...otherVals]);
+  if (wide !== undefined) return wide;
   return sLines.toLowerCase() === 'none' ? 'none' : sLines;
 }
 

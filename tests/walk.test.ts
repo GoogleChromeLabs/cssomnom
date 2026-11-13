@@ -311,6 +311,54 @@ describe('src/walk.ts: Pure-CSSOM Traversal, Selector Resolution, and Property Q
     assert.equal(withoutSupports.has('backdrop-filter'), false);
   });
 
+  it('getDeclaredProperties handles partial longhands, logical shorthands, CSS-wide keywords, and var() fallbacks', () => {
+    // 1. Partial longhands: only border-bottom declared (border should NOT be added)
+    const partialSheet = parse('.card { border-bottom: 1px solid black; }');
+    const partialProps = getDeclaredProperties(partialSheet);
+    assert.ok(partialProps.has('border-bottom'));
+    assert.ok(partialProps.has('border-bottom-width'));
+    assert.ok(partialProps.has('border-bottom-style'));
+    assert.ok(partialProps.has('border-bottom-color'));
+    assert.equal(partialProps.has('border'), false);
+    assert.equal(partialProps.has('border-top'), false);
+    assert.equal(partialProps.has('border-width'), false);
+
+    // 2. Full longhands contracting into shorthand
+    const fullMarginSheet = parse('.box { margin-top: 10px; margin-right: 10px; margin-bottom: 10px; margin-left: 10px; }');
+    const marginProps = getDeclaredProperties(fullMarginSheet);
+    assert.ok(marginProps.has('margin'));
+    assert.ok(marginProps.has('margin-top'));
+    assert.ok(marginProps.has('margin-bottom'));
+
+    // 3. Logical shorthand: border-block
+    const logicalSheet = parse('.block { border-block: 2px dashed green; }');
+    const logicalProps = getDeclaredProperties(logicalSheet);
+    assert.ok(logicalProps.has('border-block'));
+    assert.ok(logicalProps.has('border-block-start'));
+    assert.ok(logicalProps.has('border-block-end'));
+
+    // 4. CSS-wide keywords on shorthands
+    const inheritSheet = parse('.inherit { font: inherit; border: initial; }');
+    const inheritProps = getDeclaredProperties(inheritSheet);
+    assert.ok(inheritProps.has('font'));
+    assert.ok(inheritProps.has('border'));
+
+    // 5. Line clamp shorthand
+    const clampSheet = parse('.clamp { -webkit-line-clamp: 3; }');
+    const clampProps = getDeclaredProperties(clampSheet);
+    assert.ok(clampProps.has('-webkit-line-clamp'));
+    assert.ok(clampProps.has('max-lines'));
+
+    // 6. Unexpanded var() shorthands (including all)
+    const varSheet = parse('.var-box { border: var(--custom-border); all: var(--all-reset); }');
+    const varProps = getDeclaredProperties(varSheet);
+    assert.ok(varProps.has('border'));
+    assert.ok(varProps.has('all'));
+    assert.ok(varProps.has('border-top-width'));
+    assert.ok(varProps.has('border-top-color'));
+    assert.ok(varProps.has('border-width'));
+  });
+
   it('tokenizes @supports condition filtering selector() pseudo-functions and non-properties', () => {
     const css = '@supports selector(div:hover) and (interpolate-size: allow-keywords) and (--custom: 1) { .a { opacity: 1; } }';
     const sheet = parse(css);
