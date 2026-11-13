@@ -75,6 +75,7 @@ export const BENCHMARK_NAMES = [
   'matcher: complex selectors matches()',
   'cascade: getCascadedStyle()',
   'typed-om: parse values & math',
+  'walk: getDeclaredProperties() (163KB)',
 ];
 
 // Entry files for each benchmark to automatically derive transitive import dependencies.
@@ -93,6 +94,7 @@ export const BENCHMARK_ENTRY_FILES: Record<string, string[]> = {
   'matcher: complex selectors matches()': ['src/matcher.ts'],
   'cascade: getCascadedStyle()': ['src/cascade.ts'],
   'typed-om: parse values & math': ['src/typed-om.ts'],
+  'walk: getDeclaredProperties() (163KB)': ['src/walk.ts', 'src/CSSStyleDeclaration.ts'],
 };
 
 // Minimum effect size threshold (2.0% pre-registered):

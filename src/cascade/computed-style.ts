@@ -82,6 +82,11 @@ export class CSSComputedStyleDeclaration extends CSSStyleDeclaration {
   }
 
   /** @internal */
+  protected override get _useDirectDeclMap(): boolean {
+    return false;
+  }
+
+  /** @internal */
   protected override _getLonghandForContraction(lh: string): { value: ComponentValue[]; important: boolean } | null {
     const computedVal = this.getPropertyValue(lh);
     if (!computedVal) return null;

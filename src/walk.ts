@@ -26,7 +26,7 @@ import {
   CSSAtRule,
 } from './rules/at-rules.ts';
 import { CSSStyleSheet, CSSStyleRule } from './CSSOM.ts';
-import { CSSStyleDeclaration } from './CSSStyleDeclaration.ts';
+import { CSSStyleDeclaration, unwrapStyle } from './CSSStyleDeclaration.ts';
 import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands } from './shorthands.ts';
 import { LOGICAL_MAPPING, PHYSICAL_TO_LOGICAL } from './data/gen/LogicalMapping.ts';
 import { serialize } from './serializer.ts';
@@ -150,18 +150,20 @@ export function resolveSelector(rule: CSSRule): string | null {
     if (anc instanceof CSSScopeRule) {
       parentSelector = ':scope';
     } else {
-      parentSelector = shouldResolveAgainstParent(anc.selectorText, parentSelector)
-        ? resolveNestedSelector(anc.selectorText, parentSelector ?? '')
-        : anc.selectorText;
+      const ancSel = anc.selectorText;
+      parentSelector = shouldResolveAgainstParent(ancSel, parentSelector)
+        ? resolveNestedSelector(ancSel, parentSelector ?? '')
+        : ancSel;
     }
   }
 
   if (rule instanceof CSSNestedDeclarations) {
     return parentSelector ?? '';
   }
-  return shouldResolveAgainstParent(rule.selectorText, parentSelector)
-    ? resolveNestedSelector(rule.selectorText, parentSelector ?? '')
-    : rule.selectorText;
+  const ruleSel = rule.selectorText;
+  return shouldResolveAgainstParent(ruleSel, parentSelector)
+    ? resolveNestedSelector(ruleSel, parentSelector ?? '')
+    : ruleSel;
 }
 
 /**
@@ -210,16 +212,11 @@ export function getDeclaredProperties(
   const properties = new Set<string>();
   for (const rule of getRules(root)) {
     if ('style' in rule && rule.style instanceof CSSStyleDeclaration) {
-      const { style } = rule;
+      const style = unwrapStyle(rule.style);
+      let checkedInRule: Set<string> | undefined;
       for (const d of style._declarations) {
         const prop = d.name.startsWith('--') ? d.name : d.name.toLowerCase();
         properties.add(prop);
-        const shorthands = LONGHAND_TO_SHORTHAND[prop];
-        if (shorthands) {
-          for (const sh of shorthands) {
-            if (style.getPropertyValue(sh) !== '') properties.add(sh.toLowerCase());
-          }
-        }
         const shorthandDef = SHORTHANDS[prop];
         if (shorthandDef && prop !== 'all') {
           for (const lh of shorthandDef.longhands) {
@@ -228,6 +225,16 @@ export function getDeclaredProperties(
             if (parentShs) {
               for (const sh of parentShs) properties.add(sh);
             }
+          }
+        }
+        const shorthands = LONGHAND_TO_SHORTHAND[prop];
+        if (shorthands) {
+          for (const sh of shorthands) {
+            if (properties.has(sh)) continue;
+            if (checkedInRule?.has(sh)) continue;
+            if (!checkedInRule) checkedInRule = new Set();
+            checkedInRule.add(sh);
+            if (style.getPropertyValue(sh) !== '') properties.add(sh.toLowerCase());
           }
         }
       }

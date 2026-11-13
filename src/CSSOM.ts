@@ -467,12 +467,19 @@ export class CSSStyleRule extends CSSGroupingRule {
     const defaultNamespacePrefixes = new Set<string>();
     const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
     if (sheet) {
-      const nsRules = (Array.from(sheet.cssRules) as CSSRule[]).filter(r => r.type === 10) as CSSNamespaceRule[];
-      const defaultNs = nsRules.find(ns => ns.prefix === '');
-      if (defaultNs) {
-        hasDefaultNamespace = true;
-        for (const ns of nsRules) {
-          if (ns.namespaceURI === defaultNs.namespaceURI && ns.prefix !== '') defaultNamespacePrefixes.add(ns.prefix);
+      const nsRules: CSSNamespaceRule[] = [];
+      for (const r of sheet._rules) {
+        if (isImportRule(r)) continue;
+        if (isNamespaceRule(r)) nsRules.push(r as CSSNamespaceRule);
+        else break;
+      }
+      if (nsRules.length > 0) {
+        const defaultNs = nsRules.find(ns => ns.prefix === '');
+        if (defaultNs) {
+          hasDefaultNamespace = true;
+          for (const ns of nsRules) {
+            if (ns.namespaceURI === defaultNs.namespaceURI && ns.prefix !== '') defaultNamespacePrefixes.add(ns.prefix);
+          }
         }
       }
     }
@@ -489,9 +496,14 @@ export class CSSStyleRule extends CSSGroupingRule {
 
   set selectorText(value: string) {
     const sheet = this.parentStyleSheet || (this.parentRule ? findParentStyleSheet(this.parentRule) : null);
-    const declaredNamespaces = new Set<string>(
-      sheet ? (Array.from(sheet.cssRules) as CSSRule[]).filter(r => r.type === 10).map(r => (r as CSSNamespaceRule).prefix) : []
-    );
+    const declaredNamespaces = new Set<string>();
+    if (sheet) {
+      for (const r of sheet._rules) {
+        if (isImportRule(r)) continue;
+        if (isNamespaceRule(r)) declaredNamespaces.add((r as CSSNamespaceRule).prefix);
+        else break;
+      }
+    }
     const nsContext = this._getNamespaceContext();
     let isNested = false;
     let allowRelative = false;
