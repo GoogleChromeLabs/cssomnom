@@ -78,11 +78,12 @@ function loadFixtures() {
   const htmlStylesPath = path.join(rootDir, 'submodules/whatwg-html/dev/styles.css');
   const htmlStylesCss = fs.existsSync(htmlStylesPath) ? fs.readFileSync(htmlStylesPath, 'utf-8') : syntheticSample;
 
-  // 4b. Multi-file real-world CSS corpus from submodules (6 KB - 221 KB unminified)
-  const realCssCorpus = [
-    modernCss,
-    htmlStylesCss,
-    geocitiesCss,
+  // 4b. Multi-file real-world CSS corpus from submodules (6 KB - 221 KB unminified);
+  // loaded lazily so missing submodules don't break unrelated --bench runs.
+  const loadRealCssCorpus = (): string[] => [
+    readFixture('tests/fixtures/modern.css'),
+    readFixture('submodules/whatwg-html/dev/styles.css'),
+    readFixture('submodules/csswg-drafts/geocities.css'),
     readFixture('submodules/lightningcss/website/docs.css'),
     readFixture('submodules/whatwg-html/styles.css'),
     readFixture('submodules/csswg-drafts/web-animations/respec/respec.css'),
@@ -240,7 +241,7 @@ $radius-${comp}: ${4 + (idx % 4)}px;
     modernCss,
     geocitiesCss,
     htmlStylesCss,
-    realCssCorpus,
+    loadRealCssCorpus,
     postcssCss,
     scssNested,
     paddedSfcBlocks,
@@ -702,17 +703,20 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
     // 16. Static analysis end-to-end (legacy-scan shape) across real submodule CSS corpus
     {
       name: 'scan: full pipeline (real css corpus)',
-      run: () => runBench(
-        'scan: full pipeline (real css corpus)',
-        () => {
-          let total = 0;
-          for (const css of fixtures.realCssCorpus) {
-            total += runStaticAnalysisScan(css, true);
-          }
-          sink(total);
-        },
-        { warmupRounds: 3, samples: 10, iterations: 1 }
-      ),
+      run: () => {
+        const corpus = fixtures.loadRealCssCorpus();
+        return runBench(
+          'scan: full pipeline (real css corpus)',
+          () => {
+            let total = 0;
+            for (const css of corpus) {
+              total += runStaticAnalysisScan(css, true);
+            }
+            sink(total);
+          },
+          { warmupRounds: 3, samples: 10, iterations: 1 }
+        );
+      },
     },
 
     // 17. Static analysis on nested SCSS ($vars, @mixin, deep & nesting, resolveSelector)
