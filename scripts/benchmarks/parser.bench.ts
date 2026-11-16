@@ -63,6 +63,9 @@ function loadFixtures() {
 `;
   const syntheticLarge = syntheticSample.repeat(500); // ~163 KB
 
+  const readFixture = (relPath: string): string =>
+    fs.readFileSync(path.join(rootDir, relPath), 'utf-8');
+
   // 2. Modern CSS features fixture (nesting, container queries, custom properties, color-mix)
   const modernPath = path.join(rootDir, 'tests/fixtures/modern.css');
   const modernCss = fs.existsSync(modernPath) ? fs.readFileSync(modernPath, 'utf-8') : syntheticSample;
@@ -74,6 +77,18 @@ function loadFixtures() {
   // 4. Real-world spec stylesheet: WHATWG HTML styles (standard browser-facing rules)
   const htmlStylesPath = path.join(rootDir, 'submodules/whatwg-html/dev/styles.css');
   const htmlStylesCss = fs.existsSync(htmlStylesPath) ? fs.readFileSync(htmlStylesPath, 'utf-8') : syntheticSample;
+
+  // 4b. Multi-file real-world CSS corpus from submodules (6 KB - 221 KB unminified)
+  const realCssCorpus = [
+    modernCss,
+    htmlStylesCss,
+    geocitiesCss,
+    readFixture('submodules/lightningcss/website/docs.css'),
+    readFixture('submodules/whatwg-html/styles.css'),
+    readFixture('submodules/csswg-drafts/web-animations/respec/respec.css'),
+    readFixture('submodules/csswg-drafts/filter-effects-1/style/default.css'),
+    readFixture('submodules/web-platform-tests/tools/wave/www/css/bulma-0.7.5/bulma.css'),
+  ];
 
   // 5. PostCSS parser test cases corpus
   const postcssDir = path.join(rootDir, 'submodules/postcss-parser-tests/cases');
@@ -225,6 +240,7 @@ $radius-${comp}: ${4 + (idx % 4)}px;
     modernCss,
     geocitiesCss,
     htmlStylesCss,
+    realCssCorpus,
     postcssCss,
     scssNested,
     paddedSfcBlocks,
@@ -683,19 +699,19 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
       ),
     },
 
-    // 16. Static analysis end-to-end (legacy-scan shape) across real medium CSS files
+    // 16. Static analysis end-to-end (legacy-scan shape) across real submodule CSS corpus
     {
       name: 'scan: full pipeline (real css corpus)',
       run: () => runBench(
         'scan: full pipeline (real css corpus)',
         () => {
           let total = 0;
-          total += runStaticAnalysisScan(fixtures.modernCss, true);
-          total += runStaticAnalysisScan(fixtures.htmlStylesCss, true);
-          total += runStaticAnalysisScan(fixtures.geocitiesCss, true);
+          for (const css of fixtures.realCssCorpus) {
+            total += runStaticAnalysisScan(css, true);
+          }
           sink(total);
         },
-        { warmupRounds: 3, samples: 10, iterations: 8 }
+        { warmupRounds: 3, samples: 10, iterations: 1 }
       ),
     },
 
