@@ -21,14 +21,28 @@ import { performance, PerformanceObserver } from 'node:perf_hooks';
 import { parseHTML } from 'linkedom';
 
 // Root-relative imports (ensuring ParseHooks and all prototypes are initialized)
-import '../../src/entry/index.ts';
-import { tokenize } from '../../src/tokenizer.ts';
+import {
+  CSSAtRule,
+  CSSConditionRule,
+  CSSGroupingRule,
+  CSSKeyframeRule,
+  CSSKeyframesRule,
+  CSSNestedDeclarations,
+  CSSStyleRule,
+  CSSStyleDeclaration,
+  CSSStyleValue,
+  CSSNumericValue,
+  getCascadedStyle,
+  getDeclaredProperties,
+  getPropertyValues,
+  getRules,
+  matches,
+  parse,
+  resolveSelector,
+  tokenize,
+  type CSSRule,
+} from '../../src/entry/index.ts';
 import { Parser, parseStyleSheet } from '../../src/parser.ts';
-import { CSSStyleDeclaration } from '../../src/CSSStyleDeclaration.ts';
-import { matches } from '../../src/matcher.ts';
-import { CSSStyleValue, CSSNumericValue } from '../../src/typed-om.ts';
-import { getCascadedStyle } from '../../src/cascade.ts';
-import { getDeclaredProperties } from '../../src/walk.ts';
 
 // --- Fixture Loader ---
 function loadFixtures() {
@@ -73,13 +87,222 @@ function loadFixtures() {
     postcssCss = syntheticSample;
   }
 
+  // 6. Realistic nested SCSS stylesheet (// line comments space-blanked, matching legacy-scan)
+  const scssComponents = [
+    'card', 'modal', 'nav', 'table', 'form', 'drawer',
+    'tabs', 'toast', 'popover', 'tooltip', 'accordion', 'sidebar',
+  ];
+  const scssNested = scssComponents.map((comp, idx) => `
+                                          
+$spacing-${comp}: ${8 + idx * 2}px;
+$radius-${comp}: ${4 + (idx % 4)}px;
+
+@mixin ${comp}-elevation($level: 1) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border-radius: $radius-${comp};
+}
+
+.${comp} {
+  @include ${comp}-elevation(2);
+  display: -webkit-box;
+  display: flex;
+  flex-direction: column;
+  padding: $spacing-${comp};
+  color: #222;
+  background: #fff;
+  background: light-dark(#fff, #18181b);
+
+  &--compact {
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #e5e7eb;
+
+    &:hover,
+    &:focus-within {
+      background-color: #f9fafb;
+
+      .${comp}__title {
+        color: #1d4ed8;
+        text-decoration: underline;
+      }
+    }
+
+    > .${comp}__icon {
+      flex-shrink: 0;
+      -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+      mask-image: linear-gradient(to bottom, #000, transparent);
+    }
+  }
+
+  &__body {
+    position: relative;
+    overflow: auto;
+    grid-template-rows: auto;
+    grid-template-rows: subgrid;
+
+    p,
+    li {
+      margin: 0 0 8px;
+      line-height: 1.5;
+
+      & + & {
+        margin-top: 4px;
+      }
+    }
+  }
+
+  @media (prefers-color-scheme: dark) {
+    color: #f4f4f5;
+    border-color: #3f3f46;
+
+    &__header {
+      border-bottom-color: #27272a;
+    }
+  }
+
+  @supports (selector(:has(*))) {
+    &:has(> .${comp}__footer) {
+      padding-bottom: 0;
+    }
+  }
+}
+
+@keyframes ${comp}-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+`).join('\n');
+
+  // 7. Whitespace-padded SFC / Lit <style> blocks (blankOutsideRange offset preservation)
+  const makeBlankPadding = (lines: number, width: number): string =>
+    `${' '.repeat(width)}\n`.repeat(lines);
+  const splitTopLevelSections = (css: string): string[] => {
+    const sections: string[] = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < css.length; i++) {
+      const ch = css[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth = Math.max(0, depth - 1);
+        if (depth === 0 && i - start >= 2000) {
+          sections.push(css.slice(start, i + 1));
+          start = i + 1;
+        }
+      }
+    }
+    if (start < css.length) sections.push(css.slice(start));
+    return sections;
+  };
+  const modernSections = splitTopLevelSections(modernCss);
+  const htmlSections = splitTopLevelSections(htmlStylesCss);
+  const scssSections = splitTopLevelSections(scssNested);
+  const paddedSfcBlocks = [
+    { leadLines: 220, trailLines: 80, width: 64, css: modernSections[0] ?? modernCss },
+    { leadLines: 450, trailLines: 120, width: 72, css: htmlSections[0] ?? htmlStylesCss },
+    { leadLines: 310, trailLines: 60, width: 56, css: scssSections[0] ?? scssNested },
+    { leadLines: 540, trailLines: 140, width: 68, css: modernSections[1] ?? modernCss },
+    { leadLines: 180, trailLines: 50, width: 60, css: htmlSections[1] ?? htmlStylesCss },
+    { leadLines: 390, trailLines: 90, width: 64, css: scssSections[1] ?? scssNested },
+  ].map(({ leadLines, trailLines, width, css }) =>
+    `${makeBlankPadding(leadLines, width)}${css}${makeBlankPadding(trailLines, width)}`
+  );
+
   return {
     syntheticLarge,
     modernCss,
     geocitiesCss,
     htmlStylesCss,
     postcssCss,
+    scssNested,
+    paddedSfcBlocks,
   };
+}
+
+// Mirror of legacy-scan's static analysis pipeline (parse -> getRules -> resolveSelector
+// + location -> getPropertyValue / Set(style) / getPropertyValues / enclosing at-rule header)
+function getEnclosingAtRuleHeader(
+  rule: CSSRule,
+  headerCache: WeakMap<CSSRule, string | null>,
+): string | null {
+  for (let curr = rule.parentRule; curr; curr = curr.parentRule) {
+    if (curr instanceof CSSStyleRule) continue;
+    if (
+      curr instanceof CSSGroupingRule ||
+      curr instanceof CSSKeyframesRule ||
+      curr instanceof CSSAtRule
+    ) {
+      let header = headerCache.get(curr);
+      if (header === undefined) {
+        const cssText = curr.cssText;
+        const brace = cssText.indexOf('{');
+        header = brace !== -1 ? cssText.slice(0, brace).trim() : null;
+        headerCache.set(curr, header);
+      }
+      if (header !== null) return header;
+    }
+  }
+  return null;
+}
+
+const SCAN_PROBED_PROPS = ['display', 'color', 'mask-image', '-webkit-mask-image', 'position'];
+
+function runStaticAnalysisScan(cssContent: string, inspectDeclarations: boolean): number {
+  const sheet = parse(cssContent);
+  const atRuleHeaderCache = new WeakMap<CSSRule, string | null>();
+  let checksum = 0;
+
+  for (const rule of getRules(sheet)) {
+    if (rule instanceof CSSConditionRule && rule.conditionText) {
+      checksum += rule.conditionText.length;
+    }
+    if (
+      !(rule instanceof CSSStyleRule) &&
+      !(rule instanceof CSSNestedDeclarations) &&
+      !(rule instanceof CSSKeyframeRule)
+    ) {
+      continue;
+    }
+    const selectorText = resolveSelector(rule);
+    if (selectorText === null) continue;
+
+    checksum += selectorText.length + (rule.location?.line ?? 1) + (rule.location?.column ?? 1);
+
+    const { style } = rule;
+    for (const prop of SCAN_PROBED_PROPS) {
+      checksum += style.getPropertyValue(prop).length;
+    }
+
+    const propSet = new Set(style);
+    checksum += propSet.size;
+
+    const parentHeader = getEnclosingAtRuleHeader(rule, atRuleHeaderCache);
+    if (parentHeader) checksum += parentHeader.length;
+
+    if (inspectDeclarations) {
+      for (const property of Array.from(style)) {
+        const values = getPropertyValues(style, property, { logical: false, shorthands: false });
+        if (values.length > 0) {
+          for (const v of values) checksum += v.length;
+        } else {
+          checksum += style.getPropertyValue(property).length;
+        }
+      }
+    }
+  }
+  return checksum;
 }
 
 // Statistical calculation
@@ -455,6 +678,50 @@ export function getBenchmarkDefinitions(): BenchmarkDefinition[] {
         'walk: getDeclaredProperties() (163KB)',
         () => {
           sink(getDeclaredProperties(syntheticSheet));
+        },
+        { warmupRounds: 3, samples: 10, iterations: 10 }
+      ),
+    },
+
+    // 16. Static analysis end-to-end (legacy-scan shape) across real medium CSS files
+    {
+      name: 'scan: full pipeline (real css corpus)',
+      run: () => runBench(
+        'scan: full pipeline (real css corpus)',
+        () => {
+          let total = 0;
+          total += runStaticAnalysisScan(fixtures.modernCss, true);
+          total += runStaticAnalysisScan(fixtures.htmlStylesCss, true);
+          total += runStaticAnalysisScan(fixtures.geocitiesCss, true);
+          sink(total);
+        },
+        { warmupRounds: 3, samples: 10, iterations: 8 }
+      ),
+    },
+
+    // 17. Static analysis on nested SCSS ($vars, @mixin, deep & nesting, resolveSelector)
+    {
+      name: 'scan: nested SCSS + resolveSelector()',
+      run: () => runBench(
+        'scan: nested SCSS + resolveSelector()',
+        () => {
+          sink(runStaticAnalysisScan(fixtures.scssNested, true));
+        },
+        { warmupRounds: 3, samples: 10, iterations: 15 }
+      ),
+    },
+
+    // 18. Static analysis on whitespace-padded SFC / Lit <style> blocks (offset preservation)
+    {
+      name: 'scan: padded SFC/Lit <style> blocks',
+      run: () => runBench(
+        'scan: padded SFC/Lit <style> blocks',
+        () => {
+          let total = 0;
+          for (const block of fixtures.paddedSfcBlocks) {
+            total += runStaticAnalysisScan(block, false);
+          }
+          sink(total);
         },
         { warmupRounds: 3, samples: 10, iterations: 10 }
       ),

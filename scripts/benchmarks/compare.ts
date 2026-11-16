@@ -76,6 +76,9 @@ export const BENCHMARK_NAMES = [
   'cascade: getCascadedStyle()',
   'typed-om: parse values & math',
   'walk: getDeclaredProperties() (163KB)',
+  'scan: full pipeline (real css corpus)',
+  'scan: nested SCSS + resolveSelector()',
+  'scan: padded SFC/Lit <style> blocks',
 ];
 
 // Entry files for each benchmark to automatically derive transitive import dependencies.
@@ -89,12 +92,15 @@ export const BENCHMARK_ENTRY_FILES: Record<string, string[]> = {
   'tokenize + parse: modern.css (7.7KB)': ['src/parser.ts', 'src/tokenizer.ts'],
   'tokenize + parse: postcss cases (4.4KB)': ['src/parser.ts', 'src/tokenizer.ts'],
   'CSSStyleDeclaration: setProperty shorthands & read': ['src/CSSStyleDeclaration.ts'],
-  'serialize: modern.css rules cssText': ['src/serializer.ts'],
+  'serialize: modern.css rules cssText': ['src/serializer.ts', 'src/CSSOM.ts', 'src/rules/at-rules.ts'],
   'round-trip: parse -> serialize -> reparse (geocities.css)': ['src/parser.ts', 'src/serializer.ts', 'src/tokenizer.ts'],
   'matcher: complex selectors matches()': ['src/matcher.ts'],
   'cascade: getCascadedStyle()': ['src/cascade.ts'],
   'typed-om: parse values & math': ['src/typed-om.ts'],
   'walk: getDeclaredProperties() (163KB)': ['src/walk.ts', 'src/CSSStyleDeclaration.ts'],
+  'scan: full pipeline (real css corpus)': ['src/parser.ts', 'src/tokenizer.ts', 'src/walk.ts', 'src/nesting.ts', 'src/CSSStyleDeclaration.ts', 'src/serializer.ts', 'src/CSSOM.ts', 'src/rules/at-rules.ts'],
+  'scan: nested SCSS + resolveSelector()': ['src/parser.ts', 'src/tokenizer.ts', 'src/walk.ts', 'src/nesting.ts', 'src/CSSStyleDeclaration.ts', 'src/serializer.ts', 'src/CSSOM.ts', 'src/rules/at-rules.ts'],
+  'scan: padded SFC/Lit <style> blocks': ['src/parser.ts', 'src/tokenizer.ts', 'src/walk.ts', 'src/nesting.ts', 'src/CSSStyleDeclaration.ts', 'src/serializer.ts', 'src/CSSOM.ts', 'src/rules/at-rules.ts'],
 };
 
 // Minimum effect size threshold (2.0% pre-registered):
@@ -503,38 +509,22 @@ async function main() {
     targetStatsPerBench[b] = [];
   }
 
-  console.log(`Executing ${runsPerRef} interleaved suite runs per ref...`);
+  const runSuite = async (dir: string): Promise<Record<string, BenchmarkStats>> =>
+    singleBench
+      ? { [singleBench]: await runSingleBenchmarkInDir(dir, singleBench) }
+      : runAllBenchmarksInDir(dir);
+
+  console.log(`Executing ${runsPerRef} interleaved ${singleBench ? 'single-benchmark' : 'suite'} runs per ref...`);
   for (let r = 0; r < runsPerRef; r++) {
-    if (r % 2 === 0) {
-      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${baseRef}]... `);
+    const order = r % 2 === 0
+      ? [{ label: baseRef, dir: baseDir, acc: baseStatsPerBench }, { label: targetRef, dir: targetDir, acc: targetStatsPerBench }]
+      : [{ label: targetRef, dir: targetDir, acc: targetStatsPerBench }, { label: baseRef, dir: baseDir, acc: baseStatsPerBench }];
+    for (const step of order) {
+      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${step.label}]... `);
       const t0 = performance.now();
-      const bMap = await runAllBenchmarksInDir(baseDir);
+      const statsMap = await runSuite(step.dir);
       for (const b of benchmarksToRun) {
-        if (bMap[b]) baseStatsPerBench[b].push(bMap[b]);
-      }
-      console.log(`done (${((performance.now() - t0) / 1000).toFixed(1)}s)`);
-
-      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${targetRef}]... `);
-      const t1 = performance.now();
-      const tMap = await runAllBenchmarksInDir(targetDir);
-      for (const b of benchmarksToRun) {
-        if (tMap[b]) targetStatsPerBench[b].push(tMap[b]);
-      }
-      console.log(`done (${((performance.now() - t1) / 1000).toFixed(1)}s)`);
-    } else {
-      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${targetRef}]... `);
-      const t1 = performance.now();
-      const tMap = await runAllBenchmarksInDir(targetDir);
-      for (const b of benchmarksToRun) {
-        if (tMap[b]) targetStatsPerBench[b].push(tMap[b]);
-      }
-      console.log(`done (${((performance.now() - t1) / 1000).toFixed(1)}s)`);
-
-      process.stdout.write(`  ↳ Run ${r + 1}/${runsPerRef} [${baseRef}]... `);
-      const t0 = performance.now();
-      const bMap = await runAllBenchmarksInDir(baseDir);
-      for (const b of benchmarksToRun) {
-        if (bMap[b]) baseStatsPerBench[b].push(bMap[b]);
+        if (statsMap[b]) step.acc[b].push(statsMap[b]);
       }
       console.log(`done (${((performance.now() - t0) / 1000).toFixed(1)}s)`);
     }
