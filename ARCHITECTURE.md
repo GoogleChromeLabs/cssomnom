@@ -123,3 +123,11 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 | **Fix media query parsing/evaluation** | `src/MediaParser.ts`, `scripts/codegen/generate_media_features.ts`, `src/data/gen/media-features.ts` |
 | **Fix Typed OM objects or math** | `src/typed-om/` (values, transforms, colors), `src/math-parser.ts`, `src/DOMMatrix.ts` |
 | **Update generated data** | `scripts/codegen/` (generators), `scripts/codegen/generate_all.ts` (`pnpm run codegen`) |
+
+## Retired Concepts
+
+- **One-off baseline/benchmark/feature-extractor scripts & `wpt-modern-features.json`**: superseded by `baselines:prune`, `wpt:run`, `core/progress.ts`, and native `compare.ts` A/A mode (`39f5ddbbb`).
+- **`src/css-escape.ts`, `applyWebIDLPrototypeDescriptors`, `CascadeOrigin`, and duplicate `<supports-condition>` walker**: merged into `serializeIdentifier`, `applyWebIDLInterface({ prototypeOnly: true })`, `evaluateSupportsCondition`, and shared `CSS_WIDE_KEYWORDS` (`2f91a68a4`).
+- **4-way shorthand combiners & hardcoded `propertyToGroup` in `src/serializer.ts`**: unified into a lazy `SHORTHANDS`-backed combiner indexed by longhand (`fdef4106c`).
+- **3 copy-pasted stylesheet harvesting loops in `src/cascade/rule-filter.ts`**: collapsed into a single parameterized `harvestRoot`/`emitSheet` pass (`43f693d0d`).
+- **Divergent unit canonicalizers across `math-parser.ts`, `numeric-methods.ts`, and `CSSUnitValue.ts`**: unified on `getCanonicalUnitInfo` using CSS Values 4 canonical units (`9f69864aa`).
