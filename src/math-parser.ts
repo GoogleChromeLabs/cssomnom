@@ -16,7 +16,8 @@
  */
 import type { ComponentValue, CSSFunction } from './types.ts';
 import { CSSNumericValue, CSSUnitValue, CSSMathSum, CSSMathProduct, CSSMathNegate, CSSMathInvert, CSSMathMin, CSSMathMax, CSSMathClamp, CSSMathFunction, CSSMathRound, CSSKeywordValue, type CSSNumericType } from './typed-om.ts';
-import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from './data/gen/units.ts';
+import { getCanonicalUnitInfo } from './typed-om/numeric/CSSUnitValue.ts';
+import { unitToBase, type CSSUnit } from './data/gen/units.ts';
 
 import { MATH_FUNCTIONS } from './data/gen/math-functions.ts';
 
@@ -34,45 +35,17 @@ function isSameType(a: CSSNumericType, b: CSSNumericType): boolean {
 }
 
 function toCanonical(val: CSSUnitValue): { value: number, unit: CSSUnit } {
-  const base = unitToBase[val.unit] || 'other';
-  if (base === 'length' && unitToPixels[val.unit]) {
-    return { value: val.value * unitToPixels[val.unit], unit: 'px' };
-  } else if (base === 'angle' && unitToRadians[val.unit]) {
-    return { value: val.value * (unitToRadians[val.unit] / unitToRadians['deg']), unit: 'deg' };
-  } else if (base === 'time' && unitToSeconds[val.unit]) {
-    return { value: val.value * unitToSeconds[val.unit], unit: 's' };
-  } else if (base === 'resolution') {
-    if (val.unit === 'dpi') return { value: val.value, unit: 'dpi' };
-    if (val.unit === 'dpcm') return { value: val.value * 2.54, unit: 'dpi' };
-    if (val.unit === 'dppx' || val.unit === 'x') return { value: val.value * 96, unit: 'dpi' };
-  }
-  return { value: val.value, unit: val.unit };
+  const info = getCanonicalUnitInfo(val.unit);
+  return info ? { value: val.value * info.factor, unit: info.canonicalUnit } : { value: val.value, unit: val.unit };
 }
 
 function fromCanonical(value: number, targetUnit: CSSUnit): number {
-  const base = unitToBase[targetUnit] || 'other';
-  if (base === 'length' && unitToPixels[targetUnit]) {
-    return value / unitToPixels[targetUnit];
-  } else if (base === 'angle' && unitToRadians[targetUnit]) {
-    return value / (unitToRadians[targetUnit] / unitToRadians['deg']);
-  } else if (base === 'time' && unitToSeconds[targetUnit]) {
-    return value / unitToSeconds[targetUnit];
-  } else if (base === 'resolution') {
-    if (targetUnit === 'dpi') return value;
-    if (targetUnit === 'dpcm') return value / 2.54;
-    if (targetUnit === 'dppx' || targetUnit === 'x') return value / 96;
-  }
-  return value;
+  const info = getCanonicalUnitInfo(targetUnit);
+  return info ? value / info.factor : value;
 }
 
 function isCanonicalizable(val: CSSUnitValue): boolean {
-  const base = unitToBase[val.unit] || 'other';
-  if (base === 'length') return !!unitToPixels[val.unit];
-  if (base === 'angle') return !!unitToRadians[val.unit];
-  if (base === 'time') return !!unitToSeconds[val.unit];
-  if (base === 'resolution') return true;
-  if (base === 'number') return true;
-  return false;
+  return unitToBase[val.unit] === 'number' || getCanonicalUnitInfo(val.unit) !== null;
 }
 
 function areCompatibleForSimplification(values: CSSUnitValue[]): boolean {
@@ -599,34 +572,10 @@ export function simplify(node: CSSNumericValue): CSSNumericValue {
     
     for (const child of values) {
       if (child instanceof CSSUnitValue) {
-        const base = unitToBase[child.unit] || 'other';
-        let canonicalValue = child.value;
-        let canonicalUnit = child.unit;
-        let key: string = child.unit;
-        
-        if (base === 'length' && unitToPixels[child.unit]) {
-          canonicalValue *= unitToPixels[child.unit];
-          canonicalUnit = 'px';
-          key = 'length';
-        } else if (base === 'angle' && unitToRadians[child.unit]) {
-          canonicalValue *= unitToRadians[child.unit] / unitToRadians['deg'];
-          canonicalUnit = 'deg';
-          key = 'angle';
-        } else if (base === 'time' && unitToSeconds[child.unit]) {
-          canonicalValue *= unitToSeconds[child.unit];
-          canonicalUnit = 's';
-          key = 'time';
-        } else if (base === 'resolution') {
-          if (child.unit === 'dpcm') {
-            canonicalValue *= 2.54;
-          } else if (child.unit === 'dppx' || child.unit === 'x') {
-            canonicalValue *= 96;
-          }
-          canonicalUnit = 'dpi';
-          key = 'resolution';
-        } else if (base === 'number') {
-          key = 'number';
-        }
+        const info = getCanonicalUnitInfo(child.unit);
+        const canonicalValue = info ? child.value * info.factor : child.value;
+        const canonicalUnit = info ? info.canonicalUnit : child.unit;
+        const key: string = info ? info.base : (unitToBase[child.unit] === 'number' ? 'number' : child.unit);
 
         const existing = numericByBase.get(key);
         if (existing) {

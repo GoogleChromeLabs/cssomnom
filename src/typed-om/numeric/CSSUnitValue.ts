@@ -20,6 +20,28 @@ import { CSSNumericValue } from './CSSNumericValue.ts';
 import { unitToBase, unitToPixels, unitToRadians, unitToSeconds, type CSSUnit } from '../../data/gen/units.ts';
 import { formatNumber } from '../../utils/format.ts';
 
+const RESOLUTION_TO_DPPX: Record<string, number> = {
+  dppx: 1,
+  x: 1,
+  dpi: 1 / 96,
+  dpcm: 2.54 / 96,
+};
+const FREQUENCY_TO_HZ: Record<string, number> = {
+  hz: 1,
+  khz: 1000,
+};
+
+// css-values-4 #canonical-unit
+export function getCanonicalUnitInfo(unit: string): { base: string; canonicalUnit: CSSUnit; factor: number } | null {
+  const base = unitToBase[unit];
+  if (base === 'length' && unitToPixels[unit]) return { base, canonicalUnit: 'px', factor: unitToPixels[unit] };
+  if (base === 'angle' && unitToRadians[unit]) return { base, canonicalUnit: 'deg', factor: unitToRadians[unit] / unitToRadians['deg'] };
+  if (base === 'time' && unitToSeconds[unit]) return { base, canonicalUnit: 's', factor: unitToSeconds[unit] };
+  if (base === 'frequency' && FREQUENCY_TO_HZ[unit]) return { base, canonicalUnit: 'hz', factor: FREQUENCY_TO_HZ[unit] };
+  if (base === 'resolution' && RESOLUTION_TO_DPPX[unit]) return { base, canonicalUnit: 'dppx', factor: RESOLUTION_TO_DPPX[unit] };
+  return null;
+}
+
 // css-typed-om #simple-numeric
 export class CSSUnitValue extends CSSNumericValue {
   private _value: number;
@@ -80,39 +102,11 @@ export class CSSUnitValue extends CSSNumericValue {
       throw new DOMException(`Invalid unit: ${unit}`, 'SyntaxError');
     }
     if (this.unit === unit) return this;
-    const base = unitToBase[this.unit];
-    const targetBase = unitToBase[unit];
-    if (!base || base !== targetBase || base === 'number' || base === 'percent') {
+    const fromInfo = getCanonicalUnitInfo(this.unit);
+    const toInfo = getCanonicalUnitInfo(unit);
+    if (!fromInfo || !toInfo || fromInfo.base !== toInfo.base) {
       throw new TypeError(`Cannot convert ${this.unit} to ${unit}`);
     }
-
-    let canonical: number;
-    let targetFactor: number;
-
-    if (base === 'length') {
-      if (!unitToPixels[this.unit] || !unitToPixels[unit]) throw new TypeError('Unsupported length conversion');
-      canonical = this.value * unitToPixels[this.unit];
-      targetFactor = unitToPixels[unit];
-    } else if (base === 'angle') {
-      canonical = this.value * unitToRadians[this.unit];
-      targetFactor = unitToRadians[unit];
-    } else if (base === 'time') {
-      canonical = this.value * unitToSeconds[this.unit];
-      targetFactor = unitToSeconds[unit];
-    } else if (base === 'resolution') {
-      const toDppx: Record<string, number> = {
-        'dppx': 1,
-        'x': 1,
-        'dpi': 1 / 96,
-        'dpcm': 2.54 / 96
-      };
-      if (!toDppx[this.unit] || !toDppx[unit]) throw new TypeError('Unsupported resolution conversion');
-      canonical = this.value * toDppx[this.unit];
-      targetFactor = toDppx[unit];
-    } else {
-      throw new TypeError(`Unsupported conversion for ${base}`);
-    }
-
-    return new CSSUnitValue(canonical / targetFactor, unit as CSSUnit);
+    return new CSSUnitValue((this.value * fromInfo.factor) / toInfo.factor, unit as CSSUnit);
   }
 }

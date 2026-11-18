@@ -18,7 +18,7 @@
 import type { CSSFunction, Token } from '../../types.ts';
 import type { CSSUnit } from '../../data/gen/units.ts';
 import { CSSNumericValue } from './CSSNumericValue.ts';
-import { CSSUnitValue } from './CSSUnitValue.ts';
+import { CSSUnitValue, getCanonicalUnitInfo } from './CSSUnitValue.ts';
 import {
   CSSMathSum,
   CSSMathProduct,
@@ -34,7 +34,7 @@ import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { parseComponentValues } from '../../parser.ts';
 import { parseMathFunction } from '../../math-parser.ts';
-import { unitToBase, unitToPixels, unitToRadians, unitToSeconds } from '../../data/gen/units.ts';
+import { unitToBase } from '../../data/gen/units.ts';
 import { compareStrings } from '../utils/validation.ts';
 import { ensureNumeric } from '../utils/formatting.ts';
 import { createCSSStyleValue } from '../values/style-value-factory.ts';
@@ -52,12 +52,9 @@ function areUnitMapsEqual(a: Map<string, number>, b: Map<string, number>): boole
 
 function isCompatible(u1: string, u2: string): boolean {
   if (u1 === u2) return true;
-  const b1 = unitToBase[u1];
-  const b2 = unitToBase[u2];
-  if (!b1 || !b2 || b1 === 'number' || b1 === 'percent') return false;
-  if (b1 !== b2) return false;
-  const abs = ['px', 'cm', 'mm', 'in', 'pt', 'pc', 'q', 'deg', 'grad', 'rad', 'turn', 's', 'ms', 'hz', 'khz', 'dpi', 'dpcm', 'dppx'];
-  return abs.includes(u1) && abs.includes(u2);
+  const c1 = getCanonicalUnitInfo(u1);
+  const c2 = getCanonicalUnitInfo(u2);
+  return c1 !== null && c2 !== null && c1.base === c2.base;
 }
 
 function createCSSUnitValueFromSumValueItem(item: SumValueItem): CSSUnitValue | null {
@@ -73,22 +70,9 @@ function createCSSUnitValueFromSumValueItem(item: SumValueItem): CSSUnitValue | 
 // css-typed-om #create-a-sum-value
 function createSumValue(node: CSSNumericValue): SumValue | null {
   if (node instanceof CSSUnitValue) {
-    let unit: string = node.unit;
-    let value = node.value;
-
-    if (unitToBase[unit] === 'length' && unitToPixels[unit]) {
-      value *= unitToPixels[unit];
-      unit = 'px';
-    } else if (unitToBase[unit] === 'angle' && unitToRadians[unit]) {
-      value *= unitToRadians[unit] / unitToRadians['deg'];
-      unit = 'deg';
-    } else if (unitToBase[unit] === 'time' && unitToSeconds[unit]) {
-      value *= unitToSeconds[unit];
-      unit = 's';
-    } else if (unit === 'khz') { value *= 1000; unit = 'hz'; }
-    else if (unit === 'dpi') { value /= 96; unit = 'dppx'; }
-    else if (unit === 'dpcm') { value /= 96 / 2.54; unit = 'dppx'; }
-    else if (unit === 'x') { unit = 'dppx'; }
+    const info = getCanonicalUnitInfo(node.unit);
+    const unit: string = info ? info.canonicalUnit : node.unit;
+    const value = info ? node.value * info.factor : node.value;
 
     const unitMap = new Map<string, number>();
     if (unit !== 'number') unitMap.set(unit, 1);
