@@ -44,7 +44,7 @@ import { camelToDashed } from '../../../src/utils.ts';
 import { MediaParser } from '../../../src/MediaParser.ts';
 import { ALL_SHORTHAND_LONGHANDS } from '../../../src/shorthands.ts';
 import * as TypedOM from '../../../src/typed-om.ts';
-import { unitToPixels, unitToRadians } from '../../../src/data/gen/units.ts';
+import { getCanonicalUnitInfo } from '../../../src/typed-om/numeric/CSSUnitValue.ts';
 import { privateToken } from '../../../src/typed-om/utils/validation.ts';
 import { setupIframePrototype } from './iframe-runner.ts';
 import type { MediaEnvironment, Rule } from '../../../src/types.ts';
@@ -182,66 +182,46 @@ function clampOpacity(property: string, rawVal: TypedOM.CSSStyleValue): TypedOM.
   return undefined;
 }
 
+const COMPUTED_CANONICAL_BASES = new Set(['length', 'time', 'angle']);
+
 function convertCanonicalUnits(rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
   if (!(rawVal instanceof TypedOM.CSSUnitValue)) return undefined;
-
-  if (rawVal.unit in unitToPixels && rawVal.unit !== 'px') {
-    return new TypedOM.CSSUnitValue(rawVal.value * unitToPixels[rawVal.unit], 'px');
-  }
-  if (rawVal.unit === 'ms') {
-    return new TypedOM.CSSUnitValue(rawVal.value * 0.001, 's');
-  }
-  if (rawVal.unit === 'rad' || rawVal.unit === 'grad' || rawVal.unit === 'turn') {
-    return new TypedOM.CSSUnitValue(rawVal.value * (unitToRadians[rawVal.unit] / unitToRadians['deg']), 'deg');
-  }
-  return undefined;
+  const info = getCanonicalUnitInfo(rawVal.unit);
+  if (!info || rawVal.unit === info.canonicalUnit || !COMPUTED_CANONICAL_BASES.has(info.base)) return undefined;
+  return new TypedOM.CSSUnitValue(rawVal.value * info.factor, info.canonicalUnit);
 }
 
 function simplifyCalcExpression(rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
   if (!(rawVal instanceof TypedOM.CSSMathSum)) return undefined;
 
-  const units = Array.from(rawVal.values, v => (v instanceof TypedOM.CSSUnitValue ? v.unit : null));
-  if (!units.every((u): u is TypedOM.CSSUnit => u !== null)) return undefined;
+  const terms = Array.from(rawVal.values);
+  if (!terms.every((v): v is TypedOM.CSSUnitValue => v instanceof TypedOM.CSSUnitValue)) return undefined;
+  if (terms.length === 0) return undefined;
 
-  if (units.every(u => u in unitToPixels || u === 'em' || u === 'rem')) {
-    let totalPx = 0;
-    for (const v of Array.from(rawVal.values) as TypedOM.CSSUnitValue[]) {
-      if (v.unit in unitToPixels) {
-        totalPx += v.value * unitToPixels[v.unit];
-      } else if (v.value !== 0) {
-        return undefined;
-      }
+  if (terms.every(v => v.unit === 'percent') || terms.every(v => v.unit === 'number')) {
+    const total = terms.reduce((acc, v) => acc + v.value, 0);
+    return new TypedOM.CSSUnitValue(total, terms[0].unit);
+  }
+
+  let targetBase: string | null = null;
+  let targetUnit: TypedOM.CSSUnit | null = null;
+  let total = 0;
+  for (const v of terms) {
+    const info = getCanonicalUnitInfo(v.unit);
+    if (info && COMPUTED_CANONICAL_BASES.has(info.base)) {
+      if (targetBase && targetBase !== info.base) return undefined;
+      targetBase = info.base;
+      targetUnit = info.canonicalUnit;
+      total += v.value * info.factor;
+    } else if ((v.unit === 'em' || v.unit === 'rem') && v.value === 0) {
+      if (targetBase && targetBase !== 'length') return undefined;
+      targetBase = 'length';
+      targetUnit = 'px';
+    } else {
+      return undefined;
     }
-    return new TypedOM.CSSUnitValue(totalPx, 'px');
   }
-
-  if (units.every(u => u === 'percent')) {
-    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
-    return new TypedOM.CSSUnitValue(total, 'percent');
-  }
-
-  if (units.every(u => u === 's' || u === 'ms')) {
-    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce(
-      (acc, v) => acc + (v.unit === 'ms' ? v.value * 0.001 : v.value),
-      0
-    );
-    return new TypedOM.CSSUnitValue(total, 's');
-  }
-
-  if (units.every(u => u in unitToRadians)) {
-    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce(
-      (acc, v) => acc + v.value * (unitToRadians[v.unit] / unitToRadians['deg']),
-      0
-    );
-    return new TypedOM.CSSUnitValue(total, 'deg');
-  }
-
-  if (units.every(u => u === 'number')) {
-    const total = Array.from(rawVal.values as Iterable<TypedOM.CSSUnitValue>).reduce((acc, v) => acc + v.value, 0);
-    return new TypedOM.CSSUnitValue(total, 'number');
-  }
-
-  return undefined;
+  return targetUnit ? new TypedOM.CSSUnitValue(total, targetUnit) : undefined;
 }
 
 function normalizeComputedColor(property: string, rawVal: TypedOM.CSSStyleValue): TypedOM.CSSStyleValue | undefined {
@@ -269,8 +249,36 @@ function getValidEncoding(label: string | null | undefined): string | null {
 }
 
 export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
+  private resolveElementValues(property: string, allowLineHeightNumber: boolean): 'disconnected' | TypedOM.CSSStyleValue[] | null {
+    if (!this._element) return null;
+    const el = this._element as { isConnected?: boolean; ownerDocument?: { contains?: (n: unknown) => boolean; documentElement?: unknown }; style?: CSSStyleDeclaration };
+    const isConnected = el.isConnected ?? Boolean(el.ownerDocument?.documentElement && el.ownerDocument.contains?.(el));
+    if (!isConnected) return 'disconnected';
+
+    const cascaded = getCascadedStyle(this._element);
+    let cascadedVal = cascaded.getPropertyValue(property);
+    if (!cascadedVal) {
+      cascadedVal = getInitialValue(camelToDashed(property).toLowerCase(), this._element);
+    }
+    if (!cascadedVal) return null;
+
+    if (allowLineHeightNumber && (property === 'line-height' || property === 'lineHeight')) {
+      const inlineVal = el.style?.getPropertyValue('line-height')?.trim();
+      if (inlineVal && !isNaN(Number(inlineVal))) {
+        return [new TypedOM.CSSUnitValue(parseFloat(inlineVal), 'number')];
+      }
+    }
+    try {
+      return TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
+    } catch {
+      return [new TypedOM.CSSStyleValue(cascadedVal, privateToken)];
+    }
+  }
+
   override get(property: string): TypedOM.CSSStyleValue | undefined {
-    const rawVal = this.getRawPropertyValue(property);
+    const resolved = this.resolveElementValues(property, true);
+    if (resolved === 'disconnected') return undefined;
+    const rawVal = resolved && resolved.length > 0 ? resolved[0] : super.get(property);
     if (!rawVal) return undefined;
 
     return (
@@ -282,56 +290,10 @@ export class ComputedStylePropertyMap extends TypedOM.StylePropertyMapReadOnly {
     );
   }
 
-  private getRawPropertyValue(property: string): TypedOM.CSSStyleValue | undefined {
-    if (this._element) {
-      const el = this._element as { isConnected?: boolean; ownerDocument?: { contains?: (n: unknown) => boolean; documentElement?: unknown } };
-      const isConnected = el.isConnected ?? (el.ownerDocument?.documentElement && el.ownerDocument.contains ? el.ownerDocument.contains(el) : false);
-      if (!isConnected) return undefined;
-
-      const cascaded = getCascadedStyle(this._element);
-      let cascadedVal = cascaded.getPropertyValue(property);
-      if (!cascadedVal) {
-        const dashed = camelToDashed(property).toLowerCase();
-        cascadedVal = getInitialValue(dashed, this._element);
-      }
-      if (cascadedVal) {
-        if (property === 'line-height' || property === 'lineHeight') {
-          const inlineVal = (this._element as { style?: CSSStyleDeclaration }).style?.getPropertyValue('line-height')?.trim();
-          if (inlineVal && !isNaN(Number(inlineVal))) {
-            return new TypedOM.CSSUnitValue(parseFloat(inlineVal), 'number');
-          }
-        }
-        try {
-          const parsed = TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
-          if (parsed.length > 0) return parsed[0];
-        } catch {
-          return new TypedOM.CSSStyleValue(cascadedVal, privateToken);
-        }
-      }
-    }
-    return super.get(property);
-  }
-
   override getAll(property: string): TypedOM.CSSStyleValue[] {
-    if (this._element) {
-      const el = this._element as { isConnected?: boolean; ownerDocument?: { contains?: (n: unknown) => boolean; documentElement?: unknown } };
-      const isConnected = el.isConnected ?? (el.ownerDocument?.documentElement && el.ownerDocument.contains ? el.ownerDocument.contains(el) : false);
-      if (!isConnected) return [];
-      const cascaded = getCascadedStyle(this._element);
-      let cascadedVal = cascaded.getPropertyValue(property);
-      if (!cascadedVal) {
-        const dashed = camelToDashed(property).toLowerCase();
-        cascadedVal = getInitialValue(dashed, this._element);
-      }
-      if (cascadedVal) {
-        try {
-          return TypedOM.CSSStyleValue.parseAll(property, cascadedVal);
-        } catch {
-          return [new TypedOM.CSSStyleValue(cascadedVal, privateToken)];
-        }
-      }
-    }
-    return super.getAll(property);
+    const resolved = this.resolveElementValues(property, false);
+    if (resolved === 'disconnected') return [];
+    return resolved ?? super.getAll(property);
   }
 }
 
@@ -2632,6 +2594,21 @@ function patchWindowStyles(window: WindowType): void {
 
     const liveDecl = new CSSStyleDeclaration([], true);
     const getCascaded = () => getCascadedStyle(element, undefined, normalizedPseudo);
+    const isBlockifiedParentDisplay = (disp: string | undefined) =>
+      disp === 'flex' || disp === 'inline-flex' || disp === 'grid' || disp === 'inline-grid';
+    const getIndexedProp = (i: number): string | undefined => {
+      if (i < ALL_COMPUTED_PROPS.length) return ALL_COMPUTED_PROPS[i];
+      const cascaded = getCascaded();
+      let customIdx = 0;
+      for (let j = 0; j < cascaded.length; j++) {
+        const name = cascaded.item(j);
+        if (name.startsWith('--')) {
+          if (customIdx === i - ALL_COMPUTED_PROPS.length) return name;
+          customIdx++;
+        }
+      }
+      return undefined;
+    };
 
     return new Proxy(liveDecl, {
       get(_target, prop, _receiver) {
@@ -2654,30 +2631,20 @@ function patchWindowStyles(window: WindowType): void {
             return (p: string) => {
               const cascaded = getCascaded();
               const val = cascaded.getPropertyValue(p);
+              const dashed = camelToDashed(p).toLowerCase();
               if (val !== '') {
-                const dashed = camelToDashed(p).toLowerCase();
                 if (normalizedPseudo && dashed === 'display') {
                   const elDisp = (element as { style?: { getPropertyValue?: (prop: string) => string } }).style?.getPropertyValue?.('display') || getCascadedStyle(element as Element).getPropertyValue('display');
-                  if (elDisp === 'flex' || elDisp === 'inline-flex' || elDisp === 'grid' || elDisp === 'inline-grid') {
-                    return 'block';
-                  }
+                  if (isBlockifiedParentDisplay(elDisp)) return 'block';
                 }
                 return val;
               }
-              const dashed = camelToDashed(p).toLowerCase();
-
               if (p.startsWith('--') || dashed.startsWith('--')) {
                 const reg = PropertyRegistry.get(p) || PropertyRegistry.get(dashed);
-                if (reg?.initialValue) {
-                  return reg.initialValue;
-                }
+                if (reg?.initialValue) return reg.initialValue;
               }
               if (normalizedPseudo && dashed === 'display') {
-                const elDisp = getCascadedStyle(element as Element).getPropertyValue('display');
-                if (elDisp === 'flex' || elDisp === 'inline-flex' || elDisp === 'grid' || elDisp === 'inline-grid') {
-                  return 'block';
-                }
-                return 'inline';
+                return isBlockifiedParentDisplay(getCascadedStyle(element as Element).getPropertyValue('display')) ? 'block' : 'inline';
               }
               return getInitialValue(dashed, element);
             };
@@ -2690,15 +2657,9 @@ function patchWindowStyles(window: WindowType): void {
               throw new DOMException('Computed style declarations are read-only', 'NoModificationAllowedError');
             };
           }
-          if (prop === '_readonly') {
-            return true;
-          }
-          if (prop === '_declarations') {
-            return [];
-          }
-          if (prop === 'parentRule') {
-            return null;
-          }
+          if (prop === '_readonly') return true;
+          if (prop === '_declarations') return [];
+          if (prop === 'parentRule') return null;
           if (prop === 'length') {
             const cascaded = getCascaded();
             let customCount = 0;
@@ -2707,38 +2668,9 @@ function patchWindowStyles(window: WindowType): void {
             }
             return ALL_COMPUTED_PROPS.length + customCount;
           }
-          if (prop === 'item') {
-            return (i: number) => {
-              if (i < ALL_COMPUTED_PROPS.length) return ALL_COMPUTED_PROPS[i];
-              const cascaded = getCascaded();
-              let customIdx = 0;
-              for (let j = 0; j < cascaded.length; j++) {
-                const name = cascaded.item(j);
-                if (name.startsWith('--')) {
-                  if (customIdx === i - ALL_COMPUTED_PROPS.length) return name;
-                  customIdx++;
-                }
-              }
-              return '';
-            };
-          }
-          if (prop === 'cssText') {
-            return '';
-          }
-          if (!isNaN(Number(prop))) {
-            const i = Number(prop);
-            if (i < ALL_COMPUTED_PROPS.length) return ALL_COMPUTED_PROPS[i];
-            const cascaded = getCascaded();
-            let customIdx = 0;
-            for (let j = 0; j < cascaded.length; j++) {
-              const name = cascaded.item(j);
-              if (name.startsWith('--')) {
-                if (customIdx === i - ALL_COMPUTED_PROPS.length) return name;
-                customIdx++;
-              }
-            }
-            return undefined;
-          }
+          if (prop === 'item') return (i: number) => getIndexedProp(i) ?? '';
+          if (prop === 'cssText') return '';
+          if (!isNaN(Number(prop))) return getIndexedProp(Number(prop));
           const isCustom = prop.startsWith('--');
           const cssProp = !isCustom && prop === 'cssFloat' ? 'float' : !isCustom ? camelToDashed(prop) : prop;
           if (typeof (_receiver as { getPropertyValue?: (p: string) => string }).getPropertyValue === 'function') {
