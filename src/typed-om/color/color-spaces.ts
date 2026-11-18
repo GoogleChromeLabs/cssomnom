@@ -20,7 +20,6 @@ import { CSSColorValue } from './CSSColorValue.ts';
 import { CSSNumericValue } from '../numeric/CSSNumericValue.ts';
 import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
-import { checkBrand } from '../utils/validation.ts';
 import { isAlphaUnity, formatAlpha, createKeywordValue } from '../utils/formatting.ts';
 import {
   rectifyColorRGBComp,
@@ -30,8 +29,8 @@ import {
   rectifyColorAngle
 } from './color-rectify.ts';
 import { createCSSStyleValue } from '../values/style-value-factory.ts';
-
 import { matchesAngle } from '../utils/type-guards.ts';
+import { applyWebIDLInterface } from '../../webidl.ts';
 
 // css-typed-om #cssrgb
 export type CSSColorRGBComp = CSSNumericValue | CSSKeywordValue | number | string;
@@ -39,12 +38,24 @@ export type CSSColorPercent = CSSNumericValue | CSSKeywordValue | number | strin
 export type CSSColorNumber = CSSNumericValue | CSSKeywordValue | number | string;
 export type CSSColorAngle = CSSNumericValue | CSSKeywordValue | number | string;
 
+type ColorChannel = CSSNumericValue | CSSKeywordValue;
+
+function assertMinArgs(name: string, actual: number, required: number): void {
+  if (actual < required) {
+    throw new TypeError(`Failed to construct '${name}': ${required} arguments required, but only ${actual} present.`);
+  }
+}
+
+function formatSpaceColor(fn: string, c1: ColorChannel, c2: ColorChannel, c3: ColorChannel, alpha: ColorChannel): string {
+  return isAlphaUnity(alpha) ? `${fn}(${c1} ${c2} ${c3})` : `${fn}(${c1} ${c2} ${c3} / ${alpha})`;
+}
+
 // css-typed-om #cssrgb
 export class CSSRGB extends CSSColorValue {
-  private _r!: CSSNumericValue | CSSKeywordValue;
-  private _g!: CSSNumericValue | CSSKeywordValue;
-  private _b!: CSSNumericValue | CSSKeywordValue;
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _r!: ColorChannel;
+  private _g!: ColorChannel;
+  private _b!: ColorChannel;
+  private _alpha!: ColorChannel;
 
   constructor(
     r: CSSColorRGBComp,
@@ -52,9 +63,7 @@ export class CSSRGB extends CSSColorValue {
     b: CSSColorRGBComp,
     alpha: CSSColorPercent = new CSSUnitValue(100, 'percent')
   ) {
-    if (arguments.length < 3) {
-      throw new TypeError("Failed to construct 'CSSRGB': 3 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSRGB', arguments.length, 3);
     super();
     this.r = r;
     this.g = g;
@@ -62,40 +71,33 @@ export class CSSRGB extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get r(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._r; }
-  set r(val: CSSColorRGBComp) { checkBrand(this, CSSRGB); this._r = rectifyColorRGBComp(val); }
+  get r(): ColorChannel { return this._r; }
+  set r(val: CSSColorRGBComp) { this._r = rectifyColorRGBComp(val); }
 
-  get g(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._g; }
-  set g(val: CSSColorRGBComp) { checkBrand(this, CSSRGB); this._g = rectifyColorRGBComp(val); }
+  get g(): ColorChannel { return this._g; }
+  set g(val: CSSColorRGBComp) { this._g = rectifyColorRGBComp(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._b; }
-  set b(val: CSSColorRGBComp) { checkBrand(this, CSSRGB); this._b = rectifyColorRGBComp(val); }
+  get b(): ColorChannel { return this._b; }
+  set b(val: CSSColorRGBComp) { this._b = rectifyColorRGBComp(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSRGB); return this._alpha; }
-  set alpha(val: CSSColorPercent) { checkBrand(this, CSSRGB); this._alpha = rectifyColorPercent(val); }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorPercent) { this._alpha = rectifyColorPercent(val); }
 
   override toString(): string {
-    // css-color-4 #css-serialization-of-srgb:
-    // "For compatibility, the legacy form with comma separators is used; exactly one ASCII space follows each comma."
-    // Alpha is omitted if unity, and serialized as a unitless <number> otherwise.
-    // Note: HSL and HWB serialize using modern space-separated syntax, but sRGB is legacy for web compat.
+    // css-color-4 #css-serialization-of-srgb: legacy comma form with unitless alpha when non-unity
     const r = this.r.toString();
     const g = this.g.toString();
     const b = this.b.toString();
-
-    if (isAlphaUnity(this.alpha)) {
-      return `rgb(${r}, ${g}, ${b})`;
-    }
-    return `rgba(${r}, ${g}, ${b}, ${formatAlpha(this.alpha)})`;
+    return isAlphaUnity(this.alpha) ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${formatAlpha(this.alpha)})`;
   }
 }
 
 // css-typed-om #csshsl
 export class CSSHSL extends CSSColorValue {
-  private _h!: CSSNumericValue | CSSKeywordValue;
-  private _s!: CSSNumericValue | CSSKeywordValue;
-  private _l!: CSSNumericValue | CSSKeywordValue;
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _h!: ColorChannel;
+  private _s!: ColorChannel;
+  private _l!: ColorChannel;
+  private _alpha!: ColorChannel;
 
   constructor(
     h: CSSColorAngle,
@@ -103,9 +105,7 @@ export class CSSHSL extends CSSColorValue {
     l: CSSColorPercent,
     alpha: CSSColorPercent = new CSSUnitValue(100, 'percent')
   ) {
-    if (arguments.length < 3) {
-      throw new TypeError("Failed to construct 'CSSHSL': 3 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSHSL', arguments.length, 3);
     super();
     this.h = h;
     this.s = s;
@@ -113,32 +113,27 @@ export class CSSHSL extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._h; }
-  set h(val: CSSColorAngle) { checkBrand(this, CSSHSL); this._h = rectifyColorAngle(val); }
+  get h(): ColorChannel { return this._h; }
+  set h(val: CSSColorAngle) { this._h = rectifyColorAngle(val); }
 
-  get s(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._s; }
-  set s(val: CSSColorPercent) { checkBrand(this, CSSHSL); this._s = rectifyColorPercent(val); }
+  get s(): ColorChannel { return this._s; }
+  set s(val: CSSColorPercent) { this._s = rectifyColorPercent(val); }
 
-  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._l; }
-  set l(val: CSSColorPercent) { checkBrand(this, CSSHSL); this._l = rectifyColorPercent(val); }
+  get l(): ColorChannel { return this._l; }
+  set l(val: CSSColorPercent) { this._l = rectifyColorPercent(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHSL); return this._alpha; }
-  set alpha(val: CSSColorPercent) { checkBrand(this, CSSHSL); this._alpha = rectifyColorPercent(val); }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorPercent) { this._alpha = rectifyColorPercent(val); }
 
-  override toString(): string {
-    if (isAlphaUnity(this.alpha)) {
-      return `hsl(${this.h} ${this.s} ${this.l})`;
-    }
-    return `hsl(${this.h} ${this.s} ${this.l} / ${this.alpha})`;
-  }
+  override toString(): string { return formatSpaceColor('hsl', this.h, this.s, this.l, this.alpha); }
 }
 
 // css-typed-om #csshwb
 export class CSSHWB extends CSSColorValue {
   private _h!: CSSNumericValue;
-  private _w!: CSSNumericValue | CSSKeywordValue;
-  private _b!: CSSNumericValue | CSSKeywordValue;
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _w!: ColorChannel;
+  private _b!: ColorChannel;
+  private _alpha!: ColorChannel;
 
   constructor(
     h: CSSNumericValue,
@@ -146,9 +141,7 @@ export class CSSHWB extends CSSColorValue {
     b: CSSColorPercent,
     alpha: CSSColorPercent = new CSSUnitValue(100, 'percent')
   ) {
-    if (arguments.length < 3) {
-      throw new TypeError("Failed to construct 'CSSHWB': 3 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSHWB', arguments.length, 3);
     super();
     this.h = h;
     this.w = w;
@@ -156,41 +149,35 @@ export class CSSHWB extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get h(): CSSNumericValue { checkBrand(this, CSSHWB); return this._h; }
+  get h(): CSSNumericValue { return this._h; }
   set h(val: CSSNumericValue) {
-    checkBrand(this, CSSHWB);
     if (!(val instanceof CSSNumericValue) || typeof val === 'number') {
-      throw new TypeError(`CSSHWB.h must be a CSSNumericValue`);
+      throw new TypeError('CSSHWB.h must be a CSSNumericValue');
     }
     if (!matchesAngle(val.type())) {
-      throw new DOMException(`CSSHWB.h must have angle type`, 'SyntaxError');
+      throw new DOMException('CSSHWB.h must have angle type', 'SyntaxError');
     }
     this._h = val;
   }
 
-  get w(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._w; }
-  set w(val: CSSColorPercent) { checkBrand(this, CSSHWB); this._w = rectifyColorPercent(val); }
+  get w(): ColorChannel { return this._w; }
+  set w(val: CSSColorPercent) { this._w = rectifyColorPercent(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._b; }
-  set b(val: CSSColorPercent) { checkBrand(this, CSSHWB); this._b = rectifyColorPercent(val); }
+  get b(): ColorChannel { return this._b; }
+  set b(val: CSSColorPercent) { this._b = rectifyColorPercent(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSHWB); return this._alpha; }
-  set alpha(val: CSSColorPercent) { checkBrand(this, CSSHWB); this._alpha = rectifyColorPercent(val); }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorPercent) { this._alpha = rectifyColorPercent(val); }
 
-  override toString(): string {
-    if (isAlphaUnity(this.alpha)) {
-      return `hwb(${this.h} ${this.w} ${this.b})`;
-    }
-    return `hwb(${this.h} ${this.w} ${this.b} / ${this.alpha})`;
-  }
+  override toString(): string { return formatSpaceColor('hwb', this.h, this.w, this.b, this.alpha); }
 }
 
 // css-typed-om #csslab
 export class CSSLab extends CSSColorValue {
-  private _l!: CSSNumericValue | CSSKeywordValue;
-  private _a!: CSSNumericValue | CSSKeywordValue;
-  private _b!: CSSNumericValue | CSSKeywordValue;
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _l!: ColorChannel;
+  private _a!: ColorChannel;
+  private _b!: ColorChannel;
+  private _alpha!: ColorChannel;
 
   constructor(
     l: CSSColorPercent,
@@ -198,9 +185,7 @@ export class CSSLab extends CSSColorValue {
     b: CSSColorNumber,
     alpha: CSSColorPercent = new CSSUnitValue(100, 'percent')
   ) {
-    if (arguments.length < 3) {
-      throw new TypeError("Failed to construct 'CSSLab': 3 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSLab', arguments.length, 3);
     super();
     this.l = l;
     this.a = a;
@@ -208,32 +193,27 @@ export class CSSLab extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._l; }
-  set l(val: CSSColorPercent) { checkBrand(this, CSSLab); this._l = rectifyColorPercent(val); }
+  get l(): ColorChannel { return this._l; }
+  set l(val: CSSColorPercent) { this._l = rectifyColorPercent(val); }
 
-  get a(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._a; }
-  set a(val: CSSColorNumber) { checkBrand(this, CSSLab); this._a = rectifyColorNumber(val); }
+  get a(): ColorChannel { return this._a; }
+  set a(val: CSSColorNumber) { this._a = rectifyColorNumber(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._b; }
-  set b(val: CSSColorNumber) { checkBrand(this, CSSLab); this._b = rectifyColorNumber(val); }
+  get b(): ColorChannel { return this._b; }
+  set b(val: CSSColorNumber) { this._b = rectifyColorNumber(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLab); return this._alpha; }
-  set alpha(val: CSSColorPercent) { checkBrand(this, CSSLab); this._alpha = rectifyColorPercent(val); }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorPercent) { this._alpha = rectifyColorPercent(val); }
 
-  override toString(): string {
-    if (isAlphaUnity(this.alpha)) {
-      return `lab(${this.l} ${this.a} ${this.b})`;
-    }
-    return `lab(${this.l} ${this.a} ${this.b} / ${this.alpha})`;
-  }
+  override toString(): string { return formatSpaceColor('lab', this.l, this.a, this.b, this.alpha); }
 }
 
 // css-typed-om #csslch
 export class CSSLCH extends CSSColorValue {
-  private _l!: CSSNumericValue | CSSKeywordValue;
-  private _c!: CSSNumericValue | CSSKeywordValue;
-  private _h!: CSSNumericValue | CSSKeywordValue;
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _l!: ColorChannel;
+  private _c!: ColorChannel;
+  private _h!: ColorChannel;
+  private _alpha!: ColorChannel;
 
   constructor(
     l: CSSColorPercent,
@@ -241,9 +221,7 @@ export class CSSLCH extends CSSColorValue {
     h: CSSColorAngle,
     alpha: CSSColorPercent = new CSSUnitValue(100, 'percent')
   ) {
-    if (arguments.length < 3) {
-      throw new TypeError("Failed to construct 'CSSLCH': 3 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSLCH', arguments.length, 3);
     super();
     this.l = l;
     this.c = c;
@@ -251,32 +229,27 @@ export class CSSLCH extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._l; }
-  set l(val: CSSColorPercent) { checkBrand(this, CSSLCH); this._l = rectifyColorPercent(val); }
+  get l(): ColorChannel { return this._l; }
+  set l(val: CSSColorPercent) { this._l = rectifyColorPercent(val); }
 
-  get c(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._c; }
-  set c(val: CSSColorPercent) { checkBrand(this, CSSLCH); this._c = rectifyColorPercent(val); }
+  get c(): ColorChannel { return this._c; }
+  set c(val: CSSColorPercent) { this._c = rectifyColorPercent(val); }
 
-  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._h; }
-  set h(val: CSSColorAngle) { checkBrand(this, CSSLCH); this._h = rectifyColorAngle(val); }
+  get h(): ColorChannel { return this._h; }
+  set h(val: CSSColorAngle) { this._h = rectifyColorAngle(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSLCH); return this._alpha; }
-  set alpha(val: CSSColorPercent) { checkBrand(this, CSSLCH); this._alpha = rectifyColorPercent(val); }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorPercent) { this._alpha = rectifyColorPercent(val); }
 
-  override toString(): string {
-    if (isAlphaUnity(this.alpha)) {
-      return `lch(${this.l} ${this.c} ${this.h})`;
-    }
-    return `lch(${this.l} ${this.c} ${this.h} / ${this.alpha})`;
-  }
+  override toString(): string { return formatSpaceColor('lch', this.l, this.c, this.h, this.alpha); }
 }
 
 // css-typed-om #cssoklab
 export class CSSOKLab extends CSSColorValue {
-  private _l!: CSSNumericValue | CSSKeywordValue;
-  private _a!: CSSNumericValue | CSSKeywordValue;
-  private _b!: CSSNumericValue | CSSKeywordValue;
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _l!: ColorChannel;
+  private _a!: ColorChannel;
+  private _b!: ColorChannel;
+  private _alpha!: ColorChannel;
 
   constructor(
     l: CSSColorPercent,
@@ -284,9 +257,7 @@ export class CSSOKLab extends CSSColorValue {
     b: CSSColorNumber,
     alpha: CSSColorPercent = new CSSUnitValue(100, 'percent')
   ) {
-    if (arguments.length < 3) {
-      throw new TypeError("Failed to construct 'CSSOKLab': 3 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSOKLab', arguments.length, 3);
     super();
     this.l = l;
     this.a = a;
@@ -294,32 +265,27 @@ export class CSSOKLab extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._l; }
-  set l(val: CSSColorPercent) { checkBrand(this, CSSOKLab); this._l = rectifyColorPercent(val); }
+  get l(): ColorChannel { return this._l; }
+  set l(val: CSSColorPercent) { this._l = rectifyColorPercent(val); }
 
-  get a(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._a; }
-  set a(val: CSSColorNumber) { checkBrand(this, CSSOKLab); this._a = rectifyColorNumber(val); }
+  get a(): ColorChannel { return this._a; }
+  set a(val: CSSColorNumber) { this._a = rectifyColorNumber(val); }
 
-  get b(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._b; }
-  set b(val: CSSColorNumber) { checkBrand(this, CSSOKLab); this._b = rectifyColorNumber(val); }
+  get b(): ColorChannel { return this._b; }
+  set b(val: CSSColorNumber) { this._b = rectifyColorNumber(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLab); return this._alpha; }
-  set alpha(val: CSSColorPercent) { checkBrand(this, CSSOKLab); this._alpha = rectifyColorPercent(val); }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorPercent) { this._alpha = rectifyColorPercent(val); }
 
-  override toString(): string {
-    if (isAlphaUnity(this.alpha)) {
-      return `oklab(${this.l} ${this.a} ${this.b})`;
-    }
-    return `oklab(${this.l} ${this.a} ${this.b} / ${this.alpha})`;
-  }
+  override toString(): string { return formatSpaceColor('oklab', this.l, this.a, this.b, this.alpha); }
 }
 
 // css-typed-om #cssoklch
 export class CSSOKLCH extends CSSColorValue {
-  private _l!: CSSNumericValue | CSSKeywordValue;
-  private _c!: CSSNumericValue | CSSKeywordValue;
-  private _h!: CSSNumericValue | CSSKeywordValue;
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _l!: ColorChannel;
+  private _c!: ColorChannel;
+  private _h!: ColorChannel;
+  private _alpha!: ColorChannel;
 
   constructor(
     l: CSSColorPercent,
@@ -327,9 +293,7 @@ export class CSSOKLCH extends CSSColorValue {
     h: CSSColorAngle,
     alpha: CSSColorPercent = new CSSUnitValue(100, 'percent')
   ) {
-    if (arguments.length < 3) {
-      throw new TypeError("Failed to construct 'CSSOKLCH': 3 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSOKLCH', arguments.length, 3);
     super();
     this.l = l;
     this.c = c;
@@ -337,45 +301,38 @@ export class CSSOKLCH extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get l(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._l; }
-  set l(val: CSSColorPercent) { checkBrand(this, CSSOKLCH); this._l = rectifyColorPercent(val); }
+  get l(): ColorChannel { return this._l; }
+  set l(val: CSSColorPercent) { this._l = rectifyColorPercent(val); }
 
-  get c(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._c; }
-  set c(val: CSSColorPercent) { checkBrand(this, CSSOKLCH); this._c = rectifyColorPercent(val); }
+  get c(): ColorChannel { return this._c; }
+  set c(val: CSSColorPercent) { this._c = rectifyColorPercent(val); }
 
-  get h(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._h; }
-  set h(val: CSSColorAngle) { checkBrand(this, CSSOKLCH); this._h = rectifyColorAngle(val); }
+  get h(): ColorChannel { return this._h; }
+  set h(val: CSSColorAngle) { this._h = rectifyColorAngle(val); }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSOKLCH); return this._alpha; }
-  set alpha(val: CSSColorPercent) { checkBrand(this, CSSOKLCH); this._alpha = rectifyColorPercent(val); }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorPercent) { this._alpha = rectifyColorPercent(val); }
 
-  override toString(): string {
-    if (isAlphaUnity(this.alpha)) {
-      return `oklch(${this.l} ${this.c} ${this.h})`;
-    }
-    return `oklch(${this.l} ${this.c} ${this.h} / ${this.alpha})`;
-  }
+  override toString(): string { return formatSpaceColor('oklch', this.l, this.c, this.h, this.alpha); }
 }
 
 // css-typed-om #csscolor
 export class CSSColor extends CSSColorValue {
   private _colorSpace!: CSSKeywordValue;
-  private _channels!: (CSSNumericValue | CSSKeywordValue)[];
-  private _alpha!: CSSNumericValue | CSSKeywordValue;
+  private _channels!: ColorChannel[];
+  private _alpha!: ColorChannel;
 
   constructor(
     colorSpace: CSSKeywordValue | string,
-    channels: (CSSNumericValue | CSSKeywordValue | number | string)[],
+    channels: (ColorChannel | number | string)[],
     alpha: CSSColorNumber = new CSSUnitValue(1, 'number')
   ) {
-    if (arguments.length < 2) {
-      throw new TypeError("Failed to construct 'CSSColor': 2 arguments required, but only " + arguments.length + " present.");
-    }
+    assertMinArgs('CSSColor', arguments.length, 2);
     if (typeof colorSpace !== 'string' && !(colorSpace instanceof CSSKeywordValue)) {
-      throw new TypeError("CSSColor colorSpace must be a string or CSSKeywordValue");
+      throw new TypeError('CSSColor colorSpace must be a string or CSSKeywordValue');
     }
     if (!Array.isArray(channels)) {
-      throw new TypeError("CSSColor channels must be an array");
+      throw new TypeError('CSSColor channels must be an array');
     }
     super();
     this.colorSpace = colorSpace;
@@ -383,175 +340,96 @@ export class CSSColor extends CSSColorValue {
     this.alpha = alpha;
   }
 
-  get colorSpace(): CSSKeywordValue { checkBrand(this, CSSColor); return this._colorSpace; }
+  get colorSpace(): CSSKeywordValue { return this._colorSpace; }
   set colorSpace(val: CSSKeywordValue | string) {
-    checkBrand(this, CSSColor);
     if (typeof val !== 'string' && !(val instanceof CSSKeywordValue)) {
-      throw new TypeError("CSSColor colorSpace must be a string or CSSKeywordValue");
+      throw new TypeError('CSSColor colorSpace must be a string or CSSKeywordValue');
     }
     this._colorSpace = typeof val === 'string' ? createKeywordValue(val) : val;
   }
 
-  get channels(): (CSSNumericValue | CSSKeywordValue)[] { checkBrand(this, CSSColor); return this._channels; }
-  set channels(val: (CSSNumericValue | CSSKeywordValue | number | string)[]) {
-    checkBrand(this, CSSColor);
+  get channels(): ColorChannel[] { return this._channels; }
+  set channels(val: (ColorChannel | number | string)[]) {
     if (!Array.isArray(val)) {
-      throw new TypeError("channels must be an array");
+      throw new TypeError('channels must be an array');
     }
     this._channels = val.map(c => rectifyColorNumberOrPercent(c));
   }
 
-  get alpha(): CSSNumericValue | CSSKeywordValue { checkBrand(this, CSSColor); return this._alpha; }
-  set alpha(val: CSSColorNumber) {
-    checkBrand(this, CSSColor);
-    this._alpha = rectifyColorNumberOrPercent(val);
-  }
+  get alpha(): ColorChannel { return this._alpha; }
+  set alpha(val: CSSColorNumber) { this._alpha = rectifyColorNumberOrPercent(val); }
 
   override toString(): string {
-    let channelsStr = '';
-    for (let i = 0; i < this.channels.length; i++) {
-      if (i > 0) channelsStr += ' ';
-      channelsStr += this.channels[i].toString();
-    }
-    if (isAlphaUnity(this.alpha)) {
-      return `color(${this.colorSpace.value} ${channelsStr})`;
-    }
-    return `color(${this.colorSpace.value} ${channelsStr} / ${this.alpha})`;
+    const channelsStr = this.channels.map(c => c.toString()).join(' ');
+    return isAlphaUnity(this.alpha)
+      ? `color(${this.colorSpace.value} ${channelsStr})`
+      : `color(${this.colorSpace.value} ${channelsStr} / ${this.alpha})`;
   }
 }
 
-type ColorReifier = (args: (CSSNumericValue | CSSKeywordValue)[], alpha: CSSNumericValue | CSSKeywordValue) => CSSColorValue | null;
+for (const cls of [CSSRGB, CSSHSL, CSSHWB, CSSLab, CSSLCH, CSSOKLab, CSSOKLCH, CSSColor]) {
+  applyWebIDLInterface(cls, { prototypeOnly: true });
+}
+
+type ColorReifier = (args: ColorChannel[], alpha: ColorChannel) => CSSColorValue | null;
+
+function scaleUnit(v: ColorChannel, from: 'number' | 'percent', to: 'percent' | 'number' | 'deg', factor = 1): ColorChannel {
+  return v instanceof CSSUnitValue && v.unit === from ? new CSSUnitValue(v.value * factor, to) : v;
+}
+
+const toPercentAlpha = (a: ColorChannel) => scaleUnit(a, 'number', 'percent', 100);
+const toDegAngle = (h: ColorChannel) => scaleUnit(h, 'number', 'deg');
+
+const reifyRgb: ColorReifier = (args, alpha) => new CSSRGB(args[0], args[1], args[2], toPercentAlpha(alpha));
+const reifyHsl: ColorReifier = (args, alpha) => new CSSHSL(toDegAngle(args[0]), args[1], args[2], toPercentAlpha(alpha));
 
 export const COLOR_REIFIERS: Record<string, ColorReifier> = {
-  rgb: (args, alpha) => {
-    let a = alpha;
-    if (a instanceof CSSUnitValue && a.unit === 'number') {
-      a = new CSSUnitValue(a.value * 100, 'percent');
-    }
-    return new CSSRGB(args[0], args[1], args[2], a);
-  },
-  rgba: (args, alpha) => {
-    let a = alpha;
-    if (a instanceof CSSUnitValue && a.unit === 'number') {
-      a = new CSSUnitValue(a.value * 100, 'percent');
-    }
-    return new CSSRGB(args[0], args[1], args[2], a);
-  },
-  hsl: (args, alpha) => {
-    let h = args[0];
-    if (h instanceof CSSUnitValue && h.unit === 'number') {
-      h = new CSSUnitValue(h.value, 'deg');
-    }
-    let a = alpha;
-    if (a instanceof CSSUnitValue && a.unit === 'number') {
-      a = new CSSUnitValue(a.value * 100, 'percent');
-    }
-    return new CSSHSL(h, args[1], args[2], a);
-  },
-  hsla: (args, alpha) => {
-    let h = args[0];
-    if (h instanceof CSSUnitValue && h.unit === 'number') {
-      h = new CSSUnitValue(h.value, 'deg');
-    }
-    let a = alpha;
-    if (a instanceof CSSUnitValue && a.unit === 'number') {
-      a = new CSSUnitValue(a.value * 100, 'percent');
-    }
-    return new CSSHSL(h, args[1], args[2], a);
-  },
-  hwb: (args, alpha) => {
-    let h = args[0];
-    if (h instanceof CSSUnitValue && h.unit === 'number') {
-      h = new CSSUnitValue(h.value, 'deg');
-    }
-    let a = alpha;
-    if (a instanceof CSSUnitValue && a.unit === 'number') {
-      a = new CSSUnitValue(a.value * 100, 'percent');
-    }
-    return new CSSHWB(h as CSSNumericValue, args[1], args[2], a);
-  },
-  lab: (args, alpha) => {
-    let l = args[0];
-    if (l instanceof CSSUnitValue && l.unit === 'number') {
-      l = new CSSUnitValue(l.value, 'percent');
-    }
-    let a = args[1];
-    let b = args[2];
-    if (a instanceof CSSUnitValue && a.unit === 'percent') {
-      a = new CSSUnitValue(a.value * 1.25, 'number');
-    }
-    if (b instanceof CSSUnitValue && b.unit === 'percent') {
-      b = new CSSUnitValue(b.value * 1.25, 'number');
-    }
-    let al = alpha;
-    if (al instanceof CSSUnitValue && al.unit === 'number') {
-      al = new CSSUnitValue(al.value * 100, 'percent');
-    }
-    return new CSSLab(l, a, b, al);
-  },
-  lch: (args, alpha) => {
-    let l = args[0];
-    if (l instanceof CSSUnitValue && l.unit === 'number') {
-      l = new CSSUnitValue(l.value, 'percent');
-    }
-    let c = args[1];
-    if (c instanceof CSSUnitValue && c.unit === 'number') {
-      c = new CSSUnitValue(c.value / 1.5, 'percent');
-    }
-    let h = args[2];
-    if (h instanceof CSSUnitValue && h.unit === 'number') {
-      h = new CSSUnitValue(h.value, 'deg');
-    }
-    let al = alpha;
-    if (al instanceof CSSUnitValue && al.unit === 'number') {
-      al = new CSSUnitValue(al.value * 100, 'percent');
-    }
-    return new CSSLCH(l, c, h, al);
-  },
-  oklab: (args, alpha) => {
-    let l = args[0];
-    if (l instanceof CSSUnitValue && l.unit === 'number') {
-      l = new CSSUnitValue(l.value * 100, 'percent');
-    }
-    let a = args[1];
-    let b = args[2];
-    if (a instanceof CSSUnitValue && a.unit === 'percent') {
-      a = new CSSUnitValue(a.value * 0.004, 'number');
-    }
-    if (b instanceof CSSUnitValue && b.unit === 'percent') {
-      b = new CSSUnitValue(b.value * 0.004, 'number');
-    }
-    let al = alpha;
-    if (al instanceof CSSUnitValue && al.unit === 'number') {
-      al = new CSSUnitValue(al.value * 100, 'percent');
-    }
-    return new CSSOKLab(l, a, b, al);
-  },
-  oklch: (args, alpha) => {
-    let l = args[0];
-    if (l instanceof CSSUnitValue && l.unit === 'number') {
-      l = new CSSUnitValue(l.value * 100, 'percent');
-    }
-    let c = args[1];
-    if (c instanceof CSSUnitValue && c.unit === 'number') {
-      c = new CSSUnitValue(c.value / 0.004, 'percent');
-    }
-    let h = args[2];
-    if (h instanceof CSSUnitValue && h.unit === 'number') {
-      h = new CSSUnitValue(h.value, 'deg');
-    }
-    let al = alpha;
-    if (al instanceof CSSUnitValue && al.unit === 'number') {
-      al = new CSSUnitValue(al.value * 100, 'percent');
-    }
-    return new CSSOKLCH(l, c, h, al);
-  },
+  rgb: reifyRgb,
+  rgba: reifyRgb,
+  hsl: reifyHsl,
+  hsla: reifyHsl,
+  hwb: (args, alpha) => new CSSHWB(toDegAngle(args[0]) as CSSNumericValue, args[1], args[2], toPercentAlpha(alpha)),
+  lab: (args, alpha) => new CSSLab(
+    scaleUnit(args[0], 'number', 'percent'),
+    scaleUnit(args[1], 'percent', 'number', 1.25),
+    scaleUnit(args[2], 'percent', 'number', 1.25),
+    toPercentAlpha(alpha),
+  ),
+  lch: (args, alpha) => new CSSLCH(
+    scaleUnit(args[0], 'number', 'percent'),
+    scaleUnit(args[1], 'number', 'percent', 1 / 1.5),
+    toDegAngle(args[2]),
+    toPercentAlpha(alpha),
+  ),
+  oklab: (args, alpha) => new CSSOKLab(
+    scaleUnit(args[0], 'number', 'percent', 100),
+    scaleUnit(args[1], 'percent', 'number', 0.004),
+    scaleUnit(args[2], 'percent', 'number', 0.004),
+    toPercentAlpha(alpha),
+  ),
+  oklch: (args, alpha) => new CSSOKLCH(
+    scaleUnit(args[0], 'number', 'percent', 100),
+    scaleUnit(args[1], 'number', 'percent', 1 / 0.004),
+    toDegAngle(args[2]),
+    toPercentAlpha(alpha),
+  ),
 };
+
+function reifyColorToken(token: ComponentValue): ColorChannel | null {
+  if (token.type === 'comma') return null;
+  const val = createCSSStyleValue(token);
+  if (val === null) return null;
+  if (val instanceof CSSUnitValue || val instanceof CSSKeywordValue ||
+      val.constructor.name === 'CSSUnitValue' || val.constructor.name === 'CSSKeywordValue') {
+    return val as ColorChannel;
+  }
+  return null;
+}
 
 export function parseColorArgs(
   nameLower: string,
   fnValue: ComponentValue[]
-): { args: (CSSNumericValue | CSSKeywordValue)[]; alpha: CSSNumericValue | CSSKeywordValue } | null {
+): { args: ColorChannel[]; alpha: ColorChannel } | null {
   const tokens: ComponentValue[] = [];
   let slashIndex = -1;
 
@@ -568,28 +446,18 @@ export function parseColorArgs(
   if (tokens.length === 0) return null;
 
   const hasCommas = tokens.some(t => t.type === 'comma');
-  const extractedArgs: (CSSNumericValue | CSSKeywordValue)[] = [];
+  if (hasCommas && slashIndex !== -1) return null;
 
-  if (hasCommas) {
-    if (slashIndex !== -1) return null;
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      if (i % 2 === 1) {
-        if (token.type !== 'comma') return null;
-      } else {
-        if (token.type === 'comma') return null;
-        const val = createCSSStyleValue(token);
-        if (val === null || (val.constructor.name !== 'CSSUnitValue' && val.constructor.name !== 'CSSKeywordValue' && !(val instanceof CSSUnitValue) && !(val instanceof CSSKeywordValue))) return null;
-        extractedArgs.push(val as CSSNumericValue | CSSKeywordValue);
-      }
+  const extractedArgs: ColorChannel[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (hasCommas && i % 2 === 1) {
+      if (token.type !== 'comma') return null;
+      continue;
     }
-  } else {
-    for (const token of tokens) {
-      if (token.type === 'comma') return null;
-      const val = createCSSStyleValue(token);
-      if (val === null || (val.constructor.name !== 'CSSUnitValue' && val.constructor.name !== 'CSSKeywordValue' && !(val instanceof CSSUnitValue) && !(val instanceof CSSKeywordValue))) return null;
-      extractedArgs.push(val as CSSNumericValue | CSSKeywordValue);
-    }
+    const val = reifyColorToken(token);
+    if (!val) return null;
+    extractedArgs.push(val);
   }
 
   if (nameLower === 'color') {
@@ -600,16 +468,15 @@ export function parseColorArgs(
   }
 
   if (slashIndex !== -1) {
-    if (slashIndex !== extractedArgs.length - 1) return null;
-    if (extractedArgs.length !== 4) return null;
+    return slashIndex === extractedArgs.length - 1 && extractedArgs.length === 4
+      ? { args: extractedArgs.slice(0, 3), alpha: extractedArgs[3] }
+      : null;
+  }
+  if (hasCommas && extractedArgs.length === 4) {
     return { args: extractedArgs.slice(0, 3), alpha: extractedArgs[3] };
-  } else {
-    if (hasCommas && extractedArgs.length === 4) {
-      return { args: extractedArgs.slice(0, 3), alpha: extractedArgs[3] };
-    }
-    if (extractedArgs.length === 3) {
-      return { args: extractedArgs, alpha: new CSSUnitValue(1, 'number') };
-    }
+  }
+  if (extractedArgs.length === 3) {
+    return { args: extractedArgs, alpha: new CSSUnitValue(1, 'number') };
   }
   return null;
 }

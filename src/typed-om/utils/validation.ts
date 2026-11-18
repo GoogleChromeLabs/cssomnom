@@ -30,12 +30,6 @@ export function compareStrings(a: string, b: string): number {
   return a === b ? 0 : (a < b ? -1 : 1);
 }
 
-export function checkBrand(obj: unknown, cls: Function): void {
-  if (!(obj instanceof cls)) {
-    throw new TypeError('Illegal invocation');
-  }
-}
-
 export function isToken(val: ComponentValue): val is Token {
   const type = typeof (val as { value: unknown }).value;
   return type === 'string' || type === 'number';

@@ -71,45 +71,66 @@ export function formatAlpha(a: number): string {
   return parseFloat(a.toFixed(4)).toString();
 }
 
-function parseRgbComponents(content: string): [number, number, number, number] | null {
+function formatRgb(r: number, g: number, b: number, a: number = 1): string {
+  return a === 1 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
+}
+
+/**
+ * Parses a raw hex color payload (without leading `#`, length 3/4/6/8) into `[r, g, b, alpha]` (alpha in `[0, 1]`).
+ */
+export function parseHexColor(hex: string): [number, number, number, number] | null {
+  if (!/^[0-9a-fA-F]+$/.test(hex)) return null;
+  const len = hex.length;
+  if (len === 3 || len === 4) {
+    const r = parseInt(hex[0] + hex[0], 16);
+    const g = parseInt(hex[1] + hex[1], 16);
+    const b = parseInt(hex[2] + hex[2], 16);
+    const a = len === 4 ? parseInt(hex[3] + hex[3], 16) / 255 : 1;
+    return [r, g, b, a];
+  }
+  if (len === 6 || len === 8) {
+    const r = parseInt(hex.slice(0, 2), 16);
+    const g = parseInt(hex.slice(2, 4), 16);
+    const b = parseInt(hex.slice(4, 6), 16);
+    const a = len === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+    return [r, g, b, a];
+  }
+  return null;
+}
+
+function splitColorArgs(content: string): string[] | null {
   let parts: string[];
   if (content.includes(',')) {
     parts = content.split(',').map(s => s.trim());
   } else {
     const slashIdx = content.indexOf('/');
     if (slashIdx !== -1) {
-      const rgbPart = content.slice(0, slashIdx).trim();
-      const aPart = content.slice(slashIdx + 1).trim();
-      parts = [...rgbPart.split(/\s+/), aPart];
+      parts = [...content.slice(0, slashIdx).trim().split(/\s+/), content.slice(slashIdx + 1).trim()];
     } else {
       parts = content.trim().split(/\s+/);
     }
   }
+  return parts.length >= 3 && parts.length <= 4 ? parts : null;
+}
 
-  if (parts.length < 3 || parts.length > 4) return null;
+function parseRgbComponents(content: string): [number, number, number, number] | null {
+  const parts = splitColorArgs(content);
+  if (!parts) return null;
 
   const parseComp = (val: string, max: number = 255): number | null => {
     val = val.trim();
-    if (val.endsWith('%')) {
-      const num = parseFloat(val.slice(0, -1));
-      if (isNaN(num)) return null;
-      return Math.min(max, Math.max(0, Math.round((num / 100) * max)));
-    }
-    const num = parseFloat(val);
+    const isPct = val.endsWith('%');
+    const num = parseFloat(isPct ? val.slice(0, -1) : val);
     if (isNaN(num)) return null;
-    return Math.min(max, Math.max(0, Math.round(num)));
+    return Math.min(max, Math.max(0, Math.round(isPct ? (num / 100) * max : num)));
   };
 
   const parseAlpha = (val: string): number => {
     val = val.trim();
-    if (val.endsWith('%')) {
-      const num = parseFloat(val.slice(0, -1));
-      if (isNaN(num)) return 1;
-      return Math.min(1, Math.max(0, num / 100));
-    }
-    const num = parseFloat(val);
+    const isPct = val.endsWith('%');
+    const num = parseFloat(isPct ? val.slice(0, -1) : val);
     if (isNaN(num)) return 1;
-    return Math.min(1, Math.max(0, num));
+    return Math.min(1, Math.max(0, isPct ? num / 100 : num));
   };
 
   const r = parseComp(parts[0], 255);
@@ -122,21 +143,8 @@ function parseRgbComponents(content: string): [number, number, number, number] |
 }
 
 function parseHslComponents(content: string): [number, number, number, number] | null {
-  let parts: string[];
-  if (content.includes(',')) {
-    parts = content.split(',').map(s => s.trim());
-  } else {
-    const slashIdx = content.indexOf('/');
-    if (slashIdx !== -1) {
-      const hslPart = content.slice(0, slashIdx).trim();
-      const aPart = content.slice(slashIdx + 1).trim();
-      parts = [...hslPart.split(/\s+/), aPart];
-    } else {
-      parts = content.trim().split(/\s+/);
-    }
-  }
-
-  if (parts.length < 3 || parts.length > 4) return null;
+  const parts = splitColorArgs(content);
+  if (!parts) return null;
 
   const parseHue = (val: string): number => {
     val = val.trim().toLowerCase();
@@ -193,71 +201,33 @@ export function normalizeComputedColor(val: string): string {
   // 1. Named colors
   if (lower in NAMED_COLORS_RGB) {
     const [r, g, b, a] = NAMED_COLORS_RGB[lower];
-    if (a !== undefined && a < 1) {
-      return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
-    }
-    return `rgb(${r}, ${g}, ${b})`;
+    return formatRgb(r, g, b, a !== undefined && a < 1 ? a : 1);
   }
 
   // 2. System colors
   if (lower in SYSTEM_COLORS) {
     const [r, g, b] = SYSTEM_COLORS[lower];
-    return `rgb(${r}, ${g}, ${b})`;
+    return formatRgb(r, g, b);
   }
 
   // 3. Hex colors
   if (trimmed.startsWith('#')) {
-    const hex = trimmed.slice(1);
-    if (/^[0-9a-fA-F]{3}$/.test(hex)) {
-      const r = parseInt(hex[0] + hex[0], 16);
-      const g = parseInt(hex[1] + hex[1], 16);
-      const b = parseInt(hex[2] + hex[2], 16);
-      return `rgb(${r}, ${g}, ${b})`;
-    }
-    if (/^[0-9a-fA-F]{4}$/.test(hex)) {
-      const r = parseInt(hex[0] + hex[0], 16);
-      const g = parseInt(hex[1] + hex[1], 16);
-      const b = parseInt(hex[2] + hex[2], 16);
-      const a = parseInt(hex[3] + hex[3], 16) / 255;
-      if (a === 1) return `rgb(${r}, ${g}, ${b})`;
-      return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
-    }
-    if (/^[0-9a-fA-F]{6}$/.test(hex)) {
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      return `rgb(${r}, ${g}, ${b})`;
-    }
-    if (/^[0-9a-fA-F]{8}$/.test(hex)) {
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      const a = parseInt(hex.slice(6, 8), 16) / 255;
-      if (a === 1) return `rgb(${r}, ${g}, ${b})`;
-      return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
-    }
+    const parsed = parseHexColor(trimmed.slice(1));
+    if (parsed) return formatRgb(parsed[0], parsed[1], parsed[2], parsed[3]);
   }
 
   // 4. rgb() / rgba() function
   const rgbMatch = /^(?:rgb|rgba)\s*\(\s*([^)]+)\s*\)$/i.exec(trimmed);
   if (rgbMatch) {
     const parsed = parseRgbComponents(rgbMatch[1]);
-    if (parsed) {
-      const [r, g, b, a] = parsed;
-      if (a === 1) return `rgb(${r}, ${g}, ${b})`;
-      return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
-    }
+    if (parsed) return formatRgb(parsed[0], parsed[1], parsed[2], parsed[3]);
   }
 
   // 5. hsl() / hsla() function
   const hslMatch = /^(?:hsl|hsla)\s*\(\s*([^)]+)\s*\)$/i.exec(trimmed);
   if (hslMatch) {
     const parsed = parseHslComponents(hslMatch[1]);
-    if (parsed) {
-      const [r, g, b, a] = parsed;
-      if (a === 1) return `rgb(${r}, ${g}, ${b})`;
-      return `rgba(${r}, ${g}, ${b}, ${formatAlpha(a)})`;
-    }
+    if (parsed) return formatRgb(parsed[0], parsed[1], parsed[2], parsed[3]);
   }
 
   return trimmed;

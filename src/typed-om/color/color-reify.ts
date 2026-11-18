@@ -21,58 +21,30 @@ import { CSSKeywordValue } from '../values/CSSKeywordValue.ts';
 import { CSSUnitValue } from '../numeric/CSSUnitValue.ts';
 import { CSSRGB, CSSColor, COLOR_REIFIERS, parseColorArgs } from './color-spaces.ts';
 import { SYSTEM_COLORS, NAMED_COLORS_RGB } from '../../data/gen/color-values.ts';
+import { parseHexColor } from '../../cascade/color-resolver.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { parseComponentValues } from '../../parser.ts';
 
+function createRgbFromTuple(r: number, g: number, b: number, alpha: number): CSSRGB {
+  return new CSSRGB(
+    new CSSUnitValue(r, 'number'),
+    new CSSUnitValue(g, 'number'),
+    new CSSUnitValue(b, 'number'),
+    new CSSUnitValue(alpha * 100, 'percent')
+  );
+}
+
 export function reifyColor(v: ComponentValue): CSSColorValue | CSSKeywordValue | null {
   if (v.type === 'hash') {
-    const hex = (v as HashToken).value;
-    const len = hex.length;
-    if (len !== 3 && len !== 4 && len !== 6 && len !== 8) {
-      return null;
-    }
-    let r = 0, g = 0, b = 0, alphaPercent = 100;
-    if (len === 3) {
-      r = parseInt(hex[0] + hex[0], 16);
-      g = parseInt(hex[1] + hex[1], 16);
-      b = parseInt(hex[2] + hex[2], 16);
-    } else if (len === 4) {
-      r = parseInt(hex[0] + hex[0], 16);
-      g = parseInt(hex[1] + hex[1], 16);
-      b = parseInt(hex[2] + hex[2], 16);
-      alphaPercent = (parseInt(hex[3] + hex[3], 16) / 255) * 100;
-    } else if (len === 6) {
-      r = parseInt(hex.slice(0, 2), 16);
-      g = parseInt(hex.slice(2, 4), 16);
-      b = parseInt(hex.slice(4, 6), 16);
-    } else if (len === 8) {
-      r = parseInt(hex.slice(0, 2), 16);
-      g = parseInt(hex.slice(2, 4), 16);
-      b = parseInt(hex.slice(4, 6), 16);
-      alphaPercent = (parseInt(hex.slice(6, 8), 16) / 255) * 100;
-    }
-    return new CSSRGB(
-      new CSSUnitValue(r, 'number'),
-      new CSSUnitValue(g, 'number'),
-      new CSSUnitValue(b, 'number'),
-      new CSSUnitValue(alphaPercent, 'percent')
-    );
+    const parsed = parseHexColor((v as HashToken).value);
+    return parsed ? createRgbFromTuple(parsed[0], parsed[1], parsed[2], parsed[3]) : null;
   }
 
   if (v.type === 'ident') {
     const name = (v as IdentToken).value.toLowerCase();
     if (name in NAMED_COLORS_RGB) {
-      const parts = NAMED_COLORS_RGB[name];
-      const r = parts[0];
-      const g = parts[1];
-      const b = parts[2];
-      const alphaPercent = parts.length > 3 ? parts[3]! * 100 : 100;
-      return new CSSRGB(
-        new CSSUnitValue(r, 'number'),
-        new CSSUnitValue(g, 'number'),
-        new CSSUnitValue(b, 'number'),
-        new CSSUnitValue(alphaPercent, 'percent')
-      );
+      const [r, g, b, a] = NAMED_COLORS_RGB[name];
+      return createRgbFromTuple(r, g, b, a ?? 1);
     }
     if (SYSTEM_COLORS.has(name)) {
       return new CSSKeywordValue(name);
