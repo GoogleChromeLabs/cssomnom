@@ -15,7 +15,8 @@
  * limitations under the License.
  */
 import type { Token, ComponentValue, Declaration, CSSFunction, SimpleBlock, SelectorList, ComplexSelector, SimpleSelector } from './types.ts';
-import { SHORTHANDS, ALL_SHORTHAND_LONGHANDS, isInitialBorderImage } from './shorthands.ts';
+import { SHORTHANDS, LONGHAND_TO_SHORTHAND, ALL_SHORTHAND_LONGHANDS, isInitialBorderImage, contractTwoValue } from './shorthands.ts';
+import { LOGICAL_PROPERTY_INFO } from './data/gen/LogicalMapping.ts';
 import { formatNumber } from './utils/format.ts';
 import { parseAnPlusB } from './SelectorParser.ts';
 import { GENERIC_FONT_FAMILIES } from './data/gen/property-list.ts';
@@ -430,80 +431,26 @@ function escapeAsCodePoint(charCode: number): string {
   return '\\' + hex + ' ';
 }
 
-const logicalShorthands: Record<string, { start: string, end: string, allowDifferent: boolean }> = {
-  'margin-inline': { start: 'margin-inline-start', end: 'margin-inline-end', allowDifferent: true },
-  'padding-inline': { start: 'padding-inline-start', end: 'padding-inline-end', allowDifferent: true },
-  'margin-block': { start: 'margin-block-start', end: 'margin-block-end', allowDifferent: true },
-  'padding-block': { start: 'padding-block-start', end: 'padding-block-end', allowDifferent: true },
-  'inset-inline': { start: 'inset-inline-start', end: 'inset-inline-end', allowDifferent: true },
-  'inset-block': { start: 'inset-block-start', end: 'inset-block-end', allowDifferent: true },
-  'border-inline-width': { start: 'border-inline-start-width', end: 'border-inline-end-width', allowDifferent: true },
-  'border-block-width': { start: 'border-block-start-width', end: 'border-block-end-width', allowDifferent: true },
-  'border-inline-style': { start: 'border-inline-start-style', end: 'border-inline-end-style', allowDifferent: true },
-  'border-block-style': { start: 'border-block-start-style', end: 'border-block-end-style', allowDifferent: true },
-  'border-inline-color': { start: 'border-inline-start-color', end: 'border-inline-end-color', allowDifferent: true },
-  'border-block-color': { start: 'border-block-start-color', end: 'border-block-end-color', allowDifferent: true },
-  'border-inline': { start: 'border-inline-start', end: 'border-inline-end', allowDifferent: false },
-  'border-block': { start: 'border-block-start', end: 'border-block-end', allowDifferent: false },
-  'overflow': { start: 'overflow-x', end: 'overflow-y', allowDifferent: true },
-  'overscroll-behavior': { start: 'overscroll-behavior-x', end: 'overscroll-behavior-y', allowDifferent: true },
-};
+const PHYSICAL_BORDER_SIDES = ['border-top', 'border-right', 'border-bottom', 'border-left'] as const;
+const BORDER_SIDE_SHORTHANDS = /* @__PURE__ */ new Set([
+  ...PHYSICAL_BORDER_SIDES,
+  'border-block-start', 'border-block-end', 'border-inline-start', 'border-inline-end',
+]);
+const GROUP_SHORTHANDS = ['border', 'outline', 'list-style', 'flex', 'font-variant', 'font'] as const;
 
-const logicalShorthandsEntries = Object.entries(logicalShorthands);
-
-const propertyToGroup: Record<string, string> = {
-  'margin-top': 'margin', 'margin-right': 'margin', 'margin-bottom': 'margin', 'margin-left': 'margin',
-  'margin-inline-start': 'margin', 'margin-inline-end': 'margin', 'margin-block-start': 'margin', 'margin-block-end': 'margin',
-  
-  'padding-top': 'padding', 'padding-right': 'padding', 'padding-bottom': 'padding', 'padding-left': 'padding',
-  'padding-inline-start': 'padding', 'padding-inline-end': 'padding', 'padding-block-start': 'padding', 'padding-block-end': 'padding',
-  
-  'top': 'inset', 'right': 'inset', 'bottom': 'inset', 'left': 'inset',
-  'inset-inline-start': 'inset', 'inset-inline-end': 'inset', 'inset-block-start': 'inset', 'inset-block-end': 'inset',
-  
-  'border-top-width': 'border-width', 'border-right-width': 'border-width', 'border-bottom-width': 'border-width', 'border-left-width': 'border-width',
-  'border-inline-start-width': 'border-width', 'border-inline-end-width': 'border-width', 'border-block-start-width': 'border-width', 'border-block-end-width': 'border-width',
-  
-  'border-top-style': 'border-style', 'border-right-style': 'border-style', 'border-bottom-style': 'border-style', 'border-left-style': 'border-style',
-  'border-inline-start-style': 'border-style', 'border-inline-end-style': 'border-style', 'border-block-start-style': 'border-style', 'border-block-end-style': 'border-style',
-  
-  'border-top-color': 'border-color', 'border-right-color': 'border-color', 'border-bottom-color': 'border-color', 'border-left-color': 'border-color',
-  'border-inline-start-color': 'border-color', 'border-inline-end-color': 'border-color', 'border-block-start-color': 'border-color', 'border-block-end-color': 'border-color',
-  
-  'width': 'size', 'height': 'size', 'inline-size': 'size', 'block-size': 'size',
-  'min-width': 'min-size', 'min-height': 'min-size', 'min-inline-size': 'min-size', 'min-block-size': 'min-size',
-  'max-width': 'max-size', 'max-height': 'max-size', 'max-inline-size': 'max-size', 'max-block-size': 'max-size',
-  
-  'border-top-left-radius': 'border-radius', 'border-top-right-radius': 'border-radius', 'border-bottom-right-radius': 'border-radius', 'border-bottom-left-radius': 'border-radius',
-  'border-start-start-radius': 'border-radius', 'border-start-end-radius': 'border-radius', 'border-end-start-radius': 'border-radius', 'border-end-end-radius': 'border-radius',
-  'border-top': 'border', 'border-right': 'border', 'border-bottom': 'border', 'border-left': 'border',
-  'border-block-start': 'border', 'border-block-end': 'border', 'border-inline-start': 'border', 'border-inline-end': 'border',
-  'overflow-x': 'overflow', 'overflow-y': 'overflow', 'overflow-inline': 'overflow', 'overflow-block': 'overflow',
-  'overscroll-behavior-x': 'overscroll-behavior', 'overscroll-behavior-y': 'overscroll-behavior', 'overscroll-behavior-inline': 'overscroll-behavior', 'overscroll-behavior-block': 'overscroll-behavior',
-  'outline-color': 'outline', 'outline-style': 'outline', 'outline-width': 'outline',
-  'list-style-type': 'list-style', 'list-style-position': 'list-style', 'list-style-image': 'list-style',
-  'flex-grow': 'flex', 'flex-shrink': 'flex', 'flex-basis': 'flex',
-  'font-style': 'font', 'font-variant-caps': 'font', 'font-weight': 'font', 'font-stretch': 'font', 'font-size': 'font', 'line-height': 'font', 'font-family': 'font',
-  'font-variant-ligatures': 'font-variant', 'font-variant-alternates': 'font-variant', 'font-variant-numeric': 'font-variant', 'font-variant-east-asian': 'font-variant', 'font-variant-position': 'font-variant', 'font-variant-emoji': 'font-variant',
-};
-
-const genericShorthands: Record<string, string[]> = {
-  'border-top': ['border-top-width', 'border-top-style', 'border-top-color'],
-  'border-right': ['border-right-width', 'border-right-style', 'border-right-color'],
-  'border-bottom': ['border-bottom-width', 'border-bottom-style', 'border-bottom-color'],
-  'border-left': ['border-left-width', 'border-left-style', 'border-left-color'],
-  'border-block-start': ['border-block-start-width', 'border-block-start-style', 'border-block-start-color'],
-  'border-block-end': ['border-block-end-width', 'border-block-end-style', 'border-block-end-color'],
-  'border-inline-start': ['border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color'],
-  'border-inline-end': ['border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color'],
-  'outline': ['outline-color', 'outline-style', 'outline-width'],
-  'list-style': ['list-style-type', 'list-style-position', 'list-style-image'],
-  'flex': ['flex-grow', 'flex-shrink', 'flex-basis'],
-  'border-image': ['border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat'],
-  'line-clamp': ['max-lines', 'block-ellipsis', 'continue'],
-};
-
-const genericShorthandsEntries = Object.entries(genericShorthands);
+function getPropertyGroup(name: string): string | undefined {
+  const info = LOGICAL_PROPERTY_INFO[name];
+  if (info) return info.group;
+  if (name === 'font-variant-caps') return 'font';
+  const shorthands = LONGHAND_TO_SHORTHAND[name];
+  if (shorthands) {
+    for (const group of GROUP_SHORTHANDS) {
+      if (shorthands.includes(group)) return group;
+    }
+  }
+  if (BORDER_SIDE_SHORTHANDS.has(name)) return 'border';
+  return undefined;
+}
 
 function checkIntervening(decls: Declaration[], allDecls: Declaration[], declIndices: Map<Declaration, number>): boolean {
   const indices = decls.map(d => declIndices.get(d)!);
@@ -511,137 +458,138 @@ function checkIntervening(decls: Declaration[], allDecls: Declaration[], declInd
   const endIdx = Math.max(...indices);
   const names = new Set(decls.map(d => d.name));
 
-  const groups = new Set(decls.map(d => propertyToGroup[d.name]).filter(Boolean));
+  const groups = new Set(decls.map(d => getPropertyGroup(d.name)).filter(Boolean));
   const isSideShorthand = groups.size > 1;
 
   for (let i = startIdx + 1; i < endIdx; i++) {
     const intervening = allDecls[i];
     if (names.has(intervening.name)) continue;
-    const interveningGroup = propertyToGroup[intervening.name];
+    const interveningGroup = getPropertyGroup(intervening.name);
     if (!interveningGroup) continue;
 
     if (isSideShorthand) {
       const sidePrefix = decls[0].name.replace(/-(width|style|color)$/, '');
-      if (intervening.name.startsWith(sidePrefix + '-') || ['all', 'border'].includes(intervening.name)) {
+      if (intervening.name.startsWith(sidePrefix + '-') || intervening.name === 'all' || intervening.name === 'border') {
         return true;
       }
-    } else {
-      if (groups.has(interveningGroup)) {
-        return true;
-      }
-      if (['all', 'border'].includes(intervening.name)) {
-        return true;
-      }
+    } else if (groups.has(interveningGroup) || intervening.name === 'all' || intervening.name === 'border') {
+      return true;
     }
   }
   return false;
 }
 
-const BOX_SHORTHAND_NAMES = /* @__PURE__ */ new Set('margin,padding,border-width,border-style,border-color,scroll-margin,scroll-padding,inset,overflow-clip-margin,border-radius'.split(','));
+interface CombinerEntry {
+  name: string;
+  longhands: readonly string[];
+  contract: (record: Record<string, ComponentValue[]>) => string | null;
+  isPhysicalBorderSide?: boolean;
+}
 
-const BOX_SHORTHAND_ENTRIES = Object.entries(SHORTHANDS).filter(
-  ([shorthand, def]) => BOX_SHORTHAND_NAMES.has(shorthand) && def.logicalLonghands?.length === 4,
+const BOX_SHORTHAND_NAMES = /* @__PURE__ */ new Set(
+  'margin,padding,border-width,border-style,border-color,scroll-margin,scroll-padding,inset,overflow-clip-margin,border-radius'.split(',')
 );
-
-function tryCombineBoxShorthand(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): string | null {
-  for (const [shorthand, def] of BOX_SHORTHAND_ENTRIES) {
-    const physical = def.longhands;
-    const logical = def.logicalLonghands!;
-    const isPhysical = physical.includes(d.name);
-    const isLogical = logical.includes(d.name);
-    if (!isPhysical && !isLogical) continue;
-
-    const longhands = isPhysical ? physical : logical;
-    const allDecls = longhands.map(name => declMap.get(name));
-    if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) continue;
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
-
-    const valuesForContract: Record<string, ComponentValue[]> = {};
-    for (const other of allDecls) valuesForContract[other!.name] = other!.value;
-
-    const value = def.contract(valuesForContract);
-    if (value !== null) {
-      for (const other of allDecls) processed.add(other!);
-      return `${shorthand}: ${value}${d.important ? ' !important' : ''}`;
-    }
-  }
-  return null;
-}
-
-function tryCombineLogicalShorthand(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): string | null {
-  for (const [shorthand, longhands] of logicalShorthandsEntries) {
-    if (d.name !== longhands.start && d.name !== longhands.end) continue;
-    const otherName = d.name === longhands.start ? longhands.end : longhands.start;
-    const otherDecl = declMap.get(otherName);
-    if (!otherDecl || processed.has(otherDecl) || d.important !== otherDecl.important) continue;
-    if (checkIntervening([d, otherDecl], declarations, declIndices)) continue;
-
-    const startDecl = d.name === longhands.start ? d : otherDecl;
-    const endDecl = d.name === longhands.end ? d : otherDecl;
-    const valS = serialize(startDecl.value).trim();
-    const valE = serialize(endDecl.value).trim();
-
-    if (valS === valE) {
-      processed.add(startDecl);
-      processed.add(endDecl);
-      return `${shorthand}: ${valS}${d.important ? ' !important' : ''}`;
-    }
-    if (longhands.allowDifferent && !valS.includes('var(') && !valE.includes('var(')) {
-      processed.add(startDecl);
-      processed.add(endDecl);
-      return `${shorthand}: ${valS} ${valE}${d.important ? ' !important' : ''}`;
-    }
-  }
-  return null;
-}
-
-function tryCombineGenericShorthand(
-  d: Declaration,
-  declMap: Map<string, Declaration>,
-  processed: Set<Declaration>,
-  declarations: Declaration[],
-  declIndices: Map<Declaration, number>
-): { name: string, value: string, important: boolean } | null {
-  for (const [shorthand, longhands] of genericShorthandsEntries) {
-    if (!longhands.includes(d.name)) continue;
-    const allDecls = longhands.map(name => declMap.get(name));
-    if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) continue;
-    if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) continue;
-
-    const record: Record<string, ComponentValue[]> = {};
-    for (const other of allDecls) record[other!.name] = other!.value;
-
-    const contracted = SHORTHANDS[shorthand]?.contract(record);
-    if (contracted !== null && contracted !== undefined) {
-      for (const other of allDecls) processed.add(other!);
-      return { name: shorthand, value: contracted, important: d.important };
-    }
-  }
-  return null;
-}
-
-const BORDER_PHYSICAL_SIDE_LONGHANDS = [
-  'border-top-width', 'border-top-style', 'border-top-color',
-  'border-right-width', 'border-right-style', 'border-right-color',
-  'border-bottom-width', 'border-bottom-style', 'border-bottom-color',
-  'border-left-width', 'border-left-style', 'border-left-color',
+const GENERIC_COMBINER_NAMES = [
+  ...PHYSICAL_BORDER_SIDES,
+  'border-block-start', 'border-block-end', 'border-inline-start', 'border-inline-end',
+  'outline', 'list-style', 'flex', 'border-image', 'line-clamp',
+] as const;
+const TWO_VALUE_COMBINER_NAMES = [
+  'margin-inline', 'padding-inline', 'margin-block', 'padding-block',
+  'inset-inline', 'inset-block',
+  'border-inline-width', 'border-block-width',
+  'border-inline-style', 'border-block-style',
+  'border-inline-color', 'border-block-color',
+  'border-inline', 'border-block',
+  'overflow',
 ] as const;
 
-const BORDER_IMAGE_LONGHAND_NAMES = [
-  'border-image-source', 'border-image-slice', 'border-image-width', 'border-image-outset', 'border-image-repeat',
-] as const;
+let cachedCombiners: {
+  byLonghand: Map<string, CombinerEntry[]>;
+  borderPhysicalLonghands: readonly string[];
+  borderImageLonghands: readonly string[];
+} | null = null;
+
+function getCombiners() {
+  if (cachedCombiners) return cachedCombiners;
+
+  const entries: CombinerEntry[] = [];
+  const add = (entry: CombinerEntry) => entries.push(entry);
+
+  // 1. Named composite shorthands (highest precedence after full border)
+  for (const name of ['font', 'font-variant', 'background'] as const) {
+    const def = SHORTHANDS[name];
+    add({ name, longhands: def.longhands, contract: def.contract });
+  }
+  for (const name of ['border-block', 'border-inline'] as const) {
+    const def = SHORTHANDS[name];
+    if (def.logicalLonghands) add({ name, longhands: def.logicalLonghands, contract: def.contract });
+  }
+
+  // 2. 4-side box shorthands (physical and logical)
+  for (const [name, def] of Object.entries(SHORTHANDS)) {
+    if (BOX_SHORTHAND_NAMES.has(name) && def.logicalLonghands?.length === 4) {
+      add({ name, longhands: def.longhands, contract: def.contract });
+      add({ name, longhands: def.logicalLonghands, contract: def.contract });
+    }
+  }
+
+  // 3. Generic & border-side shorthands
+  const physicalBorderSet = new Set<string>(PHYSICAL_BORDER_SIDES);
+  for (const name of GENERIC_COMBINER_NAMES) {
+    const def = SHORTHANDS[name];
+    add({ name, longhands: def.longhands, contract: def.contract, isPhysicalBorderSide: physicalBorderSet.has(name) });
+  }
+
+  // 4. Two-value logical/overflow shorthands
+  for (const name of TWO_VALUE_COMBINER_NAMES) {
+    const def = SHORTHANDS[name];
+    add({ name, longhands: def.longhands, contract: def.contract });
+  }
+  const overscrollLonghands = ['overscroll-behavior-x', 'overscroll-behavior-y'] as const;
+  add({
+    name: 'overscroll-behavior',
+    longhands: overscrollLonghands,
+    contract: contractTwoValue(overscrollLonghands),
+  });
+
+  const byLonghand = new Map<string, CombinerEntry[]>();
+  for (const entry of entries) {
+    for (const lh of entry.longhands) {
+      let list = byLonghand.get(lh);
+      if (!list) {
+        list = [];
+        byLonghand.set(lh, list);
+      }
+      list.push(entry);
+    }
+  }
+
+  cachedCombiners = {
+    byLonghand,
+    borderPhysicalLonghands: PHYSICAL_BORDER_SIDES.flatMap(side => SHORTHANDS[side].longhands),
+    borderImageLonghands: SHORTHANDS['border-image'].longhands,
+  };
+  return cachedCombiners;
+}
+
+function collectDeclGroup(
+  longhands: readonly string[],
+  important: boolean,
+  declMap: Map<string, Declaration>,
+  processed: Set<Declaration>,
+  declarations: Declaration[],
+  declIndices: Map<Declaration, number>
+): Declaration[] | null {
+  const matched: Declaration[] = [];
+  for (const name of longhands) {
+    const decl = declMap.get(name);
+    if (!decl || processed.has(decl) || decl.important !== important) return null;
+    matched.push(decl);
+  }
+  if (checkIntervening(matched, declarations, declIndices)) return null;
+  return matched;
+}
 
 function tryCombineBorderFull(
   d: Declaration,
@@ -650,13 +598,13 @@ function tryCombineBorderFull(
   declarations: Declaration[],
   declIndices: Map<Declaration, number>
 ): string | null {
-  if (!BORDER_PHYSICAL_SIDE_LONGHANDS.includes(d.name as typeof BORDER_PHYSICAL_SIDE_LONGHANDS[number])) return null;
+  const { borderPhysicalLonghands, borderImageLonghands } = getCombiners();
+  if (!borderPhysicalLonghands.includes(d.name)) return null;
 
-  const allDecls = BORDER_PHYSICAL_SIDE_LONGHANDS.map(name => declMap.get(name));
-  if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) return null;
-  if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
+  const allDecls = collectDeclGroup(borderPhysicalLonghands, d.important, declMap, processed, declarations, declIndices);
+  if (!allDecls) return null;
 
-  const imageDecls = BORDER_IMAGE_LONGHAND_NAMES
+  const imageDecls = borderImageLonghands
     .map(name => declMap.get(name))
     .filter((img): img is Declaration => Boolean(img && !processed.has(img)));
   if (imageDecls.length === 0) return null;
@@ -672,65 +620,72 @@ function tryCombineBorderFull(
   if (!isInitialBorderImage(imageRecord)) return null;
 
   const record: Record<string, ComponentValue[]> = { ...imageRecord };
-  for (const other of allDecls) record[other!.name] = other!.value;
+  for (const other of allDecls) record[other.name] = other.value;
 
   const contracted = SHORTHANDS['border']?.contract(record);
-  if (contracted !== null && contracted !== undefined) {
-    for (const other of allDecls) processed.add(other!);
-    for (const img of imageDecls) processed.add(img);
-    return `border: ${contracted}${d.important ? ' !important' : ''}`;
-  }
-  return null;
+  if (contracted === null || contracted === undefined) return null;
+
+  for (const other of allDecls) processed.add(other);
+  for (const img of imageDecls) processed.add(img);
+  return `border: ${contracted}${d.important ? ' !important' : ''}`;
 }
 
-const ORDERED_SHORTHAND_COMBINERS: readonly { name: string; longhands: readonly string[] }[] = [
-  { name: 'font', longhands: SHORTHANDS['font'].longhands },
-  { name: 'font-variant', longhands: SHORTHANDS['font-variant'].longhands },
-  {
-    name: 'background',
-    longhands: [
-      'background-image', 'background-position', 'background-size', 'background-repeat',
-      'background-attachment', 'background-origin', 'background-clip', 'background-color',
-    ],
-  },
-  {
-    name: 'border-block',
-    longhands: [
-      'border-block-start-width', 'border-block-start-style', 'border-block-start-color',
-      'border-block-end-width', 'border-block-end-style', 'border-block-end-color',
-    ],
-  },
-  {
-    name: 'border-inline',
-    longhands: [
-      'border-inline-start-width', 'border-inline-start-style', 'border-inline-start-color',
-      'border-inline-end-width', 'border-inline-end-style', 'border-inline-end-color',
-    ],
-  },
-];
-
-function tryCombineNamedShorthand(
-  shorthandName: string,
-  longhands: readonly string[],
+function tryCombineDeclaration(
   d: Declaration,
   declMap: Map<string, Declaration>,
   processed: Set<Declaration>,
   declarations: Declaration[],
   declIndices: Map<Declaration, number>
 ): string | null {
-  if (!longhands.includes(d.name)) return null;
+  const candidates = getCombiners().byLonghand.get(d.name);
+  if (!candidates) return null;
 
-  const allDecls = longhands.map(name => declMap.get(name));
-  if (!allDecls.every(other => other && !processed.has(other) && other.important === d.important)) return null;
-  if (checkIntervening(allDecls as Declaration[], declarations, declIndices)) return null;
+  for (const entry of candidates) {
+    const matched = collectDeclGroup(entry.longhands, d.important, declMap, processed, declarations, declIndices);
+    if (!matched) continue;
 
-  const record: Record<string, ComponentValue[]> = {};
-  for (const other of allDecls) record[other!.name] = other!.value;
+    const record: Record<string, ComponentValue[]> = {};
+    for (const decl of matched) record[decl.name] = decl.value;
+    const value = entry.contract(record);
+    if (value === null || value === undefined) continue;
 
-  const contracted = SHORTHANDS[shorthandName]?.contract(record);
-  if (contracted !== null && contracted !== undefined) {
-    for (const other of allDecls) processed.add(other!);
-    return `${shorthandName}: ${contracted}${d.important ? ' !important' : ''}`;
+    for (const decl of matched) processed.add(decl);
+    const suffix = d.important ? ' !important' : '';
+
+    if (entry.isPhysicalBorderSide) {
+      const otherSideDecls: Declaration[] = [];
+      let allSidesEqual = true;
+      for (const side of PHYSICAL_BORDER_SIDES) {
+        if (side === entry.name) continue;
+        const existing = declMap.get(side);
+        if (existing && !processed.has(existing)) {
+          if (existing.important === d.important && serialize(existing.value).trim() === value) {
+            otherSideDecls.push(existing);
+            continue;
+          }
+          allSidesEqual = false;
+          break;
+        }
+        const sideMatched = collectDeclGroup(SHORTHANDS[side].longhands, d.important, declMap, processed, declarations, declIndices);
+        if (!sideMatched) {
+          allSidesEqual = false;
+          break;
+        }
+        const sideRecord: Record<string, ComponentValue[]> = {};
+        for (const lh of sideMatched) sideRecord[lh.name] = lh.value;
+        if (SHORTHANDS[side].contract(sideRecord) !== value) {
+          allSidesEqual = false;
+          break;
+        }
+        otherSideDecls.push(...sideMatched);
+      }
+      if (allSidesEqual) {
+        for (const decl of otherSideDecls) processed.add(decl);
+        return `border: ${value}${suffix}`;
+      }
+    }
+
+    return `${entry.name}: ${value}${suffix}`;
   }
   return null;
 }
@@ -832,57 +787,9 @@ export function serializeDeclarations(declarations: Declaration[]): string {
   for (const d of declarations) {
     if (processed.has(d)) continue;
 
-    let combined = tryCombineBorderFull(d, declMap, processed, declarations, declIndices);
-    if (!combined) {
-      for (const spec of ORDERED_SHORTHAND_COMBINERS) {
-        combined = tryCombineNamedShorthand(spec.name, spec.longhands, d, declMap, processed, declarations, declIndices);
-        if (combined) break;
-      }
-    }
-    if (!combined) {
-      combined = tryCombineBoxShorthand(d, declMap, processed, declarations, declIndices);
-    }
-
-    if (!combined) {
-      const generic = tryCombineGenericShorthand(d, declMap, processed, declarations, declIndices);
-      if (generic) {
-        const sides = ['border-top', 'border-right', 'border-bottom', 'border-left'];
-        if (sides.includes(generic.name)) {
-          const sideResults = sides.map(side => {
-            if (side === generic.name) return generic;
-            const existing = declMap.get(side);
-            if (existing && !processed.has(existing)) {
-              return { name: side, value: serialize(existing.value).trim(), important: existing.important, decl: existing };
-            }
-            const longhands = genericShorthands[side];
-            if (!longhands) return null;
-            const sideLonghands = longhands.map(lh => declMap.get(lh));
-            if (sideLonghands.every(lh => lh && !processed.has(lh) && lh.important === generic.important)) {
-              if (checkIntervening(sideLonghands as Declaration[], declarations, declIndices)) return null;
-              const vals = sideLonghands.map(lh => serialize(lh!.value).trim());
-              return { name: side, value: vals.filter(v => v !== '').join(' '), important: generic.important, longhands: sideLonghands };
-            }
-            return null;
-          });
-
-          if (sideResults.every(r => r !== null && r.value === generic.value && r.important === generic.important)) {
-            for (const r of sideResults) {
-              if (r && 'longhands' in r) (r.longhands as Declaration[]).forEach(lh => processed.add(lh));
-              else if (r && 'decl' in r) processed.add(r.decl as Declaration);
-            }
-            combined = `border: ${generic.value}${generic.important ? ' !important' : ''}`;
-          } else {
-            combined = `${generic.name}: ${generic.value}${generic.important ? ' !important' : ''}`;
-          }
-        } else {
-          combined = `${generic.name}: ${generic.value}${generic.important ? ' !important' : ''}`;
-        }
-      }
-    }
-
-    if (!combined) {
-      combined = tryCombineLogicalShorthand(d, declMap, processed, declarations, declIndices);
-    }
+    const combined =
+      tryCombineBorderFull(d, declMap, processed, declarations, declIndices) ??
+      tryCombineDeclaration(d, declMap, processed, declarations, declIndices);
 
     if (combined) {
       result.push(combined);

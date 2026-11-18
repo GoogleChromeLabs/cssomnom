@@ -549,7 +549,7 @@ const expandTwoValue = (longhands: readonly string[]) => (values: ComponentValue
   };
 };
 
-const contractTwoValue = (longhands: readonly string[]) => (values: Record<string, ComponentValue[]>): string | null => {
+export const contractTwoValue = (longhands: readonly string[]) => (values: Record<string, ComponentValue[]>): string | null => {
   const v1 = values[longhands[0]];
   const v2 = values[longhands[1]];
   if (!v1 || !v2) return null;
@@ -557,6 +557,9 @@ const contractTwoValue = (longhands: readonly string[]) => (values: Record<strin
   const s2 = serialize(v2).trim();
   const cssWide = checkUniformCssWide([s1, s2]);
   if (cssWide !== undefined) return cssWide;
+  if (s1.includes('var(') || s2.includes('var(')) {
+    return s1 === s2 ? s1 : null;
+  }
   return s1 === s2 ? s1 : `${s1} ${s2}`;
 };
 
@@ -1196,23 +1199,6 @@ function contractFlex(values: Record<string, ComponentValue[]>): string | null {
   return `${sg} ${ss} ${sb}`;
 }
 
-function contractOverflow(values: Record<string, ComponentValue[]>): string | null {
-  const x = values['overflow-x'];
-  const y = values['overflow-y'];
-  if (!x || !y) return null;
-
-  const sx = serialize(x).trim();
-  const sy = serialize(y).trim();
-
-  const wide = checkUniformCssWide([sx, sy]);
-  if (wide !== undefined) return wide;
-
-  if (sx.includes('var(') || sy.includes('var(')) {
-    return sx === sy ? sx : null;
-  }
-  return sx === sy ? sx : `${sx} ${sy}`;
-}
-
 const LINE_CLAMP_LONGHANDS = ['max-lines', 'block-ellipsis', 'continue'] as const;
 
 function expandLineClamp(values: ComponentValue[]): Record<string, ComponentValue[]> | null {
@@ -1472,11 +1458,7 @@ export const SHORTHANDS: Record<string, ShorthandDefinition> = {
     expand: expandListStyle,
     contract: contractListStyle,
   },
-  'overflow': {
-    longhands: SHORTHANDS_DATA['overflow'],
-    expand: expandTwoValue(SHORTHANDS_DATA['overflow']),
-    contract: contractOverflow,
-  },
+  'overflow': createTwoValueShorthand('overflow'),
   'flex': {
     longhands: FLEX_LONGHANDS,
     expand: expandFlex,
