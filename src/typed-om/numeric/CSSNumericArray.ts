@@ -17,6 +17,7 @@
 
 import type { CSSNumericValue } from './CSSNumericValue.ts';
 import { applyValueIterable } from '../../webidl.ts';
+import { createTypedIndexedProxy } from '../utils/validation.ts';
 
 // css-typed-om #cssnumericarray
 export class CSSNumericArray {
@@ -31,22 +32,7 @@ export class CSSNumericArray {
   constructor(values: CSSNumericValue[]) {
     this._values = [...values];
     Object.freeze(this._values);
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          return target._values[index];
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-      has(target, prop) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          return index >= 0 && index < target._values.length;
-        }
-        return Reflect.has(target, prop);
-      }
-    });
+    return createTypedIndexedProxy(this, t => t._values);
   }
 
   get length(): number { return this._values.length; }

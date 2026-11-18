@@ -219,51 +219,21 @@ export class CSSRotate extends CSSTransformComponent {
   }
 
   override toMatrix(): DOMMatrix {
-    const rad = this.angle.to('rad').value;
-
     if (this.is2D) {
+      const rad = this.angle.to('rad').value;
       const c = Math.cos(rad);
       const s = Math.sin(rad);
       return new DOMMatrix([c, s, -s, c, 0, 0]);
-    } else {
-      let x = this.x.to('number').value;
-      let y = this.y.to('number').value;
-      let z = this.z.to('number').value;
-
-      const len = Math.hypot(x, y, z);
-      if (len === 0) {
-        x = 0;
-        y = 0;
-        z = 1;
-      } else {
-        x /= len;
-        y /= len;
-        z /= len;
-      }
-
-      const c = Math.cos(rad);
-      const s = Math.sin(rad);
-      const t = 1 - c;
-
-      return new DOMMatrix([
-        t * x * x + c,
-        t * x * y + s * z,
-        t * x * z - s * y,
-        0,
-        t * x * y - s * z,
-        t * y * y + c,
-        t * y * z + s * x,
-        0,
-        t * x * z + s * y,
-        t * y * z - s * x,
-        t * z * z + c,
-        0,
-        0,
-        0,
-        0,
-        1
-      ]);
     }
+    let x = this.x.to('number').value;
+    let y = this.y.to('number').value;
+    let z = this.z.to('number').value;
+    if (Math.hypot(x, y, z) === 0) {
+      x = 0;
+      y = 0;
+      z = 1;
+    }
+    return DOMMatrix.fromMatrix({ is2D: false }).rotateAxisAngleSelf(x, y, z, this.angle.to('deg').value);
   }
 }
 

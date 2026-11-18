@@ -30,6 +30,7 @@ import {
   parseMatrix
 } from './transform-parser.ts';
 import { applyValueIterable } from '../../webidl.ts';
+import { createTypedIndexedProxy } from '../utils/validation.ts';
 
 // css-typed-om #transformvalue-objects
 export class CSSTransformValue extends CSSStyleValue {
@@ -47,35 +48,11 @@ export class CSSTransformValue extends CSSStyleValue {
       throw new TypeError('CSSTransformValue requires at least one transform component');
     }
     this.components = components;
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          return target.components[index];
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-      has(target, prop) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          return index >= 0 && index < target.components.length;
-        }
-        return Reflect.has(target, prop);
-      },
-      set(target, prop, value, receiver) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          if (index < 0 || index > target.components.length) {
-            throw new RangeError(`Index ${index} is out of bounds (length ${target.components.length})`);
-          }
-          if (!(value instanceof CSSTransformComponent)) {
-            throw new TypeError('Value must be an instance of CSSTransformComponent');
-          }
-          target.components[index] = value;
-          return true;
-        }
-        return Reflect.set(target, prop, value, receiver);
+    return createTypedIndexedProxy(this, t => t.components, (items, index, value) => {
+      if (!(value instanceof CSSTransformComponent)) {
+        throw new TypeError('Value must be an instance of CSSTransformComponent');
       }
+      items[index] = value;
     });
   }
 

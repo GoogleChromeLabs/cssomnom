@@ -30,6 +30,43 @@ export function compareStrings(a: string, b: string): number {
   return a === b ? 0 : (a < b ? -1 : 1);
 }
 
+export function createTypedIndexedProxy<T extends object, V>(
+  target: T,
+  getItems: (t: T) => readonly V[],
+  onSet?: (items: V[], index: number, value: unknown) => void,
+): T {
+  const handler: ProxyHandler<T> = {
+    get(t, prop, receiver) {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        return getItems(t)[parseInt(prop, 10)];
+      }
+      return Reflect.get(t, prop, receiver);
+    },
+    has(t, prop) {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const index = parseInt(prop, 10);
+        return index >= 0 && index < getItems(t).length;
+      }
+      return Reflect.has(t, prop);
+    },
+  };
+  if (onSet) {
+    handler.set = (t, prop, value, receiver) => {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const items = getItems(t) as V[];
+        const index = parseInt(prop, 10);
+        if (index < 0 || index > items.length) {
+          throw new RangeError(`Index ${index} is out of bounds (length ${items.length})`);
+        }
+        onSet(items, index, value);
+        return true;
+      }
+      return Reflect.set(t, prop, value, receiver);
+    };
+  }
+  return new Proxy(target, handler);
+}
+
 export function isToken(val: ComponentValue): val is Token {
   const type = typeof (val as { value: unknown }).value;
   return type === 'string' || type === 'number';

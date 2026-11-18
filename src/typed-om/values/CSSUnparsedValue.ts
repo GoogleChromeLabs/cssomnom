@@ -21,6 +21,7 @@ import { CSSVariableReferenceValue } from './CSSVariableReferenceValue.ts';
 import { serialize, getMirrorToken } from '../../serializer.ts';
 import { isCSSFunction, hasVarFunction } from '../utils/validation.ts';
 import { applyValueIterable } from '../../webidl.ts';
+import { createTypedIndexedProxy } from '../utils/validation.ts';
 
 function serializeSegment(seg: string | CSSVariableReferenceValue): string {
   return seg instanceof CSSVariableReferenceValue ? seg._serialize() : String(seg);
@@ -39,36 +40,11 @@ export class CSSUnparsedValue extends CSSStyleValue {
   constructor(values: (string | CSSVariableReferenceValue)[]) {
     super();
     this._values = values;
-    return new Proxy(this, {
-      get(target, prop, receiver) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          return target._values[index];
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-      has(target, prop) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          return index >= 0 && index < target._values.length;
-        }
-        return Reflect.has(target, prop);
-      },
-      // css-typed-om #unparsedvalue-objects
-      set(target, prop, value, receiver) {
-        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
-          const index = parseInt(prop, 10);
-          if (index < 0 || index > target._values.length) {
-            throw new RangeError(`Index ${index} is out of bounds (length ${target._values.length})`);
-          }
-          if (typeof value !== 'string' && !(value instanceof CSSVariableReferenceValue)) {
-            throw new TypeError('Value must be a string or CSSVariableReferenceValue');
-          }
-          target._values[index] = value;
-          return true;
-        }
-        return Reflect.set(target, prop, value, receiver);
+    return createTypedIndexedProxy(this, t => t._values, (items, index, value) => {
+      if (typeof value !== 'string' && !(value instanceof CSSVariableReferenceValue)) {
+        throw new TypeError('Value must be a string or CSSVariableReferenceValue');
       }
+      items[index] = value;
     });
   }
 

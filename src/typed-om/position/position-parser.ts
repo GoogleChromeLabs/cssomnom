@@ -108,86 +108,57 @@ export function tryParsePosition(trimmed: ComponentValue[], property?: string): 
     }
   }
 
-  // 3-value syntax:
-  if (components.length === 3) {
-    const c0 = components[0];
-    const c1 = components[1];
-    const c2 = components[2];
+  // 3-value & 4-value syntaxes:
+  const getIdentLower = (c: ComponentValue): string | null =>
+    isToken(c) && c.type === 'ident' ? c.value.toLowerCase() : null;
+  const isHorizEdge = (kw: string | null): kw is 'left' | 'right' => kw === 'left' || kw === 'right';
+  const isVertEdge = (kw: string | null): kw is 'top' | 'bottom' => kw === 'top' || kw === 'bottom';
+  const resolveEdgeOffset = (edge: 'left' | 'right' | 'top' | 'bottom', off: CSSNumericValue): CSSNumericValue =>
+    edge === 'right' || edge === 'bottom'
+      ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off)))
+      : off;
 
-    // Case 1: [ left | right ] <offset> [ top | bottom | center ]
-    if (isToken(c0) && c0.type === 'ident' && ['left', 'right'].includes(c0.value.toLowerCase())) {
+  if (components.length === 3) {
+    const [c0, c1, c2] = components;
+    const kw0 = getIdentLower(c0);
+    const kw1 = getIdentLower(c1);
+
+    // [ left | right ] <offset> [ top | bottom | center ]
+    if (isHorizEdge(kw0)) {
       const off = toPositionCoord(createCSSStyleValue(c1, 'left'));
       const vert = toPositionCoord(createCSSStyleValue(c2, 'top'));
-      if (off && vert) {
-        const xCoord = c0.value.toLowerCase() === 'right'
-          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off)))
-          : off;
-        return new CSSPositionValue(xCoord, vert);
-      }
+      if (off && vert) return new CSSPositionValue(resolveEdgeOffset(kw0, off), vert);
     }
-
-    // Case 2: [ left | right | center ] [ top | bottom ] <offset>
-    if (isToken(c1) && c1.type === 'ident' && ['top', 'bottom'].includes(c1.value.toLowerCase())) {
+    // [ left | right | center ] [ top | bottom ] <offset>
+    if (isVertEdge(kw1)) {
       const horiz = toPositionCoord(createCSSStyleValue(c0, 'left'));
       const off = toPositionCoord(createCSSStyleValue(c2, 'top'));
-      if (horiz && off) {
-        const yCoord = c1.value.toLowerCase() === 'bottom'
-          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off)))
-          : off;
-        return new CSSPositionValue(horiz, yCoord);
-      }
+      if (horiz && off) return new CSSPositionValue(horiz, resolveEdgeOffset(kw1, off));
     }
-
-    // Case 3: [ top | bottom ] <offset> [ left | right | center ]
-    if (isToken(c0) && c0.type === 'ident' && ['top', 'bottom'].includes(c0.value.toLowerCase())) {
+    // [ top | bottom ] <offset> [ left | right | center ]
+    if (isVertEdge(kw0)) {
       const off = toPositionCoord(createCSSStyleValue(c1, 'top'));
       const horiz = toPositionCoord(createCSSStyleValue(c2, 'left'));
-      if (off && horiz) {
-        const yCoord = c0.value.toLowerCase() === 'bottom'
-          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off)))
-          : off;
-        return new CSSPositionValue(horiz, yCoord);
-      }
+      if (off && horiz) return new CSSPositionValue(horiz, resolveEdgeOffset(kw0, off));
     }
   }
 
-  // 4-value syntax:
   if (components.length === 4) {
-    const c0 = components[0];
-    const c1 = components[1];
-    const c2 = components[2];
-    const c3 = components[3];
+    const [c0, c1, c2, c3] = components;
+    const kw0 = getIdentLower(c0);
+    const kw2 = getIdentLower(c2);
 
-    // Case A: [ left | right ] <offset1> [ top | bottom ] <offset2>
-    if (isToken(c0) && c0.type === 'ident' && ['left', 'right'].includes(c0.value.toLowerCase()) &&
-        isToken(c2) && c2.type === 'ident' && ['top', 'bottom'].includes(c2.value.toLowerCase())) {
+    // [ left | right ] <offset1> [ top | bottom ] <offset2>
+    if (isHorizEdge(kw0) && isVertEdge(kw2)) {
       const off1 = toPositionCoord(createCSSStyleValue(c1, 'left'));
       const off2 = toPositionCoord(createCSSStyleValue(c3, 'top'));
-      if (off1 && off2) {
-        const xCoord = c0.value.toLowerCase() === 'right'
-          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off1)))
-          : off1;
-        const yCoord = c2.value.toLowerCase() === 'bottom'
-          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off2)))
-          : off2;
-        return new CSSPositionValue(xCoord, yCoord);
-      }
+      if (off1 && off2) return new CSSPositionValue(resolveEdgeOffset(kw0, off1), resolveEdgeOffset(kw2, off2));
     }
-
-    // Case B: [ top | bottom ] <offset1> [ left | right ] <offset2>
-    if (isToken(c0) && c0.type === 'ident' && ['top', 'bottom'].includes(c0.value.toLowerCase()) &&
-        isToken(c2) && c2.type === 'ident' && ['left', 'right'].includes(c2.value.toLowerCase())) {
+    // [ top | bottom ] <offset1> [ left | right ] <offset2>
+    if (isVertEdge(kw0) && isHorizEdge(kw2)) {
       const off1 = toPositionCoord(createCSSStyleValue(c1, 'top'));
       const off2 = toPositionCoord(createCSSStyleValue(c3, 'left'));
-      if (off1 && off2) {
-        const yCoord = c0.value.toLowerCase() === 'bottom'
-          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off1)))
-          : off1;
-        const xCoord = c2.value.toLowerCase() === 'right'
-          ? simplify(new CSSMathSum(createUnitValue(100, 'percent'), new CSSMathNegate(off2)))
-          : off2;
-        return new CSSPositionValue(xCoord, yCoord);
-      }
+      if (off1 && off2) return new CSSPositionValue(resolveEdgeOffset(kw2, off2), resolveEdgeOffset(kw0, off1));
     }
   }
 
