@@ -131,3 +131,7 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - **4-way shorthand combiners & hardcoded `propertyToGroup` in `src/serializer.ts`**: unified into a lazy `SHORTHANDS`-backed combiner indexed by longhand (`fdef4106c`).
 - **3 copy-pasted stylesheet harvesting loops in `src/cascade/rule-filter.ts`**: collapsed into a single parameterized `harvestRoot`/`emitSheet` pass (`43f693d0d`).
 - **Divergent unit canonicalizers across `math-parser.ts`, `numeric-methods.ts`, and `CSSUnitValue.ts`**: unified on `getCanonicalUnitInfo` using CSS Values 4 canonical units (`9f69864aa`).
+- **Duplicate hex/color parsers, inline `checkBrand` boilerplate, and per-space Typed OM serializers**: unified on `parseHexColor`, `formatSpaceColor`/`parseColorArgs`, and `applyWebIDLInterface({ prototypeOnly: true })` (`20905ee94`).
+- **Hand-rolled 3D rotation matrix math, 3 copies of indexed Typed OM `Proxy`, and duplicated position edge-offset branches**: unified on `DOMMatrix.rotateAxisAngleSelf`, `createTypedIndexedProxy`, and `resolveEdgeOffset` (`09e2159cf`).
+- **Duplicated discrete media-feature switches, repeated namespace checks, and full-tree `querySelector` scan**: replaced with `DISCRETE_FEATURES`, `matchesNamespace`, and short-circuiting `queryDescendants` (`d202db91c`).
+- **Duplicated unit converters, computed Typed OM resolvers, and computed-style index lookups in `tests/dom-shim/src/dom-stubs.ts`**: reused `getCanonicalUnitInfo`, `resolveElementValues`, and `getIndexedProp` (`b9399deac`).
