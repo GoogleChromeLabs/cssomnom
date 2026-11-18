@@ -88,7 +88,7 @@ import './numeric/numeric-methods.ts';
 import './color/color-reify.ts';
 import { CSSTransformValue } from './transform/CSSTransformValue.ts';
 import { setParseTransformListHook, DOMMatrix, DOMMatrixReadOnly } from '../DOMMatrix.ts';
-import { applyWebIDLPrototypeDescriptors } from '../webidl.ts';
+import { applyWebIDLInterface } from '../webidl.ts';
 
 import { CSSStyleValue } from './values/CSSStyleValue.ts';
 import { CSSNumericValue } from './numeric/CSSNumericValue.ts';
@@ -193,7 +193,7 @@ const WEBIDL_INTERFACES: Function[] = [
 ];
 
 for (const cls of WEBIDL_INTERFACES) {
-  applyWebIDLPrototypeDescriptors(cls);
+  applyWebIDLInterface(cls, { prototypeOnly: true });
 }
 
 setParseTransformListHook((str) => {

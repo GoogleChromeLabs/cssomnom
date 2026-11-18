@@ -16,7 +16,7 @@
  */
 
 import { CSSStyleValue } from './CSSStyleValue.ts';
-import { escape } from '../../css-escape.ts';
+import { serializeIdentifier } from '../../serializer.ts';
 
 // css-typed-om #keywordvalue-objects
 export class CSSKeywordValue extends CSSStyleValue {
@@ -42,6 +42,6 @@ export class CSSKeywordValue extends CSSStyleValue {
   }
 
   override toString(): string {
-    return escape(this._value);
+    return serializeIdentifier(this._value);
   }
 }

@@ -44,6 +44,8 @@ export interface WebIDLOptions {
   exclude?: readonly string[];
   /** Method names that return promises and should reject with TypeError on brand/arity failure instead of throwing. */
   rejectOperations?: readonly string[];
+  /** If true, preserves constructor length and skips operation wrapping (only sets @@toStringTag, makes members enumerable, and brand-checks accessors). Default: false */
+  prototypeOnly?: boolean;
 }
 
 /**
@@ -64,27 +66,32 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
   }
   appliedCtors.add(ctor);
 
+  const prototypeOnly = options.prototypeOnly ?? false;
   const brandCheck = options.brandCheck ?? true;
   const arityCheck = options.arityCheck ?? true;
   const interfaceName = options.interfaceName || ctor.name;
   const excludeSet = new Set(options.exclude || []);
   const rejectSet = new Set(options.rejectOperations || []);
 
-  // WebIDL § 3.6: Non-constructible interface objects have length 0 with { writable: false, enumerable: false, configurable: true }
-  Object.defineProperty(ctor, 'length', {
-    value: 0,
-    writable: false,
-    enumerable: false,
-    configurable: true
-  });
+  if (!prototypeOnly) {
+    // WebIDL § 3.6: Non-constructible interface objects have length 0 with { writable: false, enumerable: false, configurable: true }
+    Object.defineProperty(ctor, 'length', {
+      value: 0,
+      writable: false,
+      enumerable: false,
+      configurable: true
+    });
+  }
 
   // WebIDL #interface-prototype-object: class string via @@toStringTag
-  Object.defineProperty(proto, Symbol.toStringTag, {
-    value: interfaceName,
-    writable: false,
-    enumerable: false,
-    configurable: true,
-  });
+  if (!Object.hasOwn(proto, Symbol.toStringTag)) {
+    Object.defineProperty(proto, Symbol.toStringTag, {
+      value: interfaceName,
+      writable: false,
+      enumerable: false,
+      configurable: true,
+    });
+  }
 
   const names = Object.getOwnPropertyNames(proto);
   for (const name of names) {
@@ -139,6 +146,13 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
       continue;
     }
 
+    if (prototypeOnly) {
+      if (!desc.enumerable) {
+        Object.defineProperty(proto, name, { ...desc, enumerable: true });
+      }
+      continue;
+    }
+
     // WebIDL #es-operations
     if (typeof desc.value === 'function') {
       const origFn = desc.value;
@@ -179,78 +193,6 @@ export function applyWebIDLInterface(ctor: Function, options: WebIDLOptions = {}
         writable: true,
         enumerable: true,
         configurable: true
-      });
-    }
-  }
-}
-
-/**
- * Ensures all regular prototype members (attributes and operations) on a WebIDL interface
- * prototype object are enumerable, wraps attribute accessors with brand checks, and defines
- * `@@toStringTag`, matching WebIDL specification requirements (WebIDL § 3.6, § 3.7).
- */
-const appliedPrototypeCtors = new WeakSet<Function>();
-
-export function applyWebIDLPrototypeDescriptors(ctor: Function): void {
-  const proto = ctor.prototype;
-  if (!proto || appliedPrototypeCtors.has(ctor)) return;
-  appliedPrototypeCtors.add(ctor);
-
-  const interfaceName = ctor.name;
-  if (!Object.hasOwn(proto, Symbol.toStringTag)) {
-    Object.defineProperty(proto, Symbol.toStringTag, {
-      value: interfaceName,
-      writable: false,
-      enumerable: false,
-      configurable: true,
-    });
-  }
-
-  const names = Object.getOwnPropertyNames(proto);
-  for (const name of names) {
-    if (name === 'constructor' || name.startsWith('_')) {
-      continue;
-    }
-    const desc = Object.getOwnPropertyDescriptor(proto, name);
-    if (!desc) continue;
-
-    if (desc.get || desc.set) {
-      const origGet = desc.get;
-      const origSet = desc.set;
-      const get = origGet
-        ? function (this: unknown) {
-            if (!this || this === proto || !(this instanceof ctor)) {
-              throw new TypeError(
-                `Failed to read the '${name}' property from '${interfaceName}': The provided value is not of type '${interfaceName}'.`
-              );
-            }
-            return origGet.call(this);
-          }
-        : undefined;
-      if (get) Object.defineProperty(get, 'name', { value: `get ${name}`, configurable: true });
-
-      const set = origSet
-        ? function (this: unknown, val: unknown) {
-            if (!this || this === proto || !(this instanceof ctor)) {
-              throw new TypeError(
-                `Failed to set the '${name}' property on '${interfaceName}': The provided value is not of type '${interfaceName}'.`
-              );
-            }
-            return origSet.call(this, val);
-          }
-        : undefined;
-      if (set) Object.defineProperty(set, 'name', { value: `set ${name}`, configurable: true });
-
-      Object.defineProperty(proto, name, {
-        get,
-        set,
-        enumerable: true,
-        configurable: true,
-      });
-    } else if (!desc.enumerable) {
-      Object.defineProperty(proto, name, {
-        ...desc,
-        enumerable: true,
       });
     }
   }

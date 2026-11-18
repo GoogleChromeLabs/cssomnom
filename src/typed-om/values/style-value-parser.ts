@@ -26,6 +26,7 @@ import { SHORTHANDS_DATA } from '../../data/gen/shorthands.ts';
 import { SUPPORTED_PROPERTIES } from '../../data/gen/property-list.ts';
 import { STANDARD_PROPERTIES_SYNTAX } from '../../data/gen/standard-syntax.ts';
 import { privateToken, hasVarFunction, isCSSFunction } from '../utils/validation.ts';
+import { CSS_WIDE_KEYWORDS } from '../../utils.ts';
 import { CSSStyleValue } from './CSSStyleValue.ts';
 import { CSSKeywordValue } from './CSSKeywordValue.ts';
 import { CSSUnparsedValue, tokensToUnparsedSegments } from './CSSUnparsedValue.ts';
@@ -163,7 +164,7 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
   }
 
   const isCSSWideKeyword = trimmed.length === 1 && trimmed[0].type === 'ident' &&
-    ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes((trimmed[0] as IdentToken).value.toLowerCase());
+    CSS_WIDE_KEYWORDS.has((trimmed[0] as IdentToken).value.toLowerCase());
 
   if (isCSSWideKeyword) {
     return [new CSSKeywordValue((trimmed[0] as IdentToken).value)];
@@ -235,12 +236,6 @@ function _parseAll(property: string, css: string): CSSStyleValue[] {
       .map(seg => createValueFromTokens(seg, property));
   }
 
-  if (trimmed.length === 1 && trimmed[0].type === 'ident') {
-    const v = trimmed[0].value.toLowerCase();
-    if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(v)) {
-      return [new CSSKeywordValue(trimmed[0].value)];
-    }
-  }
   if (trimmed.length === 1 && trimmed[0].type === 'function') {
     const fnName = ('name' in trimmed[0] ? (trimmed[0] as { name?: string }).name : ('value' in trimmed[0] ? (trimmed[0] as { value?: string }).value : ''))?.toString().toLowerCase();
     if (fnName === 'var') {
@@ -456,7 +451,7 @@ ParseHooks.validatePropertyValue = (property: string, value: string): boolean =>
   const lowerProp = property.toLowerCase();
   if (!SUPPORTED_PROPERTIES.has(lowerProp)) return true;
   const lowerVal = value.trim().toLowerCase();
-  if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(lowerVal)) return true;
+  if (CSS_WIDE_KEYWORDS.has(lowerVal)) return true;
   if (lowerVal.includes('var(') || lowerVal.includes('calc(') || lowerVal.includes('env(') || lowerVal.includes('attr(')) return true;
 
   const tokens = tokenize(value).filter(t => t.type !== 'whitespace' && t.type !== 'EOF');

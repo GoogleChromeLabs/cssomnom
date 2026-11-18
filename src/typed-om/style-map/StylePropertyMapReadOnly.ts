@@ -24,6 +24,7 @@ import { serialize } from '../../serializer.ts';
 import { tokenize } from '../../tokenizer.ts';
 import { parseComponentValues } from '../../parser.ts';
 import { validateProperty, compareStrings, privateToken } from '../utils/validation.ts';
+import { CSS_WIDE_KEYWORDS } from '../../utils.ts';
 
 export interface StyleReadOnlyLike {
   length: number;
@@ -214,7 +215,7 @@ export class StylePropertyMapReadOnly {
             }
             if (allSet) {
               const firstVal = serialize(longhandValues[lhList[0]]).trim().toLowerCase();
-              if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(firstVal)) {
+              if (CSS_WIDE_KEYWORDS.has(firstVal)) {
                 if (lhList.every(lh => serialize(longhandValues[lh]).trim().toLowerCase() === firstVal)) {
                   try {
                     return CSSStyleValue.parseAll(propKey, firstVal);
@@ -257,7 +258,7 @@ export class StylePropertyMapReadOnly {
         const shorthand = SHORTHANDS[propKey];
         if (shorthand) {
           const firstVal = this._style.getPropertyValue(shorthand.longhands[0]).trim().toLowerCase();
-          if (['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(firstVal)) {
+          if (CSS_WIDE_KEYWORDS.has(firstVal)) {
             if (shorthand.longhands.every(lh => this._style.getPropertyValue(lh).trim().toLowerCase() === firstVal)) {
               try {
                 return CSSStyleValue.parseAll(propKey, firstVal);

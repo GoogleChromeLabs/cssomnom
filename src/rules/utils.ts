@@ -54,63 +54,69 @@ export function findParentStyleSheet(rule: CSSRule): CSSStyleSheet | null {
 }
 
 /**
- * Validates that component values match <supports-condition> grammar.
+ * Validates and evaluates a `<supports-condition>` component-value list.
+ * Returns `null` if grammatically invalid, or the boolean result from `evalInParens`.
  * css-conditional-3 #at-supports
  */
-export function isGrammaticallyValidSupportsCondition(values: ComponentValue[]): boolean {
+export function evaluateSupportsCondition(
+  values: ComponentValue[],
+  evalInParens: (item: ComponentValue) => boolean,
+): boolean | null {
   const items = values.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-  if (items.length === 0) return false;
+  if (items.length === 0) return null;
 
-  const isSupportsInParens = (item: ComponentValue): boolean => {
-    if (item.type === 'function') return true;
+  const evalItem = (item: ComponentValue): boolean | null => {
+    if (item.type === 'function') return evalInParens(item);
     if (item.type === 'simple-block' && (item as SimpleBlock).associatedToken.value === '(') {
       const blockValues = (item as SimpleBlock).value.filter(v => v.type !== 'whitespace' && v.type !== 'comment');
-      if (blockValues.length === 0) return true;
+      if (blockValues.length === 0) return evalInParens(item);
       const hasTopOp = blockValues.some(v => v.type === 'ident' && ['and', 'or', 'not'].includes(String((v as Token).value).toLowerCase()));
       const isNestedParenBlock = blockValues.length === 1 &&
         blockValues[0].type === 'simple-block' &&
         (blockValues[0] as SimpleBlock).associatedToken.value === '(';
       if (hasTopOp || isNestedParenBlock) {
-        return isGrammaticallyValidSupportsCondition((item as SimpleBlock).value);
+        return evaluateSupportsCondition((item as SimpleBlock).value, evalInParens);
       }
-      return true;
+      return evalInParens(item);
     }
-    return false;
+    return null;
   };
 
-  const operands: boolean[] = [];
-  const operators: string[] = [];
-
+  const results: boolean[] = [];
+  let operator: 'and' | 'or' | null = null;
   let i = 0;
+
   while (i < items.length) {
+    let negated = false;
     if (items[i].type === 'ident' && String((items[i] as Token).value).toLowerCase() === 'not') {
-      if (i + 1 >= items.length) return false;
-      if (!isSupportsInParens(items[i + 1])) return false;
-      operands.push(true);
-      i += 2;
-    } else if (isSupportsInParens(items[i])) {
-      operands.push(true);
-      i += 1;
-    } else {
-      return false;
+      negated = true;
+      i++;
+      if (i >= items.length) return null;
     }
+    const res = evalItem(items[i]);
+    if (res === null) return null;
+    results.push(negated ? !res : res);
+    i++;
 
     if (i < items.length) {
-      if (items[i].type !== 'ident') return false;
+      if (items[i].type !== 'ident') return null;
       const op = String((items[i] as Token).value).toLowerCase();
-      if (op !== 'and' && op !== 'or') return false;
-      operators.push(op);
-      i += 1;
+      if (op !== 'and' && op !== 'or') return null;
+      if (operator !== null && operator !== op) return null;
+      operator = op;
+      i++;
+      if (i >= items.length) return null;
     }
   }
 
-  if (operands.length === 0) return false;
-  if (operands.length !== operators.length + 1) return false;
+  if (results.length === 1) return results[0];
+  return operator === 'and' ? results.every(Boolean) : results.some(Boolean);
+}
 
-  if (operators.length > 0) {
-    const firstOp = operators[0];
-    if (!operators.every(op => op === firstOp)) return false;
-  }
-
-  return true;
+/**
+ * Validates that component values match <supports-condition> grammar.
+ * css-conditional-3 #at-supports
+ */
+export function isGrammaticallyValidSupportsCondition(values: ComponentValue[]): boolean {
+  return evaluateSupportsCondition(values, () => true) !== null;
 }

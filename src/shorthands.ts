@@ -34,6 +34,7 @@ import {
 import { LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
 import { NAMED_COLORS } from './data/gen/colors.ts';
 import { LENGTH_UNITS } from './data/gen/units.ts';
+import { CSS_WIDE_KEYWORDS } from './utils.ts';
 
 export interface ShorthandDefinition {
   longhands: readonly string[];
@@ -42,10 +43,8 @@ export interface ShorthandDefinition {
   logicalLonghands?: readonly string[];
   physicalLonghands?: readonly string[];
   allLonghands?: readonly string[];
-  stub?: boolean;
 }
 
-const CSS_WIDE_KEYWORDS = /* @__PURE__ */ new Set('initial,inherit,unset,revert,revert-layer'.split(','));
 const REPEAT_KEYWORDS = /* @__PURE__ */ new Set('repeat,no-repeat,space,round,repeat-x,repeat-y'.split(','));
 const ATTACHMENT_KEYWORDS = /* @__PURE__ */ new Set('scroll,fixed,local'.split(','));
 const BOX_KEYWORDS = /* @__PURE__ */ new Set('border-box,padding-box,content-box,text,border-area'.split(','));

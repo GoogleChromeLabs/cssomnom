@@ -19,6 +19,7 @@ import { SHORTHANDS, ALL_SHORTHAND_LONGHANDS, isInitialBorderImage } from './sho
 import { formatNumber } from './utils/format.ts';
 import { parseAnPlusB } from './SelectorParser.ts';
 import { GENERIC_FONT_FAMILIES } from './data/gen/property-list.ts';
+import { CSS_WIDE_AND_DEFAULT_KEYWORDS as CSS_WIDE_AND_DEFAULT } from './utils.ts';
 
 /**
  * Determines whether two consecutive tokens require an empty comment separator
@@ -733,8 +734,6 @@ function tryCombineNamedShorthand(
   }
   return null;
 }
-
-const CSS_WIDE_AND_DEFAULT = /* @__PURE__ */ new Set('initial,inherit,unset,revert,revert-layer,default'.split(','));
 
 function serializeFontFamilyItem(tokens: ComponentValue[]): string {
   const nonWs = tokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment' && t.type !== 'EOF');

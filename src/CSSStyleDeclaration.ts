@@ -24,11 +24,10 @@ import { SHORTHANDS, LONGHAND_TO_SHORTHAND, getShorthandAllLonghands, type Short
 import { SHORTHANDS_DATA } from './data/gen/shorthands.ts';
 import { resolveLogicalProperty, LOGICAL_PROPERTY_INFO, LOGICAL_MAPPING } from './data/gen/LogicalMapping.ts';
 import { SUPPORTED_PROPERTIES, CUSTOM_IDENT_PROPERTIES, FONT_FACE_DESCRIPTORS, PAGE_ALLOWED_PROPERTIES, PAGE_DESCRIPTOR_PROPERTIES, POSITION_TRY_ALLOWED_PROPERTIES } from './data/gen/property-list.ts';
-import { camelToDashed } from './utils.ts';
+import { camelToDashed, CSS_WIDE_KEYWORDS } from './utils.ts';
 import { CSSStyleProperties } from './data/gen/properties.ts';
 import { applyWebIDLInterface } from './webidl.ts';
 
-const CSS_WIDE_KEYWORDS = /* @__PURE__ */ new Set('inherit,initial,unset,revert,revert-layer'.split(','));
 const LOGICAL_SHORTHANDS = /* @__PURE__ */ new Set('margin,padding,inset,scroll-margin,scroll-padding,border-width,border-style,border-color'.split(','));
 
 const proxyToTarget = new WeakMap<CSSStyleDeclaration, CSSStyleDeclaration>();
@@ -639,7 +638,7 @@ export class CSSStyleDeclaration extends CSSStyleProperties {
         for (const lh of shorthand.longhands) {
           this.removeProperty(lh);
         }
-      } else if (!shorthand.stub) {
+      } else {
         return;
       }
     }

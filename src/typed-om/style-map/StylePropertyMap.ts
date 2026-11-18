@@ -34,6 +34,7 @@ import { tokenize } from '../../tokenizer.ts';
 import { parseComponentValues } from '../../parser.ts';
 import { validateProperty, privateToken } from '../utils/validation.ts';
 import type { ElementLike } from '../../types.ts';
+import { CSS_WIDE_KEYWORDS } from '../../utils.ts';
 
 export interface StyleLike extends StyleReadOnlyLike {
   setProperty(property: string, value: string | null, priority?: string): void;
@@ -172,7 +173,7 @@ export class StylePropertyMap extends StylePropertyMapReadOnly {
 
     // Check if existing property contains a var() reference or CSS-wide keyword per css-typed-om #dom-stylepropertymap-append: step 7
     const current = getPropertyValueSafe(this._style, property);
-    if (current && ['initial', 'inherit', 'unset', 'revert', 'revert-layer'].includes(current.trim().toLowerCase())) {
+    if (current && CSS_WIDE_KEYWORDS.has(current.trim().toLowerCase())) {
       throw new TypeError(`Cannot append to CSS-wide keyword '${current}'.`);
     }
     if (current && current.includes('var(')) {

@@ -61,7 +61,6 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
 - [`src/parser-api.ts`](./src/parser-api.ts): WICG CSS Parser API and `CSS.*` utility namespace (`CSS.escape`, `CSS.supports`).
 - [`src/webidl.ts`](./src/webidl.ts): WebIDL prototype descriptors, brand checks, arity enforcement, and constants.
 - [`src/cascade.ts`](./src/cascade.ts): Thin barrel export redirecting root cascade imports to `src/cascade/index.ts`.
-- [`src/css-escape.ts`](./src/css-escape.ts): Spec-compliant `CSS.escape()` implementation per `cssom-1 #serialize-an-identifier`.
 - [`src/internal-token.ts`](./src/internal-token.ts): Internal symbol token guarding non-constructible CSSOM rule constructors per WebIDL § 3.6.3.
 - [`src/utils.ts`](./src/utils.ts): Common helper utilities (`camelToDashed`, `createIndexedProxy`, `deleteRuleFromArray`).
 - [`src/utils/format.ts`](./src/utils/format.ts): Number formatting utility using `Intl.NumberFormat` with spec float precision.
@@ -77,7 +76,7 @@ AST & CSSOM Objects [CSSOM.ts, rules/, CSSStyleDeclaration.ts]
   - [`cascade/color-resolver.ts`](./src/cascade/color-resolver.ts): CSS Color 4 color space resolution and system colors.
   - [`cascade/value-processor.ts`](./src/cascade/value-processor.ts): Standard property processing and initial value fallback.
   - [`cascade/computed-style.ts`](./src/cascade/computed-style.ts): `CSSComputedStyleDeclaration` resolving computed property values.
-  - [`cascade/types.ts`](./src/cascade/types.ts): Cascade types (`MatchedDeclaration`, `CascadeOrigin`).
+  - [`cascade/types.ts`](./src/cascade/types.ts): Cascade types (`MatchedDeclaration`).
 - [`src/typed-om.ts`](./src/typed-om.ts): Barrel re-export file for `src/typed-om/index.ts`.
 - [`src/typed-om/`](./src/typed-om/): CSS Typed OM Level 1 & 2 implementation (`index.ts` WebIDL descriptors and transforms hook):
   - [`typed-om/values/`](./src/typed-om/values/): Style values (`CSSStyleValue.ts`, `CSSKeywordValue.ts`, `CSSImageValue.ts`, `CSSUnparsedValue.ts`, `CSSVariableReferenceValue.ts`), value factory (`style-value-factory.ts`), and parser (`style-value-parser.ts`).

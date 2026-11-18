@@ -937,13 +937,6 @@ function getLangRanges(pseudo: PseudoClassSelector): string[] {
     }
     return ranges;
   }
-  if (typeof pseudo.argument === 'string') {
-    const trimmed = (pseudo.argument as string).trim();
-    if (trimmed === '""' || trimmed === "''") return [''];
-    return trimmed
-      .split(/\s*,\s*/)
-      .map(s => s.replace(/^["']|["']$/g, ''));
-  }
   return [];
 }
 

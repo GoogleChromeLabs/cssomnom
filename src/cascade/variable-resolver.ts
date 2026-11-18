@@ -24,6 +24,7 @@ import type { MatchedDeclaration } from './types.ts';
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
 import { PropertyRegistry, type PropertyDefinition, matchesSyntax } from '../PropertyRegistry.ts';
 import { parseMathFunction, simplify } from '../math-parser.ts';
+import { CSS_WIDE_KEYWORDS } from '../utils.ts';
 
 const STANDARD_ENV_VARS: Record<string, string> = {
   'safe-area-inset-top': '0px',
@@ -430,7 +431,7 @@ export function substituteVariables(
             if (def) {
               const cleanTokens = substitutedTokens.filter(t => t.type !== 'whitespace' && t.type !== 'comment');
               const isCSSWideKeyword = cleanTokens.length === 1 && cleanTokens[0].type === 'ident' &&
-                ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(String((cleanTokens[0] as Token).value).toLowerCase());
+                CSS_WIDE_KEYWORDS.has(String((cleanTokens[0] as Token).value).toLowerCase());
               if (!isCSSWideKeyword && !matchesSyntax(cleanTokens, def.syntax || '*')) {
                 if (def.initialValue !== undefined) {
                   substitutedTokens = def.parsedInitialValue ? cloneComponentValues(def.parsedInitialValue) : parseComponentValues(tokenize(def.initialValue));
@@ -543,9 +544,7 @@ export function resolveVariables(
       const isCSSWideKeyword =
         tokens.length === 1 &&
         tokens[0].type === 'ident' &&
-        ['inherit', 'initial', 'unset', 'revert', 'revert-layer'].includes(
-          String((tokens[0] as Token).value).toLowerCase()
-        );
+        CSS_WIDE_KEYWORDS.has(String((tokens[0] as Token).value).toLowerCase());
       if (!isCSSWideKeyword && !matchesSyntax(tokens, def.syntax)) {
         return def.initialValue ?? '';
       }

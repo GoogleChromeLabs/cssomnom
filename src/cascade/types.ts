@@ -39,20 +39,4 @@ export interface MatchedDeclaration {
   origin?: 'user-agent' | 'author' | 'animation';
 }
 
-/**
- * Cascade origin and importance precedence levels.
- */
-export const CascadeOrigin = {
-  USER_AGENT: 0,
-  USER: 10,
-  AUTHOR_NORMAL_LAYERED: 10,
-  AUTHOR_NORMAL_UNLAYERED: 20,
-  INLINE_NORMAL: 30,
-  AUTHOR_IMPORTANT_UNLAYERED: 40,
-  AUTHOR_IMPORTANT_LAYERED: 50,
-  INLINE_IMPORTANT: 60,
-} as const;
-
-export type CascadeOrigin = typeof CascadeOrigin[keyof typeof CascadeOrigin];
-
 export { INHERITED_PROPERTIES } from '../data/gen/cascade-data.ts';

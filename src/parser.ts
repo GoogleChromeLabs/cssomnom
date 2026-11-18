@@ -29,6 +29,7 @@ import { isGrammaticallyValidSupportsCondition } from './rules/utils.ts';
 import { INTERNAL_RULE_TOKEN } from './internal-token.ts';
 import { ArrayTokenStream, ArrayComponentValueStream, LazyComponentValueStream } from './TokenStream.ts';
 import { FONT_FEATURE_VALUE_BLOCKS, MARGIN_RULE_NAMES } from './data/gen/property-list.ts';
+import { CSS_WIDE_AND_DEFAULT_KEYWORDS as CSS_WIDE_KEYWORDS } from './utils.ts';
 
 /**
  * Configuration options for `parse()` and `Parser`.
@@ -123,7 +124,6 @@ function splitLeadingDeclarations(blockContents: Rule[]): { declarations: Declar
   return { declarations, nestedRules };
 }
 
-const CSS_WIDE_KEYWORDS = /* @__PURE__ */ new Set('initial,inherit,unset,revert,revert-layer,default'.split(','));
 const KEYFRAMES_DISALLOWED_NAMES = /* @__PURE__ */ new Set('none,initial,inherit,unset,revert,default'.split(','));
 
 export function isValidDashedIdent(name: string): boolean {

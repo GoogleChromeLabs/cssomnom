@@ -24,104 +24,35 @@ import {
   matchesAngle
 } from '../utils/type-guards.ts';
 
+import type { CSSNumericType } from '../numeric/CSSNumericType.ts';
+
+function rectifyColorComponent(
+  v: unknown,
+  numUnit: 'percent' | 'number' | 'deg',
+  numScale: number,
+  matches: (type: CSSNumericType) => boolean,
+  label: string,
+  allowUndefined = false,
+): CSSNumericValue | CSSKeywordValue {
+  if (typeof v === 'number') return new CSSUnitValue(v * numScale, numUnit);
+  if (allowUndefined && v === undefined) return new CSSKeywordValue('undefined');
+  const val = typeof v === 'string' ? new CSSKeywordValue(v) : v;
+  if (val instanceof CSSNumericValue && matches(val.type())) return val;
+  if (val instanceof CSSKeywordValue) {
+    const kw = val.value.toLowerCase();
+    if (kw === 'none' || (allowUndefined && kw === 'undefined')) return val;
+  }
+  throw new DOMException(`Invalid ${label} value`, 'SyntaxError');
+}
+
+const matchesNumberOrPercent = (t: CSSNumericType) => matchesNumber(t) || matchesPercentage(t);
+
 // css-typed-om #cssrgb #rectify-a-csscolorrgbcomp
-export function rectifyColorRGBComp(v: unknown): CSSNumericValue | CSSKeywordValue {
-  if (typeof v === 'number') {
-    return new CSSUnitValue(v * 100, 'percent');
-  }
-  if (typeof v === 'string') {
-    v = new CSSKeywordValue(v);
-  }
-  if (v instanceof CSSNumericValue) {
-    if (matchesNumber(v.type()) || matchesPercentage(v.type())) {
-      return v;
-    }
-  } else if (v instanceof CSSKeywordValue) {
-    if (v.value.toLowerCase() === 'none') {
-      return v;
-    }
-  }
-  throw new DOMException('Invalid CSSColorRGBComp value', 'SyntaxError');
-}
-
+export const rectifyColorRGBComp = (v: unknown) => rectifyColorComponent(v, 'percent', 100, matchesNumberOrPercent, 'CSSColorRGBComp');
 // css-typed-om #cssrgb #rectify-a-csscolorpercent
-export function rectifyColorPercent(v: unknown): CSSNumericValue | CSSKeywordValue {
-  if (typeof v === 'number') {
-    return new CSSUnitValue(v * 100, 'percent');
-  }
-  if (typeof v === 'string') {
-    v = new CSSKeywordValue(v);
-  }
-  if (v instanceof CSSNumericValue) {
-    if (matchesPercentage(v.type())) {
-      return v;
-    }
-  } else if (v instanceof CSSKeywordValue) {
-    if (v.value.toLowerCase() === 'none') {
-      return v;
-    }
-  }
-  throw new DOMException('Invalid CSSColorPercent value', 'SyntaxError');
-}
-
+export const rectifyColorPercent = (v: unknown) => rectifyColorComponent(v, 'percent', 100, matchesPercentage, 'CSSColorPercent');
 // css-typed-om #cssrgb #rectify-a-csscolornumber
-export function rectifyColorNumber(v: unknown): CSSNumericValue | CSSKeywordValue {
-  if (typeof v === 'number') {
-    return new CSSUnitValue(v, 'number');
-  }
-  if (typeof v === 'string') {
-    v = new CSSKeywordValue(v);
-  }
-  if (v instanceof CSSNumericValue) {
-    if (matchesNumber(v.type())) {
-      return v;
-    }
-  } else if (v instanceof CSSKeywordValue) {
-    if (v.value.toLowerCase() === 'none') {
-      return v;
-    }
-  }
-  throw new DOMException('Invalid CSSColorNumber value', 'SyntaxError');
-}
-
+export const rectifyColorNumber = (v: unknown) => rectifyColorComponent(v, 'number', 1, matchesNumber, 'CSSColorNumber');
 // css-typed-om #cssrgb #rectify-a-csscolorangle
-export function rectifyColorAngle(v: unknown): CSSNumericValue | CSSKeywordValue {
-  if (typeof v === 'number') {
-    return new CSSUnitValue(v, 'deg');
-  }
-  if (v === undefined) {
-    return new CSSKeywordValue('undefined');
-  }
-  if (typeof v === 'string') {
-    v = new CSSKeywordValue(v);
-  }
-  if (v instanceof CSSNumericValue) {
-    if (matchesAngle(v.type())) {
-      return v;
-    }
-  } else if (v instanceof CSSKeywordValue) {
-    if (v.value.toLowerCase() === 'none' || v.value.toLowerCase() === 'undefined') {
-      return v;
-    }
-  }
-  throw new DOMException('Invalid CSSColorAngle value', 'SyntaxError');
-}
-
-export function rectifyColorNumberOrPercent(v: unknown): CSSNumericValue | CSSKeywordValue {
-  if (typeof v === 'number') {
-    return new CSSUnitValue(v, 'number');
-  }
-  if (typeof v === 'string') {
-    v = new CSSKeywordValue(v);
-  }
-  if (v instanceof CSSNumericValue) {
-    if (matchesNumber(v.type()) || matchesPercentage(v.type())) {
-      return v;
-    }
-  } else if (v instanceof CSSKeywordValue) {
-    if (v.value.toLowerCase() === 'none') {
-      return v;
-    }
-  }
-  throw new DOMException('Invalid CSSColor channel value', 'SyntaxError');
-}
+export const rectifyColorAngle = (v: unknown) => rectifyColorComponent(v, 'deg', 1, matchesAngle, 'CSSColorAngle', true);
+export const rectifyColorNumberOrPercent = (v: unknown) => rectifyColorComponent(v, 'number', 1, matchesNumberOrPercent, 'CSSColor channel');

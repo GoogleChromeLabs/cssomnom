@@ -27,6 +27,7 @@ import { resolveLogicalProperty, LOGICAL_MAPPING } from '../data/gen/LogicalMapp
 import { compareCascadeDeclarations } from './cascade-sorter.ts';
 import type { CSSStyleDeclaration } from '../CSSStyleDeclaration.ts';
 import type { PropertyDefinition } from '../PropertyRegistry.ts';
+import { CSS_WIDE_KEYWORDS } from '../utils.ts';
 
 export function isSvgElement(element: unknown): boolean {
   if (!element || typeof element !== 'object') return false;
@@ -116,7 +117,7 @@ function expandShorthandWithVariables(
   }
 
   const trimmed = subVal.trim().toLowerCase();
-  const isCSSWide = ['revert', 'revert-layer', 'revert-rule', 'initial', 'inherit', 'unset'].includes(trimmed);
+  const isCSSWide = CSS_WIDE_KEYWORDS.has(trimmed) || trimmed === 'revert-rule';
 
   if (isCSSWide) {
     const results: MatchedDeclaration[] = [];

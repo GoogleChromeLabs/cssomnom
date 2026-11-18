@@ -16,11 +16,19 @@
  */
 import { unitToBase, unitToPixels } from './data/gen/units.ts';
 import { NAMED_COLORS } from './data/gen/colors.ts';
+import { MATH_FUNCTIONS } from './data/gen/math-functions.ts';
 import { tokenize } from './tokenizer.ts';
 import { ParseHooks } from './parse-hooks.ts';
 import { parseComponentValues, validateCustomPropertyValue } from './parser.ts';
 import type { ComponentValue, Token, SimpleBlock, CSSFunction, ParseError } from './types.ts';
 import { ArrayTokenStream } from './TokenStream.ts';
+import { CSS_WIDE_AND_DEFAULT_KEYWORDS } from './utils.ts';
+
+const VALID_TRANSFORM_FUNCTIONS = /* @__PURE__ */ new Set(
+  'matrix,matrix3d,translate,translate3d,translatex,translatey,translatez,scale,scale3d,scalex,scaley,scalez,rotate,rotate3d,rotatex,rotatey,rotatez,skew,skewx,skewy,perspective'.split(',')
+);
+const COLOR_FUNCTIONS = /* @__PURE__ */ new Set('rgb,rgba,hsl,hsla,hwb,lab,lch,oklab,oklch,color'.split(','));
+const ALL_MATH_FUNCTIONS = /* @__PURE__ */ new Set(['calc', 'min', 'max', 'clamp', 'round', ...MATH_FUNCTIONS]);
 
 /**
  * Descriptor dictionary for registering a custom property via `CSS.registerProperty(definition)`.
@@ -129,9 +137,7 @@ function consumeSyntaxComponent(stream: ArrayTokenStream, isRegistered = false):
     }
   } else if (token.type === 'ident') {
     name = token.value.toString();
-    const lowerName = name.toLowerCase();
-    const keywords = ['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default'];
-    if (keywords.includes(lowerName)) {
+    if (CSS_WIDE_AND_DEFAULT_KEYWORDS.has(name.toLowerCase())) {
       throw new DOMException(`CSS-wide keyword "${name}" is not allowed as a literal identifier in syntax string`, 'SyntaxError');
     }
   } else {
@@ -181,15 +187,6 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
     if (name.startsWith('<') && name.endsWith('>')) {
       const typeName = name.slice(1, -1);
 
-      const VALID_TRANSFORM_FUNCTIONS = new Set([
-        'matrix', 'matrix3d',
-        'translate', 'translate3d', 'translatex', 'translatey', 'translatez',
-        'scale', 'scale3d', 'scalex', 'scaley', 'scalez',
-        'rotate', 'rotate3d', 'rotatex', 'rotatey', 'rotatez',
-        'skew', 'skewx', 'skewy',
-        'perspective'
-      ]);
-
       checkItem = (itemTokens: ComponentValue[]) => {
         if (typeName === 'transform-list') {
           if (itemTokens.length === 0) return false;
@@ -202,8 +199,7 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
 
         if (itemTokens.length !== 1) return false;
         const t = itemTokens[0];
-        const MATH_FUNCTIONS = new Set(['calc', 'min', 'max', 'clamp', 'round', 'mod', 'rem', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2', 'pow', 'sqrt', 'hypot', 'log', 'exp', 'abs', 'sign']);
-        const isMathFunction = t.type === 'function' && MATH_FUNCTIONS.has((t as CSSFunction).name.toLowerCase());
+        const isMathFunction = t.type === 'function' && ALL_MATH_FUNCTIONS.has((t as CSSFunction).name.toLowerCase());
 
         if (typeName === 'length') return isMathFunction || (t.type === 'dimension' && unitToBase[t.unit.toLowerCase()] === 'length') || (t.type === 'number' && t.value === 0);
         if (typeName === 'number') return isMathFunction || t.type === 'number';
@@ -220,9 +216,7 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
             return /^[0-9a-fA-F]{3,4}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(t.value);
           }
           if (t.type === 'function') {
-            const funcName = (t as CSSFunction).name.toLowerCase();
-            const COLOR_FUNCTIONS = new Set(['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
-            return COLOR_FUNCTIONS.has(funcName);
+            return COLOR_FUNCTIONS.has((t as CSSFunction).name.toLowerCase());
           }
           if (t.type === 'ident') {
             const val = (t as Token).value.toString().toLowerCase();
@@ -234,8 +228,7 @@ export function matchesSyntax(tokens: ComponentValue[], syntax: string): boolean
         if (typeName === 'image') return t.type === 'url' || t.type === 'function';
         if (typeName === 'custom-ident') {
           if (t.type !== 'ident') return false;
-          const val = (t as Token).value.toString().toLowerCase();
-          return !['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default'].includes(val);
+          return !CSS_WIDE_AND_DEFAULT_KEYWORDS.has((t as Token).value.toString().toLowerCase());
         }
         if (typeName === 'string') return t.type === 'string';
         if (typeName === 'transform-function') {

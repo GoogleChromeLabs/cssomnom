@@ -32,6 +32,7 @@ import { SHORTHANDS } from '../../shorthands.ts';
 import { NAMED_COLORS } from '../../data/gen/colors.ts';
 import { validateProperty } from '../utils/validation.ts';
 import { CSSStyleDeclaration } from '../../CSSStyleDeclaration.ts';
+import { CSS_WIDE_AND_DEFAULT_KEYWORDS } from '../../utils.ts';
 import {
   matchesLength,
   matchesPercentage,
@@ -206,8 +207,7 @@ function matchesStyleValueSyntax(value: CSSStyleValue, syntax: string, propKey: 
 
   if (value instanceof CSSKeywordValue) {
     const kw = value.value.toLowerCase();
-    const CSS_WIDE = new Set(['initial', 'inherit', 'unset', 'revert', 'revert-layer', 'default']);
-    if (CSS_WIDE.has(kw)) return true;
+    if (CSS_WIDE_AND_DEFAULT_KEYWORDS.has(kw)) return true;
 
     if (syntax.includes('<custom-ident>') || syntax.includes('<string>')) return true;
 

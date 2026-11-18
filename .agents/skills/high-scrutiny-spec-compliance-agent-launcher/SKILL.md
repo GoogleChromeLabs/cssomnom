@@ -9,7 +9,7 @@ This skill is used to launch a comprehensive compliance audit of the CSSOM parse
 
 ## Workflow
 1.  **Spawn Auditors**: Spawn specialized read-only subagents (`Model: 'flash'`) in parallel for assigned specifications:
-    *   **CSSOM Auditor**: `submodules/csswg-drafts/cssom-1/Overview.bs` and `css-style-attr-1/Overview.src.html` -> `src/types.ts`, `src/CSSOM.ts`, `src/CSSStyleDeclaration.ts`, `src/css-escape.ts`, and `src/rules/`.
+    *   **CSSOM Auditor**: `submodules/csswg-drafts/cssom-1/Overview.bs` and `css-style-attr-1/Overview.src.html` -> `src/types.ts`, `src/CSSOM.ts`, `src/CSSStyleDeclaration.ts`, and `src/rules/`.
     *   **CSS Syntax Auditor**: `submodules/csswg-drafts/css-syntax-3/Overview.bs` -> `src/tokenizer.ts`, `src/AbstractTokenizer.ts`, `src/streaming-tokenizer.ts`, `src/TokenStream.ts`, `src/parser.ts`, and `src/serializer.ts`.
     *   **Selectors Auditor**: `submodules/csswg-drafts/selectors-4/Overview.bs`, `css-namespaces-3/Overview.bs`, and relevant HTML matching hooks in `submodules/whatwg-html/source` -> `src/SelectorParser.ts`, `src/specificity.ts`, and `src/matcher.ts`.
     *   **Values & Typed OM Auditor**: `submodules/csswg-drafts/css-values-4/Overview.bs`, `submodules/css-houdini-drafts/css-typed-om/Overview.bs`, and `submodules/css-houdini-drafts/css-typed-om-2/Overview.bs` -> `src/math-parser.ts` and `src/typed-om/`.

@@ -17,6 +17,14 @@
 import type { Rule } from './types.ts';
 import { hideInternalFields } from './webidl.ts';
 
+export const CSS_WIDE_KEYWORDS: ReadonlySet<string> = /* @__PURE__ */ new Set(
+  'initial,inherit,unset,revert,revert-layer'.split(',')
+);
+
+export const CSS_WIDE_AND_DEFAULT_KEYWORDS: ReadonlySet<string> = /* @__PURE__ */ new Set(
+  'initial,inherit,unset,revert,revert-layer,default'.split(',')
+);
+
 export function camelToDashed(str: string): string {
   return str.replace(/[A-Z]/g, m => '-' + m.toLowerCase()).replace(/^ms-/, '-ms-');
 }
