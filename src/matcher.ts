@@ -162,46 +162,46 @@ export function matches(element: unknown, selector: string | ComplexSelector | S
   return false;
 }
 
+function queryDescendants(
+  root: unknown,
+  selector: string | ComplexSelector | SelectorList,
+  firstOnly: boolean,
+): DOMElement[] {
+  if (!root || typeof root !== 'object') return [];
+  const list = parseSelector(selector);
+  const scope = isElement(root) ? root : undefined;
+  const results: DOMElement[] = [];
+
+  function walk(node: DOMElement): boolean {
+    if (matches(node, list, scope)) {
+      results.push(node);
+      if (firstOnly) return true;
+    }
+    const children = node.children ? Array.from(node.children) : [];
+    for (const child of children) {
+      if (isElement(child) && walk(child)) return true;
+    }
+    return false;
+  }
+
+  const rootNodes = isElement(root)
+    ? (root.children ? Array.from(root.children) : [])
+    : ('children' in root || 'childNodes' in root)
+      ? Array.from((root as { children?: ArrayLike<unknown>; childNodes?: ArrayLike<unknown> }).children ||
+          (root as { childNodes?: ArrayLike<unknown> }).childNodes || [])
+      : [];
+  for (const child of rootNodes) {
+    if (isElement(child) && walk(child)) break;
+  }
+  return results;
+}
+
 /**
  * Returns all descendant elements matching a CSS selector in tree order.
  * selectors-4 #match-against-tree
  */
 export function querySelectorAll(root: unknown, selector: string | ComplexSelector | SelectorList): DOMElement[] {
-  if (!root || typeof root !== 'object') return [];
-  const results: DOMElement[] = [];
-  const list = parseSelector(selector);
-
-  function walk(node: DOMElement) {
-    if (matches(node, list, isElement(root) ? root : undefined)) {
-      results.push(node);
-    }
-    const children = node.children ? Array.from(node.children) : [];
-    for (const child of children) {
-      if (isElement(child)) {
-        walk(child);
-      }
-    }
-  }
-
-  if (isElement(root)) {
-    const children = root.children ? Array.from(root.children) : [];
-    for (const child of children) {
-      if (isElement(child)) {
-        walk(child);
-      }
-    }
-  } else if ('children' in root || 'childNodes' in root) {
-    // Document, DocumentFragment, or Node container
-    const nodes = (root as { children?: ArrayLike<unknown>; childNodes?: ArrayLike<unknown> }).children ||
-                  (root as { childNodes?: ArrayLike<unknown> }).childNodes || [];
-    for (let i = 0; i < nodes.length; i++) {
-      const child = nodes[i];
-      if (isElement(child)) {
-        walk(child);
-      }
-    }
-  }
-  return results;
+  return queryDescendants(root, selector, false);
 }
 
 /**
@@ -209,8 +209,7 @@ export function querySelectorAll(root: unknown, selector: string | ComplexSelect
  * selectors-4 #match-against-tree
  */
 export function querySelector(root: unknown, selector: string | ComplexSelector | SelectorList): DOMElement | null {
-  const all = querySelectorAll(root, selector);
-  return all.length > 0 ? all[0] : null;
+  return queryDescendants(root, selector, true)[0] ?? null;
 }
 
 /**
@@ -331,6 +330,20 @@ function matchCompoundSelector(element: DOMElement, compound: CompoundSelector, 
   return true;
 }
 
+function matchesNamespace(element: DOMElement, elLocal: string, namespace: string | undefined): boolean {
+  if (namespace === undefined || namespace === '*') return true;
+  const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
+  if (namespace === '') {
+    // Linkedom compatibility invariant: un-namespaced XML elements return 'http://www.w3.org/1999/xhtml' instead of null.
+    if (element.namespaceURI && element.namespaceURI !== 'http://www.w3.org/1999/xhtml') return false;
+    return !isSvg;
+  }
+  if (namespace === 'svg') {
+    return isSvg || element.prefix === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
+  }
+  return element.prefix === namespace || element.namespaceURI === namespace;
+}
+
 /**
  * Matches a simple selector (type, universal, class, ID, attribute, pseudo).
  * selectors-4 #structure (<simple-selector>)
@@ -343,35 +356,12 @@ function matchSimpleSelector(element: DOMElement, simple: SimpleSelector, scope?
       const elLocal = isXml ? (element.localName || element.tagName || '') : toAsciiLowerCase(element.localName || element.tagName || '');
       const selName = isXml ? simple.name : toAsciiLowerCase(simple.name);
       if (selName !== '*' && elLocal !== selName) return false;
-      if (simple.namespace !== undefined && simple.namespace !== '*') {
-        const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
-        if (simple.namespace === '') {
-          // Trigger #3: Linkedom compatibility invariant - document.createElementNS(null, 'x') and un-namespaced XML elements in linkedom return 'http://www.w3.org/1999/xhtml' instead of null.
-          if (element.namespaceURI && element.namespaceURI !== 'http://www.w3.org/1999/xhtml') return false;
-          if (isSvg) return false;
-        } else if (simple.namespace === 'svg') {
-          if (!isSvg && element.prefix !== 'svg' && element.namespaceURI !== 'http://www.w3.org/2000/svg') return false;
-        } else {
-          if (element.prefix !== simple.namespace && element.namespaceURI !== simple.namespace) return false;
-        }
-      }
-      return true;
+      return matchesNamespace(element, elLocal, simple.namespace);
     }
 
     case 'universal-selector': {
       const elLocal = toAsciiLowerCase(element.localName || element.tagName || '');
-      if (simple.namespace !== undefined && simple.namespace !== '*') {
-        const isSvg = elLocal === 'svg' || element.namespaceURI === 'http://www.w3.org/2000/svg';
-        if (simple.namespace === '') {
-          if (element.namespaceURI && element.namespaceURI !== 'http://www.w3.org/1999/xhtml') return false;
-          if (isSvg) return false;
-        } else if (simple.namespace === 'svg') {
-          if (!isSvg && element.prefix !== 'svg' && element.namespaceURI !== 'http://www.w3.org/2000/svg') return false;
-        } else {
-          if (element.prefix !== simple.namespace && element.namespaceURI !== simple.namespace) return false;
-        }
-      }
-      return true;
+      return matchesNamespace(element, elLocal, simple.namespace);
     }
 
     // selectors-4 #id-selectors

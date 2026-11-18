@@ -883,6 +883,41 @@ function parseValueForFeature(prop: string, tokens: ComponentValue[]): number | 
   }
 }
 
+interface DiscreteFeatureSpec {
+  get: (env: MediaEnvironment) => string;
+  falseValue?: string;
+}
+
+const DISCRETE_FEATURES: Record<string, DiscreteFeatureSpec> = {
+  'orientation': { get: env => (env.width > env.height ? 'landscape' : 'portrait') },
+  'display-mode': { get: env => env.displayMode },
+  'display-state': { get: env => env.displayState },
+  'prefers-color-scheme': { get: env => env.prefersColorScheme },
+  'prefers-contrast': { get: env => env.prefersContrast, falseValue: 'no-preference' },
+  'prefers-reduced-motion': { get: env => env.prefersReducedMotion, falseValue: 'no-preference' },
+  'prefers-reduced-transparency': { get: env => env.prefersReducedTransparency, falseValue: 'no-preference' },
+  'prefers-reduced-data': { get: env => env.prefersReducedData, falseValue: 'no-preference' },
+  'forced-colors': { get: env => env.forcedColors, falseValue: 'none' },
+  'inverted-colors': { get: env => env.invertedColors, falseValue: 'none' },
+  'dynamic-range': { get: env => env.dynamicRange, falseValue: '' },
+  'video-dynamic-range': { get: env => env.videoDynamicRange, falseValue: '' },
+  'color-gamut': { get: env => env.colorGamut, falseValue: 'none' },
+  'video-color-gamut': { get: env => env.videoColorGamut, falseValue: 'none' },
+  'pointer': { get: env => env.pointer, falseValue: 'none' },
+  'hover': { get: env => env.hover, falseValue: 'none' },
+  'any-pointer': { get: env => env.anyPointer, falseValue: 'none' },
+  'any-hover': { get: env => env.anyHover, falseValue: 'none' },
+  'scan': { get: env => env.scan },
+  'update': { get: env => env.update, falseValue: 'none' },
+  'overflow-block': { get: env => env.overflowBlock, falseValue: 'none' },
+  'overflow-inline': { get: env => env.overflowInline, falseValue: 'none' },
+  'scripting': { get: env => env.scripting, falseValue: 'none' },
+  'environment-blending': { get: env => env.environmentBlending },
+  'nav-controls': { get: env => env.navControls, falseValue: 'none' },
+  'navigation-controls': { get: env => env.navControls, falseValue: 'none' },
+  'resizable': { get: env => (env.resizable !== false ? 'true' : 'false'), falseValue: 'false' },
+};
+
 function evaluateBooleanFeature(baseName: string, env: MediaEnvironment): boolean {
   const num = getActualNumeric(baseName, env);
   if (num !== null) {
@@ -890,64 +925,15 @@ function evaluateBooleanFeature(baseName: string, env: MediaEnvironment): boolea
     if (baseName === 'device-aspect-ratio') return env.deviceAspectRatio[0] > 0 && env.deviceAspectRatio[1] > 0;
     return num > 0;
   }
-  switch (baseName) {
-    case 'hover': return env.hover !== 'none';
-    case 'pointer': return env.pointer !== 'none';
-    case 'any-hover': return env.anyHover !== 'none';
-    case 'any-pointer': return env.anyPointer !== 'none';
-    case 'prefers-contrast': return env.prefersContrast !== 'no-preference';
-    case 'prefers-reduced-motion': return env.prefersReducedMotion !== 'no-preference';
-    case 'prefers-reduced-transparency': return env.prefersReducedTransparency !== 'no-preference';
-    case 'prefers-reduced-data': return env.prefersReducedData !== 'no-preference';
-    case 'forced-colors': return env.forcedColors !== 'none';
-    case 'inverted-colors': return env.invertedColors !== 'none';
-    case 'scripting': return env.scripting !== 'none';
-    case 'update': return env.update !== 'none';
-    case 'color-gamut': return (env.colorGamut as string) !== 'none';
-    case 'video-color-gamut': return (env.videoColorGamut as string) !== 'none';
-    case 'dynamic-range': return Boolean(env.dynamicRange);
-    case 'video-dynamic-range': return Boolean(env.videoDynamicRange);
-    case 'overflow-block': return env.overflowBlock !== 'none';
-    case 'overflow-inline': return env.overflowInline !== 'none';
-    case 'nav-controls':
-    case 'navigation-controls':
-      return env.navControls !== 'none';
-    case 'resizable':
-      return env.resizable !== false;
-    default:
-      return true;
-  }
+  const spec = DISCRETE_FEATURES[baseName];
+  if (!spec || spec.falseValue === undefined) return true;
+  const val = spec.get(env);
+  return spec.falseValue === '' ? Boolean(val) : val !== spec.falseValue;
 }
 
 function getEnvDiscreteIdent(baseName: string, env: MediaEnvironment): string | null {
-  switch (baseName) {
-    case 'orientation': return env.width > env.height ? 'landscape' : 'portrait';
-    case 'display-mode': return env.displayMode;
-    case 'display-state': return env.displayState;
-    case 'prefers-color-scheme': return env.prefersColorScheme;
-    case 'prefers-contrast': return env.prefersContrast;
-    case 'prefers-reduced-motion': return env.prefersReducedMotion;
-    case 'prefers-reduced-transparency': return env.prefersReducedTransparency;
-    case 'prefers-reduced-data': return env.prefersReducedData;
-    case 'forced-colors': return env.forcedColors;
-    case 'inverted-colors': return env.invertedColors;
-    case 'dynamic-range': return env.dynamicRange;
-    case 'video-dynamic-range': return env.videoDynamicRange;
-    case 'pointer': return env.pointer;
-    case 'hover': return env.hover;
-    case 'any-pointer': return env.anyPointer;
-    case 'any-hover': return env.anyHover;
-    case 'scan': return env.scan;
-    case 'update': return env.update;
-    case 'overflow-block': return env.overflowBlock;
-    case 'overflow-inline': return env.overflowInline;
-    case 'scripting': return env.scripting;
-    case 'environment-blending': return env.environmentBlending;
-    case 'nav-controls':
-    case 'navigation-controls': return env.navControls;
-    case 'resizable': return env.resizable !== false ? 'true' : 'false';
-    default: return null;
-  }
+  const spec = DISCRETE_FEATURES[baseName];
+  return spec ? spec.get(env) : null;
 }
 
 export function evaluateMediaFeature(feature: MediaFeature, env: MediaEnvironment): EvalResult {
