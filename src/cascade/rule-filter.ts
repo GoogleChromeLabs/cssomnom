@@ -34,13 +34,12 @@ import { CSSAtRule } from '../rules/at-rules.ts';
 import { supports } from '../css-namespace.ts';
 import { tokenize } from '../tokenizer.ts';
 import { resolveNestedSelector } from '../nesting.ts';
-import { parseStyleSheet } from '../parser.ts';
+import { parseStyleSheet, parseComponentValues, parseRuleInScopeBlock, parseStyleAttribute } from '../parser.ts';
 import { MediaParser } from '../MediaParser.ts';
 import { SelectorParser } from '../SelectorParser.ts';
 import { serialize, serializeSelectorList } from '../serializer.ts';
 import { matches, isElement } from '../matcher.ts';
 import type { DOMElement } from '../matcher.ts';
-import { parseComponentValues, parseRuleInScopeBlock, parseStyleAttribute } from '../parser.ts';
 import { SVG_PRESENTATION_ATTRIBUTES } from '../data/gen/cascade-data.ts';
 import type { CSSRuleList } from '../rules/collections.ts';
 import type {
@@ -60,6 +59,56 @@ function getEffectiveParent(node: unknown): unknown {
   return n.parentElement || (n.parentNode && n.parentNode.host) || n.host || null;
 }
 
+interface SheetContainerLike {
+  host?: { isConnected?: boolean };
+  documentElement?: unknown;
+  styleSheets?: ArrayLike<CSSStyleSheet>;
+  adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
+  querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
+}
+
+interface SheetLike {
+  disabled?: boolean;
+  title?: string | null;
+  textContent?: string;
+  sheet?: unknown;
+  cssRules?: ArrayLike<CSSRule>;
+  ownerNode?: { isConnected?: boolean; getAttribute?: (attr: string) => string | null };
+  isConnected?: boolean;
+  getAttribute?: (attr: string) => string | null;
+}
+
+function getSheetAttr(sheet: unknown, attr: 'title' | 'rel'): string | null {
+  const s = sheet as SheetLike;
+  if (attr === 'title' && s.title) return s.title;
+  const fromOwner = s.ownerNode?.getAttribute?.(attr);
+  if (fromOwner) return fromOwner;
+  return s.getAttribute?.(attr) ?? null;
+}
+
+function isInsideTemplate(el: unknown): boolean {
+  let curr: unknown = el;
+  while (curr && typeof curr === 'object') {
+    const c = curr as { tagName?: string; nodeName?: string; parentElement?: unknown; parentNode?: unknown };
+    if ((c.tagName || c.nodeName) === 'TEMPLATE') return true;
+    curr = c.parentElement || c.parentNode;
+  }
+  return false;
+}
+
+function collectRulesMatchingKeyword(rule: CSSRule, keyword: '::part(' | '::slotted(', out: CSSRule[]): void {
+  if (rule instanceof CSSStyleRule) {
+    if (rule.selectorText.includes(keyword)) out.push(rule);
+  } else if (rule instanceof CSSGroupingRule) {
+    const children = rule.cssRules;
+    for (let i = 0; i < children.length; i++) {
+      collectRulesMatchingKeyword(children[i], keyword, out);
+    }
+  } else if (rule instanceof CSSAtRule && rule.prelude) {
+    if (serialize(rule.prelude).includes(keyword)) out.push(rule);
+  }
+}
+
 /**
  * Harvests all applicable stylesheets and rule lists for an element across document and shadow contexts.
  * css-cascade-5 #filtering
@@ -73,22 +122,12 @@ export function collectStyleSheetsAndRules(
   }
 
   const elObj = element as {
-    ownerDocument?: {
-      documentElement?: unknown;
-      styleSheets?: ArrayLike<CSSStyleSheet>;
-      adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
-      querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
-    };
+    ownerDocument?: SheetContainerLike;
     nodeType?: number;
     isConnected?: boolean;
-    parentNode?: unknown;
-    parentElement?: unknown;
+    parentElement?: { shadowRoot?: SheetContainerLike } | null;
     getRootNode?: (options?: { composed?: boolean }) => unknown;
-    shadowRoot?: {
-      adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
-      styleSheets?: ArrayLike<CSSStyleSheet>;
-      querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
-    };
+    shadowRoot?: SheetContainerLike;
   };
 
   // css-cascade-5 #value-stages: disconnected elements do not participate in cascade
@@ -105,31 +144,6 @@ export function collectStyleSheetsAndRules(
     ? elObj.getRootNode()
     : (elObj.ownerDocument ?? (elObj.nodeType === 9 ? (elObj as DocumentLike) : null));
 
-  const getSheetTitle = (sheet: unknown): string | null => {
-    const s = sheet as { title?: string | null; ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
-    if (s.title) return s.title;
-    if (s.ownerNode && typeof s.ownerNode.getAttribute === 'function') {
-      const t = s.ownerNode.getAttribute('title');
-      if (t) return t;
-    }
-    if (typeof s.getAttribute === 'function') {
-      const t = s.getAttribute('title');
-      if (t) return t;
-    }
-    return null;
-  };
-
-  const getSheetRel = (sheet: unknown): string | null => {
-    const s = sheet as { ownerNode?: { getAttribute?: (attr: string) => string | null }; getAttribute?: (attr: string) => string | null };
-    if (s.ownerNode && typeof s.ownerNode.getAttribute === 'function') {
-      return s.ownerNode.getAttribute('rel');
-    }
-    if (typeof s.getAttribute === 'function') {
-      return s.getAttribute('rel');
-    }
-    return null;
-  };
-
   let preferredTitle: string | null = null;
   let preferredTitleFound = false;
 
@@ -137,9 +151,8 @@ export function collectStyleSheetsAndRules(
     if (preferredTitleFound) return;
     for (let i = 0; i < sheetsOrTags.length; i++) {
       const item = sheetsOrTags[i];
-      const title = getSheetTitle(item);
-      const rel = getSheetRel(item) || '';
-      const isAlternate = rel.toLowerCase().includes('alternate');
+      const title = getSheetAttr(item, 'title');
+      const isAlternate = (getSheetAttr(item, 'rel') || '').toLowerCase().includes('alternate');
       if (title && !isAlternate) {
         preferredTitle = title;
         preferredTitleFound = true;
@@ -152,244 +165,131 @@ export function collectStyleSheetsAndRules(
   // cssom-1 #the-linkstyle-interface
   const isSheetEnabledForSet = (sheet: unknown): boolean => {
     if (!sheet || typeof sheet !== 'object') return false;
-    const title = getSheetTitle(sheet);
-    const rel = getSheetRel(sheet) || '';
-    const isAlternate = rel.toLowerCase().includes('alternate');
-    if (!title && !isAlternate) {
-      return true;
-    }
-    if (preferredTitleFound && preferredTitle !== null) {
-      return title === preferredTitle;
-    }
-    if ((sheet as { ownerNode?: unknown }).ownerNode) {
-      return true;
-    }
+    const title = getSheetAttr(sheet, 'title');
+    const isAlternate = (getSheetAttr(sheet, 'rel') || '').toLowerCase().includes('alternate');
+    if (!title && !isAlternate) return true;
+    if (preferredTitleFound && preferredTitle !== null) return title === preferredTitle;
+    if ((sheet as SheetLike).ownerNode) return true;
     return !isAlternate;
   };
 
-  const isInsideTemplate = (el: unknown): boolean => {
-    let curr: unknown = el;
-    while (curr && typeof curr === 'object') {
-      const tag = (curr as { tagName?: string; nodeName?: string }).tagName || (curr as { nodeName?: string }).nodeName;
-      if (tag === 'TEMPLATE') return true;
-      curr = (curr as { parentElement?: unknown; parentNode?: unknown }).parentElement || (curr as { parentNode?: unknown }).parentNode;
-    }
-    return false;
-  };
-
-  const addSheetRules = (sheet: unknown) => {
+  const emitSheet = (sheet: unknown, checkEnabled: boolean, filterKeyword?: '::part(' | '::slotted(') => {
     if (!sheet) return;
-    const node = ((sheet as { ownerNode?: unknown }).ownerNode || sheet) as { isConnected?: boolean };
-    if (node && typeof node.isConnected === 'boolean' && !node.isConnected) {
+    const s = sheet as SheetLike;
+    if (checkEnabled) {
+      const node = s.ownerNode || s;
+      if (typeof node.isConnected === 'boolean' && !node.isConnected) return;
+      if (isInsideTemplate(node)) return;
+      if (s.disabled || !isSheetEnabledForSet(sheet)) return;
+    } else if (s.disabled) {
       return;
     }
-    if (isInsideTemplate(node)) {
-      return;
-    }
-    const s = sheet as { disabled?: boolean; textContent?: string; sheet?: unknown };
-    if (s.disabled) return;
-    if (!isSheetEnabledForSet(sheet)) return;
-    // Foreign CSSOM (e.g. linkedom's style.sheet) is ignored; its <style> text is re-parsed below.
+
+    // Foreign CSSOM (e.g. linkedom's style.sheet) may throw on modern CSS syntax; fall back to textContent.
     try {
-      if (s.sheet instanceof CSSStyleSheet) {
-        addSheetRules(s.sheet);
+      if (checkEnabled ? s.sheet instanceof CSSStyleSheet : Boolean((s.sheet as SheetLike | undefined)?.cssRules)) {
+        emitSheet(s.sheet, checkEnabled, filterKeyword);
         return;
       }
     } catch {
-      // linkedom style.sheet throws on modern CSS syntax (@layer, nesting)
+      // linkedom fallback
     }
-    if (sheet instanceof CSSStyleSheet) {
-      ruleList.push(...Array.from(sheet.cssRules));
-      return;
+
+    let extracted: CSSRule[] | null = null;
+    if (checkEnabled) {
+      if (sheet instanceof CSSStyleSheet) extracted = Array.from(sheet.cssRules);
+    } else if (s.cssRules && s.cssRules.length !== undefined) {
+      extracted = Array.from(s.cssRules).filter(Boolean);
     }
-    if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
-      const parsed = parseStyleSheet(s.textContent);
-      ruleList.push(...parsed);
-      return;
+    if (!extracted && typeof s.textContent === 'string' && s.textContent.trim() !== '') {
+      extracted = parseStyleSheet(s.textContent);
+    }
+    if (!extracted) return;
+
+    if (filterKeyword) {
+      for (const r of extracted) collectRulesMatchingKeyword(r, filterKeyword, ruleList);
+    } else {
+      ruleList.push(...extracted);
     }
   };
 
-  const collectFilteredRules = (targetRoot: unknown, keyword: '::part(' | '::slotted('): CSSRule[] => {
-    const result: CSSRule[] = [];
-    const tObj = targetRoot as {
-      styleSheets?: ArrayLike<CSSStyleSheet>;
-      adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
-      querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
-    };
+  const harvestRoot = (
+    targetRoot: SheetContainerLike,
+    options: { checkEnabled: boolean; filterKeyword?: '::part(' | '::slotted('; shadowHost?: boolean }
+  ) => {
+    const { checkEnabled, filterKeyword, shadowHost } = options;
     const seenNodes = new Set<unknown>();
+    const hasStyleSheets = Boolean(targetRoot.styleSheets && targetRoot.styleSheets.length > 0);
 
-    const checkAndAddRule = (r: CSSRule) => {
-      if (r instanceof CSSStyleRule) {
-        if (r.selectorText.includes(keyword)) {
-          result.push(r);
-        }
-      } else if (r instanceof CSSGroupingRule) {
-        const children = r.cssRules;
-        for (let i = 0; i < children.length; i++) {
-          checkAndAddRule(children[i]);
-        }
-      } else if (r instanceof CSSAtRule && r.prelude) {
-        if (serialize(r.prelude).includes(keyword)) {
-          result.push(r);
-        }
+    if (hasStyleSheets && targetRoot.styleSheets) {
+      if (checkEnabled && !shadowHost) determinePreferredTitle(targetRoot.styleSheets);
+      for (let i = 0; i < targetRoot.styleSheets.length; i++) {
+        const sheet = targetRoot.styleSheets[i];
+        emitSheet(sheet, checkEnabled, filterKeyword);
+        const ownerNode = (sheet as SheetLike | undefined)?.ownerNode;
+        if (ownerNode) seenNodes.add(ownerNode);
       }
-    };
+    }
 
-    const processSheet = (sheet: unknown) => {
-      if (!sheet) return;
-      const s = sheet as { disabled?: boolean; cssRules?: ArrayLike<CSSRule>; textContent?: string; sheet?: unknown };
-      if (s.disabled) return;
-      try {
-        if (s.sheet && (s.sheet as { cssRules?: ArrayLike<CSSRule> }).cssRules) {
-          processSheet(s.sheet);
-          return;
-        }
-      } catch {
-        // linkedom fallback
-      }
-      if (s.cssRules && s.cssRules.length !== undefined) {
-        for (let j = 0; j < s.cssRules.length; j++) {
-          const r = s.cssRules[j];
-          if (r) checkAndAddRule(r as CSSRule);
-        }
-        return;
-      }
-      if (typeof s.textContent === 'string' && s.textContent.trim() !== '') {
-        const parsed = parseStyleSheet(s.textContent);
-        for (const r of parsed) {
-          checkAndAddRule(r);
-        }
-        return;
-      }
-    };
-
-    if ('styleSheets' in tObj && tObj.styleSheets && tObj.styleSheets.length > 0) {
-      for (let i = 0; i < tObj.styleSheets.length; i++) {
-        const sheet = tObj.styleSheets[i];
-        processSheet(sheet);
-        if (sheet && (sheet as { ownerNode?: unknown }).ownerNode) {
-          seenNodes.add((sheet as { ownerNode: unknown }).ownerNode);
+    if (typeof targetRoot.querySelectorAll === 'function' && (!shadowHost || !hasStyleSheets)) {
+      const styleTags = shadowHost
+        ? Array.from(targetRoot.querySelectorAll('style'))
+        : Array.from(targetRoot.querySelectorAll('style')).filter(s => !isInsideTemplate(s));
+      if (checkEnabled && !shadowHost) determinePreferredTitle(styleTags);
+      for (const tag of styleTags) {
+        if (seenNodes.has(tag)) continue;
+        if (shadowHost && !tag.sheet) {
+          if (tag.textContent) ruleList.push(...parseStyleSheet(tag.textContent));
+        } else {
+          emitSheet(shadowHost ? tag.sheet : tag, checkEnabled, filterKeyword);
         }
       }
     }
-    if (typeof tObj.querySelectorAll === 'function') {
-      const styleTags = Array.from(tObj.querySelectorAll('style')).filter(s => !isInsideTemplate(s));
-      for (let i = 0; i < styleTags.length; i++) {
-        const tag = styleTags[i];
-        if (!seenNodes.has(tag)) {
-          processSheet(tag);
-        }
+
+    if (targetRoot.adoptedStyleSheets && targetRoot.adoptedStyleSheets.length > 0) {
+      for (let i = 0; i < targetRoot.adoptedStyleSheets.length; i++) {
+        emitSheet(targetRoot.adoptedStyleSheets[i], checkEnabled, filterKeyword);
       }
     }
-    if (tObj.adoptedStyleSheets && tObj.adoptedStyleSheets.length > 0) {
-      for (let i = 0; i < tObj.adoptedStyleSheets.length; i++) {
-        processSheet(tObj.adoptedStyleSheets[i]);
-      }
-    }
-    return result;
   };
 
   if (root && typeof root === 'object') {
-    const rootObj = root as {
-      host?: { isConnected?: boolean };
-      styleSheets?: ArrayLike<CSSStyleSheet>;
-      adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
-      querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
-    };
-
-    const addRootSheets = (targetRoot: unknown) => {
-      if (!targetRoot || typeof targetRoot !== 'object') return;
-      const tObj = targetRoot as {
-        styleSheets?: ArrayLike<CSSStyleSheet>;
-        adoptedStyleSheets?: ArrayLike<CSSStyleSheet>;
-        querySelectorAll?(s: string): ArrayLike<{ textContent?: string; sheet?: CSSStyleSheet }>;
-      };
-      const seenNodes = new Set<unknown>();
-      if ('styleSheets' in tObj && tObj.styleSheets && tObj.styleSheets.length > 0) {
-        determinePreferredTitle(tObj.styleSheets);
-        for (let i = 0; i < tObj.styleSheets.length; i++) {
-          const sheet = tObj.styleSheets[i];
-          addSheetRules(sheet);
-          if (sheet && (sheet as { ownerNode?: unknown }).ownerNode) {
-            seenNodes.add((sheet as { ownerNode: unknown }).ownerNode);
-          }
-        }
-      }
-      if (typeof tObj.querySelectorAll === 'function') {
-        const styleTags = Array.from(tObj.querySelectorAll('style')).filter(s => !isInsideTemplate(s));
-        determinePreferredTitle(styleTags);
-        for (let i = 0; i < styleTags.length; i++) {
-          const tag = styleTags[i];
-          if (!seenNodes.has(tag)) {
-            addSheetRules(tag);
-          }
-        }
-      }
-      if (tObj.adoptedStyleSheets && tObj.adoptedStyleSheets.length > 0) {
-        for (let i = 0; i < tObj.adoptedStyleSheets.length; i++) {
-          addSheetRules(tObj.adoptedStyleSheets[i]);
-        }
-      }
-    };
-
+    const rootObj = root as SheetContainerLike;
     // If root is a ShadowRoot whose host is disconnected
     if (rootObj.host && rootObj.host.isConnected === false) {
       return null;
     }
 
-    addRootSheets(root);
+    harvestRoot(rootObj, { checkEnabled: true });
 
     // If element is inside a ShadowRoot, also collect ::part() rules from document
     if (rootObj.host && elObj.ownerDocument) {
-      const partRules = collectFilteredRules(elObj.ownerDocument, '::part(');
-      ruleList.push(...partRules);
+      harvestRoot(elObj.ownerDocument, { checkEnabled: false, filterKeyword: '::part(' });
     }
   }
 
   // 2. If element is slotted into a shadow host, also collect ::slotted() rules from that host's shadowRoot
-  const parent = (element as { parentElement?: unknown }).parentElement as { shadowRoot?: unknown } | null;
-  if (parent && parent.shadowRoot) {
-    const slottedRules = collectFilteredRules(parent.shadowRoot, '::slotted(');
-    ruleList.push(...slottedRules);
+  if (elObj.parentElement?.shadowRoot) {
+    harvestRoot(elObj.parentElement.shadowRoot, { checkEnabled: false, filterKeyword: '::slotted(' });
   }
 
   // 3. If element is a shadow host (has shadowRoot), also include :host rules from shadowRoot
   if (elObj.shadowRoot) {
-    const sr = elObj.shadowRoot;
-    if ('styleSheets' in sr && sr.styleSheets && sr.styleSheets.length > 0) {
-      for (let i = 0; i < sr.styleSheets.length; i++) {
-        addSheetRules(sr.styleSheets[i]);
-      }
-    } else if (typeof sr.querySelectorAll === 'function') {
-      const styleTags = sr.querySelectorAll('style');
-      for (let i = 0; i < styleTags.length; i++) {
-        const styleEl = styleTags[i];
-        if (styleEl.sheet) {
-          addSheetRules(styleEl.sheet);
-        } else {
-          const text = styleEl.textContent || '';
-          if (text) {
-            const parsed = parseStyleSheet(text);
-            ruleList.push(...parsed);
-          }
-        }
-      }
-    }
-    if (sr.adoptedStyleSheets && sr.adoptedStyleSheets.length > 0) {
-      for (let i = 0; i < sr.adoptedStyleSheets.length; i++) {
-        addSheetRules(sr.adoptedStyleSheets[i]);
-      }
-    }
+    harvestRoot(elObj.shadowRoot, { checkEnabled: true, shadowHost: true });
   }
 
   return ruleList;
 }
 
-function splitSelectorList(selectorText: string): string[] {
-  const list = new SelectorParser(
+function parseSelectorList(selectorText: string) {
+  return new SelectorParser(
     parseComponentValues(tokenize(selectorText)),
     { allowRelative: true, forgiving: true }
   ).parse();
+}
+
+function splitSelectorList(selectorText: string): string[] {
+  const list = parseSelectorList(selectorText);
   const result = list.selectors
     .map(s => (s.type === 'invalid-selector' ? serialize(s.tokens).trim() : serializeSelectorList({ type: 'selector-list', selectors: [s] })))
     .filter(Boolean);
@@ -397,18 +297,10 @@ function splitSelectorList(selectorText: string): string[] {
 }
 
 function normalizeScopeEndSelector(rawEnd: string): string {
-  const parts = splitSelectorList(rawEnd);
-  return parts.map(part => {
-    let p = part.trim();
-    if (p.includes('&')) {
-      p = p.replace(/&/g, ':where(:scope)');
-    } else if (!p.includes(':scope')) {
-      if (/^[>+~]/.test(p)) {
-        p = `:where(:scope) ${p}`;
-      } else {
-        p = `:where(:scope) ${p}`;
-      }
-    }
+  return splitSelectorList(rawEnd).map(part => {
+    const p = part.trim();
+    if (p.includes('&')) return p.replace(/&/g, ':where(:scope)');
+    if (!p.includes(':scope')) return `:where(:scope) ${p}`;
     return p;
   }).join(', ');
 }
@@ -476,6 +368,15 @@ interface SelectorListMatchResult {
   matchingTreeScope?: 'document' | 'part' | 'slotted' | 'shadow';
 }
 
+function matchesInScope(domEl: DOMElement, sel: string, scopeNode: DOMElement | undefined): boolean {
+  if (!scopeNode) return matches(domEl, sel, scopeNode);
+  const trimmed = sel.trim();
+  if (/^([>+~]|\s)/.test(trimmed) || /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed)) {
+    return matches(domEl, sel, scopeNode);
+  }
+  return matches(domEl, `:where(:scope) ${trimmed}`, scopeNode);
+}
+
 function matchSelectorList(
   selectors: string[],
   element: ElementLike,
@@ -508,18 +409,7 @@ function matchSelectorList(
         }
         if (isMatch) {
           selectorForMatching = sel.slice(0, match.index).trim() || ':scope';
-          if (scopeNode) {
-            const trimmed = selectorForMatching.trim();
-            const startsWithComb = /^([>+~]|\s)/.test(trimmed);
-            const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
-            if (startsWithComb || containsScopeOrNesting) {
-              matchesThisSel = matches(domEl, selectorForMatching, scopeNode);
-            } else {
-              matchesThisSel = matches(domEl, `:where(:scope) ${selectorForMatching}`, scopeNode);
-            }
-          } else {
-            matchesThisSel = matches(domEl, selectorForMatching, scopeNode);
-          }
+          matchesThisSel = matchesInScope(domEl, selectorForMatching, scopeNode);
         }
       }
     } else {
@@ -561,18 +451,7 @@ function matchSelectorList(
       } else {
         const hasPseudo = /::[a-zA-Z-]+(?:\([^)]*\))?$/.test(sel) || /:(before|after|first-line|first-letter)\b/.test(sel);
         if (!hasPseudo) {
-          if (scopeNode) {
-            const trimmed = sel.trim();
-            const startsWithComb = /^([>+~]|\s)/.test(trimmed);
-            const containsScopeOrNesting = /(^|[^a-zA-Z0-9_-])(:scope|&)([^a-zA-Z0-9_-]|$)/.test(trimmed);
-            if (startsWithComb || containsScopeOrNesting) {
-              matchesThisSel = matches(domEl, sel, scopeNode);
-            } else {
-              matchesThisSel = matches(domEl, `:where(:scope) ${sel}`, scopeNode);
-            }
-          } else {
-            matchesThisSel = matches(domEl, sel, scopeNode);
-          }
+          matchesThisSel = matchesInScope(domEl, sel, scopeNode);
           if (matchesThisSel) {
             const rootNode = getElementRootNode(domEl);
             if (rootNode && (rootNode as { host?: unknown }).host) {
@@ -982,10 +861,7 @@ export { resolveNestedSelector } from '../nesting.ts';
  * selectors-4 #specificity-rules
  */
 export function getMatchingSpecificity(element: ElementLike, selectorText: string, scope?: DOMElement): Specificity {
-  const tokens = tokenize(selectorText);
-  const componentValues = parseComponentValues(tokens);
-  const selectorParser = new SelectorParser(componentValues, { allowRelative: true, forgiving: true });
-  const list = selectorParser.parse();
+  const list = parseSelectorList(selectorText);
 
   let maxSpec: Specificity = [0, 0, 0];
 
